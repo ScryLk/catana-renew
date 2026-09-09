@@ -507,3 +507,168 @@ class BlockedUser(models.Model):
 
     def __str__(self):
         return f"{self.blocker.username} blocked {self.blocked.username}"
+
+
+# ==============================================================================
+# CATANA 2.0 - MODELOS DE ASSINATURA, LIMITES E CONTABILIZACAO DE TOKENS
+# ==============================================================================
+
+class SubscriptionPlan(models.Model):
+    """
+    Plano de assinatura e limites operacionais de IA e catalogos
+    """
+    name = models.CharField(max_length=100)
+    tier = models.CharField(max_length=50, unique=True, default='free')
+    monthly_token_quota = models.BigIntegerField(default=100000)
+    max_active_catalogs = models.PositiveIntegerField(default=5)
+    rate_limit_rpm = models.PositiveIntegerField(default=15)
+    can_use_council = models.BooleanField(default=False)
+    can_export_pdf = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'subscription_plans'
+
+    def __str__(self):
+        return f"{self.name} ({self.tier})"
+
+
+class OrganizationQuota(models.Model):
+    """
+    Cotas e consumo mensal por organizacao
+    """
+    organization = models.OneToOneField(Organization, on_delete=models.CASCADE, related_name='quota')
+    plan = models.ForeignKey(SubscriptionPlan, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_quotas')
+    tokens_used_this_month = models.BigIntegerField(default=0)
+    billing_cycle_anchor = models.DateField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'organization_quotas'
+
+    def __str__(self):
+        return f"Quota: {self.organization.name} ({self.tokens_used_this_month} tokens)"
+
+
+class TokenUsageLog(models.Model):
+    """
+    Auditoria e registro granular de consumo de tokens por requisicao de IA
+    """
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, null=True, blank=True, related_name='token_logs')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='token_logs')
+    catalog = models.ForeignKey('StudioCatalog', on_delete=models.SET_NULL, null=True, blank=True, related_name='token_logs')
+    agent_role = models.CharField(max_length=50)
+    prompt_tokens = models.IntegerField(default=0)
+    completion_tokens = models.IntegerField(default=0)
+    total_tokens = models.IntegerField(default=0)
+    model_name = models.CharField(max_length=100, default='gemini-2.0-flash')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'token_usage_logs'
+        indexes = [
+            models.Index(fields=['organization', 'created_at']),
+            models.Index(fields=['agent_role']),
+        ]
+
+    def __str__(self):
+        return f"[{self.agent_role}] {self.total_tokens} tokens ({self.created_at})"
+
+
+# ==============================================================================
+# CATANA 2.0 - STUDIO MULTI-AGENTES E PAGINAS DUPLAS (SPREADS)
+# ==============================================================================
+
+class StudioCatalog(models.Model):
+    """
+    Catalogo interativo do Studio com suporte a spreads e geracao por IA
+    """
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    brand_name = models.CharField(max_length=255, blank=True, null=True)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, null=True, blank=True, related_name='studio_catalogs')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_studio_catalogs')
+    style_preset = models.CharField(max_length=50, default='editorial_clean')
+    primary_color = models.CharField(max_length=30, default='#111827')
+    secondary_color = models.CharField(max_length=30, default='#6366f1')
+    accent_color = models.CharField(max_length=30, default='#f59e0b')
+    font_family = models.CharField(max_length=100, default='Inter')
+    page_width = models.PositiveIntegerField(default=794)
+    page_height = models.PositiveIntegerField(default=1123)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'studio_catalogs'
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return self.title
+
+
+class CatalogSpread(models.Model):
+    """
+    Par de paginas (spread duplo A4: 794x1123 por pagina) do catalogo
+    """
+    catalog = models.ForeignKey(StudioCatalog, on_delete=models.CASCADE, related_name='spreads')
+    spread_index = models.PositiveIntegerField(default=0)
+    title = models.CharField(max_length=255, blank=True, null=True)
+    left_page_elements = models.JSONField(default=list, blank=True)
+    right_page_elements = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'catalog_spreads'
+        unique_together = ('catalog', 'spread_index')
+        ordering = ['spread_index']
+
+    def __str__(self):
+        return f"{self.catalog.title} - Spread {self.spread_index}"
+
+
+class ChatThread(models.Model):
+    """
+    Sessao de conversa com os agentes de IA
+    """
+    catalog = models.ForeignKey(StudioCatalog, on_delete=models.CASCADE, null=True, blank=True, related_name='threads')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='studio_threads')
+    title = models.CharField(max_length=255, default='Nova Sessao')
+    active_agent = models.CharField(max_length=50, default='orchestrator')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'studio_chat_threads'
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"Thread: {self.title} ({self.active_agent})"
+
+
+class ChatMessage(models.Model):
+    """
+    Mensagem individual no chat com suporte a metadados de anexos e sugestoes
+    """
+    SENDER_CHOICES = [
+        ('user', 'User'),
+        ('agent', 'Agent'),
+        ('system', 'System'),
+    ]
+
+    thread = models.ForeignKey(ChatThread, on_delete=models.CASCADE, related_name='messages')
+    sender_type = models.CharField(max_length=20, choices=SENDER_CHOICES)
+    agent_role = models.CharField(max_length=50, blank=True, default='')
+    content = models.TextField()
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'studio_chat_messages'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"[{self.sender_type}:{self.agent_role}] {self.content[:40]}"

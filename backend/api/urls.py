@@ -19,6 +19,15 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
+from .views_studio import (
+    StudioAgentsListView,
+    StudioQuotaStatusView,
+    StudioChatStreamView,
+    StudioCatalogListView,
+    StudioCatalogDetailView,
+    StudioSpreadManageView,
+    StudioThreadMessagesView,
+)
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
@@ -90,6 +99,17 @@ urlpatterns = [
     path('public-catalogs/<int:pk>/like', public_catalog_like, name='public_catalog_like'),
     path('public-catalogs/<int:pk>/view', public_catalog_view, name='public_catalog_view'),
     path('public-catalogs/<int:pk>/share', public_catalog_share, name='public_catalog_share'),
+
+    # ============================================
+    # CATANA 2.0 - STUDIO MULTI-AGENTES E SPREADS
+    # ============================================
+    path('v2/studio/agents/', StudioAgentsListView.as_view(), name='studio_agents_list'),
+    path('v2/studio/quotas/', StudioQuotaStatusView.as_view(), name='studio_quota_status'),
+    path('v2/studio/chat/stream/', StudioChatStreamView.as_view(), name='studio_chat_stream'),
+    path('v2/studio/catalogs/', StudioCatalogListView.as_view(), name='studio_catalog_list'),
+    path('v2/studio/catalogs/<int:pk>/', StudioCatalogDetailView.as_view(), name='studio_catalog_detail'),
+    path('v2/studio/catalogs/<int:catalog_id>/spreads/', StudioSpreadManageView.as_view(), name='studio_spread_manage'),
+    path('v2/studio/threads/<int:thread_id>/messages/', StudioThreadMessagesView.as_view(), name='studio_thread_messages'),
 
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
