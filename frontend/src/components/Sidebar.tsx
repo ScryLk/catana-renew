@@ -67,12 +67,17 @@ export const Sidebar: FC = () => {
   return (
     <aside className="w-16 h-screen bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col fixed left-0 top-0 z-50">
       {/* Logo */}
-      <div className="flex items-center justify-center h-20 border-b border-zinc-200 dark:border-zinc-800">
-        <Link to="/" className="flex items-center justify-center">
+      <div className="flex items-center justify-center h-20 border-b border-zinc-200 dark:border-zinc-800 px-2">
+        <Link to="/" className="flex items-center justify-center w-full">
           <img
-            src="/logo/logo.png"
+            src="/logo/catana_logo_dark.png"
             alt="Catana Logo"
-            className="w-10 h-10 object-contain cursor-pointer hover:opacity-80 transition-opacity"
+            className="w-11 h-auto object-contain dark:hidden cursor-pointer hover:opacity-80 transition-opacity"
+          />
+          <img
+            src="/logo/catana_logo_white.png"
+            alt="Catana Logo"
+            className="w-11 h-auto object-contain hidden dark:block cursor-pointer hover:opacity-80 transition-opacity"
           />
         </Link>
       </div>

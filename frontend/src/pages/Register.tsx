@@ -133,9 +133,14 @@ export const Register = () => {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <img
-                src="/logo/logo.png"
+                src="/logo/catana_logo_dark.png"
                 alt="Catana"
-                className="w-8 h-8 object-contain dark:brightness-0 dark:invert"
+                className="h-7 w-auto object-contain dark:hidden"
+              />
+              <img
+                src="/logo/catana_logo_white.png"
+                alt="Catana"
+                className="h-7 w-auto object-contain hidden dark:block"
               />
             </div>
             <div className="flex gap-1">

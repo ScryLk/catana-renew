@@ -43,9 +43,14 @@ export const Login = () => {
         <div className="w-full lg:w-5/12 p-8 sm:p-12 flex flex-col justify-center relative">
           <div className="mb-6">
             <img
-              src="/logo/logo.png"
+              src="/logo/catana_logo_dark.png"
               alt="Catana"
-              className="w-10 h-10 object-contain dark:brightness-0 dark:invert"
+              className="h-8 w-auto object-contain dark:hidden"
+            />
+            <img
+              src="/logo/catana_logo_white.png"
+              alt="Catana"
+              className="h-8 w-auto object-contain hidden dark:block"
             />
           </div>
 
