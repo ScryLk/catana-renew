@@ -7,8 +7,10 @@ import {
   FileText,
   FileImage,
   File,
+  FileUp,
 } from 'lucide-react';
 import { useStudioStore, ChatAttachment } from '../../store/studioStore';
+import { ImportCatalogModal } from './ImportCatalogModal';
 import { toast } from 'sonner';
 
 const PROMPT_SUGGESTIONS = [
@@ -23,6 +25,7 @@ export const StudioHomeChat: React.FC = () => {
   const [prompt, setPrompt] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -297,6 +300,21 @@ export const StudioHomeChat: React.FC = () => {
                     {attachments.length > 0 ? ` (${attachments.length})` : ''}
                   </span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsImportModalOpen(true)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    isDark
+                      ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/80'
+                      : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
+                  }`}
+                  title="Importar catálogo existente para torná-lo 100% editável"
+                  aria-label="Importar catálogo"
+                >
+                  <FileUp className="size-3.5" />
+                  <span>Importar Catálogo</span>
+                </button>
               </div>
 
               <button
@@ -355,6 +373,12 @@ export const StudioHomeChat: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de Importacao Inteligente de Catalogos */}
+      <ImportCatalogModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+      />
     </div>
   );
 };

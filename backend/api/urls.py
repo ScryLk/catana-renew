@@ -34,6 +34,8 @@ from .views_studio import (
     StudioThreadMessagesView,
     StudioTemplateListView,
     StudioTemplateSaveFromSpreadView,
+    StudioCatalogImportDocumentView,
+    StudioMediaRemoveBackgroundView,
 )
 
 router = DefaultRouter()
@@ -124,6 +126,8 @@ urlpatterns = [
     path('v2/studio/threads/<int:thread_id>/messages/', StudioThreadMessagesView.as_view(), name='studio_thread_messages'),
     path('v2/studio/templates/', StudioTemplateListView.as_view(), name='studio_templates_list'),
     path('v2/studio/templates/save-from-spread/', StudioTemplateSaveFromSpreadView.as_view(), name='studio_templates_save_from_spread'),
+    path('v2/studio/catalogs/import-document/', StudioCatalogImportDocumentView.as_view(), name='studio_catalog_import_document'),
+    path('v2/studio/media/remove-background/', StudioMediaRemoveBackgroundView.as_view(), name='studio_media_remove_background'),
 
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

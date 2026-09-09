@@ -1,7 +1,10 @@
+import io
 import json
+from PIL import Image
 from django.test import TestCase
 from django.urls import reverse
 from django.core.management import call_command
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 from rest_framework import status
 from django.contrib.auth import get_user_model
@@ -252,5 +255,82 @@ class StudioBackendTests(TestCase):
         self.assertEqual(created_tpl.title, "Meu Template Customizado Lookbook")
         self.assertFalse(created_tpl.is_system)
         self.assertTrue(len(created_tpl.embedding) > 0)
+
+    def test_background_removal_alpha_channel(self):
+        """Verifica se o servico de remocao de fundo produz canal alfa transparente"""
+        from api.services.background_removal import BackgroundRemovalService
+
+        # Cria imagem sintetica de 80x80 com fundo branco e circulo central vermelho
+        img = Image.new("RGB", (80, 80), color=(255, 255, 255))
+        for x in range(30, 50):
+            for y in range(30, 50):
+                img.putpixel((x, y), (220, 20, 60))
+
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        image_bytes = buf.getvalue()
+
+        nobg_bytes = BackgroundRemovalService.remove_background(image_bytes)
+        out_img = Image.open(io.BytesIO(nobg_bytes))
+
+        self.assertEqual(out_img.mode, "RGBA")
+        # O canto (0, 0) que era branco deve ser transparente (alfa == 0)
+        self.assertEqual(out_img.getpixel((0, 0))[3], 0)
+        # O centro (40, 40) deve permanecer opaco (alfa == 255)
+        self.assertEqual(out_img.getpixel((40, 40))[3], 255)
+
+    def test_document_import_pdf_reconstruction(self):
+        """Verifica a rota de importacao e engenharia reversa de documento"""
+        url = reverse('studio_catalog_import_document')
+
+        # Cria um PDF sintetico com 2 paginas usando pypdf
+        import pypdf
+        writer = pypdf.PdfWriter()
+        writer.add_blank_page(width=794, height=1123)
+        writer.add_blank_page(width=794, height=1123)
+
+        pdf_buf = io.BytesIO()
+        writer.write(pdf_buf)
+        pdf_bytes = pdf_buf.getvalue()
+
+        upload = SimpleUploadedFile("catalogo_fornecedor.pdf", pdf_bytes, content_type="application/pdf")
+
+        response = self.client.post(
+            url,
+            {
+                "file": upload,
+                "title": "Colecao Fornecedor 2026",
+                "brand_name": "Fornecedor Teste",
+                "remove_background": "false",
+                "mode": "redesign",
+            },
+            format="multipart"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn("catalog_id", response.data)
+        self.assertGreaterEqual(response.data["total_pages"], 2)
+
+        # Verifica persistencia no banco
+        catalog = StudioCatalog.objects.get(id=response.data["catalog_id"])
+        self.assertEqual(catalog.title, "Colecao Fornecedor 2026")
+        self.assertGreaterEqual(catalog.spreads.count(), 1)
+
+    def test_remove_background_api_endpoint(self):
+        """Verifica a rota POST /api/v2/studio/media/remove-background/ com upload de arquivo"""
+        url = reverse('studio_media_remove_background')
+
+        img = Image.new("RGB", (60, 60), color=(255, 255, 255))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG")
+        img_bytes = buf.getvalue()
+
+        upload = SimpleUploadedFile("sapato.jpg", img_bytes, content_type="image/jpeg")
+
+        response = self.client.post(url, {"image": upload}, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("processed_url", response.data)
+        self.assertTrue(response.data["has_transparency"])
+
 
 

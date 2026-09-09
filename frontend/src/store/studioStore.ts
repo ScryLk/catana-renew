@@ -10,7 +10,7 @@ import {
   STUDIO_PALETTE_PRESETS,
 } from '../data/aureaCatalog.mock';
 
-const API_BASE_URL = (import.meta.env && import.meta.env.VITE_API_BASE_URL) || 'http://localhost:8000';
+export const API_BASE_URL = (import.meta.env && import.meta.env.VITE_API_BASE_URL) || 'http://localhost:8000';
 let saveTimeout: any = null;
 
 export type StudioMode = 'director' | 'commercial' | 'copywriter' | string;
@@ -234,6 +234,8 @@ export interface StudioState {
   openAccountSettings: () => void;
   closeAccountSettings: () => void;
   activeCatalogId: string;
+  setActiveCatalogId: (id: string) => void;
+  setHasStartedSession: (started: boolean) => void;
   loadExistingCatalog: (catalogId: string) => void;
   applyCouncilResolutions: (resolutions: {
     summary: string;
@@ -282,6 +284,7 @@ export interface StudioState {
   setPages: (pages: CatalogPageData[]) => void;
   updatePage: (pageNumber: number, updates: Partial<CatalogPageData>) => void;
   updateProduct: (productId: string, updates: Partial<ProductItem>) => void;
+  removeProductBackground: (pageNumber: number, productId: string) => Promise<void>;
   executeCopilotCommand: (command: string, attachments?: ChatAttachment[]) => void;
 
   // Active theme / palette & Brand Lock
@@ -424,6 +427,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   openAccountSettings: () => set({ isAccountSettingsOpen: true }),
   closeAccountSettings: () => set({ isAccountSettingsOpen: false }),
   activeCatalogId: 'aurea-2026',
+  setActiveCatalogId: (id) => set({ activeCatalogId: id }),
+  setHasStartedSession: (started) => set({ hasStartedSession: started }),
 
   loadExistingCatalog: (catalogId: string) => {
     if (catalogId === 'aurea-2026' || catalogId.includes('aurea')) {
@@ -893,6 +898,36 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       saveStatus: 'unsaved',
     }));
     get().debouncedSaveCurrentSpread();
+  },
+
+  removeProductBackground: async (pageNumber, productId) => {
+    const page = get().pages.find((p) => p.pageNumber === pageNumber);
+    const prod = page?.products?.find((p) => p.id === productId);
+    if (!prod || !prod.image) {
+      toast.error('Produto nao possui imagem para remocao de fundo.');
+      return;
+    }
+
+    toast.info('Isolando produto e removendo fundo com IA...');
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await axios.post(
+        `${API_BASE_URL}/api/v2/studio/media/remove-background/`,
+        { image_url: prod.image },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          withCredentials: true,
+        }
+      );
+
+      if (res.data && res.data.processed_url) {
+        get().updateProduct(productId, { image: res.data.processed_url });
+        toast.success('Fundo do produto removido com sucesso!');
+      }
+    } catch (err) {
+      console.warn('Falha na remocao de fundo:', err);
+      toast.error('Nao foi possivel remover o fundo desta imagem.');
+    }
   },
 
   // Undo / Redo Stack State

@@ -29,6 +29,8 @@ from api.guards.quota_guard import (
 )
 from api.services.file_processor import FileAttachmentProcessor
 from api.services.template_rag import TemplateRAGService, generate_embedding
+from api.services.background_removal import BackgroundRemovalService
+from api.services.document_reconstructor import DocumentReconstructorService
 
 logger = logging.getLogger(__name__)
 
@@ -652,4 +654,91 @@ class StudioTemplateSaveFromSpreadView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class StudioCatalogImportDocumentView(APIView):
+    """
+    Importacao e engenharia reversa de catalogo a partir de PDF/DOCX
+    POST /api/v2/studio/catalogs/import-document/
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response({"error": "Nenhum arquivo enviado para importacao."}, status=status.HTTP_400_BAD_REQUEST)
+
+        filename = uploaded_file.name
+        file_bytes = uploaded_file.read()
+
+        title = request.data.get("title")
+        brand_name = request.data.get("brand_name")
+        style_preset = request.data.get("style_preset", "editorial_clean")
+        mode = request.data.get("mode", "redesign")
+        remove_bg = request.data.get("remove_background") in [True, "true", "True", "1", 1]
+
+        try:
+            result = DocumentReconstructorService.reconstruct_from_file(
+                file_bytes=file_bytes,
+                filename=filename,
+                title=title,
+                brand_name=brand_name,
+                style_preset=style_preset,
+                remove_bg=remove_bg,
+                mode=mode,
+                user=request.user if request.user.is_authenticated else None,
+            )
+            return Response(result, status=status.HTTP_201_CREATED)
+        except Exception as exc:
+            logger.error(f"[ImportDocument] Erro na reconstrucao do catalogo: {exc}")
+            return Response(
+                {"error": f"Nao foi possivel reconstruir o documento: {str(exc)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class StudioMediaRemoveBackgroundView(APIView):
+    """
+    Remocao de fundo sob demanda para imagens de produtos no Canvas
+    POST /api/v2/studio/media/remove-background/
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        uploaded_image = request.FILES.get("image")
+        if uploaded_image:
+            img_bytes = uploaded_image.read()
+            filename = uploaded_image.name
+        elif request.data.get("image_url"):
+            import urllib.request
+            url = request.data.get("image_url")
+            media_url = getattr(settings, 'MEDIA_URL', '/media/')
+            media_root = getattr(settings, 'MEDIA_ROOT', os.path.join(settings.BASE_DIR, 'media'))
+            if url.startswith(media_url):
+                rel_path = url[len(media_url):]
+                abs_path = os.path.join(media_root, rel_path)
+                if os.path.exists(abs_path):
+                    with open(abs_path, "rb") as f:
+                        img_bytes = f.read()
+                    filename = os.path.basename(abs_path)
+                else:
+                    return Response({"error": "Arquivo de imagem local nao encontrado."}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                try:
+                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req, timeout=10) as response:
+                        img_bytes = response.read()
+                    filename = "external_image.png"
+                except Exception as dl_err:
+                    return Response({"error": f"Falha ao baixar imagem remota: {dl_err}"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "Envie um arquivo de imagem ou forneca image_url."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            result = BackgroundRemovalService.process_and_save(img_bytes, original_filename=filename)
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as exc:
+            logger.error(f"[RemoveBackground] Erro ao remover fundo: {exc}")
+            return Response({"error": f"Falha ao remover fundo: {str(exc)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
