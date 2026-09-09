@@ -11,6 +11,7 @@ import {
 import { useStudioStore } from '../../store/studioStore';
 import { CatalogPageData } from '../../data/aureaCatalog.mock';
 import { MiniPageThumbnail } from './MiniPageThumbnail';
+import { Tooltip } from '../ui/Tooltip';
 import { toast } from 'sonner';
 
 export const SpreadViewport: React.FC = () => {
@@ -815,23 +816,24 @@ export const SpreadViewport: React.FC = () => {
         {/* Center Swap Pages Quick Button (Between Left and Right) */}
         {viewMode !== 'single' && (
           <div className="flex flex-col items-center justify-center pt-44 self-start">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                swapSpreadPages();
-                toast.success('Páginas invertidas: esquerda ⇄ direita!');
-              }}
-              className={`p-2.5 rounded-full border transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95 ${
-                isDark
-                  ? 'bg-[#141418] border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800'
-                  : 'bg-white border-zinc-300 text-zinc-700 hover:text-zinc-950 hover:bg-zinc-100'
-              }`}
-              title="Inverter páginas (Esquerda ⇄ Direita)"
-              aria-label="Inverter lados das páginas"
-            >
-              <ArrowLeftRight className="size-4 text-zinc-400" />
-            </button>
+            <Tooltip text="Inverter páginas (Esquerda ⇄ Direita)" position="top">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  swapSpreadPages();
+                  toast.success('Páginas invertidas: esquerda ⇄ direita!');
+                }}
+                className={`p-2.5 rounded-full border transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95 ${
+                  isDark
+                    ? 'bg-[#141418] border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800'
+                    : 'bg-white border-zinc-300 text-zinc-700 hover:text-zinc-950 hover:bg-zinc-100'
+                }`}
+                aria-label="Inverter lados das páginas"
+              >
+                <ArrowLeftRight className="size-4 text-zinc-400" />
+              </button>
+            </Tooltip>
           </div>
         )}
 

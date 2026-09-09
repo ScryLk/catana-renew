@@ -9,6 +9,7 @@ import { EditorialCouncilModal } from './EditorialCouncilModal';
 import { PaletteManagerModal } from './PaletteManagerModal';
 import { SkillsCatalogModal } from './SkillsCatalogModal';
 import { useStudioStore } from '../../store/studioStore';
+import { Tooltip } from '../ui/Tooltip';
 import { toast } from 'sonner';
 
 export const AgentCoPilot: React.FC = () => {
@@ -78,19 +79,20 @@ export const AgentCoPilot: React.FC = () => {
       >
         <div className="flex items-center gap-1.5">
           {!isStudioSidebarOpen && (
-            <button
-              type="button"
-              onClick={toggleStudioSidebar}
-              className={`p-1.5 rounded-lg border transition-colors cursor-pointer mr-0.5 ${
-                isDark
-                  ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
-                  : 'bg-white border-zinc-200 text-zinc-600 hover:text-zinc-950 shadow-xs'
-              }`}
-              title="Abrir barra lateral (Ctrl+B)"
-              aria-label="Abrir barra lateral"
-            >
-              <PanelLeftOpen className="size-3.5" />
-            </button>
+            <Tooltip text="Abrir barra lateral" shortcut="Ctrl+B" position="bottom">
+              <button
+                type="button"
+                onClick={toggleStudioSidebar}
+                className={`p-1.5 rounded-lg border transition-colors cursor-pointer mr-0.5 ${
+                  isDark
+                    ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
+                    : 'bg-white border-zinc-200 text-zinc-600 hover:text-zinc-950 shadow-xs'
+                }`}
+                aria-label="Abrir barra lateral"
+              >
+                <PanelLeftOpen className="size-3.5" />
+              </button>
+            </Tooltip>
           )}
           <div className="relative" ref={roleDropdownRef}>
             <button
@@ -212,66 +214,70 @@ export const AgentCoPilot: React.FC = () => {
 
         {/* Action icons */}
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setIsCouncilModalOpen(true)}
-            className={`p-1.5 rounded transition-colors cursor-pointer ${
-              isDark
-                ? 'hover:text-white hover:bg-zinc-800 text-zinc-400'
-                : 'hover:text-zinc-950 hover:bg-zinc-100 text-zinc-500'
-            }`}
-            title="Conselho Editorial (Mesa Redonda)"
-            aria-label="Conselho Editorial (Mesa Redonda)"
-          >
-            <Scale className="size-3.5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsRoleManagerOpen(true)}
-            className={`p-1.5 rounded transition-colors cursor-pointer ${
-              isDark
-                ? 'hover:text-white hover:bg-zinc-800 text-zinc-400'
-                : 'hover:text-zinc-950 hover:bg-zinc-100 text-zinc-500'
-            }`}
-            title="Gerenciar Agentes e Cargos"
-            aria-label="Gerenciar Agentes e Cargos"
-          >
-            <Users className="size-3.5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={handleCreateNewThread}
-            className={`p-1.5 rounded transition-colors cursor-pointer ${
-              isDark
-                ? 'hover:text-white hover:bg-zinc-800 text-zinc-400'
-                : 'hover:text-zinc-950 hover:bg-zinc-100 text-zinc-500'
-            }`}
-            title="Nova conversa (adicionar aba)"
-            aria-label="Nova conversa"
-          >
-            <Plus className="size-3.5" />
-          </button>
-
-          <div className="relative" ref={historyRef}>
+          <Tooltip text="Conselho Editorial (Mesa Redonda)" position="bottom">
             <button
               type="button"
-              onClick={() => setIsHistoryOpen((prev) => !prev)}
+              onClick={() => setIsCouncilModalOpen(true)}
               className={`p-1.5 rounded transition-colors cursor-pointer ${
-                isHistoryOpen
-                  ? isDark
-                    ? 'bg-zinc-800 text-white'
-                    : 'bg-zinc-200 text-zinc-950'
-                  : isDark
+                isDark
                   ? 'hover:text-white hover:bg-zinc-800 text-zinc-400'
                   : 'hover:text-zinc-950 hover:bg-zinc-100 text-zinc-500'
               }`}
-              title="Histórico de conversas"
-              aria-label="Histórico de conversas"
+              aria-label="Conselho Editorial (Mesa Redonda)"
             >
-              <History className="size-3.5" />
+              <Scale className="size-3.5" />
             </button>
+          </Tooltip>
+
+          <Tooltip text="Gerenciar Agentes e Cargos" position="bottom">
+            <button
+              type="button"
+              onClick={() => setIsRoleManagerOpen(true)}
+              className={`p-1.5 rounded transition-colors cursor-pointer ${
+                isDark
+                  ? 'hover:text-white hover:bg-zinc-800 text-zinc-400'
+                  : 'hover:text-zinc-950 hover:bg-zinc-100 text-zinc-500'
+              }`}
+              aria-label="Gerenciar Agentes e Cargos"
+            >
+              <Users className="size-3.5" />
+            </button>
+          </Tooltip>
+
+          <Tooltip text="Nova conversa (adicionar aba)" position="bottom">
+            <button
+              type="button"
+              onClick={handleCreateNewThread}
+              className={`p-1.5 rounded transition-colors cursor-pointer ${
+                isDark
+                  ? 'hover:text-white hover:bg-zinc-800 text-zinc-400'
+                  : 'hover:text-zinc-950 hover:bg-zinc-100 text-zinc-500'
+              }`}
+              aria-label="Nova conversa"
+            >
+              <Plus className="size-3.5" />
+            </button>
+          </Tooltip>
+
+          <div className="relative" ref={historyRef}>
+            <Tooltip text="Histórico de conversas" position="bottom">
+              <button
+                type="button"
+                onClick={() => setIsHistoryOpen((prev) => !prev)}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  isHistoryOpen
+                    ? isDark
+                      ? 'bg-zinc-800 text-white'
+                      : 'bg-zinc-200 text-zinc-950'
+                    : isDark
+                    ? 'hover:text-white hover:bg-zinc-800 text-zinc-400'
+                    : 'hover:text-zinc-950 hover:bg-zinc-100 text-zinc-500'
+                }`}
+                aria-label="Histórico de conversas"
+              >
+                <History className="size-3.5" />
+              </button>
+            </Tooltip>
 
             {/* Floating History Dropdown */}
             {isHistoryOpen && (
@@ -345,19 +351,20 @@ export const AgentCoPilot: React.FC = () => {
           </div>
 
           {/* Collapse CoPilot Button */}
-          <button
-            type="button"
-            onClick={toggleCoPilot}
-            className={`p-1.5 rounded transition-colors cursor-pointer ${
-              isDark
-                ? 'hover:text-white hover:bg-zinc-800 text-zinc-400'
-                : 'hover:text-zinc-950 hover:bg-zinc-100 text-zinc-500'
-            }`}
-            title="Recolher painel de IA (Ctrl+J para alternar)"
-            aria-label="Recolher painel de IA"
-          >
-            <PanelLeftClose className="size-3.5" />
-          </button>
+          <Tooltip text="Recolher painel de IA" shortcut="Ctrl+J" position="bottom">
+            <button
+              type="button"
+              onClick={toggleCoPilot}
+              className={`p-1.5 rounded transition-colors cursor-pointer ${
+                isDark
+                  ? 'hover:text-white hover:bg-zinc-800 text-zinc-400'
+                  : 'hover:text-zinc-950 hover:bg-zinc-100 text-zinc-500'
+              }`}
+              aria-label="Recolher painel de IA"
+            >
+              <PanelLeftClose className="size-3.5" />
+            </button>
+          </Tooltip>
         </div>
       </div>
 

@@ -21,6 +21,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
+import { Tooltip } from '../ui/Tooltip';
 import { toast } from 'sonner';
 
 export const CanvasTopToolbar: React.FC = () => {
@@ -162,33 +163,36 @@ export const CanvasTopToolbar: React.FC = () => {
           className={`flex items-center rounded-lg border p-0.5 shrink-0 transition-colors ${
             isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-100 border-zinc-200'
           }`}
-          title={`Spread atual: páginas ${currentSpread[0]} e ${currentSpread[1]} de ${totalPages}`}
         >
-          <button
-            type="button"
-            onClick={prevSpread}
-            className={`p-1 rounded transition-colors cursor-pointer ${
-              isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
-            }`}
-            title="Spread anterior"
-            aria-label="Spread anterior"
-          >
-            <ChevronLeft className="size-3.5" />
-          </button>
-          <span className="px-1.5 font-mono text-[10px] tracking-tight font-medium text-inherit">
-            {String(currentSpread[0]).padStart(2, '0')}-{String(currentSpread[1]).padStart(2, '0')} / {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={nextSpread}
-            className={`p-1 rounded transition-colors cursor-pointer ${
-              isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
-            }`}
-            title="Próximo spread"
-            aria-label="Próximo spread"
-          >
-            <ChevronRight className="size-3.5" />
-          </button>
+          <Tooltip text="Spread anterior" position="bottom">
+            <button
+              type="button"
+              onClick={prevSpread}
+              className={`p-1 rounded transition-colors cursor-pointer ${
+                isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
+              }`}
+              aria-label="Spread anterior"
+            >
+              <ChevronLeft className="size-3.5" />
+            </button>
+          </Tooltip>
+          <Tooltip text={`Lâmina ativa: Páginas ${currentSpread[0]} e ${currentSpread[1]} de ${totalPages}`} position="bottom">
+            <span className="px-1.5 font-mono text-[10px] tracking-tight font-medium text-inherit cursor-default">
+              {String(currentSpread[0]).padStart(2, '0')}-{String(currentSpread[1]).padStart(2, '0')} / {totalPages}
+            </span>
+          </Tooltip>
+          <Tooltip text="Próximo spread" position="bottom">
+            <button
+              type="button"
+              onClick={nextSpread}
+              className={`p-1 rounded transition-colors cursor-pointer ${
+                isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
+              }`}
+              aria-label="Próximo spread"
+            >
+              <ChevronRight className="size-3.5" />
+            </button>
+          </Tooltip>
         </div>
 
         {/* Undo / Redo Controls */}
@@ -197,53 +201,63 @@ export const CanvasTopToolbar: React.FC = () => {
             isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-100 border-zinc-200'
           }`}
         >
-          <button
-            type="button"
-            onClick={undo}
-            disabled={!canUndo}
-            className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-              isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
-            }`}
-            title="Desfazer alteração (Ctrl+Z / Cmd+Z)"
-            aria-label="Desfazer"
-          >
-            <Undo2 className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={redo}
-            disabled={!canRedo}
-            className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-              isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
-            }`}
-            title="Refazer alteração (Ctrl+Shift+Z / Cmd+Shift+Z)"
-            aria-label="Refazer"
-          >
-            <Redo2 className="size-3.5" />
-          </button>
+          <Tooltip text="Desfazer alteração" shortcut="Ctrl+Z" position="bottom">
+            <button
+              type="button"
+              onClick={undo}
+              disabled={!canUndo}
+              className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+                isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
+              }`}
+              aria-label="Desfazer"
+            >
+              <Undo2 className="size-3.5" />
+            </button>
+          </Tooltip>
+          <Tooltip text="Refazer alteração" shortcut="Ctrl+Y" position="bottom">
+            <button
+              type="button"
+              onClick={redo}
+              disabled={!canRedo}
+              className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+                isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
+              }`}
+              aria-label="Refazer"
+            >
+              <Redo2 className="size-3.5" />
+            </button>
+          </Tooltip>
         </div>
 
         {/* Autosave Status Indicator (Icon with tooltip) */}
         <div className="flex items-center px-1 py-1 rounded-md shrink-0">
           {saveStatus === 'saving' && (
-            <div title="Salvando alterações na nuvem...">
-              <Loader2 className="size-3.5 animate-spin text-amber-500" />
-            </div>
+            <Tooltip text="Salvando alterações na nuvem..." position="bottom">
+              <div className="cursor-help p-0.5 flex items-center">
+                <Loader2 className="size-3.5 animate-spin text-amber-500" />
+              </div>
+            </Tooltip>
           )}
           {saveStatus === 'saved' && (
-            <div title="Todas as alterações foram salvas na nuvem">
-              <Check className="size-3.5 text-emerald-500" />
-            </div>
+            <Tooltip text="Todas as alterações salvas na nuvem" position="bottom">
+              <div className="cursor-help p-0.5 flex items-center">
+                <Check className="size-3.5 text-emerald-500" />
+              </div>
+            </Tooltip>
           )}
           {saveStatus === 'error' && (
-            <div title="Erro ao salvar alterações na nuvem">
-              <CloudOff className="size-3.5 text-red-500" />
-            </div>
+            <Tooltip text="Erro ao sincronizar com a nuvem" position="bottom">
+              <div className="cursor-help p-0.5 flex items-center">
+                <CloudOff className="size-3.5 text-red-500" />
+              </div>
+            </Tooltip>
           )}
           {saveStatus === 'unsaved' && (
-            <div title="Alterações pendentes de sincronização">
-              <Cloud className="size-3.5 text-zinc-400 opacity-60" />
-            </div>
+            <Tooltip text="Alterações pendentes de sincronização" position="bottom">
+              <div className="cursor-help p-0.5 flex items-center">
+                <Cloud className="size-3.5 text-zinc-400 opacity-60" />
+              </div>
+            </Tooltip>
           )}
         </div>
       </div>
@@ -256,59 +270,62 @@ export const CanvasTopToolbar: React.FC = () => {
             isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-100 border-zinc-200'
           }`}
         >
-          <button
-            type="button"
-            onClick={() => setViewMode('spread')}
-            className={`p-1.5 rounded transition-colors cursor-pointer ${
-              viewMode === 'spread'
-                ? isDark
-                  ? 'bg-zinc-800 text-white shadow-2xs'
-                  : 'bg-white text-zinc-950 shadow-2xs border border-zinc-200'
-                : isDark
-                ? 'text-zinc-400 hover:text-zinc-200'
-                : 'text-zinc-600 hover:text-zinc-950'
-            }`}
-            title="Visualização em Lâmina Dupla (Spread)"
-            aria-label="Visualização em Lâmina Dupla"
-          >
-            <BookOpen className="size-3.5" />
-          </button>
+          <Tooltip text="Visualização em Lâmina Dupla (Spread)" position="bottom">
+            <button
+              type="button"
+              onClick={() => setViewMode('spread')}
+              className={`p-1.5 rounded transition-colors cursor-pointer ${
+                viewMode === 'spread'
+                  ? isDark
+                    ? 'bg-zinc-800 text-white shadow-2xs'
+                    : 'bg-white text-zinc-950 shadow-2xs border border-zinc-200'
+                  : isDark
+                  ? 'text-zinc-400 hover:text-zinc-200'
+                  : 'text-zinc-600 hover:text-zinc-950'
+              }`}
+              aria-label="Visualização em Lâmina Dupla"
+            >
+              <BookOpen className="size-3.5" />
+            </button>
+          </Tooltip>
 
-          <button
-            type="button"
-            onClick={() => setViewMode('single')}
-            className={`p-1.5 rounded transition-colors cursor-pointer ${
-              viewMode === 'single'
-                ? isDark
-                  ? 'bg-zinc-800 text-white shadow-2xs'
-                  : 'bg-white text-zinc-950 shadow-2xs border border-zinc-200'
-                : isDark
-                ? 'text-zinc-400 hover:text-zinc-200'
-                : 'text-zinc-600 hover:text-zinc-950'
-            }`}
-            title="Visualização em Página Única"
-            aria-label="Visualização em Página Única"
-          >
-            <FileText className="size-3.5" />
-          </button>
+          <Tooltip text="Visualização em Página Única" position="bottom">
+            <button
+              type="button"
+              onClick={() => setViewMode('single')}
+              className={`p-1.5 rounded transition-colors cursor-pointer ${
+                viewMode === 'single'
+                  ? isDark
+                    ? 'bg-zinc-800 text-white shadow-2xs'
+                    : 'bg-white text-zinc-950 shadow-2xs border border-zinc-200'
+                  : isDark
+                  ? 'text-zinc-400 hover:text-zinc-200'
+                  : 'text-zinc-600 hover:text-zinc-950'
+              }`}
+              aria-label="Visualização em Página Única"
+            >
+              <FileText className="size-3.5" />
+            </button>
+          </Tooltip>
 
-          <button
-            type="button"
-            onClick={() => setViewMode('grid')}
-            className={`p-1.5 rounded transition-colors cursor-pointer ${
-              viewMode === 'grid'
-                ? isDark
-                  ? 'bg-zinc-800 text-white shadow-2xs'
-                  : 'bg-white text-zinc-950 shadow-2xs border border-zinc-200'
-                : isDark
-                ? 'text-zinc-400 hover:text-zinc-200'
-                : 'text-zinc-600 hover:text-zinc-950'
-            }`}
-            title="Visualização em Grade de Páginas"
-            aria-label="Visualização em Grade de Páginas"
-          >
-            <Grid3X3 className="size-3.5" />
-          </button>
+          <Tooltip text="Visualização em Grade de Páginas" position="bottom">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded transition-colors cursor-pointer ${
+                viewMode === 'grid'
+                  ? isDark
+                    ? 'bg-zinc-800 text-white shadow-2xs'
+                    : 'bg-white text-zinc-950 shadow-2xs border border-zinc-200'
+                  : isDark
+                  ? 'text-zinc-400 hover:text-zinc-200'
+                  : 'text-zinc-600 hover:text-zinc-950'
+              }`}
+              aria-label="Visualização em Grade de Páginas"
+            >
+              <Grid3X3 className="size-3.5" />
+            </button>
+          </Tooltip>
         </div>
 
         {/* Zoom Controls */}
@@ -317,98 +334,106 @@ export const CanvasTopToolbar: React.FC = () => {
             isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-100 border-zinc-200'
           }`}
         >
-          <button
-            type="button"
-            onClick={handleZoomOut}
-            className={`p-1 rounded transition-colors cursor-pointer ${
-              isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
-            }`}
-            title="Reduzir zoom (-10%)"
-            aria-label="Reduzir zoom"
-          >
-            <Minus className="size-3" />
-          </button>
-          <button
-            type="button"
-            onClick={handleResetZoom}
-            className={`px-1.5 font-mono text-[10px] cursor-pointer bg-transparent border-none ${
-              isDark ? 'text-zinc-300 hover:text-white' : 'text-zinc-700 hover:text-zinc-950'
-            }`}
-            title="Clique para alternar zoom (100% / 75%)"
-            aria-label="Alternar zoom entre 100% e 75%"
-          >
-            {zoomLevel}%
-          </button>
-          <button
-            type="button"
-            onClick={handleZoomIn}
-            className={`p-1 rounded transition-colors cursor-pointer ${
-              isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
-            }`}
-            title="Aumentar zoom (+10%)"
-            aria-label="Aumentar zoom"
-          >
-            <Plus className="size-3" />
-          </button>
+          <Tooltip text="Reduzir zoom (-10%)" position="bottom">
+            <button
+              type="button"
+              onClick={handleZoomOut}
+              className={`p-1 rounded transition-colors cursor-pointer ${
+                isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
+              }`}
+              aria-label="Reduzir zoom"
+            >
+              <Minus className="size-3" />
+            </button>
+          </Tooltip>
+
+          <Tooltip text="Alternar zoom (100% / 75%)" position="bottom">
+            <button
+              type="button"
+              onClick={handleResetZoom}
+              className={`px-1.5 font-mono text-[10px] cursor-pointer bg-transparent border-none ${
+                isDark ? 'text-zinc-300 hover:text-white' : 'text-zinc-700 hover:text-zinc-950'
+              }`}
+              aria-label="Alternar zoom entre 100% e 75%"
+            >
+              {zoomLevel}%
+            </button>
+          </Tooltip>
+
+          <Tooltip text="Aumentar zoom (+10%)" position="bottom">
+            <button
+              type="button"
+              onClick={handleZoomIn}
+              className={`p-1 rounded transition-colors cursor-pointer ${
+                isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
+              }`}
+              aria-label="Aumentar zoom"
+            >
+              <Plus className="size-3" />
+            </button>
+          </Tooltip>
         </div>
 
         {/* Active Theme Palette Indicator - Compact Icon + Swatches with Tooltip */}
-        <button
-          type="button"
-          onClick={() => setIsPalettePanelOpen(true)}
-          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border cursor-pointer transition-colors ${
-            isDark
-              ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
-              : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300'
-          }`}
-          title={`Sistema de Cores & Design Tokens: ${activePalette.name} (Clique para gerenciar)`}
-          aria-label={`Sistema de Cores: ${activePalette.name}`}
-        >
-          <Palette className="size-3.5 text-zinc-400 shrink-0" />
-          <div className="flex items-center gap-1">
-            <span
-              className="size-2.5 rounded-full border border-zinc-600/40"
-              style={{ backgroundColor: activePalette.primary }}
-            />
-            <span
-              className="size-2.5 rounded-full border border-zinc-600/40"
-              style={{ backgroundColor: activePalette.accent }}
-            />
-          </div>
-          {activePalette.locked && (
-            <Lock className="size-2.5 text-amber-400 shrink-0" />
-          )}
-        </button>
+        <Tooltip text={`Sistema de Cores & Tokens: ${activePalette.name} (Clique para gerenciar)`} position="bottom">
+          <button
+            type="button"
+            onClick={() => setIsPalettePanelOpen(true)}
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border cursor-pointer transition-colors ${
+              isDark
+                ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+                : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300'
+            }`}
+            aria-label={`Sistema de Cores: ${activePalette.name}`}
+          >
+            <Palette className="size-3.5 text-zinc-400 shrink-0" />
+            <div className="flex items-center gap-1">
+              <span
+                className="size-2.5 rounded-full border border-zinc-600/40"
+                style={{ backgroundColor: activePalette.primary }}
+              />
+              <span
+                className="size-2.5 rounded-full border border-zinc-600/40"
+                style={{ backgroundColor: activePalette.accent }}
+              />
+            </div>
+            {activePalette.locked && (
+              <Lock className="size-2.5 text-amber-400 shrink-0" />
+            )}
+          </button>
+        </Tooltip>
 
         {/* Quick Export Action: Compartilhar (Icon only with Tooltip) */}
-        <button
-          type="button"
-          onClick={() => toast.success('Link do catálogo copiado para a área de transferência!')}
-          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-            isDark
-              ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white'
-              : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300 text-zinc-700 hover:text-zinc-950'
-          }`}
-          title="Compartilhar catálogo (copiar link público)"
-          aria-label="Compartilhar catálogo"
-        >
-          <Share2 className="size-3.5" />
-        </button>
+        <Tooltip text="Compartilhar catálogo (copiar link público)" position="bottom">
+          <button
+            type="button"
+            onClick={() => toast.success('Link do catálogo copiado para a área de transferência!')}
+            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+              isDark
+                ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white'
+                : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300 text-zinc-700 hover:text-zinc-950'
+            }`}
+            aria-label="Compartilhar catálogo"
+          >
+            <Share2 className="size-3.5" />
+          </button>
+        </Tooltip>
 
         {/* Quick Export Action: Exportar PDF (Icon only with Tooltip) */}
-        <button
-          type="button"
-          onClick={() => toast.info('Gerando PDF gráfico em alta resolução (300 DPI)...')}
-          className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-xs ${
-            isDark
-              ? 'bg-zinc-100 hover:bg-white text-zinc-950'
-              : 'bg-zinc-900 hover:bg-zinc-800 text-white'
-          }`}
-          title="Exportar catálogo em PDF para impressão gráfica (300 DPI)"
-          aria-label="Exportar catálogo em PDF"
-        >
-          <Download className="size-3.5" />
-        </button>
+        <Tooltip text="Exportar em PDF para impressão gráfica (300 DPI)" position="bottom">
+          <button
+            type="button"
+            onClick={() => toast.info('Gerando PDF gráfico em alta resolução (300 DPI)...')}
+            className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-xs ${
+              isDark
+                ? 'bg-zinc-100 hover:bg-white text-zinc-950'
+                : 'bg-zinc-900 hover:bg-zinc-800 text-white'
+            }`}
+            aria-label="Exportar catálogo em PDF"
+          >
+            <Download className="size-3.5" />
+          </button>
+        </Tooltip>
       </div>
     </div>
   );
