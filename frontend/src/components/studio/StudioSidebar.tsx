@@ -7,7 +7,6 @@ import {
   BookOpen,
   Sun,
   Moon,
-  User as UserIcon,
   Settings,
   Image as ImageIcon,
   LogOut,
@@ -400,22 +399,6 @@ export const StudioSidebar: React.FC = () => {
 
                 {/* Navigation Actions */}
                 <div className="space-y-0.5 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsProfileMenuOpen(false);
-                      navigate('/profiles/me');
-                    }}
-                    className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors cursor-pointer text-left ${
-                      isDark
-                        ? 'hover:bg-zinc-800/80 hover:text-white text-zinc-300'
-                        : 'hover:bg-zinc-100 hover:text-zinc-950 text-zinc-700'
-                    }`}
-                  >
-                    <UserIcon className="size-3.5 text-zinc-400" />
-                    <span className="flex-1">Visualizar Perfil Público</span>
-                  </button>
-
                   <button
                     type="button"
                     onClick={() => {
