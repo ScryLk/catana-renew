@@ -126,11 +126,6 @@ export const StudioHomeChat: React.FC = () => {
     }
   };
 
-  const handleChipClick = (chipPrompt: string) => {
-    setPrompt(chipPrompt);
-    handleStart(chipPrompt);
-  };
-
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -331,45 +326,6 @@ export const StudioHomeChat: React.FC = () => {
                 <ArrowRight className="size-3.5" />
               </button>
             </div>
-          </div>
-
-          {/* Quick Starter Templates */}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => handleChipClick('Criar catálogo editorial de moda e acessórios de luxo (Coleção ÁUREA 2026)')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors cursor-pointer border ${
-                isDark
-                  ? 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-amber-500/50 hover:text-amber-400'
-                  : 'bg-white border-zinc-200 text-zinc-700 hover:border-amber-600/50 hover:text-amber-700 shadow-xs'
-              }`}
-            >
-              <span>ÁUREA — Boutique de Luxo (10 págs)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleChipClick('Criar catálogo de confeitaria de 4 páginas com fotos artesanais')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors cursor-pointer border ${
-                isDark
-                  ? 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
-                  : 'bg-white border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 shadow-xs'
-              }`}
-            >
-              <span>Confeitaria Artesanal (4 págs)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleChipClick('Criar catálogo TechGear de acessórios e gadgets com especificações técnicas')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors cursor-pointer border ${
-                isDark
-                  ? 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
-                  : 'bg-white border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 shadow-xs'
-              }`}
-            >
-              <span>TechGear — Setup & Tech (6 págs)</span>
-            </button>
           </div>
         </div>
       </div>
