@@ -4,13 +4,9 @@ import {
   PanelLeftClose,
   Search,
   BookOpen,
-  LayoutGrid,
-  FolderOpen,
   Sun,
   Moon,
-  ExternalLink,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useStudioStore } from '../../store/studioStore';
 
 export interface RecentCatalogItem {
@@ -53,7 +49,6 @@ const RECENT_CATALOGS: RecentCatalogItem[] = [
 ];
 
 export const StudioSidebar: React.FC = () => {
-  const navigate = useNavigate();
   const {
     isStudioSidebarOpen,
     toggleStudioSidebar,
@@ -239,40 +234,6 @@ export const StudioSidebar: React.FC = () => {
         })}
       </div>
 
-      {/* Secondary Navigation Section */}
-      <div className="p-2 border-t border-inherit shrink-0 space-y-0.5 text-xs">
-        <button
-          type="button"
-          onClick={() => navigate('/catalogs')}
-          className={`w-full flex items-center justify-between p-2 rounded-lg transition-colors cursor-pointer ${
-            isDark
-              ? 'hover:bg-zinc-900 hover:text-white text-zinc-400'
-              : 'hover:bg-zinc-200/80 hover:text-zinc-950 text-zinc-600'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <LayoutGrid className="size-3.5" />
-            <span>Todos os Catálogos</span>
-          </div>
-          <ExternalLink className="size-3 text-zinc-500" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate('/products')}
-          className={`w-full flex items-center justify-between p-2 rounded-lg transition-colors cursor-pointer ${
-            isDark
-              ? 'hover:bg-zinc-900 hover:text-white text-zinc-400'
-              : 'hover:bg-zinc-200/80 hover:text-zinc-950 text-zinc-600'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <FolderOpen className="size-3.5" />
-            <span>Produtos & SKUs</span>
-          </div>
-          <ExternalLink className="size-3 text-zinc-500" />
-        </button>
-      </div>
 
       {/* Footer: Status, Theme & Account */}
       <div className="p-3 border-t border-inherit shrink-0 space-y-2.5">
