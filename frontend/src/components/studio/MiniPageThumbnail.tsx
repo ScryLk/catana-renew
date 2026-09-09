@@ -105,7 +105,9 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
             </p>
           </div>
           <div className="text-center pb-0.5">
-            <span className="text-[5px] font-mono text-stone-500">ÁUREA · 02</span>
+            <span className="text-[5px] font-mono text-stone-500">
+              {page.folio || `PÁG. ${String(page.pageNumber).padStart(2, '0')}`}
+            </span>
           </div>
         </div>
       )}
@@ -205,14 +207,28 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
 
       {page.type === 'backcover' && (
         <div className="h-full flex flex-col items-center justify-center text-center gap-1 pt-3">
-          <div className="size-5 rounded-full border border-[#B08D57]/40 flex items-center justify-center p-0.5 bg-[#1A1817]">
-            <span className="text-[8px] font-serif text-[#F5F1EA]">Á</span>
+          <div
+            className="size-5 rounded-full border flex items-center justify-center p-0.5 bg-black/20"
+            style={{ borderColor: `${page.accentColor || '#B08D57'}66` }}
+          >
+            <span
+              className="text-[8px] font-serif"
+              style={{ color: page.textColor || '#F5F1EA' }}
+            >
+              {(page.title || 'C').charAt(0)}
+            </span>
           </div>
-          <span className="text-[5px] tracking-widest text-[#B08D57] uppercase font-semibold">
-            ATELIER ÁUREA
+          <span
+            className="text-[5px] tracking-widest uppercase font-semibold max-w-[90%] truncate"
+            style={{ color: page.accentColor || '#B08D57' }}
+          >
+            {page.title || 'CATÁLOGO'}
           </span>
-          <span className="text-[4px] tracking-wider text-[#F5F1EA]/80 uppercase">
-            OSCAR FREIRE · SP
+          <span
+            className="text-[4px] tracking-wider uppercase opacity-80"
+            style={{ color: page.textColor || '#F5F1EA' }}
+          >
+            EDIÇÃO 2026
           </span>
         </div>
       )}

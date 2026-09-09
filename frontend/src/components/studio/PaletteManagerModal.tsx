@@ -9,7 +9,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
-import { STUDIO_PALETTE_PRESETS, AUREA_PALETTE, StudioPalette } from '../../data/aureaCatalog.mock';
+import { STUDIO_PALETTE_PRESETS, StudioPalette } from '../../data/aureaCatalog.mock';
 import { toast } from 'sonner';
 
 export const PaletteManagerModal: React.FC = () => {
@@ -20,6 +20,7 @@ export const PaletteManagerModal: React.FC = () => {
     setActivePalette,
     updateActivePalette,
     setPaletteLocked,
+    totalPages,
     theme,
   } = useStudioStore();
 
@@ -61,14 +62,15 @@ export const PaletteManagerModal: React.FC = () => {
   };
 
   const handleResetToDefault = () => {
+    const defaultPreset = STUDIO_PALETTE_PRESETS[0];
     setActivePalette(
       {
-        ...AUREA_PALETTE,
+        ...defaultPreset,
         locked: activePalette.locked,
       },
       true
     );
-    toast.success('Paleta restaurada para o padrão ÁUREA.');
+    toast.success(`Paleta restaurada para a configuração padrão (${defaultPreset.name}).`);
   };
 
   const handleColorChange = (key: 'primary' | 'background' | 'accent' | 'secondary', value: string) => {
@@ -398,14 +400,16 @@ export const PaletteManagerModal: React.FC = () => {
             </div>
           </div>
 
-          {/* SEÇÃO 3: Coleção de Paletas da Maison (Curadoria Editorial) */}
+          {/* SEÇÃO 3: Curadoria de Paletas Editoriais */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold uppercase font-mono tracking-wider text-zinc-400">
-                Curadoria de Paletas da Maison
+                Curadoria de Paletas Editoriais
               </span>
               <span className={`text-[11px] ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                Clique para aplicar instantaneamente a todas as 10 páginas
+                {totalPages > 0
+                  ? `Clique para aplicar instantaneamente a todas as ${totalPages} páginas`
+                  : 'Clique para aplicar instantaneamente a todas as páginas'}
               </span>
             </div>
 
@@ -485,7 +489,7 @@ export const PaletteManagerModal: React.FC = () => {
             }`}
           >
             <RotateCcw className="size-3.5" />
-            <span>Restaurar Padrão ÁUREA</span>
+            <span>Restaurar Paleta Padrão</span>
           </button>
 
           <button

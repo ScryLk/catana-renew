@@ -431,7 +431,7 @@ export const CatalogGenerationExperience: React.FC = () => {
 
                 {/* Bottom Signature */}
                 <div className="flex items-center justify-between text-[8px] font-mono tracking-wider opacity-60 relative z-10">
-                  <span>PROPORÇÃO ÁUREA</span>
+                  <span>PROPORÇÃO A4 (1:1.414)</span>
                   <span>WCAG AAA COMPLIANT</span>
                 </div>
               </div>

@@ -4,8 +4,6 @@ import { toast } from 'sonner';
 import {
   CatalogPageData,
   ProductItem,
-  AUREA_PAGES,
-  AUREA_PALETTE,
   StudioPalette,
   STUDIO_PALETTE_PRESETS,
 } from '../data/aureaCatalog.mock';
@@ -407,7 +405,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   hasStartedSession: false,
 
-  catalogTitle: 'ÁUREA — Coleção Inverno 2026',
+  catalogTitle: 'Novo Catálogo',
   setCatalogTitle: (title) => set({ catalogTitle: title }),
 
   activeMode: 'orchestrator',
@@ -632,20 +630,21 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
 
   loadExistingCatalog: (catalogId: string) => {
-    if (catalogId === 'aurea-2026' || catalogId.includes('aurea')) {
+    if (catalogId === 'lookbook-editorial-2026' || catalogId === 'aurea-2026' || catalogId.includes('aurea')) {
+      const generated = generateCatalogFromPrompt('Lookbook editorial de moda e acessórios de luxo');
       set({
         hasStartedSession: true,
-        catalogTitle: 'ÁUREA — Coleção Inverno 2026',
-        activeCatalogId: 'aurea-2026',
-        pages: AUREA_PAGES,
-        totalPages: AUREA_PAGES.length,
+        catalogTitle: generated.title,
+        activeCatalogId: catalogId,
+        pages: generated.pages,
+        totalPages: generated.totalPages,
         currentSpread: [1, 2],
-        activePalette: AUREA_PALETTE,
+        activePalette: generated.palette,
       });
       get().addMessage({
         role: 'assistant',
-        content: 'Catálogo **ÁUREA — Coleção Inverno 2026** carregado com sucesso para edição. Os 10 spreads e os agentes da marca estão ativos para alterações.',
-        reasoning: 'Racional do Orquestrador: Carregamento do dossiê e spreads da Coleção ÁUREA. Modos de proporção áurea, fólio e paleta Noir & Or aplicados.',
+        content: `Catálogo **${generated.title}** carregado com sucesso para edição. Os ${generated.totalPages} spreads e os agentes estão ativos para alterações.`,
+        reasoning: 'Racional do Orquestrador: Carregamento do catálogo editorial com paleta harmônica e modos de diagramação A4 aplicados.',
       });
     } else if (catalogId === 'techgear-2026') {
       const generated = generateCatalogFromPrompt('Catálogo TechGear hardware e setup');
@@ -1935,7 +1934,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // 2. Mudança de Título ou Coleção
     if (lower.includes('título') || lower.includes('coleção') || lower.includes('nome')) {
       const cleanTitle = command.replace(/(mude|altere|troque|coloque|para|o|título|da|coleção|do|catálogo|:)+/gi, '').trim();
-      const updatedTitle = cleanTitle.length > 2 ? cleanTitle : 'ÁUREA — Coleção 2026';
+      const updatedTitle = cleanTitle.length > 2 ? cleanTitle : (state.catalogTitle || 'Novo Catálogo');
       
       set({ catalogTitle: updatedTitle, agentStatus: 'idle' });
       state.updatePage(1, { label: updatedTitle.toUpperCase() });

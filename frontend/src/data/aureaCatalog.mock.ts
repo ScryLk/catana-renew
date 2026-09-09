@@ -60,7 +60,7 @@ export interface StudioPalette {
 }
 
 export const AUREA_PALETTE: StudioPalette = {
-  name: 'ÁUREA · Noir & Or',
+  name: 'Luxe · Noir & Or',
   primary: '#1A1817', // Off-black
   background: '#F5F1EA', // Ivory
   accent: '#B08D57', // Ouro envelhecido
@@ -72,7 +72,7 @@ export const AUREA_PALETTE: StudioPalette = {
 
 export const STUDIO_PALETTE_PRESETS: StudioPalette[] = [
   {
-    name: 'ÁUREA · Noir & Or',
+    name: 'Luxe · Noir & Or',
     primary: '#1A1817',
     background: '#F5F1EA',
     accent: '#B08D57',
@@ -160,7 +160,7 @@ export const AUREA_PAGES: CatalogPageData[] = [
     backgroundColor: '#F5F1EA',
     textColor: '#1A1817',
     accentColor: '#B08D57',
-    folio: 'ÁUREA · 02',
+    folio: '02 · MANIFESTO',
   },
 
   // ================= PÁGINA 03: DIVISÓRIA I (ACESSÓRIOS) =================
@@ -187,7 +187,7 @@ export const AUREA_PAGES: CatalogPageData[] = [
     backgroundColor: '#F5F1EA',
     textColor: '#1A1817',
     accentColor: '#B08D57',
-    folio: 'ÁUREA · 04',
+    folio: '04 · LOOKBOOK',
     products: [
       {
         id: 'prod-bolsa',
@@ -214,7 +214,7 @@ export const AUREA_PAGES: CatalogPageData[] = [
     backgroundColor: '#F5F1EA',
     textColor: '#1A1817',
     accentColor: '#B08D57',
-    folio: 'ÁUREA · 05',
+    folio: '05 · ACESSÓRIOS',
     mirrored: false,
     products: [
       {
@@ -222,7 +222,7 @@ export const AUREA_PAGES: CatalogPageData[] = [
         category: 'ACESSÓRIOS',
         index: '02',
         name: 'Cinto Fiora',
-        sku: 'AUREA-002',
+        sku: 'ART-002',
         price: 'R$ 890',
         description: 'Corte único de couro integral, fivela em latão maciço escovado à mão.',
         image: '/aurea/images/prod-cinto.jpg',
@@ -232,7 +232,7 @@ export const AUREA_PAGES: CatalogPageData[] = [
         category: 'ACESSÓRIOS',
         index: '03',
         name: 'Luvas Alba',
-        sku: 'AUREA-003',
+        sku: 'ART-003',
         price: 'R$ 1.190',
         description: 'Pelica extra macia forrada em puro cashmere, costura à mão em ponto sela.',
         image: '/aurea/images/prod-luvas.jpg',
@@ -264,14 +264,14 @@ export const AUREA_PAGES: CatalogPageData[] = [
     backgroundColor: '#F5F1EA',
     textColor: '#1A1817',
     accentColor: '#B08D57',
-    folio: 'ÁUREA · 07',
+    folio: '07 · SEDA',
     products: [
       {
         id: 'prod-camisa',
         category: 'SEDA & CASHMERE',
         index: '04',
         name: 'Camisa Solene',
-        sku: 'AUREA-004',
+        sku: 'ART-004',
         price: 'R$ 2.300',
         description:
           'Seda dupla de 22 momme, botões de madrepérola natural talhados à mão, corte atemporal.',
@@ -290,7 +290,7 @@ export const AUREA_PAGES: CatalogPageData[] = [
     backgroundColor: '#F5F1EA',
     textColor: '#1A1817',
     accentColor: '#B08D57',
-    folio: 'ÁUREA · 08',
+    folio: '08 · LOOKBOOK',
     mirrored: true,
     products: [
       {
@@ -298,7 +298,7 @@ export const AUREA_PAGES: CatalogPageData[] = [
         category: 'SEDA & CASHMERE',
         index: '05',
         name: 'Echarpe Ligure',
-        sku: 'AUREA-005',
+        sku: 'ART-005',
         price: 'R$ 1.590',
         description: 'Cashmere de fio duplo, tecida em tear manual tradicional, bainha cega.',
         image: '/aurea/images/prod-echarpe.jpg',
@@ -308,7 +308,7 @@ export const AUREA_PAGES: CatalogPageData[] = [
         category: 'SEDA & CASHMERE',
         index: '06',
         name: 'Lenço Ária',
-        sku: 'AUREA-006',
+        sku: 'ART-006',
         price: 'R$ 980',
         description: 'Twill de seda pura estampado a quadro, bainha enrolada à mão.',
         image: '/aurea/images/prod-lenco.jpg',
@@ -325,14 +325,14 @@ export const AUREA_PAGES: CatalogPageData[] = [
     backgroundColor: '#F5F1EA',
     textColor: '#1A1817',
     accentColor: '#B08D57',
-    folio: 'ÁUREA · 09',
+    folio: '09 · TRICÔ',
     products: [
       {
         id: 'prod-trico',
         category: 'SEDA & CASHMERE',
         index: '07',
         name: 'Tricô Bruma',
-        sku: 'AUREA-007',
+        sku: 'ART-007',
         price: 'R$ 3.400',
         description:
           'Cashmere de seis fios, tricotado em peça única integral sem costuras. Série limitada.',
@@ -348,9 +348,9 @@ export const AUREA_PAGES: CatalogPageData[] = [
     pageNumber: 10,
     type: 'backcover',
     label: 'SOB CONVITE E AGENDAMENTO',
-    title: 'ATELIER ÁUREA',
+    title: 'ATELIER DE CRIAÇÃO',
     content:
-      'RUA OSCAR FREIRE 1200 · SÃO PAULO\nATELIER@AUREA.COM.BR · +55 11 3061 0000\n@AUREA.ATELIER',
+      'ATELIER CENTRAL · SÃO PAULO\nATENDIMENTO EXECUTIVO · +55 11 3061 0000\nWWW.CATANASTUDIO.COM.BR',
     backgroundColor: '#1A1817',
     textColor: '#F5F1EA',
     accentColor: '#B08D57',

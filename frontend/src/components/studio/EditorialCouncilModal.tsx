@@ -18,6 +18,7 @@ export const EditorialCouncilModal: React.FC = () => {
     roles,
     currentSpread,
     pages,
+    catalogTitle,
     applyCouncilResolutions,
     theme,
   } = useStudioStore();
@@ -162,7 +163,7 @@ export const EditorialCouncilModal: React.FC = () => {
                   Prancheta sob Análise: {leftPage?.title || 'Divisória'} & {rightPage?.title || 'Hero'}
                 </span>
                 <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  Coleção ÁUREA · Inverno 2026 · Formato A4 (794x1123)
+                  {catalogTitle} · Formato A4 (794x1123)
                 </span>
               </div>
             </div>

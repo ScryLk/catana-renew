@@ -28,7 +28,6 @@ export const SpreadViewport: React.FC = () => {
     setSpreadPage,
     swapSpreadPages,
     activePalette,
-    activeCatalogId,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -259,12 +258,6 @@ export const SpreadViewport: React.FC = () => {
                     alt={page.title || 'Capa'}
                     className="w-full h-full object-contain"
                   />
-                ) : activeCatalogId === 'aurea-2026' ? (
-                  <img
-                    src="/aurea/aurea-monograma.png"
-                    alt="Monograma"
-                    className="w-full h-full object-contain"
-                  />
                 ) : (
                   <span
                     className="text-4xl font-serif font-light select-none"
@@ -365,7 +358,7 @@ export const SpreadViewport: React.FC = () => {
             <div className="flex flex-col items-center">
               <div className="w-6 h-[1px] mb-2" style={{ backgroundColor: accent }} />
               <span className="text-[9px] tracking-[0.3em] text-[#1A1817]/70 font-mono">
-                {page.folio || 'ÁUREA · 02'}
+                {page.folio || `PÁG. ${String(page.pageNumber).padStart(2, '0')}`}
               </span>
             </div>
           </div>
