@@ -13,11 +13,11 @@ import { useStudioStore, ChatAttachment } from '../../store/studioStore';
 import { toast } from 'sonner';
 
 const PROMPT_SUGGESTIONS = [
-  'Crie um catálogo de confeitaria de até 5 páginas com fotos e destaques...',
-  'Crie um cardápio de restaurante de até 2 páginas com pratos e bebidas...',
-  'Crie um catálogo B2B de embalagens com tabela técnica de especificações...',
-  'Crie um catálogo editorial de moda e joias com 8 páginas...',
-  'Crie uma tabela comercial com produtos, códigos SKU e preços...',
+  'Catálogo de confeitaria com fotos e preços...',
+  'Cardápio de restaurante com pratos e bebidas...',
+  'Catálogo B2B industrial com especificações...',
+  'Lookbook de moda e joias com 8 páginas...',
+  'Tabela comercial com códigos SKU e atacado...',
 ];
 
 export const StudioHomeChat: React.FC = () => {
@@ -35,7 +35,7 @@ export const StudioHomeChat: React.FC = () => {
 
   const isDark = theme === 'dark';
 
-  // Typewriter effect para alternar sugestões no placeholder
+  // Typewriter effect com "Ex: " fixo e fluido, sem quebras bruscas
   const [currentText, setCurrentText] = useState('');
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -50,9 +50,10 @@ export const StudioHomeChat: React.FC = () => {
           setCurrentText(fullText.slice(0, currentText.length + 1));
         }, 40);
       } else {
+        // Pausa com a frase completa antes de iniciar o apagamento
         timeout = setTimeout(() => {
           setIsDeleting(true);
-        }, 2200);
+        }, 2600);
       }
     } else {
       if (currentText.length > 0) {
@@ -60,10 +61,11 @@ export const StudioHomeChat: React.FC = () => {
           setCurrentText(fullText.slice(0, currentText.length - 1));
         }, 20);
       } else {
+        // Pausa mantendo apenas o "Ex: " antes de digitar a próxima sugestão
         timeout = setTimeout(() => {
           setIsDeleting(false);
           setSuggestionIndex((prev) => (prev + 1) % PROMPT_SUGGESTIONS.length);
-        }, 350);
+        }, 400);
       }
     }
 
@@ -239,9 +241,7 @@ export const StudioHomeChat: React.FC = () => {
                 placeholder={
                   attachments.length > 0
                     ? 'Descreva instruções adicionais para os arquivos anexados...'
-                    : currentText
-                    ? `Ex: ${currentText}`
-                    : 'Ex: Crie um catálogo de confeitaria de até 5 páginas...'
+                    : `Ex: ${currentText}`
                 }
                 className={`w-full bg-transparent text-sm resize-none outline-none leading-relaxed ${
                   isDark
