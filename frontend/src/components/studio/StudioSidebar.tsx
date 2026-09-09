@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   PanelLeftClose,
@@ -6,8 +7,17 @@ import {
   BookOpen,
   Sun,
   Moon,
+  User as UserIcon,
+  Settings,
+  Building2,
+  Image as ImageIcon,
+  LogOut,
+  ChevronUp,
+  Sparkles,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
+import { useAuthStore } from '../../store/authStore';
+import api from '../../services/api';
 
 export interface RecentCatalogItem {
   id: string;
@@ -49,6 +59,19 @@ const RECENT_CATALOGS: RecentCatalogItem[] = [
 ];
 
 export const StudioSidebar: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  const [quotaData, setQuotaData] = useState<{
+    tier: string;
+    plan_name: string;
+    tokens_used_this_month: number;
+    monthly_token_quota: number;
+    percentage_used: number;
+  } | null>(null);
+
   const {
     isStudioSidebarOpen,
     toggleStudioSidebar,
@@ -63,6 +86,51 @@ export const StudioSidebar: React.FC = () => {
 
   const isDark = theme === 'dark';
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchQuota = async () => {
+      try {
+        const res = await api.get('/api/v2/studio/quotas/');
+        if (res.data && isMounted) {
+          setQuotaData(res.data);
+        }
+      } catch {
+        // Usa valores padrao se o backend estiver fora
+      }
+    };
+    fetchQuota();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    if (isProfileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isProfileMenuOpen]);
+
+  const handleLogout = () => {
+    logout();
+    setIsProfileMenuOpen(false);
+    navigate('/login');
+  };
 
   const filteredCatalogs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -236,60 +304,222 @@ export const StudioSidebar: React.FC = () => {
 
 
       {/* Footer: Status, Theme & Account */}
-      <div className="p-3 border-t border-inherit shrink-0 space-y-2.5">
-        {/* Status Pill & Theme Toggle */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-            <span
-              className={`size-1.5 rounded-full ${
-                agentStatus === 'thinking' || agentStatus === 'generating'
-                  ? 'bg-amber-400 animate-pulse'
-                  : 'bg-emerald-400'
+      {(() => {
+        const displayName = user?.name || user?.username || 'Lucas';
+        const displayEmail = user?.email || 'lucas@catana.com.br';
+        const displayInitial = displayName.charAt(0).toUpperCase() || 'L';
+        const planName = quotaData?.plan_name || 'Plano Gratuito';
+        const tokensUsed = quotaData?.tokens_used_this_month || 0;
+        const tokenQuota = quotaData?.monthly_token_quota || 100000;
+        const percentageUsed = quotaData?.percentage_used || 0;
+
+        return (
+          <div className="p-3 border-t border-inherit shrink-0 space-y-2.5 relative" ref={profileMenuRef}>
+            {/* Status Pill & Theme Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                <span
+                  className={`size-1.5 rounded-full ${
+                    agentStatus === 'thinking' || agentStatus === 'generating'
+                      ? 'bg-amber-400 animate-pulse'
+                      : 'bg-emerald-400'
+                  }`}
+                />
+                <span className="capitalize">
+                  {agentStatus === 'thinking'
+                    ? 'Agente pensando'
+                    : agentStatus === 'generating'
+                    ? 'Gerando'
+                    : 'Aguardando instrução'}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                  isDark
+                    ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
+                    : 'bg-white border-zinc-200 text-zinc-600 hover:text-zinc-950 hover:border-zinc-300'
+                }`}
+                title={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+                aria-label="Alternar tema"
+              >
+                {isDark ? <Sun className="size-3" /> : <Moon className="size-3" />}
+              </button>
+            </div>
+
+            {/* Profile Dropdown Menu (Opens Upwards) */}
+            {isProfileMenuOpen && (
+              <div
+                className={`absolute bottom-full left-2 right-2 mb-2 rounded-2xl border shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150 backdrop-blur-xl transition-all ${
+                  isDark
+                    ? 'bg-[#121215]/98 border-zinc-800 text-zinc-200 shadow-[0_16px_48px_rgba(0,0,0,0.8)]'
+                    : 'bg-white/98 border-zinc-200 text-zinc-800 shadow-[0_12px_36px_rgba(0,0,0,0.15)]'
+                }`}
+              >
+                {/* Header: User Info & Plan Badge */}
+                <div className="p-2 flex items-center gap-2.5 border-b border-inherit pb-2.5">
+                  <div className="size-9 rounded-full bg-zinc-800 border border-zinc-700 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                    {displayInitial}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="text-xs font-semibold truncate leading-tight">{displayName}</div>
+                      <span
+                        className={`text-[9px] font-mono px-1.5 py-0.2 rounded-full border shrink-0 ${
+                          isDark
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}
+                      >
+                        {planName}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-zinc-400 truncate leading-tight mt-0.5">{displayEmail}</div>
+                  </div>
+                </div>
+
+                {/* AI Tokens Quota Widget */}
+                <div className="p-2 my-1 rounded-xl bg-zinc-500/5 border border-inherit">
+                  <div className="flex items-center justify-between text-[10px] text-zinc-400 font-medium mb-1.5">
+                    <span className="flex items-center gap-1">
+                      <Sparkles className="size-2.5 text-indigo-400" />
+                      <span>Consumo de IA</span>
+                    </span>
+                    <span className="font-mono">
+                      {tokensUsed.toLocaleString('pt-BR')} / {tokenQuota.toLocaleString('pt-BR')}
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-zinc-700/30 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-300"
+                      style={{ width: `${Math.min(100, Math.max(2, percentageUsed))}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Navigation Actions */}
+                <div className="space-y-0.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileMenuOpen(false);
+                      navigate('/profiles/me');
+                    }}
+                    className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors cursor-pointer text-left ${
+                      isDark
+                        ? 'hover:bg-zinc-800/80 hover:text-white text-zinc-300'
+                        : 'hover:bg-zinc-100 hover:text-zinc-950 text-zinc-700'
+                    }`}
+                  >
+                    <UserIcon className="size-3.5 text-zinc-400" />
+                    <span className="flex-1">Visualizar Perfil Público</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileMenuOpen(false);
+                      navigate('/profile');
+                    }}
+                    className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors cursor-pointer text-left ${
+                      isDark
+                        ? 'hover:bg-zinc-800/80 hover:text-white text-zinc-300'
+                        : 'hover:bg-zinc-100 hover:text-zinc-950 text-zinc-700'
+                    }`}
+                  >
+                    <Settings className="size-3.5 text-zinc-400" />
+                    <span className="flex-1">Configurações da Conta</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileMenuOpen(false);
+                      navigate('/organizations');
+                    }}
+                    className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors cursor-pointer text-left ${
+                      isDark
+                        ? 'hover:bg-zinc-800/80 hover:text-white text-zinc-300'
+                        : 'hover:bg-zinc-100 hover:text-zinc-950 text-zinc-700'
+                    }`}
+                  >
+                    <Building2 className="size-3.5 text-zinc-400" />
+                    <span className="flex-1">Organizações e Sedes</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileMenuOpen(false);
+                      navigate('/media');
+                    }}
+                    className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors cursor-pointer text-left ${
+                      isDark
+                        ? 'hover:bg-zinc-800/80 hover:text-white text-zinc-300'
+                        : 'hover:bg-zinc-100 hover:text-zinc-950 text-zinc-700'
+                    }`}
+                  >
+                    <ImageIcon className="size-3.5 text-zinc-400" />
+                    <span className="flex-1">Biblioteca de Mídias</span>
+                  </button>
+                </div>
+
+                {/* Separator */}
+                <div className="my-1.5 border-t border-inherit" />
+
+                {/* Logout Action */}
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors cursor-pointer text-left ${
+                    isDark
+                      ? 'text-red-400 hover:bg-red-500/10 hover:text-red-300'
+                      : 'text-red-600 hover:bg-red-50 hover:text-red-700'
+                  }`}
+                >
+                  <LogOut className="size-3.5" />
+                  <span>Sair da Conta</span>
+                </button>
+              </div>
+            )}
+
+            {/* User Account Trigger Button */}
+            <button
+              type="button"
+              onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+              className={`w-full p-2 rounded-xl flex items-center justify-between border transition-all cursor-pointer text-left ${
+                isProfileMenuOpen
+                  ? isDark
+                    ? 'bg-zinc-800 border-zinc-700 text-white'
+                    : 'bg-zinc-100 border-zinc-300 text-zinc-950'
+                  : isDark
+                  ? 'bg-zinc-900/50 hover:bg-zinc-800/60 border-zinc-800/80 text-zinc-200'
+                  : 'bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-900'
               }`}
-            />
-            <span className="capitalize">
-              {agentStatus === 'thinking'
-                ? 'Agente pensando'
-                : agentStatus === 'generating'
-                ? 'Gerando'
-                : 'Aguardando instrução'}
-            </span>
+              aria-expanded={isProfileMenuOpen}
+              aria-haspopup="true"
+              title="Opções de perfil e configurações"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="size-7 rounded-full bg-zinc-800 border border-zinc-700 text-white flex items-center justify-center font-semibold text-xs shrink-0">
+                  {displayInitial}
+                </div>
+                <div className="truncate">
+                  <div className="text-xs font-semibold truncate leading-tight">{displayName}</div>
+                  <div className="text-[10px] text-zinc-500 truncate leading-tight mt-0.5">Workspace Pessoal</div>
+                </div>
+              </div>
+              <ChevronUp
+                className={`size-3.5 text-zinc-400 transition-transform duration-200 shrink-0 ml-1 ${
+                  isProfileMenuOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-              isDark
-                ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
-                : 'bg-white border-zinc-200 text-zinc-600 hover:text-zinc-950 hover:border-zinc-300'
-            }`}
-            title={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-            aria-label="Alternar tema"
-          >
-            {isDark ? <Sun className="size-3" /> : <Moon className="size-3" />}
-          </button>
-        </div>
-
-        {/* User Account Info */}
-        <div
-          className={`p-2 rounded-xl flex items-center justify-between border ${
-            isDark
-              ? 'bg-zinc-900/50 border-zinc-800/80 text-zinc-200'
-              : 'bg-white border-zinc-200 text-zinc-900'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="size-7 rounded-full bg-zinc-800 border border-zinc-700 text-white flex items-center justify-center font-semibold text-xs shrink-0">
-              L
-            </div>
-            <div className="truncate">
-              <div className="text-xs font-semibold truncate leading-tight">Lucas</div>
-              <div className="text-[10px] text-zinc-500 truncate leading-tight mt-0.5">Workspace Pessoal</div>
-            </div>
-          </div>
-        </div>
-      </div>
+        );
+      })()}
     </aside>
   );
 };
