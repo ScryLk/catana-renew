@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { GoogleLoginButton } from '../components/auth/GoogleLoginButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +10,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 
 export const Login = () => {
   const navigate = useNavigate();
-  const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
+  const { login, googleLogin, isLoading, error, clearError, isAuthenticated } = useAuthStore();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -31,15 +32,15 @@ export const Login = () => {
     if (isAuthenticated) {
       navigate('/');
     }
-  }, [isAuthenticated, navigate])
+  }, [isAuthenticated, navigate]);
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-950 p-4">
-      <div className="w-full max-w-[1000px] h-[600px] bg-white dark:bg-zinc-900 rounded-[32px] shadow-2xl overflow-hidden flex">
+      <div className="w-full max-w-[1000px] h-[640px] bg-white dark:bg-zinc-900 rounded-[32px] shadow-2xl overflow-hidden flex">
 
         {/* Left Side - Form Area */}
         <div className="w-full lg:w-5/12 p-8 sm:p-12 flex flex-col justify-center relative">
-          <div className="mb-10">
+          <div className="mb-6">
             <img
               src="/logo/logo.png"
               alt="Catana"
@@ -48,28 +49,51 @@ export const Login = () => {
           </div>
 
           <div className="flex-1 flex flex-col justify-center">
-            <div className="mb-8">
+            <div className="mb-6">
               <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Bem-vindo(a)</h1>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">Insira seus dados para continuar.</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">Insira seus dados para continuar no Catana.</p>
             </div>
 
             {error && (
-              <div className="mb-6 p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-sm text-red-600 dark:bg-red-900/10 dark:border-red-900/20 dark:text-red-400">
+              <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-sm text-red-600 dark:bg-red-900/10 dark:border-red-900/20 dark:text-red-400">
                 <AlertCircle className="w-4 h-4" />
                 <span className="font-medium">{error}</span>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Login com Google */}
+            <div className="mb-5 space-y-4">
+              <GoogleLoginButton
+                onSuccess={async (credential) => {
+                  try {
+                    await googleLogin(credential);
+                    navigate('/');
+                  } catch (err) {
+                    console.error('Falha no login com Google:', err);
+                  }
+                }}
+                isLoading={isLoading}
+              />
+
+              <div className="relative flex items-center justify-center">
+                <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
+                <span className="bg-white dark:bg-zinc-900 px-3 text-[11px] uppercase tracking-wider text-zinc-400 shrink-0 font-medium">
+                  ou continue com
+                </span>
+                <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">E-mail</Label>
+                <Label htmlFor="username">E-mail ou usuario</Label>
                 <Input
                   id="username"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   disabled={isLoading}
-                  placeholder="exemplo@email.com"
+                  placeholder="exemplo@email.com ou usuario"
                   className="h-11 rounded-xl bg-zinc-50 border-zinc-200 focus:bg-white transition-all dark:bg-zinc-800 dark:border-zinc-700"
                 />
               </div>

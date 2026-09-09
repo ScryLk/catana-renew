@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { GoogleLoginButton } from '../components/auth/GoogleLoginButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +14,7 @@ type AccountType = 'individual' | 'company';
 
 export const Register = () => {
   const navigate = useNavigate();
-  const { register, isLoading, error: authError, clearError } = useAuthStore();
+  const { register, googleLogin, isLoading, error: authError, clearError } = useAuthStore();
 
   const [currentStep, setCurrentStep] = useState('account');
   const [formData, setFormData] = useState({
@@ -170,6 +171,29 @@ export const Register = () => {
             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
               {currentStep === 'account' && (
                 <div className="space-y-4">
+                  {/* Google Login no Registro */}
+                  <div className="space-y-3">
+                    <GoogleLoginButton
+                      onSuccess={async (credential) => {
+                        try {
+                          await googleLogin(credential);
+                          navigate('/');
+                        } catch (err) {
+                          console.error('Falha no registro via Google:', err);
+                        }
+                      }}
+                      isLoading={isLoading}
+                    />
+
+                    <div className="relative flex items-center justify-center">
+                      <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
+                      <span className="bg-white dark:bg-zinc-900 px-3 text-[11px] uppercase tracking-wider text-zinc-400 shrink-0 font-medium">
+                        ou preencha os dados
+                      </span>
+                      <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
                     <Label htmlFor="fullName">Nome Completo</Label>
                     <Input

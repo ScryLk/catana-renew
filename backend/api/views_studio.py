@@ -2,8 +2,9 @@ import json
 import logging
 from typing import Generator
 from django.http import StreamingHttpResponse, JsonResponse
+from django.db.models import Q
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from drf_spectacular.utils import extend_schema
@@ -43,10 +44,10 @@ class StudioQuotaStatusView(APIView):
     """
     Consulta o plano atual, consumo de tokens e limites de taxa.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user if request.user.is_authenticated else None
+        user = request.user
         quota, plan = get_user_quota(user)
 
         tokens_used = quota.tokens_used_this_month if quota else 0
@@ -68,12 +69,15 @@ class StudioQuotaStatusView(APIView):
 
 class StudioCatalogListView(APIView):
     """
-    Lista e cria novos catalogos do Studio.
+    Lista e cria novos catalogos do Studio isolados por usuario e organizacao.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        catalogs = StudioCatalog.objects.all().order_by("-updated_at")
+        user = request.user
+        catalogs = StudioCatalog.objects.filter(
+            Q(created_by=user) | Q(organization__in=user.organizations.all())
+        ).distinct().order_by("-updated_at")
         results = []
         for cat in catalogs:
             spread_count = cat.spreads.count()
@@ -101,7 +105,8 @@ class StudioCatalogListView(APIView):
         primary_color = data.get("primary_color", "#111827")
         secondary_color = data.get("secondary_color", "#6366f1")
 
-        user = request.user if request.user.is_authenticated else None
+        user = request.user
+        org = user.organizations.first()
 
         catalog = StudioCatalog.objects.create(
             title=title,
@@ -109,6 +114,7 @@ class StudioCatalogListView(APIView):
             style_preset=style_preset,
             primary_color=primary_color,
             secondary_color=secondary_color,
+            organization=org,
             created_by=user,
         )
 
@@ -144,12 +150,17 @@ class StudioCatalogDetailView(APIView):
     """
     Recupera, atualiza ou exclui um catalogo do Studio com seus spreads.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
+
+    def get_catalog(self, user, pk):
+        return StudioCatalog.objects.filter(
+            Q(created_by=user) | Q(organization__in=user.organizations.all()),
+            pk=pk
+        ).first()
 
     def get(self, request, pk):
-        try:
-            catalog = StudioCatalog.objects.get(pk=pk)
-        except StudioCatalog.DoesNotExist:
+        catalog = self.get_catalog(request.user, pk)
+        if not catalog:
             return Response({"error": "Catalogo nao encontrado"}, status=status.HTTP_404_NOT_FOUND)
 
         spreads = []
@@ -184,9 +195,8 @@ class StudioCatalogDetailView(APIView):
         })
 
     def put(self, request, pk):
-        try:
-            catalog = StudioCatalog.objects.get(pk=pk)
-        except StudioCatalog.DoesNotExist:
+        catalog = self.get_catalog(request.user, pk)
+        if not catalog:
             return Response({"error": "Catalogo nao encontrado"}, status=status.HTTP_404_NOT_FOUND)
 
         data = request.data
@@ -203,24 +213,28 @@ class StudioCatalogDetailView(APIView):
         return Response({"status": "updated", "id": catalog.id, "title": catalog.title})
 
     def delete(self, request, pk):
-        try:
-            catalog = StudioCatalog.objects.get(pk=pk)
-            catalog.delete()
-            return Response({"status": "deleted"}, status=status.HTTP_204_NO_CONTENT)
-        except StudioCatalog.DoesNotExist:
+        catalog = self.get_catalog(request.user, pk)
+        if not catalog:
             return Response({"error": "Catalogo nao encontrado"}, status=status.HTTP_404_NOT_FOUND)
+
+        catalog.delete()
+        return Response({"status": "deleted"}, status=status.HTTP_204_NO_CONTENT)
 
 
 class StudioSpreadManageView(APIView):
     """
     Gerencia spreads individuais (salvar alteracoes de layout e paginas duplas).
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, catalog_id):
-        try:
-            catalog = StudioCatalog.objects.get(pk=catalog_id)
-        except StudioCatalog.DoesNotExist:
+        user = request.user
+        catalog = StudioCatalog.objects.filter(
+            Q(created_by=user) | Q(organization__in=user.organizations.all()),
+            pk=catalog_id
+        ).first()
+
+        if not catalog:
             return Response({"error": "Catalogo nao encontrado"}, status=status.HTTP_404_NOT_FOUND)
 
         data = request.data
@@ -252,12 +266,16 @@ class StudioThreadMessagesView(APIView):
     """
     Recupera o historico de mensagens de uma sessao de chat.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, thread_id):
-        try:
-            thread = ChatThread.objects.get(pk=thread_id)
-        except ChatThread.DoesNotExist:
+        user = request.user
+        thread = ChatThread.objects.filter(
+            Q(user=user) | Q(catalog__created_by=user) | Q(catalog__organization__in=user.organizations.all()),
+            pk=thread_id
+        ).first()
+
+        if not thread:
             return Response({"error": "Sessao nao encontrada"}, status=status.HTTP_404_NOT_FOUND)
 
         messages = []
@@ -284,10 +302,10 @@ class StudioChatStreamView(APIView):
     Endpoint SSE (Server-Sent Events) para streaming de respostas dos agentes do Studio.
     Verifica cotas, aplica rate limiting, processa anexos multimodais e registra consumo de tokens.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user if request.user.is_authenticated else None
+        user = request.user
         client_ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "127.0.0.1"))
         if "," in client_ip:
             client_ip = client_ip.split(",")[0].strip()

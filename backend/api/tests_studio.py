@@ -3,6 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
+from django.contrib.auth import get_user_model
 from api.models import (
     StudioCatalog,
     CatalogSpread,
@@ -20,6 +21,8 @@ from api.guards.quota_guard import (
     QuotaExceededException,
 )
 
+User = get_user_model()
+
 class StudioBackendTests(TestCase):
     """
     Testes de integracao e conformidade da API do Catana Studio 2.0.
@@ -27,6 +30,12 @@ class StudioBackendTests(TestCase):
 
     def setUp(self):
         self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="test_studio_user",
+            email="studio@catana.dev",
+            password="password123"
+        )
+        self.client.force_authenticate(user=self.user)
         self.plan = get_or_create_default_plan("free")
 
     def test_list_agents(self):
@@ -99,9 +108,10 @@ class StudioBackendTests(TestCase):
     def test_rate_limit_enforcement(self):
         """Verifica se o rate limiter bloqueia excesso de requisicoes com HTTP 429"""
         test_ip = "192.168.1.99"
-        # Esgota as requisicoes permitidas
+        # Esgota as requisicoes permitidas para o usuario
+        identifier = f"user_{self.user.id}"
         for _ in range(15):
-            rate_limiter.check_rate_limit(f"ip_{test_ip}", max_rpm=15)
+            rate_limiter.check_rate_limit(identifier, max_rpm=15)
 
         # A decima sexta requisicao deve falhar
         url = reverse('studio_chat_stream')

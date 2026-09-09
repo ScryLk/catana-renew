@@ -2,11 +2,11 @@ import { logger } from '../utils/logger';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import axios from 'axios';
+import { setInMemoryAccessToken } from '../services/api';
 
-// FRG-04: respeita VITE_API_BASE_URL como o resto dos services (api.ts).
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-// ⚙️ Login automático (conveniência de dev — autenticação não exigida no momento).
+// Login automatico (conveniencia de dev - autenticacao nao exigida no momento).
 // Para desligar e voltar a exigir login manual: VITE_AUTO_LOGIN=false no .env do front.
 export const AUTO_LOGIN_ENABLED =
   (import.meta.env.VITE_AUTO_LOGIN ?? 'true') !== 'false';
@@ -17,15 +17,11 @@ const DEFAULT_USER = {
   role: 'admin',
 };
 
-// Boot do auto-login: roda UMA vez por carregamento de página (não por
-// navegação SPA). Garante um token válido antes de qualquer requisição
-// protegida — sem isso, no reload o editor dispara /catalogs e /pages antes do
-// token e a corrida de 401 fazia o catálogo "sumir".
 let autoLoginPromise: Promise<void> | null = null;
 let autoLoginDone = false;
 export const isAutoLoginSettled = () => autoLoginDone || !AUTO_LOGIN_ENABLED;
 
-interface User {
+export interface User {
   id: number;
   name: string;
   email: string;
@@ -36,21 +32,53 @@ interface User {
 
 interface AuthStore {
   user: User | null;
+  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
   login: (credentials: { username: string; password: string }) => Promise<void>;
-  logout: () => void;
-  checkAuth: () => void;
+  googleLogin: (credential: string) => Promise<void>;
+  logout: () => Promise<void>;
+  checkAuth: () => Promise<void>;
+  silentRefresh: () => Promise<boolean>;
   clearError: () => void;
   register: (user: any) => Promise<void>;
   autoLogin: () => Promise<void>;
+}
+
+// Helper para selecionar organizacao e sede padrao apos login
+async function setupUserOrganizationContext(accessToken: string) {
+  try {
+    const orgsResponse = await axios.get(`${API_BASE_URL}/api/organizations/`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      withCredentials: true,
+    });
+
+    const organizations = orgsResponse.data?.results ?? orgsResponse.data;
+
+    if (organizations && organizations.length > 0) {
+      const firstOrg = organizations[0];
+      localStorage.setItem('active_organization', JSON.stringify(firstOrg));
+
+      if (firstOrg.default_sede && firstOrg.sedes) {
+        const defaultSede = firstOrg.sedes.find((s: any) => s.id === firstOrg.default_sede);
+        if (defaultSede) {
+          localStorage.setItem('active_sede', JSON.stringify(defaultSede));
+        }
+      }
+    }
+  } catch (orgError) {
+    logger.debug('Falha ao carregar organizacao inicial:', orgError);
+  }
 }
 
 export const useAuthStore = create<AuthStore>()(
   persist(
     (set, get) => ({
       user: null,
+      token: null,
       isAuthenticated: false,
       isLoading: false,
       error: null,
@@ -58,128 +86,230 @@ export const useAuthStore = create<AuthStore>()(
       login: async (credentials) => {
         set({ isLoading: true, error: null });
         try {
-          // Fazer login na API
-          const response = await axios.post(`${API_BASE_URL}/api/auth/token/`, {
-            username: credentials.username,
-            password: credentials.password,
-          });
-
-          const { access, refresh } = response.data;
-
-          // Salvar tokens no localStorage
-          localStorage.setItem('access_token', access);
-          localStorage.setItem('refresh_token', refresh);
-
-          // Buscar dados do perfil do usuário
-          const profileResponse = await axios.get(`${API_BASE_URL}/api/profile/`, {
-            headers: {
-              Authorization: `Bearer ${access}`,
+          // Dispara login seguro com cookie HttpOnly de refresh token
+          const response = await axios.post(
+            `${API_BASE_URL}/api/auth/token/`,
+            {
+              username: credentials.username,
+              password: credentials.password,
             },
-          });
+            { withCredentials: true }
+          );
 
-          const userData = profileResponse.data;
+          const { access, user: rawUser } = response.data;
 
-          const user: User = {
-            id: userData.id,
-            name: userData.name || userData.username,
-            email: userData.email,
-            avatar: userData.avatar,
-            username: userData.username,
-            role: userData.role || 'viewer',
-          };
+          setInMemoryAccessToken(access);
+          localStorage.setItem('access_token', access);
+          // O refresh_token e gerenciado via Cookie HttpOnly seguro pelo backend
 
-          // 🏢 Auto-select Organização e Sede padrão no login
-          // Busca as organizações do usuário
-          try {
-            const orgsResponse = await axios.get(`${API_BASE_URL}/api/organizations/`, {
-              headers: {
-                Authorization: `Bearer ${access}`,
-              },
+          let user: User;
+          if (rawUser) {
+            user = {
+              id: rawUser.id,
+              name: rawUser.name || rawUser.username,
+              email: rawUser.email,
+              avatar: rawUser.avatar,
+              username: rawUser.username,
+              role: rawUser.role || 'editor',
+            };
+          } else {
+            const profileResponse = await axios.get(`${API_BASE_URL}/api/profile/`, {
+              headers: { Authorization: `Bearer ${access}` },
+              withCredentials: true,
             });
-
-            // Esta chamada usa axios cru (não a instância 'api'), então o
-            // envelope de paginação do DRF não é desembrulhado aqui.
-            const organizations = orgsResponse.data?.results ?? orgsResponse.data;
-
-            if (organizations && organizations.length > 0) {
-              // Pega a primeira organização (ou a última usada, se implementado)
-              const firstOrg = organizations[0];
-              localStorage.setItem('active_organization', JSON.stringify(firstOrg));
-
-              // Se tiver sede padrão, ativa automaticamente
-              if (firstOrg.default_sede && firstOrg.sedes) {
-                const defaultSede = firstOrg.sedes.find((s: any) => s.id === firstOrg.default_sede);
-                if (defaultSede) {
-                  localStorage.setItem('active_sede', JSON.stringify(defaultSede));
-                }
-              }
-            }
-          } catch (orgError) {
-            console.error('Erro ao carregar organizações no login:', orgError);
-            // Não bloqueia o login se falhar
+            const userData = profileResponse.data;
+            user = {
+              id: userData.id,
+              name: userData.name || userData.username,
+              email: userData.email,
+              avatar: userData.avatar,
+              username: userData.username,
+              role: userData.role || 'viewer',
+            };
           }
+
+          await setupUserOrganizationContext(access);
 
           set({
             user,
+            token: access,
             isAuthenticated: true,
             isLoading: false,
           });
-        } catch (err) {
-          // Limpar tokens em caso de erro
+        } catch (err: any) {
+          setInMemoryAccessToken(null);
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
 
+          const errorMsg =
+            err.response?.data?.error ||
+            err.response?.data?.detail ||
+            (err instanceof Error ? err.message : 'Credenciais invalidas');
+
           set({
-            error: err instanceof Error ? err.message : 'Erro ao fazer login',
+            error: errorMsg,
             isLoading: false,
             user: null,
+            token: null,
             isAuthenticated: false,
           });
           throw err;
         }
       },
 
-      logout: () => {
-        // Limpar tokens
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
+      googleLogin: async (credential: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await axios.post(
+            `${API_BASE_URL}/api/auth/google/`,
+            { credential },
+            { withCredentials: true }
+          );
 
-        // 🏢 Limpar contexto de organização e sede
-        localStorage.removeItem('active_organization');
-        localStorage.removeItem('active_sede');
+          const { access, user: rawUser } = response.data;
 
-        set({ user: null, isAuthenticated: false });
+          setInMemoryAccessToken(access);
+          localStorage.setItem('access_token', access);
+
+          const user: User = {
+            id: rawUser.id,
+            name: rawUser.name || rawUser.username,
+            email: rawUser.email,
+            avatar: rawUser.avatar,
+            username: rawUser.username,
+            role: rawUser.role || 'editor',
+          };
+
+          await setupUserOrganizationContext(access);
+
+          set({
+            user,
+            token: access,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        } catch (err: any) {
+          setInMemoryAccessToken(null);
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+
+          const errorMsg =
+            err.response?.data?.error ||
+            err.response?.data?.detail ||
+            'Falha na autenticacao com o Google';
+
+          set({
+            error: errorMsg,
+            isLoading: false,
+            user: null,
+            token: null,
+            isAuthenticated: false,
+          });
+          throw err;
+        }
       },
 
-      checkAuth: () => {
-        const { user } = get();
-        const token = localStorage.getItem('access_token');
+      silentRefresh: async () => {
+        try {
+          const response = await axios.post(
+            `${API_BASE_URL}/api/auth/token/refresh/`,
+            {},
+            { withCredentials: true }
+          );
 
-        if (user && token) {
-          logger.debug('User authenticated:', user.name);
-        } else if (!token && user) {
-          // Token expirado mas ainda tem user no store
-          set({ user: null, isAuthenticated: false });
+          const { access, user: rawUser } = response.data;
+          setInMemoryAccessToken(access);
+          localStorage.setItem('access_token', access);
+
+          let user = get().user;
+          if (rawUser) {
+            user = {
+              id: rawUser.id,
+              name: rawUser.name || rawUser.username,
+              email: rawUser.email,
+              avatar: rawUser.avatar,
+              username: rawUser.username,
+              role: rawUser.role || 'editor',
+            };
+          } else if (!user) {
+            const profileResponse = await axios.get(`${API_BASE_URL}/api/profile/`, {
+              headers: { Authorization: `Bearer ${access}` },
+              withCredentials: true,
+            });
+            const userData = profileResponse.data;
+            user = {
+              id: userData.id,
+              name: userData.name || userData.username,
+              email: userData.email,
+              avatar: userData.avatar,
+              username: userData.username,
+              role: userData.role || 'viewer',
+            };
+          }
+
+          set({
+            user,
+            token: access,
+            isAuthenticated: true,
+          });
+          return true;
+        } catch {
+          setInMemoryAccessToken(null);
+          localStorage.removeItem('access_token');
+          set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+          });
+          return false;
         }
+      },
+
+      logout: async () => {
+        try {
+          await axios.post(
+            `${API_BASE_URL}/api/auth/logout/`,
+            {},
+            { withCredentials: true }
+          );
+        } catch (e) {
+          logger.debug('Logout endpoint falhou silenciosamente:', e);
+        } finally {
+          setInMemoryAccessToken(null);
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('active_organization');
+          localStorage.removeItem('active_sede');
+          set({ user: null, token: null, isAuthenticated: false });
+        }
+      },
+
+      checkAuth: async () => {
+        const storedToken = localStorage.getItem('access_token');
+        if (storedToken) {
+          setInMemoryAccessToken(storedToken);
+        }
+        await get().silentRefresh();
       },
 
       clearError: () => set({ error: null }),
 
-      // Entra automaticamente com o usuário padrão. Se ele ainda não existir
-      // (banco novo), registra e já fica autenticado. Idempotente.
       autoLogin: async () => {
         if (!AUTO_LOGIN_ENABLED) return;
-        // Uma sessão fresca por carregamento de página (login real → token novo),
-        // memoizada para não relogar a cada navegação SPA.
         if (autoLoginPromise) return autoLoginPromise;
+
         autoLoginPromise = (async () => {
           try {
+            // Tenta primeiro refresh silencioso via cookie existente
+            const refreshed = await get().silentRefresh();
+            if (refreshed) return;
+
+            // Caso contrario, utiliza o usuario padrao de desenvolvimento
             await get().login({
               username: DEFAULT_USER.username,
               password: DEFAULT_USER.password,
             });
           } catch {
-            // Usuário padrão pode não existir (banco novo) — cria e autentica.
             try {
               await get().register({
                 username: DEFAULT_USER.username,
@@ -189,29 +319,31 @@ export const useAuthStore = create<AuthStore>()(
               });
             } catch (err) {
               if (import.meta.env.DEV) {
-                console.error('[autoLogin] falha ao criar/logar usuário padrão', err);
+                console.error('[autoLogin] falha ao registrar usuario demo', err);
               }
             }
           } finally {
             autoLoginDone = true;
           }
         })();
+
         return autoLoginPromise;
       },
 
       register: async (credentials) => {
         set({ isLoading: true, error: null });
         try {
-          // Registrar usuário
-          const response = await axios.post(`${API_BASE_URL}/api/register/`, credentials);
+          const response = await axios.post(
+            `${API_BASE_URL}/api/register/`,
+            credentials,
+            { withCredentials: true }
+          );
 
-          const { user: userData, access, refresh, organization, default_sede } = response.data;
+          const { user: userData, access, organization, default_sede } = response.data;
 
-          // Salvar tokens no localStorage
+          setInMemoryAccessToken(access);
           localStorage.setItem('access_token', access);
-          localStorage.setItem('refresh_token', refresh);
 
-          // 🏢 Salvar Organização e Sede criadas automaticamente
           if (organization) {
             localStorage.setItem('active_organization', JSON.stringify(organization));
           }
@@ -219,10 +351,9 @@ export const useAuthStore = create<AuthStore>()(
             localStorage.setItem('active_sede', JSON.stringify(default_sede));
           }
 
-          // Formatar usuário para o store
           const user: User = {
             id: userData.id,
-            name: userData.first_name || userData.username, // UserSerializer might return first/last name or just username
+            name: userData.first_name || userData.username,
             email: userData.email,
             avatar: userData.avatar,
             username: userData.username,
@@ -231,11 +362,16 @@ export const useAuthStore = create<AuthStore>()(
 
           set({
             user,
+            token: access,
             isAuthenticated: true,
-            isLoading: false
+            isLoading: false,
           });
         } catch (err: any) {
-          const errorMessage = err.response?.data?.error || err.response?.data?.detail || err.message || 'Erro ao registrar';
+          const errorMessage =
+            err.response?.data?.error ||
+            err.response?.data?.detail ||
+            err.message ||
+            'Erro ao registrar conta';
           set({
             error: errorMessage,
             isLoading: false,
@@ -246,6 +382,10 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'catana-auth-storage',
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+      }),
     }
   )
 );

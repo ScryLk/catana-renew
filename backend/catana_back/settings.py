@@ -2,6 +2,7 @@
 # .env do historico git (BFG/git filter-repo). O .env foi removido do tracking,
 # mas os segredos antigos ja vazaram no historico e precisam ser invalidados.
 import environ
+from datetime import timedelta
 from pathlib import Path
 
 env = environ.Env(
@@ -38,6 +39,7 @@ CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[
 ])
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOW_CREDENTIALS = True
+CORS_EXPOSE_HEADERS = ['Set-Cookie']
 
 # Application definition
 
@@ -49,6 +51,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'api',
     'drf_spectacular',
@@ -168,3 +171,33 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Google Gemini AI configuration
 GEMINI_API_KEY = env('GEMINI_API_KEY', default='')
 AI_DEFAULT_MODEL = env('AI_DEFAULT_MODEL', default='gemini-2.0-flash')
+
+# ==============================================================================
+# CATANA 2.0 - AUTENTICACAO AVANCADA, SIMPLE_JWT & GOOGLE OAUTH 2.0
+# ==============================================================================
+
+AUTHENTICATION_BACKENDS = [
+    'api.auth_backends.EmailOrUsernameModelBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
+# Parametros para Cookie HttpOnly de Refresh Token (Opcao A)
+JWT_AUTH_COOKIE_REFRESH = 'catana_refresh_token'
+JWT_AUTH_COOKIE_PATH = '/api/auth/'
+JWT_AUTH_COOKIE_SAMESITE = 'Lax'
+JWT_AUTH_COOKIE_SECURE = not DEBUG
+
+# Google OAuth 2.0
+GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID', default='')
+GOOGLE_CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET', default='')

@@ -1,34 +1,46 @@
 import axios, { AxiosError } from 'axios';
 
-// TODO(arquitetura) SEG-06: avaliar mover o refresh token para cookie
-// HttpOnly/SameSite em vez de localStorage (mitiga roubo via XSS).
-
 // Base URL da API (de acordo com o swagger)
 const API_BASE_URL = (import.meta.env && import.meta.env.VITE_API_BASE_URL) || 'http://localhost:8000';
 
-// SEG-02: limpa a sessão e manda para o login (usado em 401 sem refresh).
+// Token mantido em memoria (Zustand / Runtime)
+let inMemoryAccessToken: string | null = null;
+
+export function setInMemoryAccessToken(token: string | null) {
+  inMemoryAccessToken = token;
+}
+
+export function getInMemoryAccessToken(): string | null {
+  return inMemoryAccessToken;
+}
+
+// Limpa a sessao e manda para o login (usado em 401 sem refresh)
 function forceLogout() {
+  inMemoryAccessToken = null;
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('user');
-  if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+  localStorage.removeItem('active_organization');
+  localStorage.removeItem('active_sede');
+  if (typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/register') {
     window.location.href = '/login';
   }
 }
 
-// Criar instância do axios
+// Criar instancia do axios com credenciais habilitadas para cookies HttpOnly
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
   timeout: 30000,
 });
 
-// Interceptor de requisição - adiciona o token JWT automaticamente
+// Interceptor de requisicao - adiciona o token JWT automaticamente
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    const token = inMemoryAccessToken || localStorage.getItem('access_token');
 
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -41,11 +53,10 @@ api.interceptors.request.use(
   }
 );
 
-// Backend usa paginação global do DRF: listagens vêm como
+// Backend usa paginacao global do DRF: listagens vem como
 // { count, next, previous, results: [...] }. Os services do front esperam
 // um array. Aqui desembrulhamos para o array, preservando os metadados de
-// paginação como props NÃO-enumeráveis (results/count/next/previous), de
-// modo que tanto `data.map(...)` quanto `data.count` continuem funcionando.
+// paginacao como props NAO-enumeraveis (results/count/next/previous).
 function unwrapPaginated(data: any): any {
   if (
     data &&
@@ -68,7 +79,25 @@ function unwrapPaginated(data: any): any {
   return data;
 }
 
-// Interceptor de resposta - trata erros e refresh de token
+// Controle de concorrencia: fila de espera para renovacao silenciosa de token
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (value?: unknown) => void;
+  reject: (reason?: unknown) => void;
+}> = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
+// Interceptor de resposta - trata erros e refresh de token seguro
 api.interceptors.response.use(
   (response) => {
     response.data = unwrapPaginated(response.data);
@@ -77,39 +106,50 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as any & { _retry?: boolean };
 
-    // Se o erro for 401 e não for uma tentativa de retry
+    // Se o erro for 401 e nao for uma tentativa de retry
     if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      const refreshToken = localStorage.getItem('refresh_token');
-
-      // Sem refresh token: sessão inválida, força logout.
-      if (!refreshToken) {
-        forceLogout();
-        return Promise.reject(error);
+      if (isRefreshing) {
+        // Enfileira requisicoes concorrentes ate que o refresh termine
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((newToken) => {
+            if (originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            }
+            return api(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
       }
 
+      originalRequest._retry = true;
+      isRefreshing = true;
+
       try {
-        // Tentar refresh do token
-        const response = await axios.post(`${API_BASE_URL}/api/auth/token/refresh/`, {
-          refresh: refreshToken,
-        });
+        // O cookie catana_refresh_token e enviado automaticamente pelo browser
+        const response = await axios.post(
+          `${API_BASE_URL}/api/auth/token/refresh/`,
+          {},
+          { withCredentials: true }
+        );
 
         const { access } = response.data;
-
-        // Salvar novo access token
+        setInMemoryAccessToken(access);
         localStorage.setItem('access_token', access);
 
-        // Refazer a requisição original com o novo token
+        processQueue(null, access);
+
         if (originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${access}`;
         }
 
         return api(originalRequest);
       } catch (refreshError) {
-        // Se o refresh falhar, limpar tokens e redirecionar para login
+        processQueue(refreshError, null);
         forceLogout();
         return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
 

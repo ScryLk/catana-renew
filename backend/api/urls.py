@@ -15,9 +15,12 @@ from .views import (
     public_profile_catalogs, public_profile_follow, public_profile_save, public_profile_block,
     public_catalogs_featured, public_catalog_like, public_catalog_view, public_catalog_share
 )
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
+from .views_auth import (
+    CatanaTokenObtainPairView,
+    CatanaTokenRefreshView,
+    CatanaLogoutView,
+    CatanaLogoutAllView,
+    GoogleAuthView,
 )
 from .views_studio import (
     StudioAgentsListView,
@@ -53,8 +56,11 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('auth/token/', CatanaTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('auth/token/refresh/', CatanaTokenRefreshView.as_view(), name='token_refresh'),
+    path('auth/logout/', CatanaLogoutView.as_view(), name='token_logout'),
+    path('auth/logout-all/', CatanaLogoutAllView.as_view(), name='token_logout_all'),
+    path('auth/google/', GoogleAuthView.as_view(), name='google_auth'),
     path('register/', register_user, name='register'),
     path('dashboard/stats/', dashboard_stats, name='dashboard_stats'),
 
@@ -64,7 +70,7 @@ urlpatterns = [
     path('profile/change-password/', change_password, name='change_password'),
     path('profile/preferences/', preferences_view, name='preferences'),
     path('profile/activity/', recent_activity, name='recent_activity'),
-    path('profile/logout-all/', logout_all_sessions, name='logout_all_sessions'),
+    path('profile/logout-all/', CatanaLogoutAllView.as_view(), name='logout_all_sessions'),
 
     # Search endpoints
     path('search/global/', global_search, name='global_search'),
