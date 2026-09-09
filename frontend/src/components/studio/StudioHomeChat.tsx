@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Paperclip,
   ArrowRight,
-  PanelLeftOpen,
   X,
   FileSpreadsheet,
   FileText,
@@ -29,8 +28,6 @@ export const StudioHomeChat: React.FC = () => {
   const {
     startSession,
     theme,
-    isStudioSidebarOpen,
-    toggleStudioSidebar,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -155,24 +152,6 @@ export const StudioHomeChat: React.FC = () => {
         className="hidden"
         aria-label="Upload de arquivos"
       />
-
-      {/* Floating Sidebar Toggle when sidebar is closed */}
-      {!isStudioSidebarOpen && (
-        <button
-          type="button"
-          onClick={toggleStudioSidebar}
-          className={`absolute top-4 left-4 px-2.5 py-1.5 rounded-xl border flex items-center gap-2 text-xs z-20 cursor-pointer shadow-xs transition-all ${
-            isDark
-              ? 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800'
-              : 'bg-white border-zinc-200 text-zinc-700 hover:text-zinc-950 hover:bg-zinc-100'
-          }`}
-          title="Expandir barra lateral de catálogos (Ctrl+B)"
-          aria-label="Expandir barra lateral"
-        >
-          <PanelLeftOpen className="size-3.5" />
-          <span className="font-medium">Catálogos</span>
-        </button>
-      )}
 
       <div className="w-full max-w-2xl flex flex-col items-center text-center relative z-10">
         {/* Cursive Brand Icon */}

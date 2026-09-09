@@ -13,7 +13,6 @@ import {
   Edit2,
   Share2,
   Download,
-  PanelLeftOpen,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
 import { toast } from 'sonner';
@@ -32,8 +31,6 @@ export const CanvasTopToolbar: React.FC = () => {
     totalPages,
     nextSpread,
     prevSpread,
-    isStudioSidebarOpen,
-    toggleStudioSidebar,
     theme,
   } = useStudioStore();
 
@@ -73,23 +70,8 @@ export const CanvasTopToolbar: React.FC = () => {
         isDark ? 'bg-[#0e0e11] border-zinc-800 text-zinc-300' : 'bg-white border-zinc-200 text-zinc-700'
       }`}
     >
-      {/* LEFT: Sidebar Toggle (if closed) + Catalog Title + Spread Navigator */}
+      {/* LEFT: Catalog Title + Spread Navigator */}
       <div className="flex items-center gap-2.5 min-w-0">
-        {!isStudioSidebarOpen && (
-          <button
-            type="button"
-            onClick={toggleStudioSidebar}
-            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-              isDark
-                ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
-                : 'bg-zinc-100 border-zinc-200 text-zinc-600 hover:text-zinc-950'
-            }`}
-            title="Expandir barra lateral (Ctrl+B)"
-            aria-label="Expandir barra lateral"
-          >
-            <PanelLeftOpen className="size-3.5" />
-          </button>
-        )}
 
         {/* Editable Title */}
         <div className="flex items-center gap-1.5 truncate">

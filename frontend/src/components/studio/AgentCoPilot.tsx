@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Plus, History, ChevronDown, Check, Trash2, Settings2, Users, Scale, Palette, Lock, Unlock } from 'lucide-react';
+import { Sparkles, Plus, History, ChevronDown, Check, Trash2, Settings2, Users, Scale, Palette, Lock, Unlock, PanelLeftOpen } from 'lucide-react';
 import { ExecutionPlanCard } from './ExecutionPlanCard';
 import { AgentChatStream } from './AgentChatStream';
 import { AgentInputBar } from './AgentInputBar';
@@ -28,6 +28,8 @@ export const AgentCoPilot: React.FC = () => {
     createThread,
     switchThread,
     closeThread,
+    isStudioSidebarOpen,
+    toggleStudioSidebar,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -74,6 +76,21 @@ export const AgentCoPilot: React.FC = () => {
         }`}
       >
         <div className="flex items-center gap-1.5">
+          {!isStudioSidebarOpen && (
+            <button
+              type="button"
+              onClick={toggleStudioSidebar}
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer mr-0.5 ${
+                isDark
+                  ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
+                  : 'bg-white border-zinc-200 text-zinc-600 hover:text-zinc-950 shadow-xs'
+              }`}
+              title="Abrir barra lateral (Ctrl+B)"
+              aria-label="Abrir barra lateral"
+            >
+              <PanelLeftOpen className="size-3.5" />
+            </button>
+          )}
           <div className="relative" ref={roleDropdownRef}>
             <button
               type="button"
