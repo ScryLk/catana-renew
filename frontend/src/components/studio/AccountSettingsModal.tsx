@@ -427,35 +427,46 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                         value={formData.language}
                         onValueChange={(val) => setFormData({ ...formData, language: val })}
                       >
-                        <SelectTrigger id="select-modal-lang" className="h-9 text-xs">
+                        <SelectTrigger
+                          id="select-modal-lang"
+                          className={`h-9 text-xs rounded-xl border transition-all cursor-pointer ${
+                            isDark
+                              ? 'bg-zinc-900/60 border-zinc-800 text-zinc-200 hover:border-zinc-700 hover:bg-zinc-800/40 focus:border-zinc-600'
+                              : 'bg-zinc-50 border-zinc-200 text-zinc-900 hover:border-zinc-300 focus:border-zinc-400'
+                          }`}
+                        >
                           <SelectValue placeholder="Idioma" />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pt-BR" className="text-xs">
+                        <SelectContent
+                          className={`rounded-xl border shadow-2xl p-1.5 z-[70] backdrop-blur-md min-w-[var(--radix-select-trigger-width)] ${
+                            isDark
+                              ? 'bg-[#141418]/95 border-zinc-800 text-zinc-100 shadow-black/80'
+                              : 'bg-white/95 border-zinc-200 text-zinc-900 shadow-zinc-300/50'
+                          }`}
+                        >
+                          <SelectItem
+                            value="pt-BR"
+                            className={`text-xs rounded-lg py-2.5 pl-8 pr-3 cursor-pointer transition-colors ${
+                              isDark
+                                ? 'hover:bg-zinc-800/80 focus:bg-zinc-800 focus:text-white text-zinc-200'
+                                : 'hover:bg-zinc-100 focus:bg-zinc-100 focus:text-zinc-950 text-zinc-800'
+                            }`}
+                          >
                             Portugues (Brasil)
                           </SelectItem>
-                          <SelectItem value="en" className="text-xs">
+                          <SelectItem
+                            value="en"
+                            className={`text-xs rounded-lg py-2.5 pl-8 pr-3 cursor-pointer transition-colors ${
+                              isDark
+                                ? 'hover:bg-zinc-800/80 focus:bg-zinc-800 focus:text-white text-zinc-200'
+                                : 'hover:bg-zinc-100 focus:bg-zinc-100 focus:text-zinc-950 text-zinc-800'
+                            }`}
+                          >
                             English (US)
                           </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
-
-                  {/* Salvar */}
-                  <div className="pt-2 flex justify-end">
-                    <Button
-                      onClick={handleSaveProfile}
-                      disabled={isSavingProfile}
-                      className={`h-8 text-xs cursor-pointer gap-1.5 ${
-                        isDark
-                          ? 'bg-zinc-100 hover:bg-white text-zinc-950 font-medium'
-                          : 'bg-zinc-900 hover:bg-zinc-800 text-white font-medium'
-                      }`}
-                    >
-                      <Save className="w-3.5 h-3.5" />
-                      {isSavingProfile ? 'Salvando...' : 'Salvar'}
-                    </Button>
                   </div>
                 </div>
               )}
@@ -626,6 +637,31 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
             </>
           )}
         </div>
+
+        {/* Rodape do Modal */}
+        {activeTab === 'profile' && (
+          <div
+            className={`px-5 py-3 border-t flex items-center justify-between transition-colors shrink-0 ${
+              isDark ? 'border-zinc-800/80 bg-zinc-900/30' : 'border-zinc-100 bg-zinc-50/70'
+            }`}
+          >
+            <span className="text-[11px] text-zinc-500">
+              Preferencias do Studio salvas automaticamente na conta.
+            </span>
+            <Button
+              onClick={handleSaveProfile}
+              disabled={isSavingProfile}
+              className={`h-8 px-4 text-xs cursor-pointer gap-1.5 rounded-lg transition-all ${
+                isDark
+                  ? 'bg-zinc-100 hover:bg-white text-zinc-950 font-medium shadow-xs'
+                  : 'bg-zinc-900 hover:bg-zinc-800 text-white font-medium shadow-xs'
+              }`}
+            >
+              <Save className="w-3.5 h-3.5" />
+              {isSavingProfile ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
