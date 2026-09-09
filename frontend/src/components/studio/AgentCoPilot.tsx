@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Plus, History, ChevronDown, Check, Trash2, Settings2, Users, Scale, Palette, Lock, Unlock, PanelLeftOpen } from 'lucide-react';
+import { Sparkles, Plus, History, ChevronDown, Check, Trash2, Settings2, Users, Scale, Palette, Lock, Unlock, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 import { ExecutionPlanCard } from './ExecutionPlanCard';
 import { AgentChatStream } from './AgentChatStream';
 import { AgentInputBar } from './AgentInputBar';
@@ -30,6 +30,7 @@ export const AgentCoPilot: React.FC = () => {
     closeThread,
     isStudioSidebarOpen,
     toggleStudioSidebar,
+    toggleCoPilot,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -282,23 +283,22 @@ export const AgentCoPilot: React.FC = () => {
                 }`}
               >
                 <div className="px-2.5 py-1.5 border-b border-zinc-700/40 mb-1 flex items-center justify-between">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-medium">
-                    Conversas Ativas ({threads.length})
+                  <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 font-medium">
+                    Conversas Ativas
                   </span>
                   <button
                     type="button"
-                    onClick={handleCreateNewThread}
-                    className={`text-[10px] font-medium flex items-center gap-1 hover:underline cursor-pointer ${
-                      isDark ? 'text-zinc-300 hover:text-white' : 'text-zinc-700 hover:text-zinc-950'
-                    }`}
+                    onClick={() => setIsHistoryOpen(false)}
+                    className="text-zinc-400 hover:text-zinc-200 p-0.5 rounded cursor-pointer"
+                    aria-label="Fechar histórico"
                   >
-                    <Plus className="size-2.5" /> Nova
+                    <Check className="size-3" />
                   </button>
                 </div>
 
-                <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-1 py-0.5">
+                <div className="max-h-60 overflow-y-auto custom-scrollbar py-0.5 flex flex-col gap-0.5">
                   {threads.map((t) => {
-                    const isCurrent = t.id === activeThreadId;
+                    const isCur = t.id === activeThreadId;
                     return (
                       <div
                         key={t.id}
@@ -306,31 +306,17 @@ export const AgentCoPilot: React.FC = () => {
                           switchThread(t.id);
                           setIsHistoryOpen(false);
                         }}
-                        className={`group flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer transition-colors border ${
-                          isCurrent
+                        className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
+                          isCur
                             ? isDark
-                              ? 'bg-zinc-800/90 border-zinc-700 text-white font-medium'
-                              : 'bg-zinc-100 border-zinc-300 text-zinc-900 font-medium'
+                              ? 'bg-zinc-800 text-white font-medium'
+                              : 'bg-zinc-200 text-zinc-950 font-medium'
                             : isDark
-                            ? 'bg-transparent border-transparent hover:bg-zinc-800/50 text-zinc-300'
-                            : 'bg-transparent border-transparent hover:bg-zinc-100 text-zinc-700'
+                            ? 'hover:bg-zinc-800/50 text-zinc-300 hover:text-white'
+                            : 'hover:bg-zinc-100 text-zinc-700 hover:text-zinc-950'
                         }`}
                       >
-                        <div className="flex-1 min-w-0 pr-2">
-                          <div className="flex items-center gap-1.5">
-                            <span className="truncate text-[11px] font-medium">{t.title}</span>
-                            {isCurrent && <Check className="size-3 text-emerald-400 shrink-0" />}
-                          </div>
-                          <div
-                            className={`text-[10px] mt-0.5 flex items-center gap-2 ${
-                              isDark ? 'text-zinc-500' : 'text-zinc-400'
-                            }`}
-                          >
-                            <span>{t.createdAt}</span>
-                            <span>·</span>
-                            <span>{t.messages.length} msgs</span>
-                          </div>
-                        </div>
+                        <span className="truncate max-w-[190px]">{t.title}</span>
 
                         {threads.length > 1 && (
                           <button
@@ -357,6 +343,21 @@ export const AgentCoPilot: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Collapse CoPilot Button */}
+          <button
+            type="button"
+            onClick={toggleCoPilot}
+            className={`p-1.5 rounded transition-colors cursor-pointer ${
+              isDark
+                ? 'hover:text-white hover:bg-zinc-800 text-zinc-400'
+                : 'hover:text-zinc-950 hover:bg-zinc-100 text-zinc-500'
+            }`}
+            title="Recolher painel de IA (Ctrl+J para alternar)"
+            aria-label="Recolher painel de IA"
+          >
+            <PanelLeftClose className="size-3.5" />
+          </button>
         </div>
       </div>
 

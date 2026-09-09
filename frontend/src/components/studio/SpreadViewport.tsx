@@ -224,6 +224,10 @@ export const SpreadViewport: React.FC = () => {
   };
 
   const scale = zoomLevel / 100;
+  const baseWidth = viewMode === 'single' ? 490 : 1066;
+  const baseHeight = 735;
+  const scaledWidth = Math.round(baseWidth * scale);
+  const scaledHeight = Math.round(baseHeight * scale);
 
   // ================= RENDERIZADORES DE PÁGINA =================
 
@@ -710,7 +714,7 @@ export const SpreadViewport: React.FC = () => {
         setSelectedElementId(null);
         setOpenDropdown(null);
       }}
-      className={`flex-1 overflow-auto custom-scrollbar p-8 flex items-center justify-center relative select-none transition-colors ${
+      className={`flex-1 overflow-auto custom-scrollbar relative select-none transition-colors ${
         isDark ? 'bg-[#0a0a0c]' : 'bg-[#e5e7eb]'
       }`}
       style={{
@@ -718,11 +722,25 @@ export const SpreadViewport: React.FC = () => {
         backgroundSize: '24px 24px',
       }}
     >
-      {/* Spread Container (proporção A4 com escala de zoom) */}
-      <div
-        className="transition-transform duration-150 origin-center flex items-start justify-center gap-6"
-        style={{ transform: `scale(${scale})` }}
-      >
+      {/* Wrapper flexivel que expande e preserva alinhamento a zero sem cortar o lado esquerdo */}
+      <div className="w-fit min-w-full h-fit min-h-full flex p-6 sm:p-10">
+        {/* Caixa escalada para manter o bounding box sincronizado com o scroll */}
+        <div
+          className="m-auto shrink-0 relative transition-all duration-150"
+          style={{
+            width: `${scaledWidth}px`,
+            height: `${scaledHeight}px`,
+          }}
+        >
+          {/* Spread Container (proporcao A4 escalada a partir do canto superior esquerdo) */}
+          <div
+            className="origin-top-left flex items-start justify-center gap-6 shrink-0 transition-transform duration-150"
+            style={{
+              width: `${baseWidth}px`,
+              height: `${baseHeight}px`,
+              transform: `scale(${scale})`,
+            }}
+          >
         {/* ================= LEFT PAGE WRAPPER ================= */}
         {leftPage && (
           <div className={`flex flex-col items-center ${viewMode === 'single' ? 'hidden' : ''}`}>
@@ -888,6 +906,8 @@ export const SpreadViewport: React.FC = () => {
             </div>
           </div>
         )}
+          </div>
+        </div>
       </div>
 
       {/* ================= FLOATING EDITORIAL CLICK-TO-PROMPT POPOVER ================= */}

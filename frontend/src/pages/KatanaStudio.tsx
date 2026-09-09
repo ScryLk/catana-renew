@@ -54,6 +54,8 @@ export const KatanaStudio: React.FC = () => {
     isGeneratingCatalog,
     isStudioSidebarOpen,
     toggleStudioSidebar,
+    isCoPilotOpen,
+    toggleCoPilot,
     resetToHome,
     theme,
     isAccountSettingsOpen,
@@ -62,17 +64,28 @@ export const KatanaStudio: React.FC = () => {
 
   const isDark = theme === 'dark';
 
-  // Global shortcut Ctrl+B / Cmd+B to toggle sidebar
+  // Global shortcut Ctrl+B / Cmd+B to toggle global sidebar, Ctrl+J / Cmd+J to toggle AI CoPilot
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isInput =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable);
+      if (isInput) return;
+
       if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
         e.preventDefault();
         toggleStudioSidebar();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'j' || e.key === 'J')) {
+        e.preventDefault();
+        toggleCoPilot();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleStudioSidebar]);
+  }, [toggleStudioSidebar, toggleCoPilot]);
 
   return (
     <div className="h-screen w-screen flex bg-[#09090b] text-zinc-100 overflow-hidden font-sans antialiased relative">
@@ -130,7 +143,7 @@ export const KatanaStudio: React.FC = () => {
         ) : (
           <div className="flex-1 w-full flex overflow-hidden animate-in fade-in duration-300">
             {/* Left: AI Agent Studio */}
-            <AgentCoPilot />
+            {isCoPilotOpen && <AgentCoPilot />}
 
             {/* Right: Living Catalog Canvas & Artifact Preview */}
             <CatalogCanvasWorkspace />

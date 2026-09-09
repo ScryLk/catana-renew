@@ -18,6 +18,7 @@ import {
   Loader2,
   Cloud,
   CloudOff,
+  Sparkles,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
 import { toast } from 'sonner';
@@ -42,6 +43,8 @@ export const CanvasTopToolbar: React.FC = () => {
     canUndo,
     canRedo,
     saveStatus,
+    isCoPilotOpen,
+    toggleCoPilot,
   } = useStudioStore();
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -58,7 +61,7 @@ export const CanvasTopToolbar: React.FC = () => {
   };
 
   const handleResetZoom = () => {
-    setZoomLevel(100);
+    setZoomLevel((prev) => (prev === 100 ? 75 : 100));
   };
 
   const handleTitleSubmit = () => {
@@ -105,6 +108,23 @@ export const CanvasTopToolbar: React.FC = () => {
     >
       {/* LEFT: Catalog Title + Spread Navigator + Undo/Redo + Autosave */}
       <div className="flex items-center gap-2 min-w-0">
+        {!isCoPilotOpen && (
+          <button
+            type="button"
+            onClick={toggleCoPilot}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-colors cursor-pointer shrink-0 ${
+              isDark
+                ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white'
+                : 'bg-zinc-100 border-zinc-200 hover:border-zinc-300 text-zinc-700 hover:text-zinc-950'
+            }`}
+            title="Abrir painel de IA (CoPilot) - Ctrl+J"
+            aria-label="Abrir painel de IA (CoPilot)"
+          >
+            <Sparkles className="size-3 text-amber-500" />
+            <span className="text-[11px] font-medium hidden sm:inline">IA CoPilot</span>
+          </button>
+        )}
+
         {/* Editable Title */}
         <div className="flex items-center gap-1.5 truncate max-w-[130px] sm:max-w-[180px] md:max-w-[220px]">
           {isEditingTitle ? (
@@ -314,8 +334,8 @@ export const CanvasTopToolbar: React.FC = () => {
             className={`px-1.5 font-mono text-[10px] cursor-pointer bg-transparent border-none ${
               isDark ? 'text-zinc-300 hover:text-white' : 'text-zinc-700 hover:text-zinc-950'
             }`}
-            title="Clique para redefinir zoom para 100%"
-            aria-label="Redefinir zoom para 100%"
+            title="Clique para alternar zoom (100% / 75%)"
+            aria-label="Alternar zoom entre 100% e 75%"
           >
             {zoomLevel}%
           </button>

@@ -228,6 +228,9 @@ export interface StudioState {
   isStudioSidebarOpen: boolean;
   setIsStudioSidebarOpen: (open: boolean) => void;
   toggleStudioSidebar: () => void;
+  isCoPilotOpen: boolean;
+  setIsCoPilotOpen: (open: boolean) => void;
+  toggleCoPilot: () => void;
   isAccountSettingsOpen: boolean;
   setIsAccountSettingsOpen: (open: boolean) => void;
   openAccountSettings: () => void;
@@ -438,6 +441,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   isStudioSidebarOpen: true,
   setIsStudioSidebarOpen: (open) => set({ isStudioSidebarOpen: open }),
   toggleStudioSidebar: () => set((s) => ({ isStudioSidebarOpen: !s.isStudioSidebarOpen })),
+  isCoPilotOpen: true,
+  setIsCoPilotOpen: (open) => set({ isCoPilotOpen: open }),
+  toggleCoPilot: () => set((s) => ({ isCoPilotOpen: !s.isCoPilotOpen })),
   isAccountSettingsOpen: false,
   setIsAccountSettingsOpen: (open) => set({ isAccountSettingsOpen: open }),
   openAccountSettings: () => set({ isAccountSettingsOpen: true }),
