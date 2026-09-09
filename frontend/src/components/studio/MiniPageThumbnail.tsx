@@ -49,21 +49,42 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
       {/* Internal Mini Visual Content */}
       {page.type === 'cover' && (
         <div className="h-full flex flex-col items-center justify-center text-center gap-1.5 pt-3">
-          <div className="size-6 rounded-full border border-[#B08D57]/40 flex items-center justify-center p-0.5 bg-[#1A1817]">
-            <img
-              src="/aurea/aurea-monograma.png"
-              alt="Monograma"
-              className="w-full h-full object-contain"
-            />
+          <div
+            className="size-6 rounded-full border flex items-center justify-center p-0.5 bg-black/20"
+            style={{ borderColor: `${page.accentColor || '#B08D57'}66` }}
+          >
+            {page.editorialImage ? (
+              <img
+                src={page.editorialImage}
+                alt="Logo"
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <span
+                className="text-[9px] font-serif font-light"
+                style={{ color: page.accentColor || '#B08D57' }}
+              >
+                {(page.title || 'C').charAt(0)}
+              </span>
+            )}
           </div>
           <span
-            className="text-[8px] tracking-[0.25em] font-normal uppercase text-[#F5F1EA]"
-            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+            className="text-[8px] tracking-[0.2em] font-normal uppercase max-w-[90%] truncate"
+            style={{
+              fontFamily: "'Cormorant Garamond', Georgia, serif",
+              color: page.textColor || '#F5F1EA',
+            }}
           >
-            ÁUREA
+            {page.title || 'CATÁLOGO'}
           </span>
-          <div className="w-3 h-[0.5px] bg-[#B08D57]" />
-          <span className="text-[5px] tracking-wider text-[#B08D57] uppercase font-medium">
+          <div
+            className="w-3 h-[0.5px]"
+            style={{ backgroundColor: page.accentColor || '#B08D57' }}
+          />
+          <span
+            className="text-[5px] tracking-wider uppercase font-medium"
+            style={{ color: page.accentColor || '#B08D57' }}
+          >
             2026
           </span>
         </div>

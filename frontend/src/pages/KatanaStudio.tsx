@@ -5,6 +5,7 @@ import { StudioSidebar } from '../components/studio/StudioSidebar';
 import { AgentCoPilot } from '../components/studio/AgentCoPilot';
 import { CatalogCanvasWorkspace } from '../components/studio/CatalogCanvasWorkspace';
 import { StudioHomeChat } from '../components/studio/StudioHomeChat';
+import { CatalogGenerationExperience } from '../components/studio/CatalogGenerationExperience';
 import { KatanaSplashScreen } from '../components/studio/KatanaSplashScreen';
 import { AccountSettingsModal } from '../components/studio/AccountSettingsModal';
 import { AuthModal } from '../components/auth/AuthModal';
@@ -50,6 +51,7 @@ export const KatanaStudio: React.FC = () => {
 
   const {
     hasStartedSession,
+    isGeneratingCatalog,
     isStudioSidebarOpen,
     toggleStudioSidebar,
     resetToHome,
@@ -81,6 +83,9 @@ export const KatanaStudio: React.FC = () => {
           onComplete={() => setShowSplash(false)}
         />
       )}
+
+      {/* Experiência Cinematográfica de Geração de Catálogo (Lovable style) */}
+      {isGeneratingCatalog && <CatalogGenerationExperience />}
 
       {/* Floating Sidebar Open Toggle Button when closed (ChatGPT style) */}
       {!isStudioSidebarOpen && !hasStartedSession && (

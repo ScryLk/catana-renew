@@ -14,11 +14,11 @@ import { ImportCatalogModal } from './ImportCatalogModal';
 import { toast } from 'sonner';
 
 const PROMPT_SUGGESTIONS = [
-  'Catálogo de confeitaria com fotos e preços...',
-  'Cardápio de restaurante com pratos e bebidas...',
-  'Catálogo B2B industrial com especificações...',
-  'Lookbook de moda e joias com 8 páginas...',
-  'Tabela comercial com códigos SKU e atacado...',
+  'Catálogo de confeitaria com potes gourmet e preços...',
+  'Cardápio executivo de restaurante com pratos e vinhos...',
+  'Lookbook de joalheria com anéis em ouro e diamantes...',
+  'Catálogo de hardware e setup com especificações técnicas...',
+  'Tabela comercial B2B com códigos SKU e atacado...',
 ];
 
 export const StudioHomeChat: React.FC = () => {
@@ -29,7 +29,7 @@ export const StudioHomeChat: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
-    startSession,
+    triggerCatalogGeneration,
     theme,
   } = useStudioStore();
 
@@ -115,8 +115,8 @@ export const StudioHomeChat: React.FC = () => {
       prompt.trim() ||
       (attachments.length > 0
         ? `Diagramar catálogo editorial com base no(s) ${attachments.length} arquivo(s) anexado(s)`
-        : 'Crie um catálogo editorial de moda e acessórios de luxo com 10 páginas (Coleção ÁUREA 2026)');
-    startSession(promptToUse, undefined, attachments);
+        : 'Catálogo de confeitaria artesanal com doces finos, potes gourmet e linha festa');
+    triggerCatalogGeneration(promptToUse, attachments);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

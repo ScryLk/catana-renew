@@ -9,6 +9,7 @@ import {
   StudioPalette,
   STUDIO_PALETTE_PRESETS,
 } from '../data/aureaCatalog.mock';
+import { generateCatalogFromPrompt, GeneratedCatalogResult } from '../utils/catalogGenerator';
 
 export const API_BASE_URL = (import.meta.env && import.meta.env.VITE_API_BASE_URL) || 'http://localhost:8000';
 let saveTimeout: any = null;
@@ -233,10 +234,27 @@ export interface StudioState {
   setIsAccountSettingsOpen: (open: boolean) => void;
   openAccountSettings: () => void;
   closeAccountSettings: () => void;
-  activeCatalogId: string;
-  setActiveCatalogId: (id: string) => void;
+  activeCatalogId: string | null;
+  setActiveCatalogId: (id: string | null) => void;
   setHasStartedSession: (started: boolean) => void;
   loadExistingCatalog: (catalogId: string) => void;
+
+  // Catalog Generation Experience (Lovable style)
+  isGeneratingCatalog: boolean;
+  generationStage: number;
+  generationProgress: number;
+  generationLogs: Array<{
+    id: string;
+    time: string;
+    roleId: string;
+    roleName: string;
+    text: string;
+  }>;
+  generationTargetCatalog: GeneratedCatalogResult | null;
+  triggerCatalogGeneration: (prompt: string, attachments?: ChatAttachment[]) => void;
+  finishCatalogGeneration: () => void;
+  cancelCatalogGeneration: () => void;
+
   applyCouncilResolutions: (resolutions: {
     summary: string;
     productUpdates?: { id: string; updates: Partial<ProductItem> };
@@ -426,9 +444,192 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setIsAccountSettingsOpen: (open) => set({ isAccountSettingsOpen: open }),
   openAccountSettings: () => set({ isAccountSettingsOpen: true }),
   closeAccountSettings: () => set({ isAccountSettingsOpen: false }),
-  activeCatalogId: 'aurea-2026',
+  activeCatalogId: null,
   setActiveCatalogId: (id) => set({ activeCatalogId: id }),
   setHasStartedSession: (started) => set({ hasStartedSession: started }),
+
+  isGeneratingCatalog: false,
+  generationStage: 1,
+  generationProgress: 0,
+  generationLogs: [],
+  generationTargetCatalog: null,
+
+  triggerCatalogGeneration: (prompt: string, attachments?: ChatAttachment[]) => {
+    const generated = generateCatalogFromPrompt(prompt, attachments);
+    const nowTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    set({
+      isGeneratingCatalog: true,
+      generationStage: 1,
+      generationProgress: 15,
+      generationTargetCatalog: generated,
+      generationLogs: [
+        {
+          id: `log-1`,
+          time: nowTime(),
+          roleId: 'orchestrator',
+          roleName: 'Orquestrador',
+          text: `Iniciando síntese generativa para "${generated.title}". Categoria identificada: ${generated.category}.`,
+        },
+      ],
+    });
+
+    // Stage 2: Conselho Editorial
+    setTimeout(() => {
+      if (!get().isGeneratingCatalog) return;
+      set((s) => ({
+        generationStage: 2,
+        generationProgress: 36,
+        generationLogs: [
+          ...s.generationLogs,
+          {
+            id: `log-2`,
+            time: nowTime(),
+            roleId: 'director',
+            roleName: 'Editor-Chefe',
+            text: `Conselho Editorial ativado. Alocados 5 agentes especialistas para direção de arte, redação e diagramação.`,
+          },
+        ],
+      }));
+    }, 700);
+
+    // Stage 3: Sistema Cromático & Tipografia
+    setTimeout(() => {
+      if (!get().isGeneratingCatalog) return;
+      set((s) => ({
+        generationStage: 3,
+        generationProgress: 62,
+        generationLogs: [
+          ...s.generationLogs,
+          {
+            id: `log-3`,
+            time: nowTime(),
+            roleId: 'art_director',
+            roleName: 'Diretor de Arte',
+            text: `Paleta "${generated.palette.name}" aplicada. Contraste certificado sob WCAG AAA (${generated.palette.contrastRatio || '9.2:1'}).`,
+          },
+        ],
+      }));
+    }, 1400);
+
+    // Stage 4: Diagramação de Spreads & Grid A4
+    setTimeout(() => {
+      if (!get().isGeneratingCatalog) return;
+      set((s) => ({
+        generationStage: 4,
+        generationProgress: 84,
+        generationLogs: [
+          ...s.generationLogs,
+          {
+            id: `log-4`,
+            time: nowTime(),
+            roleId: 'grid_architect',
+            roleName: 'Diagramador A4',
+            text: `Estruturadas ${generated.totalPages} páginas editoriais com margens de 96px e proporção áurea.`,
+          },
+          {
+            id: `log-5`,
+            time: nowTime(),
+            roleId: 'copywriter',
+            roleName: 'Copywriter',
+            text: `Manifesto de marca e chamadas comerciais de produtos redigidos com vocabulário de posicionamento.`,
+          },
+        ],
+      }));
+    }, 2200);
+
+    // Stage 5: Renderização Vetorial & Auditoria
+    setTimeout(() => {
+      if (!get().isGeneratingCatalog) return;
+      set((s) => ({
+        generationStage: 5,
+        generationProgress: 97,
+        generationLogs: [
+          ...s.generationLogs,
+          {
+            id: `log-6`,
+            time: nowTime(),
+            roleId: 'branding_auditor',
+            roleName: 'Auditor de Branding',
+            text: `Homologação concluída com sucesso. Compilando pranchetas de alta fidelidade para o Katana Studio.`,
+          },
+        ],
+      }));
+    }, 3000);
+
+    // Auto-finish after 3600ms
+    setTimeout(() => {
+      if (!get().isGeneratingCatalog) return;
+      get().finishCatalogGeneration();
+    }, 3600);
+  },
+
+  finishCatalogGeneration: () => {
+    const target = get().generationTargetCatalog;
+    if (!target) {
+      set({ isGeneratingCatalog: false });
+      return;
+    }
+
+    const initialMessages: ChatMessage[] = [
+      {
+        id: 'msg-1',
+        role: 'user',
+        content: target.initialPrompt || `Criar catálogo ${target.title}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+      {
+        id: 'msg-2',
+        role: 'assistant',
+        content: `Catálogo **"${target.title}"** gerado e diagramado com sucesso!\n\nEstruturei **${target.totalPages} páginas em ${Math.ceil(target.totalPages / 2)} spreads duplos**, com direção de arte em harmonia com a paleta **${target.palette.name}**.\n\n${target.summary}\n\n**Você pode interagir livremente:**\n- **Clique em qualquer elemento** na prancheta para editar textos, preços e imagens.\n- **Use o chat do Co-Pilot** para solicitar alterações com auxílio do Conselho Editorial.\n- **Navegue pelos spreads** pelo filmstrip inferior ou teclas de seta.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        reasoning: target.reasoning,
+        delegations: target.councilDelegations,
+      },
+    ];
+
+    const initialThread: ChatThread = {
+      id: 'thread-main',
+      title: 'Coordenação Editorial',
+      mode: 'orchestrator',
+      roleId: 'orchestrator',
+      messages: initialMessages,
+      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    set({
+      isGeneratingCatalog: false,
+      generationProgress: 100,
+      hasStartedSession: true,
+      activeCatalogId: target.catalogId,
+      catalogTitle: target.title,
+      pages: target.pages,
+      totalPages: target.totalPages,
+      activePalette: target.palette,
+      currentSpread: [1, 2],
+      agentStatus: 'idle',
+      threads: [initialThread],
+      activeThreadId: initialThread.id,
+      messages: initialMessages,
+      executionPlan: [
+        { id: 'step-1', label: `Análise semântica do briefing: "${target.category}"`, status: 'completed', roleBadge: 'Estratégia' },
+        { id: 'step-2', label: `Aplicação da paleta cromática ${target.palette.name}`, status: 'completed', roleBadge: 'Design' },
+        { id: 'step-3', label: `Diagramação de ${target.totalPages} páginas no padrão A4`, status: 'completed', roleBadge: 'Diagramação' },
+        { id: 'step-4', label: 'Auditoria editorial e conformidade de leitura WCAG AAA', status: 'completed', roleBadge: 'Auditoria' },
+      ],
+    });
+    toast.success(`Catálogo "${target.title}" gerado com sucesso!`);
+  },
+
+  cancelCatalogGeneration: () => {
+    set({
+      isGeneratingCatalog: false,
+      generationProgress: 0,
+      generationStage: 1,
+      generationLogs: [],
+      generationTargetCatalog: null,
+    });
+  },
 
   loadExistingCatalog: (catalogId: string) => {
     if (catalogId === 'aurea-2026' || catalogId.includes('aurea')) {
@@ -437,6 +638,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         catalogTitle: 'ÁUREA — Coleção Inverno 2026',
         activeCatalogId: 'aurea-2026',
         pages: AUREA_PAGES,
+        totalPages: AUREA_PAGES.length,
         currentSpread: [1, 2],
         activePalette: AUREA_PALETTE,
       });
@@ -446,10 +648,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         reasoning: 'Racional do Orquestrador: Carregamento do dossiê e spreads da Coleção ÁUREA. Modos de proporção áurea, fólio e paleta Noir & Or aplicados.',
       });
     } else if (catalogId === 'techgear-2026') {
+      const generated = generateCatalogFromPrompt('Catálogo TechGear hardware e setup');
       set({
         hasStartedSession: true,
-        catalogTitle: 'TechGear 2026 — Setup & Tech',
+        catalogTitle: generated.title,
         activeCatalogId: 'techgear-2026',
+        pages: generated.pages,
+        totalPages: generated.totalPages,
+        activePalette: generated.palette,
         currentSpread: [1, 2],
       });
       get().addMessage({
@@ -457,10 +663,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         content: 'Catálogo **TechGear 2026 — Setup & Tech** aberto para edição na prancheta.',
       });
     } else if (catalogId === 'confeitaria-artesanal') {
+      const generated = generateCatalogFromPrompt('Catálogo de confeitaria artesanal doces gourmet');
       set({
         hasStartedSession: true,
-        catalogTitle: 'Confeitaria Artesanal — Coleção Festas',
+        catalogTitle: generated.title,
         activeCatalogId: 'confeitaria-artesanal',
+        pages: generated.pages,
+        totalPages: generated.totalPages,
+        activePalette: generated.palette,
         currentSpread: [1, 2],
       });
       get().addMessage({
@@ -468,10 +678,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         content: 'Catálogo **Confeitaria Artesanal** aberto para edição na prancheta.',
       });
     } else if (catalogId === 'cristallo-joias') {
+      const generated = generateCatalogFromPrompt('Alta joalheria cristallo gemas ouro');
       set({
         hasStartedSession: true,
-        catalogTitle: 'Cristallo — Alta Joalheria & Gemas Raras',
+        catalogTitle: generated.title,
         activeCatalogId: 'cristallo-joias',
+        pages: generated.pages,
+        totalPages: generated.totalPages,
+        activePalette: generated.palette,
         currentSpread: [1, 2],
       });
       get().addMessage({
@@ -871,7 +1085,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       currentSpread: [s.currentSpread[1], s.currentSpread[0]],
     })),
 
-  pages: AUREA_PAGES,
+  pages: [],
   setPages: (pages) => set({ pages, totalPages: pages.length }),
 
   updatePage: (pageNumber, updates) => {
@@ -1014,6 +1228,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
     const state = get();
     const catalogId = state.activeCatalogId;
+    if (!catalogId) {
+      set({ saveStatus: 'saved' });
+      return;
+    }
     const [leftPageNum, rightPageNum] = state.currentSpread;
     const leftPage = state.pages.find((p) => p.pageNumber === leftPageNum);
     const rightPage = state.pages.find((p) => p.pageNumber === rightPageNum);
@@ -1152,8 +1370,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }));
 
     const token = localStorage.getItem('access_token');
-    const numericCatalogId = parseInt(state.activeCatalogId, 10);
-    const numericThreadId = parseInt(state.activeThreadId, 10);
+    const numericCatalogId = state.activeCatalogId ? parseInt(state.activeCatalogId, 10) : NaN;
+    const numericThreadId = state.activeThreadId ? parseInt(state.activeThreadId, 10) : NaN;
 
     const payload = {
       message: userPrompt,
@@ -1889,7 +2107,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   isPalettePanelOpen: false,
   setIsPalettePanelOpen: (open) => set({ isPalettePanelOpen: open }),
 
-  activePalette: AUREA_PALETTE,
+  activePalette: STUDIO_PALETTE_PRESETS[0],
 
   setPaletteLocked: (locked) => {
     set((state) => ({
@@ -1957,140 +2175,18 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   selectedElementId: null,
   setSelectedElementId: (id) => set({ selectedElementId: id }),
 
-  startSession: (initialPrompt, categoryName, attachments) => {
-    const prompt = initialPrompt || 'Criar catálogo showcase ÁUREA — Coleção Inverno 2026';
-    const title = categoryName ? `ÁUREA · ${categoryName}` : 'ÁUREA — Coleção Inverno 2026';
-
-    let assistantContent = `Coleção **"${title}"** diagramada com sucesso!\n\nEstruturei **10 páginas em 5 spreads duplos**, adotando os princípios de direção de arte de grandes maisons europeias: minimalismo, respiro generoso de 96px, contraste cromático de 3 tons e filetes de 1px em ouro.`;
-
-    if (attachments && attachments.length > 0) {
-      const fileList = attachments.map((a) => `• **${a.name}** (${a.size})`).join('\n');
-      assistantContent += `\n\n**Documentos e referências integrados:**\n${fileList}\nOs dados comerciais, especificações técnicas e materiais anexados foram assimilados pelos agentes e aplicados à composição.`;
-    }
-
-    assistantContent += `\n\n**Você pode interagir livremente:**\n- **Clique em qualquer elemento** (fotos, títulos, preços ou descrições) para editar ou acionar comandos com IA.\n- **Use o chat do Co-Pilot** para solicitar alterações na coleção inteira (ex: mudar preços, paleta ou rótulos).\n- **Navegue pelos spreads** pelo filmstrip inferior ou pelas setas no topo.`;
-
-    const initialMessages: ChatMessage[] = [
-      {
-        id: 'msg-1',
-        role: 'user',
-        content: prompt,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        attachments: attachments && attachments.length > 0 ? attachments : undefined,
-      },
-      {
-        id: 'msg-2',
-        role: 'assistant',
-        content: assistantContent,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        reasoning:
-          attachments && attachments.length > 0
-            ? `Racional do Editor-Chefe [${attachments.length} arquivo(s) assimilado(s)]: Extração de dados dos anexos, compatibilização de grid A4 e alinhamento de diretrizes editoriais.`
-            : 'Racional do Editor-Chefe [Coordenação]: Diagramação A4 com proporção 794x1123, margens de 96px e tipografia em versalete com letter-spacing calibrado.',
-        delegations: [
-          {
-            roleId: 'director',
-            roleName: 'Diretor de Arte',
-            badge: 'Design',
-            action: 'Definiu o grid A4 proporcional com margens e respiro de 96px.',
-          },
-          {
-            roleId: 'copywriter',
-            roleName: 'Redator Publicitário',
-            badge: 'Redação',
-            action: 'Escreveu o manifesto da maison e claims com vocabulário nobre.',
-          },
-          {
-            roleId: 'commercial',
-            roleName: 'Tabela Comercial / B2B',
-            badge: 'Comercial',
-            action: 'Estruturou preços e tabelas de faturamento da coleção.',
-          },
-          {
-            roleId: 'branding',
-            roleName: 'Auditor de Branding',
-            badge: 'Auditoria',
-            action: 'Homologou o contraste de 3 tons e o monograma na capa.',
-          },
-        ],
-      },
-    ];
-
-    const initialThread: ChatThread = {
-      id: 'thread-main',
-      title: 'Coordenação Editorial',
-      mode: 'orchestrator',
-      roleId: 'orchestrator',
-      messages: initialMessages,
-      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    set({
-      hasStartedSession: true,
-      catalogTitle: title,
-      pages: AUREA_PAGES,
-      totalPages: 10,
-      currentSpread: [1, 2],
-      activePalette: AUREA_PALETTE,
-      agentStatus: 'generating',
-      threads: [initialThread],
-      activeThreadId: initialThread.id,
-      messages: initialMessages,
-      executionPlan: [
-        {
-          id: 'step-1',
-          label: 'Análise de referências de maisons e briefing de luxo',
-          status: 'completed',
-          roleBadge: 'Estratégia',
-        },
-        {
-          id: 'step-2',
-          label: 'Aplicação da paleta Off-Black #1A1817, Ivory #F5F1EA e Ouro #B08D57',
-          status: 'completed',
-          roleBadge: 'Design',
-        },
-        {
-          id: 'step-3',
-          label: 'Diagramação de 10 páginas em 5 spreads editoriais (A4)',
-          status: 'active',
-          roleBadge: 'Diagramação',
-        },
-        {
-          id: 'step-4',
-          label: 'Auditoria de tipografia Cormorant e conformidade WCAG AA',
-          status: 'pending',
-          roleBadge: 'Auditoria',
-        },
-      ],
-    });
-
-    // Simulação progressiva do plano de execução
-    setTimeout(() => {
-      set((s) => ({
-        executionPlan: s.executionPlan.map((step) =>
-          step.id === 'step-3'
-            ? { ...step, status: 'completed' }
-            : step.id === 'step-4'
-            ? { ...step, status: 'active' }
-            : step
-        ),
-      }));
-    }, 800);
-
-    setTimeout(() => {
-      set((s) => ({
-        agentStatus: 'idle',
-        executionPlan: s.executionPlan.map((step) =>
-          step.id === 'step-4' ? { ...step, status: 'completed' } : step
-        ),
-      }));
-    }, 1400);
+  startSession: (initialPrompt, _categoryName, attachments) => {
+    const prompt = initialPrompt || 'Criar catálogo editorial moderno';
+    get().triggerCatalogGeneration(prompt, attachments);
   },
 
   resetToHome: () => {
     set({
       hasStartedSession: false,
+      activeCatalogId: null,
       catalogTitle: 'Novo Catálogo',
+      pages: [],
+      totalPages: 0,
       executionPlan: [],
       messages: [],
       threads: [],
@@ -2098,6 +2194,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       agentStatus: 'idle',
       selectedElementId: null,
       currentSpread: [1, 2],
+      isGeneratingCatalog: false,
+      generationProgress: 0,
+      generationStage: 1,
+      generationLogs: [],
+      generationTargetCatalog: null,
     });
   },
 }));

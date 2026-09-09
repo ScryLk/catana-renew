@@ -28,6 +28,7 @@ export const SpreadViewport: React.FC = () => {
     setSpreadPage,
     swapSpreadPages,
     activePalette,
+    activeCatalogId,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -247,16 +248,34 @@ export const SpreadViewport: React.FC = () => {
               }`}
               onClick={(e) => handleSelect(`page-${page.pageNumber}-brand`, e, 'Identidade da Capa')}
             >
-              {/* Monogram PNG */}
+              {/* Monogram or Brand Emblem */}
               <div
-                className="w-24 h-24 rounded-full border flex items-center justify-center p-2 bg-[#1A1817] shadow-lg overflow-hidden"
+                className="w-24 h-24 rounded-full border flex items-center justify-center p-2 bg-black/20 shadow-lg overflow-hidden"
                 style={{ borderColor: `${accent}66` }}
               >
-                <img
-                  src="/aurea/aurea-monograma.png"
-                  alt="Monograma Áurea"
-                  className="w-full h-full object-contain"
-                />
+                {page.editorialImage ? (
+                  <img
+                    src={page.editorialImage}
+                    alt={page.title || 'Capa'}
+                    className="w-full h-full object-contain"
+                  />
+                ) : activeCatalogId === 'aurea-2026' ? (
+                  <img
+                    src="/aurea/aurea-monograma.png"
+                    alt="Monograma"
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <span
+                    className="text-4xl font-serif font-light select-none"
+                    style={{
+                      fontFamily: "'Cormorant Garamond', Georgia, serif",
+                      color: accent,
+                    }}
+                  >
+                    {(page.title || 'C').charAt(0)}
+                  </span>
+                )}
               </div>
 
               {/* Wordmark */}
@@ -265,11 +284,11 @@ export const SpreadViewport: React.FC = () => {
                   className="text-4xl tracking-[0.35em] text-[#F5F1EA] font-normal uppercase"
                   style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
                 >
-                  {page.title || 'Á U R E A'}
+                  {page.title || 'CATÁLOGO'}
                 </h1>
                 <div className="w-8 h-[1px] my-3" style={{ backgroundColor: accent }} />
                 <span className="text-[10px] tracking-[0.3em] uppercase font-medium" style={{ color: accent }}>
-                  {page.label || 'COLEÇÃO INVERNO 2026'}
+                  {page.label || 'COLEÇÃO EXECUTIVA 2026'}
                 </span>
               </div>
             </div>
