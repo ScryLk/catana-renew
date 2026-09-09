@@ -130,11 +130,11 @@ export const Login = () => {
                   id="remember"
                   checked={rememberMe}
                   onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-                  className="rounded-[6px] border-zinc-300 data-[state=checked]:bg-zinc-900 data-[state=checked]:border-zinc-900 cursor-pointer"
+                  className="rounded-[6px] cursor-pointer"
                 />
                 <label
                   htmlFor="remember"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-zinc-500 dark:text-zinc-400 cursor-pointer"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-zinc-500 dark:text-zinc-400 cursor-pointer select-none"
                 >
                   Lembrar de mim
                 </label>
@@ -142,7 +142,7 @@ export const Login = () => {
 
               <Button
                 type="submit"
-                className="w-full h-11 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-medium shadow-lg shadow-zinc-500/10 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                className="w-full h-11 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 font-medium shadow-lg shadow-zinc-500/10 dark:shadow-zinc-950/50 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                 disabled={isLoading}
               >
                 {isLoading ? (
