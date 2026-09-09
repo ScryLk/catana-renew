@@ -9,7 +9,6 @@ import {
   Moon,
   User as UserIcon,
   Settings,
-  Building2,
   Image as ImageIcon,
   LogOut,
   ChevronUp,
@@ -431,22 +430,6 @@ export const StudioSidebar: React.FC = () => {
                   >
                     <Settings className="size-3.5 text-zinc-400" />
                     <span className="flex-1">Configurações da Conta</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsProfileMenuOpen(false);
-                      navigate('/organizations');
-                    }}
-                    className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors cursor-pointer text-left ${
-                      isDark
-                        ? 'hover:bg-zinc-800/80 hover:text-white text-zinc-300'
-                        : 'hover:bg-zinc-100 hover:text-zinc-950 text-zinc-700'
-                    }`}
-                  >
-                    <Building2 className="size-3.5 text-zinc-400" />
-                    <span className="flex-1">Organizações e Sedes</span>
                   </button>
 
                   <button
