@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Sparkles,
   Paperclip,
   ArrowRight,
   PanelLeftOpen,
+  X,
+  FileSpreadsheet,
+  FileText,
+  FileImage,
+  File,
 } from 'lucide-react';
-import { useStudioStore } from '../../store/studioStore';
+import { useStudioStore, ChatAttachment } from '../../store/studioStore';
 import { toast } from 'sonner';
 
 const PROMPT_SUGGESTIONS = [
@@ -18,6 +22,10 @@ const PROMPT_SUGGESTIONS = [
 
 export const StudioHomeChat: React.FC = () => {
   const [prompt, setPrompt] = useState('');
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const {
     startSession,
     theme,
@@ -62,12 +70,51 @@ export const StudioHomeChat: React.FC = () => {
     return () => clearTimeout(timeout);
   }, [currentText, isDeleting, suggestionIndex]);
 
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    processFiles(files);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const processFiles = (files: FileList | File[]) => {
+    const newAtts: ChatAttachment[] = Array.from(files).map((f) => {
+      const ext = f.name.split('.').pop()?.toLowerCase() || '';
+      let type: ChatAttachment['type'] = 'file';
+      if (['csv', 'xlsx', 'xls'].includes(ext)) type = 'sheet';
+      else if (['pdf'].includes(ext)) type = 'pdf';
+      else if (['doc', 'docx', 'txt', 'rtf'].includes(ext)) type = 'doc';
+      else if (['png', 'jpg', 'jpeg', 'webp', 'svg'].includes(ext)) type = 'image';
+
+      const sizeFormatted =
+        f.size > 1024 * 1024
+          ? `${(f.size / (1024 * 1024)).toFixed(1)} MB`
+          : `${Math.max(1, Math.round(f.size / 1024))} KB`;
+
+      return {
+        id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        name: f.name,
+        size: sizeFormatted,
+        type,
+      };
+    });
+
+    setAttachments((prev) => [...prev, ...newAtts]);
+    toast.success(`${newAtts.length} arquivo(s) anexado(s) com sucesso.`);
+  };
+
+  const handleRemoveAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
+
   const handleStart = (customP?: string) => {
     const promptToUse =
       customP ||
       prompt.trim() ||
-      'Crie um catálogo editorial de moda e acessórios de luxo com 10 páginas (Coleção ÁUREA 2026)';
-    startSession(promptToUse);
+      (attachments.length > 0
+        ? `Diagramar catálogo editorial com base no(s) ${attachments.length} arquivo(s) anexado(s)`
+        : 'Crie um catálogo editorial de moda e acessórios de luxo com 10 páginas (Coleção ÁUREA 2026)');
+    startSession(promptToUse, undefined, attachments);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -82,12 +129,31 @@ export const StudioHomeChat: React.FC = () => {
     handleStart(chipPrompt);
   };
 
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFiles(e.dataTransfer.files);
+    }
+  };
+
   return (
     <div
       className={`flex-1 h-dvh overflow-y-auto custom-scrollbar flex flex-col items-center justify-center p-6 select-none relative transition-colors ${
         isDark ? 'bg-[#09090b]' : 'bg-[#f8f9fa]'
       }`}
     >
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        multiple
+        accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls,image/*"
+        onChange={handleFileInputChange}
+        className="hidden"
+        aria-label="Upload de arquivos"
+      />
+
       {/* Floating Sidebar Toggle when sidebar is closed */}
       {!isStudioSidebarOpen && (
         <button
@@ -143,120 +209,175 @@ export const StudioHomeChat: React.FC = () => {
         >
           O que vamos criar hoje?
         </h1>
-          <div className="w-full mb-8">
-            <div
-              className={`w-full rounded-2xl border transition-colors p-3.5 text-left ${
-                isDark
-                  ? 'bg-[#121215] border-zinc-800 focus-within:border-zinc-600 shadow-xl'
-                  : 'bg-white border-zinc-200 focus-within:border-zinc-400 shadow-lg'
-              }`}
-            >
+
+        <div className="w-full mb-8">
+          {/* Central Prompt Input Box */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            className={`w-full rounded-2xl border transition-all text-left overflow-hidden ${
+              isDragging
+                ? isDark
+                  ? 'border-zinc-400 bg-zinc-900/90 shadow-2xl ring-2 ring-zinc-500/30'
+                  : 'border-zinc-500 bg-zinc-50 shadow-2xl ring-2 ring-zinc-400/30'
+                : isDark
+                ? 'bg-[#121215] border-zinc-800 focus-within:border-zinc-600 shadow-xl'
+                : 'bg-white border-zinc-200 focus-within:border-zinc-400 shadow-lg'
+            }`}
+          >
+            <div className="p-3.5">
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
                 rows={3}
                 aria-label="Instrução para criação do catálogo"
-                placeholder={currentText ? `Ex: ${currentText}` : 'Ex: Crie um catálogo de confeitaria de até 5 páginas...'}
+                placeholder={
+                  attachments.length > 0
+                    ? 'Descreva instruções adicionais para os arquivos anexados...'
+                    : currentText
+                    ? `Ex: ${currentText}`
+                    : 'Ex: Crie um catálogo de confeitaria de até 5 páginas...'
+                }
                 className={`w-full bg-transparent text-sm resize-none outline-none leading-relaxed ${
                   isDark
                     ? 'text-zinc-100 placeholder:text-zinc-500'
                     : 'text-zinc-900 placeholder:text-zinc-400'
                 }`}
               />
-
-              <div
-                className={`flex items-center justify-between pt-2.5 border-t mt-2 ${
-                  isDark ? 'border-zinc-800/80' : 'border-zinc-100'
-                }`}
-              >
-                <div className={`flex items-center gap-2 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  <button
-                    type="button"
-                    onClick={() => toast.info('Anexe fotos, PDF ou tabela de produtos...')}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
-                      isDark
-                        ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/80'
-                        : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
-                    }`}
-                    aria-label="Anexar arquivos"
-                  >
-                    <Paperclip className="size-3.5" />
-                    <span>Anexar arquivos</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => toast.info('Seletor de estilo e paleta de cores')}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
-                      isDark
-                        ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/80'
-                        : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
-                    }`}
-                    aria-label="Estilo visual"
-                  >
-                    <Sparkles className="size-3.5" />
-                    <span>Estilo visual</span>
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleStart()}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer ${
-                    isDark
-                      ? 'bg-zinc-100 hover:bg-white text-zinc-950'
-                      : 'bg-zinc-900 hover:bg-zinc-800 text-white'
-                  }`}
-                  aria-label="Gerar catálogo"
-                >
-                  <span>Gerar Catálogo</span>
-                  <ArrowRight className="size-3.5" />
-                </button>
-              </div>
             </div>
 
-            {/* Quick Starter Templates */}
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleChipClick('Criar catálogo editorial de moda e acessórios de luxo (Coleção ÁUREA 2026)')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors cursor-pointer border ${
-                  isDark
-                    ? 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-amber-500/50 hover:text-amber-400'
-                    : 'bg-white border-zinc-200 text-zinc-700 hover:border-amber-600/50 hover:text-amber-700 shadow-xs'
+            {/* Attached Files Chips Strip */}
+            {attachments.length > 0 && (
+              <div
+                className={`px-3.5 pb-2.5 pt-0.5 flex flex-wrap gap-1.5 border-t ${
+                  isDark ? 'border-zinc-800/60' : 'border-zinc-100'
                 }`}
               >
-                <span>ÁUREA — Boutique de Luxo (10 págs)</span>
-              </button>
+                {attachments.map((att) => (
+                  <div
+                    key={att.id}
+                    className={`inline-flex items-center gap-1.5 pl-2 pr-1.5 py-1 rounded-lg text-xs border ${
+                      isDark
+                        ? 'bg-zinc-900/90 border-zinc-700/80 text-zinc-200'
+                        : 'bg-zinc-100 border-zinc-200 text-zinc-800'
+                    }`}
+                  >
+                    {att.type === 'sheet' ? (
+                      <FileSpreadsheet className="size-3.5 text-emerald-400 shrink-0" />
+                    ) : att.type === 'pdf' ? (
+                      <FileText className="size-3.5 text-rose-400 shrink-0" />
+                    ) : att.type === 'image' ? (
+                      <FileImage className="size-3.5 text-sky-400 shrink-0" />
+                    ) : (
+                      <File className="size-3.5 text-zinc-400 shrink-0" />
+                    )}
+                    <span className="truncate max-w-[140px] font-medium">{att.name}</span>
+                    <span className="text-[10px] text-zinc-500 font-mono">({att.size})</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAttachment(att.id)}
+                      className="p-0.5 rounded hover:bg-zinc-700/50 text-zinc-400 hover:text-zinc-100 cursor-pointer ml-0.5 transition-colors"
+                      title="Remover anexo"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Action Bar (Attachments & Submit) */}
+            <div
+              className={`flex items-center justify-between px-3.5 py-2.5 border-t ${
+                isDark ? 'border-zinc-800/80 bg-zinc-900/20' : 'border-zinc-100 bg-zinc-50/50'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    attachments.length > 0
+                      ? isDark
+                        ? 'bg-zinc-800 text-zinc-100 border border-zinc-700'
+                        : 'bg-zinc-200 text-zinc-900 border border-zinc-300'
+                      : isDark
+                      ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/80'
+                      : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
+                  }`}
+                  aria-label="Anexar arquivos"
+                >
+                  <Paperclip className="size-3.5" />
+                  <span>
+                    Anexar arquivos
+                    {attachments.length > 0 ? ` (${attachments.length})` : ''}
+                  </span>
+                </button>
+              </div>
 
               <button
                 type="button"
-                onClick={() => handleChipClick('Criar catálogo de confeitaria de 4 páginas com fotos artesanais')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors cursor-pointer border ${
+                onClick={() => handleStart()}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer ${
                   isDark
-                    ? 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
-                    : 'bg-white border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 shadow-xs'
+                    ? 'bg-zinc-100 hover:bg-white text-zinc-950'
+                    : 'bg-zinc-900 hover:bg-zinc-800 text-white'
                 }`}
+                aria-label="Gerar catálogo"
               >
-                <span>Confeitaria Artesanal (4 págs)</span>
+                <span>Gerar Catálogo</span>
+                <ArrowRight className="size-3.5" />
               </button>
+            </div>
+          </div>
 
-              <button
-                type="button"
-                onClick={() => handleChipClick('Criar catálogo TechGear de acessórios e gadgets com especificações técnicas')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors cursor-pointer border ${
-                  isDark
-                    ? 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
-                    : 'bg-white border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 shadow-xs'
-                }`}
-              >
-                <span>TechGear — Setup & Tech (6 págs)</span>
-              </button>
+          {/* Quick Starter Templates */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleChipClick('Criar catálogo editorial de moda e acessórios de luxo (Coleção ÁUREA 2026)')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors cursor-pointer border ${
+                isDark
+                  ? 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-amber-500/50 hover:text-amber-400'
+                  : 'bg-white border-zinc-200 text-zinc-700 hover:border-amber-600/50 hover:text-amber-700 shadow-xs'
+              }`}
+            >
+              <span>ÁUREA — Boutique de Luxo (10 págs)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleChipClick('Criar catálogo de confeitaria de 4 páginas com fotos artesanais')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors cursor-pointer border ${
+                isDark
+                  ? 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
+                  : 'bg-white border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 shadow-xs'
+              }`}
+            >
+              <span>Confeitaria Artesanal (4 págs)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleChipClick('Criar catálogo TechGear de acessórios e gadgets com especificações técnicas')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors cursor-pointer border ${
+                isDark
+                  ? 'bg-zinc-900/90 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
+                  : 'bg-white border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:text-zinc-900 shadow-xs'
+              }`}
+            >
+              <span>TechGear — Setup & Tech (6 págs)</span>
+            </button>
           </div>
         </div>
       </div>
     </div>
   );
 };
+
 

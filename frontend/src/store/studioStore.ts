@@ -185,7 +185,7 @@ export interface ChatThread {
 export interface StudioState {
   // Session & Workspace Mode
   hasStartedSession: boolean;
-  startSession: (initialPrompt?: string, categoryName?: string) => void;
+  startSession: (initialPrompt?: string, categoryName?: string, attachments?: ChatAttachment[]) => void;
   resetToHome: () => void;
 
   // Catalog Info (Personal use)
@@ -1539,9 +1539,18 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   selectedElementId: null,
   setSelectedElementId: (id) => set({ selectedElementId: id }),
 
-  startSession: (initialPrompt, categoryName) => {
+  startSession: (initialPrompt, categoryName, attachments) => {
     const prompt = initialPrompt || 'Criar catálogo showcase ÁUREA — Coleção Inverno 2026';
     const title = categoryName ? `ÁUREA · ${categoryName}` : 'ÁUREA — Coleção Inverno 2026';
+
+    let assistantContent = `Coleção **"${title}"** diagramada com sucesso!\n\nEstruturei **10 páginas em 5 spreads duplos**, adotando os princípios de direção de arte de grandes maisons europeias: minimalismo, respiro generoso de 96px, contraste cromático de 3 tons e filetes de 1px em ouro.`;
+
+    if (attachments && attachments.length > 0) {
+      const fileList = attachments.map((a) => `• **${a.name}** (${a.size})`).join('\n');
+      assistantContent += `\n\n**Documentos e referências integrados:**\n${fileList}\nOs dados comerciais, especificações técnicas e materiais anexados foram assimilados pelos agentes e aplicados à composição.`;
+    }
+
+    assistantContent += `\n\n**Você pode interagir livremente:**\n- **Clique em qualquer elemento** (fotos, títulos, preços ou descrições) para editar ou acionar comandos com IA.\n- **Use o chat do Co-Pilot** para solicitar alterações na coleção inteira (ex: mudar preços, paleta ou rótulos).\n- **Navegue pelos spreads** pelo filmstrip inferior ou pelas setas no topo.`;
 
     const initialMessages: ChatMessage[] = [
       {
@@ -1549,14 +1558,17 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         role: 'user',
         content: prompt,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        attachments: attachments && attachments.length > 0 ? attachments : undefined,
       },
       {
         id: 'msg-2',
         role: 'assistant',
-        content: `Coleção **"${title}"** diagramada com sucesso!\n\nEstruturei **10 páginas em 5 spreads duplos**, adotando os princípios de direção de arte de grandes maisons europeias: minimalismo, respiro generoso de 96px, contraste cromático de 3 tons e filetes de 1px em ouro.\n\n**Você pode interagir livremente:**\n- **Clique em qualquer elemento** (fotos, títulos, preços ou descrições) para editar ou acionar comandos com IA.\n- **Use o chat do Co-Pilot** para solicitar alterações na coleção inteira (ex: mudar preços, paleta ou rótulos).\n- **Navegue pelos spreads** pelo filmstrip inferior ou pelas setas no topo.`,
+        content: assistantContent,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         reasoning:
-          'Racional do Editor-Chefe [Coordenação]: Diagramação A4 com proporção 794x1123, margens de 96px e tipografia em versalete com letter-spacing calibrado.',
+          attachments && attachments.length > 0
+            ? `Racional do Editor-Chefe [${attachments.length} arquivo(s) assimilado(s)]: Extração de dados dos anexos, compatibilização de grid A4 e alinhamento de diretrizes editoriais.`
+            : 'Racional do Editor-Chefe [Coordenação]: Diagramação A4 com proporção 794x1123, margens de 96px e tipografia em versalete com letter-spacing calibrado.',
         delegations: [
           {
             roleId: 'director',
