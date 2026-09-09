@@ -219,6 +219,13 @@ export interface StudioState {
   setIsSkillsModalOpen: (open: boolean) => void;
   pendingInputPrompt: string | null;
   setPendingInputPrompt: (prompt: string | null) => void;
+
+  // Studio Sidebar (ChatGPT style) & Recent Catalogs
+  isStudioSidebarOpen: boolean;
+  setIsStudioSidebarOpen: (open: boolean) => void;
+  toggleStudioSidebar: () => void;
+  activeCatalogId: string;
+  loadExistingCatalog: (catalogId: string) => void;
   applyCouncilResolutions: (resolutions: {
     summary: string;
     productUpdates?: { id: string; updates: Partial<ProductItem> };
@@ -373,6 +380,70 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setIsSkillsModalOpen: (open) => set({ isSkillsModalOpen: open }),
   pendingInputPrompt: null,
   setPendingInputPrompt: (prompt) => set({ pendingInputPrompt: prompt }),
+
+  // Studio Sidebar (ChatGPT style) & Recent Catalogs
+  isStudioSidebarOpen: true,
+  setIsStudioSidebarOpen: (open) => set({ isStudioSidebarOpen: open }),
+  toggleStudioSidebar: () => set((s) => ({ isStudioSidebarOpen: !s.isStudioSidebarOpen })),
+  activeCatalogId: 'aurea-2026',
+
+  loadExistingCatalog: (catalogId: string) => {
+    if (catalogId === 'aurea-2026' || catalogId.includes('aurea')) {
+      set({
+        hasStartedSession: true,
+        catalogTitle: 'ÁUREA — Coleção Inverno 2026',
+        activeCatalogId: 'aurea-2026',
+        pages: AUREA_PAGES,
+        currentSpread: [1, 2],
+        activePalette: AUREA_PALETTE,
+      });
+      get().addMessage({
+        role: 'assistant',
+        content: 'Catálogo **ÁUREA — Coleção Inverno 2026** carregado com sucesso para edição. Os 10 spreads e os agentes da marca estão ativos para alterações.',
+        reasoning: 'Racional do Orquestrador: Carregamento do dossiê e spreads da Coleção ÁUREA. Modos de proporção áurea, fólio e paleta Noir & Or aplicados.',
+      });
+    } else if (catalogId === 'techgear-2026') {
+      set({
+        hasStartedSession: true,
+        catalogTitle: 'TechGear 2026 — Setup & Tech',
+        activeCatalogId: 'techgear-2026',
+        currentSpread: [1, 2],
+      });
+      get().addMessage({
+        role: 'assistant',
+        content: 'Catálogo **TechGear 2026 — Setup & Tech** aberto para edição na prancheta.',
+      });
+    } else if (catalogId === 'confeitaria-artesanal') {
+      set({
+        hasStartedSession: true,
+        catalogTitle: 'Confeitaria Artesanal — Coleção Festas',
+        activeCatalogId: 'confeitaria-artesanal',
+        currentSpread: [1, 2],
+      });
+      get().addMessage({
+        role: 'assistant',
+        content: 'Catálogo **Confeitaria Artesanal** aberto para edição na prancheta.',
+      });
+    } else if (catalogId === 'cristallo-joias') {
+      set({
+        hasStartedSession: true,
+        catalogTitle: 'Cristallo — Alta Joalheria & Gemas Raras',
+        activeCatalogId: 'cristallo-joias',
+        currentSpread: [1, 2],
+      });
+      get().addMessage({
+        role: 'assistant',
+        content: 'Catálogo **Cristallo Joalheria** aberto para edição na prancheta.',
+      });
+    } else {
+      set({
+        hasStartedSession: true,
+        catalogTitle: 'Catálogo Comercial',
+        activeCatalogId: catalogId,
+        currentSpread: [1, 2],
+      });
+    }
+  },
 
   applyCouncilResolutions: ({ summary, productUpdates, pageUpdates, delegations, reasoning }) => {
     const s = get();
