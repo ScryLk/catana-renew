@@ -122,3 +122,51 @@ class StudioBackendTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
         self.assertIn("code", response.data)
         self.assertEqual(response.data["code"], "rate_limit_exceeded")
+
+    def test_chat_stream_with_active_spread_and_patch(self):
+        """Verifica se o streaming recebe o JSON do spread ativo e processa o contexto"""
+        url = reverse('studio_chat_stream')
+        spread_data = {
+            "left_page": {"type": "hero", "title": "Capa Colecao"},
+            "right_page": {"type": "grid", "products": [{"id": "prod-1", "price": "R$ 1.000"}]}
+        }
+        skeleton = [
+            {"index": 0, "type": "cover", "title": "Capa Principal"},
+            {"index": 1, "type": "hero", "title": "Spread Ativo"}
+        ]
+        payload = {
+            "message": "Aumente o preco do produto 1 em 10%",
+            "agent_role": "commercial",
+            "spread_index": 1,
+            "active_spread_data": spread_data,
+            "catalog_skeleton": skeleton,
+            "selected_element_id": "prod-1",
+        }
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response['Content-Type'], 'text/event-stream')
+
+        content_stream = b"".join(response.streaming_content).decode("utf-8")
+        self.assertIn('"event": "start"', content_stream)
+        self.assertIn('"event": "done"', content_stream)
+
+    def test_extract_patch_from_text_helper(self):
+        """Valida o extrator de blocos json:patch"""
+        from api.views_studio import extract_patch_from_text
+        text_with_patch = (
+            "Aqui esta o parecer tecnico editorial.\n\n"
+            "```json:patch\n"
+            "{\n"
+            '  "spread_index": 1,\n'
+            '  "updates": [{"target": "prod-1", "field": "price", "value": "R$ 1.100"}],\n'
+            '  "summary": "Preco atualizado com +10%"\n'
+            "}\n"
+            "```\n\n"
+            "Alteracoes efetuadas com sucesso."
+        )
+        patch = extract_patch_from_text(text_with_patch)
+        self.assertIsNotNone(patch)
+        self.assertEqual(patch["spread_index"], 1)
+        self.assertEqual(len(patch["updates"]), 1)
+        self.assertEqual(patch["updates"][0]["value"], "R$ 1.100")
+

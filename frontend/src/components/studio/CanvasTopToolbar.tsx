@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BookOpen,
   FileText,
@@ -13,6 +13,12 @@ import {
   Edit2,
   Share2,
   Download,
+  Undo2,
+  Redo2,
+  Check,
+  Loader2,
+  Cloud,
+  CloudOff,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
 import { toast } from 'sonner';
@@ -32,6 +38,11 @@ export const CanvasTopToolbar: React.FC = () => {
     nextSpread,
     prevSpread,
     theme,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    saveStatus,
   } = useStudioStore();
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -57,6 +68,35 @@ export const CanvasTopToolbar: React.FC = () => {
     }
     setIsEditingTitle(false);
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isInput =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable);
+      if (isInput) return;
+
+      const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+      const modifier = isMac ? e.metaKey : e.ctrlKey;
+
+      if (modifier && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        if (canUndo) undo();
+      } else if (
+        (modifier && e.shiftKey && (e.key === 'z' || e.key === 'Z')) ||
+        (modifier && !e.shiftKey && (e.key === 'y' || e.key === 'Y'))
+      ) {
+        e.preventDefault();
+        if (canRedo) redo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo, canUndo, canRedo]);
 
   const isConsecutive =
     currentSpread[1] === currentSpread[0] + 1 && currentSpread[0] % 2 === 1;
@@ -136,6 +176,66 @@ export const CanvasTopToolbar: React.FC = () => {
           >
             <ChevronRight className="size-3" />
           </button>
+        </div>
+
+        {/* Undo / Redo Controls */}
+        <div
+          className={`flex items-center rounded-lg border p-0.5 shrink-0 transition-colors ${
+            isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-100 border-zinc-200'
+          }`}
+        >
+          <button
+            type="button"
+            onClick={undo}
+            disabled={!canUndo}
+            className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+              isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
+            }`}
+            title="Desfazer (Ctrl+Z / Cmd+Z)"
+            aria-label="Desfazer"
+          >
+            <Undo2 className="size-3" />
+          </button>
+          <button
+            type="button"
+            onClick={redo}
+            disabled={!canRedo}
+            className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+              isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
+            }`}
+            title="Refazer (Ctrl+Shift+Z / Cmd+Shift+Z / Ctrl+Y)"
+            aria-label="Refazer"
+          >
+            <Redo2 className="size-3" />
+          </button>
+        </div>
+
+        {/* Autosave Status Indicator */}
+        <div className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium text-zinc-400 shrink-0">
+          {saveStatus === 'saving' && (
+            <>
+              <Loader2 className="size-3 animate-spin text-amber-500" />
+              <span className="text-amber-500 font-mono text-[10px]">Salvando...</span>
+            </>
+          )}
+          {saveStatus === 'saved' && (
+            <>
+              <Check className="size-3 text-emerald-500" />
+              <span className="text-zinc-400 font-mono text-[10px]">Salvo na nuvem</span>
+            </>
+          )}
+          {saveStatus === 'error' && (
+            <>
+              <CloudOff className="size-3 text-red-500" />
+              <span className="text-red-500 font-mono text-[10px]">Erro ao salvar</span>
+            </>
+          )}
+          {saveStatus === 'unsaved' && (
+            <>
+              <Cloud className="size-3 text-zinc-400 opacity-60" />
+              <span className="text-zinc-400 font-mono text-[10px]">Alterações pendentes</span>
+            </>
+          )}
         </div>
       </div>
 

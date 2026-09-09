@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import Generator
+import re
+from typing import Generator, Optional, Dict, Any
 from django.http import StreamingHttpResponse, JsonResponse
 from django.db.models import Q
 from rest_framework.views import APIView
@@ -297,6 +298,23 @@ class StudioThreadMessagesView(APIView):
         })
 
 
+def extract_patch_from_text(text: str) -> Optional[Dict[str, Any]]:
+    """
+    Extrai bloco estruturado de JSON Patch emitido pelo modelo.
+    Suporta formatacao ```json:patch ... ``` ou ```json ... ``` contendo a chave updates.
+    """
+    if not text:
+        return None
+    pattern = r"```(?:json:patch|json)?\s*(\{[\s\S]*?\"updates\"[\s\S]*?\})\s*```"
+    match = re.search(pattern, text)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except Exception:
+            pass
+    return None
+
+
 class StudioChatStreamView(APIView):
     """
     Endpoint SSE (Server-Sent Events) para streaming de respostas dos agentes do Studio.
@@ -381,6 +399,27 @@ class StudioChatStreamView(APIView):
                 "content": past_msg.content,
             })
 
+        # Contexto estendido do Canvas e Spread
+        active_spread_data = request.data.get("active_spread_data")
+        if isinstance(active_spread_data, str):
+            try:
+                active_spread_data = json.loads(active_spread_data)
+            except Exception:
+                pass
+
+        catalog_skeleton = request.data.get("catalog_skeleton")
+        if isinstance(catalog_skeleton, str):
+            try:
+                catalog_skeleton = json.loads(catalog_skeleton)
+            except Exception:
+                pass
+
+        selected_element_id = request.data.get("selected_element_id")
+        try:
+            spread_index = int(request.data.get("spread_index", 0))
+        except (ValueError, TypeError):
+            spread_index = 0
+
         # 6. Prepara o agente especializado
         agent = get_agent(agent_role)
         catalog_context = {
@@ -389,7 +428,10 @@ class StudioChatStreamView(APIView):
             "brand_name": catalog.brand_name if catalog else "",
             "style_preset": catalog.style_preset if catalog else "",
             "primary_color": catalog.primary_color if catalog else "",
-            "spread_index": 0,
+            "spread_index": spread_index,
+            "active_spread_data": active_spread_data,
+            "catalog_skeleton": catalog_skeleton,
+            "selected_element_id": selected_element_id,
         }
 
         # 7. Gerador de Eventos SSE
@@ -431,6 +473,11 @@ class StudioChatStreamView(APIView):
 
                 full_content = "".join(accumulated_text)
 
+                # Extrai bloco de patch estruturado para aplicacao no canvas
+                patch_data = extract_patch_from_text(full_content)
+                if patch_data:
+                    yield f"data: {json.dumps({'event': 'patch', 'patch': patch_data})}\n\n"
+
                 # Registra auditoria e consumo de tokens
                 prompt_tok = final_usage.get("prompt_tokens", 0)
                 comp_tok = final_usage.get("completion_tokens", 0)
@@ -449,7 +496,7 @@ class StudioChatStreamView(APIView):
                     sender_type="agent",
                     agent_role=agent.role,
                     content=full_content,
-                    metadata={"usage": final_usage, "metadata": metadata},
+                    metadata={"usage": final_usage, "metadata": metadata, "patch": patch_data},
                 )
 
                 done_payload = {
@@ -459,6 +506,7 @@ class StudioChatStreamView(APIView):
                     "catalog_id": catalog.id if catalog else None,
                     "usage": final_usage,
                     "metadata": metadata,
+                    "patch": patch_data,
                 }
                 yield f"data: {json.dumps(done_payload)}\n\n"
 

@@ -18,9 +18,23 @@ class BaseAgent:
         """
         return (
             "Voce e um agente de inteligencia artificial especializado do Catana Studio 2.0. "
-            "Seu foco e auxiliar na criacao, refinamento e producao de catalogos comerciais e editoriais de alto padrao. "
-            "Responda sempre em Portugues do Brasil com precisao profissional, objetividade e clareza. "
-            "Nao utilize nenhum emoji em suas respostas."
+            "Seu foco e auxiliar na criacao, refinamento e producao de catalogos comerciais e editoriais de alto padrao.\n\n"
+            "Diretrizes Gerais:\n"
+            "1. Responda sempre em Portugues do Brasil com precisao profissional, objetividade e clareza editorial.\n"
+            "2. Proporcao Padrao: Paginas A4 (794x1123 px por pagina), organizadas em pares de spreads duplos.\n"
+            "3. Protocolo de Modificacao do Canvas (JSON Delta Patch):\n"
+            "   Quando a solicitacao do usuario demandar criacao, atualizacao ou estilizacao de elementos no spread atual, "
+            "finalize sua resposta com um bloco JSON delimitado exatamente por ```json:patch e ``` no formato:\n"
+            "   ```json:patch\n"
+            "   {\n"
+            "     \"spread_index\": <numero_do_spread>,\n"
+            "     \"updates\": [\n"
+            "       {\"target\": \"left_page\" | \"right_page\" | \"<product_id>\", \"field\": \"<campo>\", \"value\": <novo_valor>}\n"
+            "     ],\n"
+            "     \"summary\": \"<descricao concisa da alteracao>\"\n"
+            "   }\n"
+            "   ```\n"
+            "4. Regra Estrita: Nao utilize nenhum emoji em suas respostas sob qualquer hipotese."
         )
 
     def build_user_prompt(
@@ -30,7 +44,7 @@ class BaseAgent:
         attachments: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
         """
-        Monta o prompt enriquecido com metadados do catalogo e anexos.
+        Monta o prompt enriquecido com metadados do catalogo, spread ativo e anexos.
         """
         context_parts = []
         if catalog_context:
@@ -40,14 +54,37 @@ class BaseAgent:
             spread_idx = catalog_context.get("spread_index", 0)
             context_parts.append(
                 f"[CONTEXTO DO PROJETO]: Catalogo: '{title}' | Marca: '{brand}' | "
-                f"Estilo: '{style}' | Spread Atual: {spread_idx} (A4 794x1123 px)."
+                f"Estilo: '{style}' | Spread Ativo: {spread_idx} (A4 794x1123 px)."
             )
+
+            # Indice resumido dos spreads (Skeleton)
+            skeleton = catalog_context.get("catalog_skeleton")
+            if skeleton:
+                try:
+                    skeleton_str = json.dumps(skeleton, ensure_ascii=False)
+                    context_parts.append(f"[INDICE RESUMIDO DO CATALOGO]: {skeleton_str}")
+                except Exception:
+                    pass
+
+            # Elemento focado pelo usuario
+            selected_id = catalog_context.get("selected_element_id")
+            if selected_id:
+                context_parts.append(f"[ELEMENTO SELECIONADO PELO USUARIO]: {selected_id}")
+
+            # Estado atual do spread ativo em JSON
+            active_spread = catalog_context.get("active_spread_data")
+            if active_spread:
+                try:
+                    spread_json = json.dumps(active_spread, ensure_ascii=False)
+                    context_parts.append(f"[ESTADO ATUAL DO SPREAD VISIVEL (JSON)]:\n{spread_json}")
+                except Exception:
+                    pass
 
         if attachments:
             context_parts.append(f"[TOTAL DE ANEXOS RECEBIDOS]: {len(attachments)}")
 
         if context_parts:
-            header = "\n".join(context_parts) + "\n\n"
+            header = "\n\n".join(context_parts) + "\n\n"
             return f"{header}Solicitacao do Usuario: {user_message}"
         
         return user_message

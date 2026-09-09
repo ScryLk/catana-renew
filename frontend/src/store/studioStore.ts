@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import axios from 'axios';
+import { toast } from 'sonner';
 import {
   CatalogPageData,
   ProductItem,
@@ -7,6 +9,9 @@ import {
   StudioPalette,
   STUDIO_PALETTE_PRESETS,
 } from '../data/aureaCatalog.mock';
+
+const API_BASE_URL = (import.meta.env && import.meta.env.VITE_API_BASE_URL) || 'http://localhost:8000';
+let saveTimeout: any = null;
 
 export type StudioMode = 'director' | 'commercial' | 'copywriter' | string;
 export type CanvasViewMode = 'spread' | 'single' | 'grid';
@@ -296,6 +301,31 @@ export interface StudioState {
   // Selected element for contextual AI prompt
   selectedElementId: string | null;
   setSelectedElementId: (id: string | null) => void;
+
+  // Undo / Redo & History Stack
+  historyStack: CatalogPageData[][];
+  redoStack: CatalogPageData[][];
+  pushHistorySnapshot: () => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+
+  // Persistence & Save Status
+  saveStatus: 'saved' | 'saving' | 'unsaved' | 'error';
+  setSaveStatus: (status: 'saved' | 'saving' | 'unsaved' | 'error') => void;
+  debouncedSaveCurrentSpread: () => void;
+  flushSaveSpread: () => Promise<void>;
+
+  // JSON Patch mutation
+  applySpreadPatch: (patch: {
+    spread_index?: number;
+    updates: Array<{ target: string; field: string; value: any }>;
+    summary?: string;
+  }) => void;
+
+  // Real Agent Streaming & Command Execution
+  sendMessageToAgent: (prompt: string, attachments?: ChatAttachment[]) => Promise<void>;
 }
 
 const getInitialTheme = (): 'dark' | 'light' => {
@@ -839,12 +869,17 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   pages: AUREA_PAGES,
   setPages: (pages) => set({ pages, totalPages: pages.length }),
 
-  updatePage: (pageNumber, updates) =>
+  updatePage: (pageNumber, updates) => {
+    get().pushHistorySnapshot();
     set((s) => ({
       pages: s.pages.map((p) => (p.pageNumber === pageNumber ? { ...p, ...updates } : p)),
-    })),
+      saveStatus: 'unsaved',
+    }));
+    get().debouncedSaveCurrentSpread();
+  },
 
-  updateProduct: (productId, updates) =>
+  updateProduct: (productId, updates) => {
+    get().pushHistorySnapshot();
     set((s) => ({
       pages: s.pages.map((page) => {
         if (!page.products) return page;
@@ -855,7 +890,347 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           ),
         };
       }),
-    })),
+      saveStatus: 'unsaved',
+    }));
+    get().debouncedSaveCurrentSpread();
+  },
+
+  // Undo / Redo Stack State
+  historyStack: [],
+  redoStack: [],
+  canUndo: false,
+  canRedo: false,
+
+  pushHistorySnapshot: () => {
+    const currentPages = get().pages;
+    set((s) => {
+      const snapshot = JSON.parse(JSON.stringify(currentPages));
+      const newHistory = [...s.historyStack, snapshot].slice(-30);
+      return {
+        historyStack: newHistory,
+        redoStack: [],
+        canUndo: true,
+        canRedo: false,
+      };
+    });
+  },
+
+  undo: () => {
+    const { historyStack, redoStack, pages } = get();
+    if (historyStack.length === 0) return;
+
+    const previousSnapshot = historyStack[historyStack.length - 1];
+    const newHistory = historyStack.slice(0, -1);
+    const currentSnapshot = JSON.parse(JSON.stringify(pages));
+
+    set({
+      pages: previousSnapshot,
+      historyStack: newHistory,
+      redoStack: [...redoStack, currentSnapshot],
+      canUndo: newHistory.length > 0,
+      canRedo: true,
+      saveStatus: 'unsaved',
+    });
+
+    toast.info('Alteracao desfeita');
+    get().debouncedSaveCurrentSpread();
+  },
+
+  redo: () => {
+    const { historyStack, redoStack, pages } = get();
+    if (redoStack.length === 0) return;
+
+    const nextSnapshot = redoStack[redoStack.length - 1];
+    const newRedo = redoStack.slice(0, -1);
+    const currentSnapshot = JSON.parse(JSON.stringify(pages));
+
+    set({
+      pages: nextSnapshot,
+      historyStack: [...historyStack, currentSnapshot],
+      redoStack: newRedo,
+      canUndo: true,
+      canRedo: newRedo.length > 0,
+      saveStatus: 'unsaved',
+    });
+
+    toast.info('Alteracao refeita');
+    get().debouncedSaveCurrentSpread();
+  },
+
+  // Persistence State
+  saveStatus: 'saved',
+  setSaveStatus: (status) => set({ saveStatus: status }),
+
+  debouncedSaveCurrentSpread: () => {
+    set({ saveStatus: 'saving' });
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+    }
+    saveTimeout = setTimeout(() => {
+      get().flushSaveSpread();
+    }, 1200);
+  },
+
+  flushSaveSpread: async () => {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+
+    const state = get();
+    const catalogId = state.activeCatalogId;
+    const [leftPageNum, rightPageNum] = state.currentSpread;
+    const leftPage = state.pages.find((p) => p.pageNumber === leftPageNum);
+    const rightPage = state.pages.find((p) => p.pageNumber === rightPageNum);
+
+    set({ saveStatus: 'saving' });
+
+    try {
+      const token = localStorage.getItem('access_token');
+      const numericCatalogId = parseInt(catalogId, 10);
+      if (!isNaN(numericCatalogId)) {
+        await axios.post(
+          `${API_BASE_URL}/api/v2/studio/catalogs/${numericCatalogId}/spreads/`,
+          {
+            spread_index: Math.floor((leftPageNum - 1) / 2),
+            title: `Spread ${leftPageNum}-${rightPageNum}`,
+            left_page_elements: leftPage ? [leftPage] : [],
+            right_page_elements: rightPage ? [rightPage] : [],
+          },
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            withCredentials: true,
+          }
+        );
+      }
+      set({ saveStatus: 'saved' });
+    } catch {
+      set({ saveStatus: 'error' });
+    }
+  },
+
+  applySpreadPatch: (patch) => {
+    if (!patch || !Array.isArray(patch.updates)) return;
+
+    const state = get();
+    state.pushHistorySnapshot();
+
+    const [leftPageNum, rightPageNum] = state.currentSpread;
+
+    set((s) => {
+      let updatedPages = [...s.pages];
+
+      for (const update of patch.updates) {
+        const { target, field, value } = update;
+
+        if (target === 'left_page' || target === 'left') {
+          updatedPages = updatedPages.map((p) =>
+            p.pageNumber === leftPageNum ? { ...p, [field]: value } : p
+          );
+        } else if (target === 'right_page' || target === 'right') {
+          updatedPages = updatedPages.map((p) =>
+            p.pageNumber === rightPageNum ? { ...p, [field]: value } : p
+          );
+        } else if (typeof target === 'string' && target.startsWith('page:')) {
+          const targetPageNum = parseInt(target.replace('page:', ''), 10);
+          updatedPages = updatedPages.map((p) =>
+            p.pageNumber === targetPageNum ? { ...p, [field]: value } : p
+          );
+        } else {
+          // target e um produto ou elemento especifico
+          updatedPages = updatedPages.map((page) => {
+            if (!page.products) return page;
+            const hasProduct = page.products.some((prod) => prod.id === target);
+            if (!hasProduct) return page;
+
+            return {
+              ...page,
+              products: page.products.map((prod) =>
+                prod.id === target ? { ...prod, [field]: value } : prod
+              ),
+            };
+          });
+        }
+      }
+
+      return {
+        pages: updatedPages,
+        saveStatus: 'unsaved',
+      };
+    });
+
+    get().debouncedSaveCurrentSpread();
+  },
+
+  sendMessageToAgent: async (prompt, attachments) => {
+    const state = get();
+    const userPrompt = prompt.trim();
+    if (!userPrompt && (!attachments || attachments.length === 0)) return;
+
+    // 1. Mensagem do usuario
+    const userMsgId = `msg-user-${Date.now()}`;
+    const userMsg: ChatMessage = {
+      id: userMsgId,
+      role: 'user',
+      content: userPrompt,
+      attachments,
+      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    // 2. Mensagem do assistente pronta para streaming
+    const assistantMsgId = `msg-agent-${Date.now()}`;
+    const assistantMsg: ChatMessage = {
+      id: assistantMsgId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    set((s) => {
+      const activeThread = s.threads.find((t) => t.id === s.activeThreadId);
+      if (!activeThread) return s;
+      return {
+        agentStatus: 'thinking',
+        threads: s.threads.map((t) =>
+          t.id === s.activeThreadId
+            ? { ...t, messages: [...t.messages, userMsg, assistantMsg] }
+            : t
+        ),
+      };
+    });
+
+    // 3. Monta o contexto para o backend
+    const [leftPageNum, rightPageNum] = state.currentSpread;
+    const leftPage = state.pages.find((p) => p.pageNumber === leftPageNum);
+    const rightPage = state.pages.find((p) => p.pageNumber === rightPageNum);
+
+    const activeSpreadData = {
+      spread_index: Math.floor((leftPageNum - 1) / 2),
+      left_page: leftPage,
+      right_page: rightPage,
+    };
+
+    const catalogSkeleton = state.pages.map((p) => ({
+      pageNumber: p.pageNumber,
+      type: p.type,
+      title: p.title || p.label || `Pagina ${p.pageNumber}`,
+    }));
+
+    const token = localStorage.getItem('access_token');
+    const numericCatalogId = parseInt(state.activeCatalogId, 10);
+    const numericThreadId = parseInt(state.activeThreadId, 10);
+
+    const payload = {
+      message: userPrompt,
+      agent_role: state.activeRoleId || 'orchestrator',
+      catalog_id: !isNaN(numericCatalogId) ? numericCatalogId : undefined,
+      thread_id: !isNaN(numericThreadId) ? numericThreadId : undefined,
+      spread_index: Math.floor((leftPageNum - 1) / 2),
+      active_spread_data: activeSpreadData,
+      catalog_skeleton: catalogSkeleton,
+      selected_element_id: state.selectedElementId || undefined,
+    };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v2/studio/chat/stream/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      set({ agentStatus: 'generating' });
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('ReadableStream nao disponivel');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let accumulatedContent = '';
+      let appliedPatch: any = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+
+          const jsonStr = trimmed.replace(/^data:\s*/, '');
+          if (!jsonStr) continue;
+
+          try {
+            const data = JSON.parse(jsonStr);
+
+            if (data.event === 'token' && data.text) {
+              accumulatedContent += data.text;
+              set((s) => ({
+                threads: s.threads.map((t) =>
+                  t.id === s.activeThreadId
+                    ? {
+                        ...t,
+                        messages: t.messages.map((m) =>
+                          m.id === assistantMsgId
+                            ? { ...m, content: accumulatedContent }
+                            : m
+                        ),
+                      }
+                    : t
+                ),
+              }));
+            }
+
+            if (data.event === 'patch' && data.patch && !appliedPatch) {
+              appliedPatch = data.patch;
+              get().applySpreadPatch(data.patch);
+              toast.success(data.patch.summary || 'Alteracoes aplicadas ao spread!');
+            }
+
+            if (data.event === 'done') {
+              if (data.patch && !appliedPatch) {
+                appliedPatch = data.patch;
+                get().applySpreadPatch(data.patch);
+                toast.success(data.patch.summary || 'Alteracoes aplicadas ao spread!');
+              }
+            }
+          } catch {
+            // Ignora linhas intermediarias de streaming
+          }
+        }
+      }
+
+      // Se nao veio evento de patch explicito mas o texto acumulado tem json:patch
+      if (!appliedPatch && accumulatedContent.includes('json:patch')) {
+        const match = accumulatedContent.match(/```(?:json:patch|json)?\s*(\{[\s\S]*?"updates"[\s\S]*?\})\s*```/);
+        if (match) {
+          try {
+            const parsed = JSON.parse(match[1]);
+            get().applySpreadPatch(parsed);
+            toast.success(parsed.summary || 'Alteracoes aplicadas ao spread!');
+          } catch {}
+        }
+      }
+
+      set({ agentStatus: 'idle' });
+      await get().flushSaveSpread();
+
+    } catch (err) {
+      console.warn('Fallback para orquestracao local:', err);
+      state.executeCopilotCommand(userPrompt, attachments);
+    }
+  },
 
   executeCopilotCommand: (command, attachments) => {
     const lower = command.toLowerCase();

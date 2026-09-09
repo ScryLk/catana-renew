@@ -31,10 +31,8 @@ export const AgentInputBar: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const {
-    addMessage,
-    setAgentStatus,
     theme,
-    executeCopilotCommand,
+    sendMessageToAgent,
     isSkillsModalOpen,
     setIsSkillsModalOpen,
     pendingInputPrompt,
@@ -163,21 +161,11 @@ export const AgentInputBar: React.FC = () => {
         ? `Analise o(s) documento(s) anexado(s): ${currentAttachments.map((a) => a.name).join(', ')}.`
         : '');
 
-    addMessage({
-      role: 'user',
-      content: userPrompt,
-      attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
-    });
-
     setInputText('');
     setAttachments([]);
     setIsSlashMenuOpen(false);
-    setAgentStatus('thinking');
 
-    setTimeout(() => {
-      executeCopilotCommand(userPrompt, currentAttachments);
-      toast.success('Instrução processada pelo assistente!');
-    }, 900);
+    sendMessageToAgent(userPrompt, currentAttachments);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
