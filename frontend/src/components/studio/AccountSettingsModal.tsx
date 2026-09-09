@@ -10,6 +10,7 @@ import {
   KeyRound,
   Layers,
   Clock,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -242,21 +243,21 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col transition-colors duration-200 animate-in zoom-in-95 duration-150 ${
+        className={`w-full max-w-xl h-[530px] rounded-2xl border shadow-2xl overflow-hidden flex flex-col transition-colors duration-200 animate-in zoom-in-95 duration-150 ${
           isDark
-            ? 'bg-[#0f0f13] border-zinc-800 text-zinc-100'
-            : 'bg-white border-zinc-200 text-zinc-900'
+            ? 'bg-[#0f0f13] border-zinc-800 text-zinc-100 shadow-[0_30px_70px_rgba(0,0,0,0.95)]'
+            : 'bg-white border-zinc-200 text-zinc-900 shadow-[0_20px_50px_rgba(0,0,0,0.15)]'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabecalho do Modal */}
         <div
-          className={`px-5 py-4 flex items-center justify-between border-b ${
+          className={`px-5 py-4 flex items-center justify-between border-b shrink-0 ${
             isDark ? 'border-zinc-800/80 bg-zinc-900/40' : 'border-zinc-100 bg-zinc-50/70'
           }`}
         >
           <div>
-            <h2 className="text-base font-semibold tracking-tight">Configuracoes</h2>
+            <h2 className="text-base font-semibold tracking-tight">Configurações</h2>
             <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
               Gerencie seus dados pessoais, plano e credenciais.
             </p>
@@ -278,7 +279,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
 
         {/* Abas de Navegacao Compactas */}
         <div
-          className={`px-5 pt-3 pb-2 flex gap-1 border-b ${
+          className={`px-5 pt-3 pb-2 flex gap-1 border-b shrink-0 ${
             isDark ? 'border-zinc-800/60 bg-zinc-950/20' : 'border-zinc-100 bg-zinc-50/30'
           }`}
         >
@@ -330,15 +331,16 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
             }`}
           >
             <Lock className="w-3.5 h-3.5" />
-            <span>Seguranca</span>
+            <span>Segurança</span>
           </button>
         </div>
 
         {/* Conteudo Principal das Abas */}
-        <div className="p-5 overflow-y-auto max-h-[60vh] space-y-4">
+        <div className="flex-1 min-h-0 p-5 overflow-y-auto space-y-4">
           {isLoading ? (
-            <div className="py-12 text-center text-xs text-zinc-500">
-              Carregando informacoes...
+            <div className="h-full flex flex-col items-center justify-center py-12 text-center text-xs text-zinc-500 gap-2.5">
+              <Loader2 className="w-5 h-5 animate-spin text-zinc-400" />
+              <span>Carregando informações da conta...</span>
             </div>
           ) : (
             <>
@@ -638,30 +640,64 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
           )}
         </div>
 
-        {/* Rodape do Modal */}
-        {activeTab === 'profile' && (
-          <div
-            className={`px-5 py-3 border-t flex items-center justify-between transition-colors shrink-0 ${
-              isDark ? 'border-zinc-800/80 bg-zinc-900/30' : 'border-zinc-100 bg-zinc-50/70'
-            }`}
-          >
-            <span className="text-[11px] text-zinc-500">
-              Preferencias do Studio salvas automaticamente na conta.
-            </span>
-            <Button
-              onClick={handleSaveProfile}
-              disabled={isSavingProfile}
-              className={`h-8 px-4 text-xs cursor-pointer gap-1.5 rounded-lg transition-all ${
-                isDark
-                  ? 'bg-zinc-100 hover:bg-white text-zinc-950 font-medium shadow-xs'
-                  : 'bg-zinc-900 hover:bg-zinc-800 text-white font-medium shadow-xs'
-              }`}
-            >
-              <Save className="w-3.5 h-3.5" />
-              {isSavingProfile ? 'Salvando...' : 'Salvar'}
-            </Button>
-          </div>
-        )}
+        {/* Rodape do Modal com Altura Fixa e Consistente */}
+        <div
+          className={`px-5 py-3 border-t flex items-center justify-between transition-colors shrink-0 ${
+            isDark ? 'border-zinc-800/80 bg-zinc-900/30' : 'border-zinc-100 bg-zinc-50/70'
+          }`}
+        >
+          {activeTab === 'profile' ? (
+            <>
+              <span className="text-[11px] text-zinc-500">
+                Preferências do Studio salvas na conta.
+              </span>
+              <Button
+                onClick={handleSaveProfile}
+                disabled={isSavingProfile}
+                className={`h-8 px-4 text-xs cursor-pointer gap-1.5 rounded-lg transition-all ${
+                  isDark
+                    ? 'bg-zinc-100 hover:bg-white text-zinc-950 font-medium shadow-xs'
+                    : 'bg-zinc-900 hover:bg-zinc-800 text-white font-medium shadow-xs'
+                }`}
+              >
+                <Save className="w-3.5 h-3.5" />
+                {isSavingProfile ? 'Salvando...' : 'Salvar Alterações'}
+              </Button>
+            </>
+          ) : activeTab === 'plan' ? (
+            <>
+              <span className="text-[11px] text-zinc-500">
+                Cotas de tokens e limites de taxa renovados a cada ciclo mensal.
+              </span>
+              <Badge
+                variant="outline"
+                className={`text-[10px] font-mono ${
+                  isDark
+                    ? 'bg-zinc-800/80 border-zinc-700 text-zinc-300'
+                    : 'bg-zinc-200/80 border-zinc-300 text-zinc-700'
+                }`}
+              >
+                {quota?.plan_name || 'Plano Gratuito'}
+              </Badge>
+            </>
+          ) : (
+            <>
+              <span className="text-[11px] text-zinc-500">
+                Altere sua senha periodicamente para manter a segurança da conta.
+              </span>
+              <Badge
+                variant="outline"
+                className={`text-[10px] font-mono ${
+                  isDark
+                    ? 'bg-zinc-800/80 border-zinc-700 text-zinc-300'
+                    : 'bg-zinc-200/80 border-zinc-300 text-zinc-700'
+                }`}
+              >
+                Sessão Ativa
+              </Badge>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
