@@ -287,7 +287,9 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
             onClick={() => setActiveTab('profile')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
               activeTab === 'profile'
-                ? 'bg-purple-600 text-white shadow-sm'
+                ? isDark
+                  ? 'bg-zinc-800 text-white border border-zinc-700/80 shadow-xs'
+                  : 'bg-zinc-900 text-white shadow-xs'
                 : isDark
                 ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
                 : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
@@ -302,7 +304,9 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
             onClick={() => setActiveTab('plan')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
               activeTab === 'plan'
-                ? 'bg-purple-600 text-white shadow-sm'
+                ? isDark
+                  ? 'bg-zinc-800 text-white border border-zinc-700/80 shadow-xs'
+                  : 'bg-zinc-900 text-white shadow-xs'
                 : isDark
                 ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
                 : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
@@ -317,7 +321,9 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
             onClick={() => setActiveTab('security')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
               activeTab === 'security'
-                ? 'bg-purple-600 text-white shadow-sm'
+                ? isDark
+                  ? 'bg-zinc-800 text-white border border-zinc-700/80 shadow-xs'
+                  : 'bg-zinc-900 text-white shadow-xs'
                 : isDark
                 ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
                 : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
@@ -341,9 +347,9 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                 <div className="space-y-4">
                   {/* Avatar Compacto */}
                   <div className="flex items-center gap-4 p-3 rounded-xl border border-inherit bg-zinc-500/5">
-                    <Avatar className="w-14 h-14 border border-purple-500/30">
+                    <Avatar className="w-14 h-14 border border-zinc-700/80">
                       <AvatarImage src={profile?.avatar} />
-                      <AvatarFallback className="bg-purple-600 text-white text-sm font-semibold">
+                      <AvatarFallback className="bg-zinc-800 text-zinc-200 border border-zinc-700/50 text-sm font-semibold">
                         {getInitials(formData.name || profile?.username || 'C')}
                       </AvatarFallback>
                     </Avatar>
@@ -441,7 +447,11 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                     <Button
                       onClick={handleSaveProfile}
                       disabled={isSavingProfile}
-                      className="h-8 text-xs bg-purple-600 hover:bg-purple-700 text-white cursor-pointer gap-1.5"
+                      className={`h-8 text-xs cursor-pointer gap-1.5 ${
+                        isDark
+                          ? 'bg-zinc-100 hover:bg-white text-zinc-950 font-medium'
+                          : 'bg-zinc-900 hover:bg-zinc-800 text-white font-medium'
+                      }`}
                     >
                       <Save className="w-3.5 h-3.5" />
                       {isSavingProfile ? 'Salvando...' : 'Salvar'}
@@ -459,7 +469,11 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                       <span className="text-xs font-semibold">Plano Ativo</span>
                       <Badge
                         variant="outline"
-                        className="bg-purple-500/10 border-purple-500/20 text-purple-400 text-[11px]"
+                        className={`text-[11px] font-mono ${
+                          isDark
+                            ? 'bg-zinc-800/80 border-zinc-700 text-zinc-300'
+                            : 'bg-zinc-200/80 border-zinc-300 text-zinc-700'
+                        }`}
                       >
                         {quota?.plan_name || 'Plano Gratuito'}
                       </Badge>
@@ -479,7 +493,9 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                         }`}
                       >
                         <div
-                          className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all duration-300"
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            isDark ? 'bg-zinc-200' : 'bg-zinc-800'
+                          }`}
                           style={{ width: `${Math.min(100, quota?.percentage_used || 0)}%` }}
                         />
                       </div>
@@ -573,7 +589,11 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                       <Button
                         type="submit"
                         disabled={isChangingPassword}
-                        className="h-8 text-xs bg-purple-600 hover:bg-purple-700 text-white cursor-pointer gap-1.5"
+                        className={`h-8 text-xs cursor-pointer gap-1.5 ${
+                          isDark
+                            ? 'bg-zinc-100 hover:bg-white text-zinc-950 font-medium'
+                            : 'bg-zinc-900 hover:bg-zinc-800 text-white font-medium'
+                        }`}
                       >
                         <KeyRound className="w-3.5 h-3.5" />
                         {isChangingPassword ? 'Atualizando...' : 'Atualizar Senha'}
