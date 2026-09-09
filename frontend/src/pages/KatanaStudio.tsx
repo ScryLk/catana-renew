@@ -5,6 +5,7 @@ import { AgentCoPilot } from '../components/studio/AgentCoPilot';
 import { CatalogCanvasWorkspace } from '../components/studio/CatalogCanvasWorkspace';
 import { StudioHomeChat } from '../components/studio/StudioHomeChat';
 import { KatanaSplashScreen } from '../components/studio/KatanaSplashScreen';
+import { AccountSettingsModal } from '../components/studio/AccountSettingsModal';
 import { useStudioStore } from '../store/studioStore';
 
 export const KatanaStudio: React.FC = () => {
@@ -15,6 +16,8 @@ export const KatanaStudio: React.FC = () => {
     toggleStudioSidebar,
     resetToHome,
     theme,
+    isAccountSettingsOpen,
+    closeAccountSettings,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -91,6 +94,12 @@ export const KatanaStudio: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Modal de Configuracoes da Conta */}
+      <AccountSettingsModal
+        isOpen={isAccountSettingsOpen}
+        onClose={closeAccountSettings}
+      />
     </div>
   );
 };

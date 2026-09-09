@@ -224,6 +224,10 @@ export interface StudioState {
   isStudioSidebarOpen: boolean;
   setIsStudioSidebarOpen: (open: boolean) => void;
   toggleStudioSidebar: () => void;
+  isAccountSettingsOpen: boolean;
+  setIsAccountSettingsOpen: (open: boolean) => void;
+  openAccountSettings: () => void;
+  closeAccountSettings: () => void;
   activeCatalogId: string;
   loadExistingCatalog: (catalogId: string) => void;
   applyCouncilResolutions: (resolutions: {
@@ -385,6 +389,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   isStudioSidebarOpen: true,
   setIsStudioSidebarOpen: (open) => set({ isStudioSidebarOpen: open }),
   toggleStudioSidebar: () => set((s) => ({ isStudioSidebarOpen: !s.isStudioSidebarOpen })),
+  isAccountSettingsOpen: false,
+  setIsAccountSettingsOpen: (open) => set({ isAccountSettingsOpen: open }),
+  openAccountSettings: () => set({ isAccountSettingsOpen: true }),
+  closeAccountSettings: () => set({ isAccountSettingsOpen: false }),
   activeCatalogId: 'aurea-2026',
 
   loadExistingCatalog: (catalogId: string) => {
