@@ -67,15 +67,22 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         },
       });
 
-      // Renderiza o botao oficial do Google com tema escuro elegante
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
+
+      const isDark = document.documentElement.classList.contains('dark');
+      const calculatedWidth = containerRef.current?.offsetWidth || 340;
+
+      // Renderiza o botao oficial do Google com tema adaptativo e largura responsiva
       window.google?.accounts.id.renderButton(containerRef.current, {
-        theme: 'filled_black',
+        theme: isDark ? 'filled_black' : 'outline',
         size: 'large',
         type: 'standard',
         shape: 'rectangular',
         text: 'continue_with',
         logo_alignment: 'left',
-        width: 350,
+        width: Math.min(Math.max(calculatedWidth, 240), 400),
         locale: 'pt-BR',
       });
     } catch (err) {
