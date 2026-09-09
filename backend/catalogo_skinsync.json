@@ -1,0 +1,390 @@
+{
+  "app": "Catana",
+  "schemaVersion": "1.0",
+  "exportedAt": "2026-09-08T00:00:00.000Z",
+  "catalog": {
+    "name": "SKINSYNC — L'Oréal Beauty Tech",
+    "description": "Apresentação de Inovação Estratégica: Sua pele. Seus produtos. Sua rotina."
+  },
+  "settings": {
+    "gridSize": 8,
+    "snapToGrid": true,
+    "defaultZoom": 75
+  },
+  "designTokens": {
+    "name": "L'Oréal Beauty Tech — SKINSYNC",
+    "version": "1.0",
+    "description": "Identidade minimalista premium para conceito de inovação Beauty Tech L'Oréal.",
+    "colors": {
+      "primary": {
+        "value": "#1E1E1E",
+        "description": "Charcoal suave"
+      },
+      "secondary": {
+        "value": "#7E1B28",
+        "description": "Rubi profundo L'Oréal"
+      },
+      "accent": {
+        "value": "#7E1B28",
+        "description": "Detalhe de sincronização"
+      },
+      "background": {
+        "value": "#F7F5F0",
+        "description": "Warm ivory / mineral beige"
+      },
+      "surface": {
+        "value": "#FFFFFF"
+      },
+      "border": {
+        "value": "#D8D4CD"
+      },
+      "text": {
+        "primary": {
+          "value": "#1E1E1E"
+        },
+        "secondary": {
+          "value": "#4E4C48"
+        },
+        "disabled": {
+          "value": "#8A8782"
+        }
+      }
+    },
+    "typography": {
+      "h1": {
+        "fontFamily": "Jost, 'Inter', Arial, sans-serif",
+        "fontSize": 34,
+        "fontWeight": 400,
+        "lineHeight": 1.2
+      },
+      "body": {
+        "fontFamily": "Jost, 'Inter', Arial, sans-serif",
+        "fontSize": 13.5,
+        "fontWeight": 400,
+        "lineHeight": 1.4
+      }
+    },
+    "spacing": {
+      "base": 8,
+      "xxs": 2,
+      "xs": 4,
+      "sm": 8,
+      "md": 16,
+      "lg": 24,
+      "xl": 32,
+      "xxl": 48,
+      "xxxl": 64
+    },
+    "borderRadius": {
+      "none": 0,
+      "sm": 4,
+      "md": 8,
+      "lg": 14,
+      "xl": 20,
+      "full": 9999
+    },
+    "shadows": {
+      "none": {
+        "value": "none"
+      },
+      "sm": {
+        "value": "0 1px 2px rgba(0,0,0,0.04)"
+      },
+      "md": {
+        "value": "0 4px 10px rgba(0,0,0,0.06)"
+      },
+      "lg": {
+        "value": "0 12px 24px rgba(0,0,0,0.08)"
+      },
+      "xl": {
+        "value": "0 20px 32px rgba(0,0,0,0.10)"
+      }
+    }
+  },
+  "pages": [
+    {
+      "logicalId": "page-skinsync-cover",
+      "name": "Capa",
+      "order": 0,
+      "elements": [
+        {
+          "logicalId": "el-bg",
+          "name": "Fundo Warm Ivory",
+          "type": "shape-rectangle",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 794,
+            "height": 1123
+          },
+          "zIndex": 0,
+          "style": {
+            "backgroundColor": "linear-gradient(180deg, #F8F6F2 0%, #F5F2EC 100%)",
+            "borderRadius": 0
+          }
+        },
+        {
+          "logicalId": "el-top-brand",
+          "name": "L'Oréal Groupe",
+          "type": "text-title",
+          "position": {
+            "x": 56,
+            "y": 84
+          },
+          "size": {
+            "width": 682,
+            "height": 22
+          },
+          "zIndex": 1,
+          "className": "tracking-widest uppercase font-medium",
+          "style": {
+            "fontFamily": "Jost, 'Inter', Arial, sans-serif",
+            "fontSize": 11,
+            "fontWeight": "500",
+            "textColor": "#2B2927",
+            "textAlign": "center"
+          },
+          "content": {
+            "text": "L'ORÉAL GROUPE"
+          }
+        },
+        {
+          "logicalId": "el-top-sub",
+          "name": "Sub-identificador 2026",
+          "type": "text-title",
+          "position": {
+            "x": 56,
+            "y": 110
+          },
+          "size": {
+            "width": 682,
+            "height": 18
+          },
+          "zIndex": 1,
+          "className": "tracking-widest uppercase",
+          "style": {
+            "fontFamily": "Jost, 'Inter', Arial, sans-serif",
+            "fontSize": 8.5,
+            "fontWeight": "400",
+            "textColor": "#8A8782",
+            "textAlign": "center"
+          },
+          "content": {
+            "text": "BEAUTY MAKE YOUR MOVE • 2026"
+          }
+        },
+        {
+          "logicalId": "el-sync-symbol",
+          "name": "Gesto Abstrato de Sincronização",
+          "type": "image",
+          "position": {
+            "x": 317,
+            "y": 428
+          },
+          "size": {
+            "width": 160,
+            "height": 56
+          },
+          "zIndex": 2,
+          "imageUrl": "/media/media/skinsync_symbol.png",
+          "imageData": {
+            "src": "/media/media/skinsync_symbol.png",
+            "opacity": 0.9,
+            "objectFit": "contain",
+            "aspectRatioLocked": true
+          },
+          "style": {
+            "objectFit": "contain"
+          }
+        },
+        {
+          "logicalId": "el-title-skin",
+          "name": "SKIN",
+          "type": "text-title",
+          "position": {
+            "x": 196,
+            "y": 502
+          },
+          "size": {
+            "width": 188,
+            "height": 48
+          },
+          "zIndex": 3,
+          "className": "tracking-widest uppercase font-medium",
+          "style": {
+            "fontFamily": "Jost, 'Inter', Arial, sans-serif",
+            "fontSize": 34,
+            "fontWeight": "400",
+            "textColor": "#1E1E1E",
+            "textAlign": "right"
+          },
+          "content": {
+            "text": "SKIN"
+          }
+        },
+        {
+          "logicalId": "el-accent-dot",
+          "name": "Micro-Acento Rubi L'Oréal",
+          "type": "shape-rectangle",
+          "position": {
+            "x": 395,
+            "y": 524
+          },
+          "size": {
+            "width": 4,
+            "height": 4
+          },
+          "zIndex": 5,
+          "style": {
+            "backgroundColor": "#7E1B28",
+            "borderRadius": 9999
+          }
+        },
+        {
+          "logicalId": "el-title-sync",
+          "name": "SYNC",
+          "type": "text-title",
+          "position": {
+            "x": 410,
+            "y": 502
+          },
+          "size": {
+            "width": 188,
+            "height": 48
+          },
+          "zIndex": 3,
+          "className": "tracking-widest uppercase font-medium",
+          "style": {
+            "fontFamily": "Jost, 'Inter', Arial, sans-serif",
+            "fontSize": 34,
+            "fontWeight": "400",
+            "textColor": "#1E1E1E",
+            "textAlign": "left"
+          },
+          "content": {
+            "text": "SYNC"
+          }
+        },
+        {
+          "logicalId": "el-tagline",
+          "name": "Tagline Editorial",
+          "type": "text-title",
+          "position": {
+            "x": 56,
+            "y": 570
+          },
+          "size": {
+            "width": 682,
+            "height": 28
+          },
+          "zIndex": 2,
+          "style": {
+            "fontFamily": "Jost, 'Inter', Arial, sans-serif",
+            "fontSize": 13.5,
+            "fontWeight": "400",
+            "textColor": "#4E4C48",
+            "textAlign": "center",
+            "letterSpacing": 2.5
+          },
+          "content": {
+            "text": "Sua pele. Seus produtos. Sua rotina."
+          }
+        },
+        {
+          "logicalId": "el-concept-line",
+          "name": "Beauty Science Technology",
+          "type": "text-title",
+          "position": {
+            "x": 56,
+            "y": 618
+          },
+          "size": {
+            "width": 682,
+            "height": 20
+          },
+          "zIndex": 2,
+          "className": "tracking-widest uppercase",
+          "style": {
+            "fontFamily": "Jost, 'Inter', Arial, sans-serif",
+            "fontSize": 9,
+            "fontWeight": "400",
+            "textColor": "#8A8782",
+            "textAlign": "center"
+          },
+          "content": {
+            "text": "BEAUTY • SCIENCE • TECHNOLOGY"
+          }
+        },
+        {
+          "logicalId": "el-bottom-divider",
+          "name": "Hairline Inferior",
+          "type": "shape-rectangle",
+          "position": {
+            "x": 369,
+            "y": 975
+          },
+          "size": {
+            "width": 56,
+            "height": 1
+          },
+          "zIndex": 1,
+          "style": {
+            "backgroundColor": "#D8D4CD",
+            "borderRadius": 0
+          }
+        },
+        {
+          "logicalId": "el-bottom-concept",
+          "name": "Beauty Tech Concept",
+          "type": "text-title",
+          "position": {
+            "x": 56,
+            "y": 996
+          },
+          "size": {
+            "width": 682,
+            "height": 20
+          },
+          "zIndex": 2,
+          "className": "tracking-widest uppercase font-medium",
+          "style": {
+            "fontFamily": "Jost, 'Inter', Arial, sans-serif",
+            "fontSize": 9,
+            "fontWeight": "500",
+            "textColor": "#55524E",
+            "textAlign": "center"
+          },
+          "content": {
+            "text": "BEAUTY TECH CONCEPT"
+          }
+        },
+        {
+          "logicalId": "el-bottom-transition",
+          "name": "Transição Estratégica",
+          "type": "text-title",
+          "position": {
+            "x": 56,
+            "y": 1020
+          },
+          "size": {
+            "width": 682,
+            "height": 22
+          },
+          "zIndex": 2,
+          "style": {
+            "fontFamily": "Jost, 'Inter', Arial, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "400",
+            "textColor": "#76736E",
+            "textAlign": "center"
+          },
+          "content": {
+            "text": "Grande Público  →  Beleza Dermatológica"
+          }
+        }
+      ]
+    }
+  ]
+}

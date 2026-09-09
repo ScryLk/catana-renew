@@ -1,0 +1,134 @@
+{
+  "tema": "acougue",
+  "empresa": {
+    "nome": "Açougue Corte Nobre",
+    "slogan": "A carne certa para o seu churrasco",
+    "sobre": "Carnes selecionadas, maturação artesanal e atendimento de quem entende do corte. Do boi premium ao tempero da casa, qualidade que você vê e sente.",
+    "contato": {
+      "telefone": "(11) 3333-1010",
+      "endereco": "Av. do Boi, 700 - Centro, São Paulo - SP",
+      "instagram": "@cortenobre",
+      "whatsapp": "(11) 98888-1010"
+    },
+    "logo": null
+  },
+  "categorias": [
+    "Bovinos",
+    "Suínos",
+    "Aves",
+    "Linguiças",
+    "Temperos"
+  ],
+  "b2b": {
+    "titulo": "Atacado para restaurantes e churrascarias",
+    "faixas": [
+      {
+        "quantidade": "5 a 20 kg",
+        "desconto": "8% off"
+      },
+      {
+        "quantidade": "21 a 50 kg",
+        "desconto": "15% off"
+      },
+      {
+        "quantidade": "50+ kg",
+        "desconto": "22% off"
+      }
+    ],
+    "observacao": "Entrega refrigerada própria. Pedidos com 24h de antecedência."
+  },
+  "produtos": [
+    {
+      "nome": "Picanha Premium",
+      "descricao": "Peça maturada por 21 dias, com capa de gordura uniforme na medida certa para selar na brasa. Marmoreio que garante suculência e aquele sabor de churrascaria em casa. A rainha do espeto, escolhida peça por peça pelo nosso mestre açougueiro.",
+      "preco": "89.90",
+      "categoria": "Bovinos",
+      "imagem": "picanha-premium.jpg",
+      "badge": "Mais vendido",
+      "specs": [{ "label": "Peça", "value": "1,2-1,5kg" }, { "label": "Maturação", "value": "21 dias" }]
+    },
+    {
+      "nome": "Maminha",
+      "descricao": "Corte macio da ponta da alcatra, de fibras curtas e sabor suave. Vai bem inteira na brasa, assada na rede ou em bifes altos na grelha. Rende porções generosas sem exigir técnica.",
+      "preco": "54.90",
+      "categoria": "Bovinos",
+      "imagem": "maminha.jpg",
+      "specs": [{ "label": "Peça", "value": "1,5-2kg" }, { "label": "Serve", "value": "6-8 pessoas" }]
+    },
+    {
+      "nome": "Costela Ripa",
+      "descricao": "Corte tradicional gaúcho para fogo de chão e assados longos. Osso e gordura entremeada que desmancham depois de horas de fogo baixo. Paciência que se paga no primeiro pedaço.",
+      "preco": "39.90",
+      "categoria": "Bovinos",
+      "imagem": "costela-ripa.jpg",
+      "badge": "Tradicional",
+      "specs": [{ "label": "Peça", "value": "2-3kg" }, { "label": "Preparo", "value": "fogo lento 4h+" }]
+    },
+    {
+      "nome": "Fraldinha",
+      "descricao": "Sabor marcante e textura que derrete quando respeitado o ponto. Excelente na grelha em peça inteira ou em tiras para o espeto. O corte preferido de quem gosta de carne com personalidade.",
+      "preco": "59.90",
+      "categoria": "Bovinos",
+      "imagem": "fraldinha.jpg",
+      "specs": [{ "label": "Peça", "value": "0,8-1,2kg" }, { "label": "Ponto", "value": "mal passada" }]
+    },
+    {
+      "nome": "Pernil Suíno",
+      "descricao": "Peça inteira desossada e limpa, pronta para marinar e assar. Casca que vira pururuca no forno e interior úmido e macio. O clássico das festas de família que serve a mesa toda.",
+      "preco": "24.90",
+      "categoria": "Suínos",
+      "imagem": "pernil-suino.jpg",
+      "specs": [{ "label": "Peça", "value": "3-4kg" }, { "label": "Serve", "value": "10-12 pessoas" }]
+    },
+    {
+      "nome": "Costelinha BBQ",
+      "descricao": "Costela suína em manta, ideal para defumar ou assar baixo e lento estilo americano. Carne que solta do osso com casquinha caramelizada de molho barbecue. Fim de semana com cheiro de defumador.",
+      "preco": "29.90",
+      "categoria": "Suínos",
+      "imagem": "costelinha-bbq.jpg",
+      "badge": "Novo",
+      "specs": [{ "label": "Manta", "value": "1-1,5kg" }, { "label": "Preparo", "value": "defumação 3h" }]
+    },
+    {
+      "nome": "Coxa e Sobrecoxa",
+      "descricao": "Frango caipira criado solto, de carne firme e sabor de antigamente. Perfeito para assados de panela, churrasco ou aquele cozidão de domingo. Tempera fácil e não resseca na brasa.",
+      "preco": "15.90",
+      "categoria": "Aves",
+      "imagem": "coxa-e-sobrecoxa.jpg",
+      "specs": [{ "label": "Bandeja", "value": "1kg" }, { "label": "Origem", "value": "caipira" }]
+    },
+    {
+      "nome": "Peito de Frango",
+      "descricao": "Filé limpo, sem pele e sem osso, embalado a vácuo na hora para máxima conservação. Corte uniforme que facilita grelhados rápidos e marmitas da semana. Proteína magra sem trabalho.",
+      "preco": "22.90",
+      "categoria": "Aves",
+      "imagem": "peito-de-frango.jpg",
+      "specs": [{ "label": "Bandeja", "value": "1kg" }, { "label": "Embalagem", "value": "a vácuo" }]
+    },
+    {
+      "nome": "Linguiça Artesanal",
+      "descricao": "Receita exclusiva da casa: suíno moído na hora, toque de pimenta calabresa e tripa natural. Feita em pequenos lotes, sem conservantes industriais. A entrada obrigatória de todo churrasco.",
+      "preco": "27.90",
+      "categoria": "Linguiças",
+      "imagem": "linguica-artesanal.jpg",
+      "badge": "Receita da casa",
+      "specs": [{ "label": "Pacote", "value": "1kg" }, { "label": "Tripa", "value": "natural" }]
+    },
+    {
+      "nome": "Linguiça de Queijo",
+      "descricao": "Recheada com queijo coalho que derrete e puxa fio na brasa. Equilíbrio entre a carne suína temperada e a cremosidade do queijo. Some da grelha antes da carne principal chegar.",
+      "preco": "31.90",
+      "categoria": "Linguiças",
+      "imagem": "linguica-de-queijo.jpg",
+      "specs": [{ "label": "Pacote", "value": "800g" }, { "label": "Queijo", "value": "coalho" }]
+    },
+    {
+      "nome": "Tempero da Casa",
+      "descricao": "Mix exclusivo de sal grosso moído, alho desidratado, ervas e pimenta do reino. Desenvolvido para realçar a carne sem mascarar o sabor. O segredo do nosso balcão, agora na sua churrasqueira.",
+      "preco": "12.90",
+      "categoria": "Temperos",
+      "imagem": "tempero-da-casa.jpg",
+      "specs": [{ "label": "Pote", "value": "200g" }, { "label": "Rende", "value": "~10 churrascos" }]
+    }
+  ]
+}

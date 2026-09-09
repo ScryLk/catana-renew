@@ -1,0 +1,112 @@
+{
+  "tema": "mercado",
+  "empresa": {
+    "nome": "Mercado Hortifruti Verde",
+    "slogan": "Do campo para a sua mesa, todo dia",
+    "sobre": "Frutas, legumes e verduras fresquinhos, selecionados diariamente de produtores locais. Variedade, preço justo e aquele cheirinho de feira.",
+    "contato": {
+      "telefone": "(11) 2222-3030",
+      "endereco": "Rua das Hortas, 45 - Jardim Verde, São Paulo - SP",
+      "instagram": "@hortifrutiverde",
+      "whatsapp": "(11) 97777-3030"
+    },
+    "logo": null
+  },
+  "categorias": [
+    "Frutas",
+    "Legumes",
+    "Verduras",
+    "Orgânicos",
+    "Mercearia"
+  ],
+  "b2b": {
+    "titulo": "Atacado para restaurantes e mercados",
+    "faixas": [
+      {
+        "quantidade": "10 a 30 kg",
+        "desconto": "7% off"
+      },
+      {
+        "quantidade": "31 a 80 kg",
+        "desconto": "12% off"
+      },
+      {
+        "quantidade": "80+ kg",
+        "desconto": "18% off"
+      }
+    ],
+    "observacao": "Entrega diária na região. Produtos da estação."
+  },
+  "produtos": [
+    {
+      "nome": "Banana Prata",
+      "descricao": "Cacho maduro no ponto. Kg.",
+      "preco": "5.90",
+      "categoria": "Frutas",
+      "imagem": "banana-prata.jpg"
+    },
+    {
+      "nome": "Maçã Gala",
+      "descricao": "Crocante e doce. Kg.",
+      "preco": "8.90",
+      "categoria": "Frutas",
+      "imagem": "maca-gala.jpg"
+    },
+    {
+      "nome": "Morango Bandeja",
+      "descricao": "Selecionado, 250g.",
+      "preco": "12.90",
+      "categoria": "Frutas",
+      "imagem": "morango-bandeja.jpg"
+    },
+    {
+      "nome": "Tomate Italiano",
+      "descricao": "Firme, ideal para molhos. Kg.",
+      "preco": "7.90",
+      "categoria": "Legumes",
+      "imagem": "tomate-italiano.jpg"
+    },
+    {
+      "nome": "Batata Lavada",
+      "descricao": "Limpa e selecionada. Kg.",
+      "preco": "4.90",
+      "categoria": "Legumes",
+      "imagem": "batata-lavada.jpg"
+    },
+    {
+      "nome": "Cenoura",
+      "descricao": "Doce e crocante. Kg.",
+      "preco": "5.50",
+      "categoria": "Legumes",
+      "imagem": "cenoura.jpg"
+    },
+    {
+      "nome": "Alface Crespa",
+      "descricao": "Folhas frescas, unidade.",
+      "preco": "3.90",
+      "categoria": "Verduras",
+      "imagem": "alface-crespa.jpg"
+    },
+    {
+      "nome": "Rúcula",
+      "descricao": "Maço fresco e perfumado.",
+      "preco": "4.50",
+      "categoria": "Verduras",
+      "imagem": "rucula.jpg"
+    },
+    {
+      "nome": "Tomate Orgânico",
+      "descricao": "Sem agrotóxicos, bandeja 500g.",
+      "preco": "11.90",
+      "categoria": "Orgânicos",
+      "imagem": "tomate-organico.jpg"
+    },
+    {
+      "nome": "Ovos Caipira",
+      "descricao": "Cartela com 12, granja local.",
+      "preco": "15.90",
+      "categoria": "Mercearia",
+      "imagem": "ovos-caipira.jpg"
+    }
+  ]
+}

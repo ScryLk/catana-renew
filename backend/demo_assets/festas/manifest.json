@@ -1,0 +1,112 @@
+{
+  "tema": "festas",
+  "empresa": {
+    "nome": "Festas Confete & Cia",
+    "slogan": "Sua festa do jeitinho que você sonhou",
+    "sobre": "Tudo para sua comemoração: decoração, doces, lembrancinhas e itens temáticos. Cores, alegria e atendimento que faz acontecer.",
+    "contato": {
+      "telefone": "(11) 5050-6060",
+      "endereco": "Rua da Alegria, 88 - Vila Festa, São Paulo - SP",
+      "instagram": "@confeteecia",
+      "whatsapp": "(11) 95555-6060"
+    },
+    "logo": null
+  },
+  "categorias": [
+    "Decoração",
+    "Doces",
+    "Lembrancinhas",
+    "Descartáveis",
+    "Balões"
+  ],
+  "b2b": {
+    "titulo": "Atacado para buffets e festas",
+    "faixas": [
+      {
+        "quantidade": "50 a 150 un",
+        "desconto": "10% off"
+      },
+      {
+        "quantidade": "151 a 300 un",
+        "desconto": "18% off"
+      },
+      {
+        "quantidade": "300+ un",
+        "desconto": "25% off"
+      }
+    ],
+    "observacao": "Kits personalizados sob encomenda."
+  },
+  "produtos": [
+    {
+      "nome": "Kit Painel Redondo",
+      "descricao": "Painel + suportes temáticos.",
+      "preco": "149.90",
+      "categoria": "Decoração",
+      "imagem": "kit-painel-redondo.jpg"
+    },
+    {
+      "nome": "Topo de Bolo",
+      "descricao": "Personalizado com o nome.",
+      "preco": "39.90",
+      "categoria": "Decoração",
+      "imagem": "topo-de-bolo.jpg"
+    },
+    {
+      "nome": "Brigadeiros Gourmet",
+      "descricao": "Caixa com 50 unidades.",
+      "preco": "89.90",
+      "categoria": "Doces",
+      "imagem": "brigadeiros-gourmet.jpg"
+    },
+    {
+      "nome": "Cupcakes Decorados",
+      "descricao": "Cobertura temática, 12 un.",
+      "preco": "64.90",
+      "categoria": "Doces",
+      "imagem": "cupcakes-decorados.jpg"
+    },
+    {
+      "nome": "Caixinha Lembrança",
+      "descricao": "Kit com 20, montada.",
+      "preco": "49.90",
+      "categoria": "Lembrancinhas",
+      "imagem": "caixinha-lembranca.jpg"
+    },
+    {
+      "nome": "Chaveiro Personalizado",
+      "descricao": "Pacote com 30.",
+      "preco": "59.90",
+      "categoria": "Lembrancinhas",
+      "imagem": "chaveiro-personalizado.jpg"
+    },
+    {
+      "nome": "Prato Temático",
+      "descricao": "Pacote com 8.",
+      "preco": "14.90",
+      "categoria": "Descartáveis",
+      "imagem": "prato-tematico.jpg"
+    },
+    {
+      "nome": "Copo Festa",
+      "descricao": "Pacote com 8, cores vivas.",
+      "preco": "12.90",
+      "categoria": "Descartáveis",
+      "imagem": "copo-festa.jpg"
+    },
+    {
+      "nome": "Balão Metalizado",
+      "descricao": "Número ou letra, unidade.",
+      "preco": "19.90",
+      "categoria": "Balões",
+      "imagem": "balao-metalizado.jpg"
+    },
+    {
+      "nome": "Arco de Balões",
+      "descricao": "Kit desconstruído 100 un.",
+      "preco": "89.90",
+      "categoria": "Balões",
+      "imagem": "arco-de-baloes.jpg"
+    }
+  ]
+}

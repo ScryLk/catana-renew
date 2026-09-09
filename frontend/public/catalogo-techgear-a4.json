@@ -1,0 +1,927 @@
+{
+  "schemaVersion": "1.0",
+  "exportedAt": "2025-12-31T12:00:00.000Z",
+  "app": "Catana",
+  "catalog": {
+    "name": "TechGear - Catálogo A4 2025",
+    "description": "Acessórios premium para o seu setup tecnológico",
+    "dimensions": {
+      "width": 1240,
+      "height": 1754,
+      "unit": "px",
+      "format": "A4",
+      "dpi": 150,
+      "orientation": "portrait"
+    },
+    "organization": "TechGear Brasil",
+    "sede": "São Paulo - Tech Hub",
+    "tags": ["tecnologia", "gadgets", "acessórios", "gamer", "produtividade"],
+    "language": "pt-BR"
+  },
+  "settings": {
+    "gridSize": 8,
+    "snapToGrid": true,
+    "defaultZoom": 75
+  },
+  "designTokens": {
+    "name": "TechGear Dark Theme A4",
+    "version": "1.0.0",
+    "description": "Tema moderno e tecnológico com visual dark mode - otimizado para A4",
+    "colors": {
+      "primary": {
+        "value": "#00D9FF",
+        "description": "Ciano tech",
+        "contrast": "#000000"
+      },
+      "secondary": {
+        "value": "#B026FF",
+        "description": "Roxo neon",
+        "contrast": "#FFFFFF"
+      },
+      "accent": {
+        "value": "#FF3D71",
+        "description": "Rosa vibrante",
+        "contrast": "#FFFFFF"
+      },
+      "background": {
+        "value": "#0A0E27",
+        "description": "Azul escuro",
+        "contrast": "#FFFFFF"
+      },
+      "surface": {
+        "value": "#1A1F3A",
+        "description": "Superfície elevada",
+        "contrast": "#FFFFFF"
+      },
+      "text": {
+        "value": "#FFFFFF",
+        "description": "Texto principal",
+        "contrast": "#0A0E27"
+      },
+      "textMuted": {
+        "value": "#A0AEC0",
+        "description": "Texto secundário",
+        "contrast": "#0A0E27"
+      }
+    },
+    "typography": {
+      "h1": {
+        "fontFamily": "Orbitron, sans-serif",
+        "fontSize": 48,
+        "fontWeight": 900,
+        "lineHeight": 1.1,
+        "letterSpacing": -2,
+        "textTransform": "uppercase"
+      },
+      "h2": {
+        "fontFamily": "Orbitron, sans-serif",
+        "fontSize": 36,
+        "fontWeight": 800,
+        "lineHeight": 1.2,
+        "letterSpacing": -1
+      },
+      "h3": {
+        "fontFamily": "Orbitron, sans-serif",
+        "fontSize": 24,
+        "fontWeight": 700,
+        "lineHeight": 1.3
+      },
+      "body": {
+        "fontFamily": "Roboto, sans-serif",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "lineHeight": 1.6
+      },
+      "caption": {
+        "fontFamily": "Roboto Mono, monospace",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "lineHeight": 1.5
+      }
+    },
+    "spacing": {
+      "base": 8,
+      "xs": 8,
+      "sm": 16,
+      "md": 24,
+      "lg": 32,
+      "xl": 48
+    },
+    "borderRadius": {
+      "sm": 4,
+      "md": 8,
+      "lg": 12,
+      "full": 9999
+    },
+    "shadows": {
+      "sm": {
+        "value": "0 2px 8px rgba(0, 217, 255, 0.1)"
+      },
+      "md": {
+        "value": "0 4px 16px rgba(0, 217, 255, 0.2)"
+      },
+      "glow": {
+        "value": "0 0 20px rgba(0, 217, 255, 0.6)"
+      }
+    }
+  },
+  "pages": [
+    {
+      "logicalId": "page-cover-a4",
+      "name": "Capa",
+      "order": 0,
+      "description": "Capa A4",
+      "elements": [
+        {
+          "logicalId": "cover-bg",
+          "type": "shape-rectangle",
+          "name": "Background",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 1240,
+            "height": 1754
+          },
+          "zIndex": 0,
+          "style": {
+            "backgroundColor": "#0A0E27",
+            "borderWidth": 0
+          }
+        },
+        {
+          "logicalId": "cover-circle-left",
+          "type": "shape-circle",
+          "name": "Círculo Esquerdo",
+          "position": {
+            "x": -80,
+            "y": 650
+          },
+          "size": {
+            "width": 300,
+            "height": 300
+          },
+          "zIndex": 1,
+          "style": {
+            "backgroundColor": "transparent",
+            "borderColor": "#00D9FF",
+            "borderWidth": 3,
+            "opacity": 0.4
+          }
+        },
+        {
+          "logicalId": "cover-circle-right",
+          "type": "shape-circle",
+          "name": "Círculo Direito",
+          "position": {
+            "x": 1020,
+            "y": 650
+          },
+          "size": {
+            "width": 300,
+            "height": 300
+          },
+          "zIndex": 1,
+          "style": {
+            "backgroundColor": "transparent",
+            "borderColor": "#B026FF",
+            "borderWidth": 3,
+            "opacity": 0.4
+          }
+        },
+        {
+          "logicalId": "cover-title",
+          "type": "text-title",
+          "name": "Título Principal",
+          "position": {
+            "x": 120,
+            "y": 600
+          },
+          "size": {
+            "width": 1000,
+            "height": 120
+          },
+          "zIndex": 10,
+          "style": {
+            "textAlign": "center"
+          },
+          "textData": {
+            "content": "TECHGEAR",
+            "fontFamily": "Orbitron, sans-serif",
+            "fontSize": 72,
+            "fontWeight": 900,
+            "textColor": "#FFFFFF",
+            "letterSpacing": 8,
+            "textTransform": "uppercase"
+          }
+        },
+        {
+          "logicalId": "cover-subtitle",
+          "type": "text-paragraph",
+          "name": "Subtítulo",
+          "position": {
+            "x": 120,
+            "y": 730
+          },
+          "size": {
+            "width": 1000,
+            "height": 50
+          },
+          "zIndex": 10,
+          "style": {
+            "textAlign": "center"
+          },
+          "textData": {
+            "content": "Catálogo Digital 2025",
+            "fontFamily": "Roboto, sans-serif",
+            "fontSize": 28,
+            "fontWeight": 300,
+            "textColor": "#00D9FF",
+            "letterSpacing": 4
+          }
+        },
+        {
+          "logicalId": "cover-badge",
+          "type": "shape-rectangle",
+          "name": "Badge NOVO",
+          "position": {
+            "x": 520,
+            "y": 800
+          },
+          "size": {
+            "width": 200,
+            "height": 50
+          },
+          "zIndex": 11,
+          "style": {
+            "backgroundColor": "#FF3D71",
+            "borderRadius": 25,
+            "borderWidth": 0
+          }
+        },
+        {
+          "logicalId": "cover-badge-text",
+          "type": "text-paragraph",
+          "name": "Texto Badge",
+          "position": {
+            "x": 520,
+            "y": 810
+          },
+          "size": {
+            "width": 200,
+            "height": 30
+          },
+          "zIndex": 12,
+          "style": {
+            "textAlign": "center"
+          },
+          "textData": {
+            "content": "NOVO 2025",
+            "fontFamily": "Orbitron, sans-serif",
+            "fontSize": 16,
+            "fontWeight": 800,
+            "textColor": "#FFFFFF",
+            "letterSpacing": 2
+          }
+        },
+        {
+          "logicalId": "cover-description",
+          "type": "text-paragraph",
+          "name": "Descrição",
+          "position": {
+            "x": 220,
+            "y": 900
+          },
+          "size": {
+            "width": 800,
+            "height": 80
+          },
+          "zIndex": 10,
+          "style": {
+            "textAlign": "center"
+          },
+          "textData": {
+            "content": "Tecnologia premium para gamers e criadores de conteúdo.\nTransforme seu setup com nossos acessórios de alta performance.",
+            "fontFamily": "Roboto, sans-serif",
+            "fontSize": 16,
+            "fontWeight": 400,
+            "textColor": "#A0AEC0",
+            "lineHeight": 1.8
+          }
+        }
+      ]
+    },
+    {
+      "logicalId": "page-peripherals-a4",
+      "name": "Periféricos Gaming",
+      "order": 1,
+      "description": "Página de produtos - Periféricos",
+      "elements": [
+        {
+          "logicalId": "peripherals-bg",
+          "type": "shape-rectangle",
+          "name": "Background",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 1240,
+            "height": 1754
+          },
+          "zIndex": 0,
+          "style": {
+            "backgroundColor": "#FFFFFF",
+            "borderWidth": 0
+          }
+        },
+        {
+          "logicalId": "peripherals-header",
+          "type": "text-title",
+          "name": "Título da Seção",
+          "position": {
+            "x": 50,
+            "y": 50
+          },
+          "size": {
+            "width": 1140,
+            "height": 60
+          },
+          "zIndex": 10,
+          "style": {
+            "textAlign": "left"
+          },
+          "textData": {
+            "content": "Periféricos Gaming",
+            "fontFamily": "Orbitron, sans-serif",
+            "fontSize": 42,
+            "fontWeight": 800,
+            "textColor": "#0A0E27"
+          }
+        },
+        {
+          "logicalId": "product-1-card",
+          "type": "product-card",
+          "name": "Teclado Mecânico",
+          "position": {
+            "x": 50,
+            "y": 150
+          },
+          "size": {
+            "width": 360,
+            "height": 480
+          },
+          "zIndex": 5,
+          "style": {
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#E2E8F0",
+            "borderWidth": 1,
+            "borderRadius": 12,
+            "boxShadow": "0 4px 12px rgba(0,0,0,0.08)"
+          },
+          "productData": {
+            "productId": 1,
+            "name": "Teclado Mecânico RGB Pro",
+            "description": "Switch mecânico Cherry MX, RGB personalizável, Anti-ghosting completo",
+            "price": 599.90,
+            "currency": "BRL",
+            "coverImage": "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=400",
+            "layout": "vertical",
+            "showPrice": true,
+            "showDescription": true,
+            "specifications": [
+              { "label": "Switch", "value": "Cherry MX Red" },
+              { "label": "Layout", "value": "ABNT2" },
+              { "label": "Iluminação", "value": "RGB 16.8M cores" },
+              { "label": "Conectividade", "value": "USB-C" }
+            ]
+          }
+        },
+        {
+          "logicalId": "product-2-card",
+          "type": "product-card",
+          "name": "Mouse Gamer",
+          "position": {
+            "x": 440,
+            "y": 150
+          },
+          "size": {
+            "width": 360,
+            "height": 480
+          },
+          "zIndex": 5,
+          "style": {
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#E2E8F0",
+            "borderWidth": 1,
+            "borderRadius": 12,
+            "boxShadow": "0 4px 12px rgba(0,0,0,0.08)"
+          },
+          "productData": {
+            "productId": 2,
+            "name": "Mouse Gamer Ultra Precision",
+            "description": "Sensor óptico 16.000 DPI, 7 botões programáveis, RGB sincronizado",
+            "price": 349.90,
+            "currency": "BRL",
+            "coverImage": "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=400",
+            "layout": "vertical",
+            "showPrice": true,
+            "showDescription": true,
+            "specifications": [
+              { "label": "Sensor", "value": "Óptico 16.000 DPI" },
+              { "label": "Botões", "value": "7 programáveis" },
+              { "label": "Peso", "value": "Ajustável 80-120g" },
+              { "label": "RGB", "value": "16.8M cores" }
+            ]
+          }
+        },
+        {
+          "logicalId": "product-3-card",
+          "type": "product-card",
+          "name": "Headset 7.1",
+          "position": {
+            "x": 830,
+            "y": 150
+          },
+          "size": {
+            "width": 360,
+            "height": 480
+          },
+          "zIndex": 5,
+          "style": {
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#E2E8F0",
+            "borderWidth": 1,
+            "borderRadius": 12,
+            "boxShadow": "0 4px 12px rgba(0,0,0,0.08)"
+          },
+          "productData": {
+            "productId": 3,
+            "name": "Headset Gaming 7.1 Surround",
+            "description": "Áudio imersivo 7.1, Microfone noise-cancelling, Almofadas em couro sintético",
+            "price": 899.90,
+            "currency": "BRL",
+            "coverImage": "https://images.unsplash.com/photo-1599669454699-248893623440?w=400",
+            "layout": "vertical",
+            "showPrice": true,
+            "showDescription": true,
+            "specifications": [
+              { "label": "Áudio", "value": "7.1 Surround Virtual" },
+              { "label": "Driver", "value": "50mm Neodímio" },
+              { "label": "Microfone", "value": "Noise-cancelling" },
+              { "label": "Conectividade", "value": "USB + P2" }
+            ]
+          }
+        },
+        {
+          "logicalId": "promo-banner",
+          "type": "shape-rectangle",
+          "name": "Banner Promocional",
+          "position": {
+            "x": 50,
+            "y": 660
+          },
+          "size": {
+            "width": 1140,
+            "height": 120
+          },
+          "zIndex": 3,
+          "style": {
+            "background": "linear-gradient(135deg, #B026FF 0%, #00D9FF 100%)",
+            "borderRadius": 16,
+            "borderWidth": 0
+          }
+        },
+        {
+          "logicalId": "promo-text",
+          "type": "text-title",
+          "name": "Texto Promocional",
+          "position": {
+            "x": 100,
+            "y": 685
+          },
+          "size": {
+            "width": 1040,
+            "height": 70
+          },
+          "zIndex": 4,
+          "style": {
+            "textAlign": "center"
+          },
+          "textData": {
+            "content": "COMBO GAMER: Teclado + Mouse + Headset por apenas R$ 1.599,90",
+            "fontFamily": "Orbitron, sans-serif",
+            "fontSize": 26,
+            "fontWeight": 800,
+            "textColor": "#FFFFFF",
+            "letterSpacing": 1
+          }
+        }
+      ]
+    },
+    {
+      "logicalId": "page-workspace-a4",
+      "name": "Workspace Essentials",
+      "order": 2,
+      "description": "Página de produtos - Workspace",
+      "elements": [
+        {
+          "logicalId": "workspace-bg",
+          "type": "shape-rectangle",
+          "name": "Background",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 1240,
+            "height": 1754
+          },
+          "zIndex": 0,
+          "style": {
+            "backgroundColor": "#F7FAFC",
+            "borderWidth": 0
+          }
+        },
+        {
+          "logicalId": "workspace-header",
+          "type": "text-title",
+          "name": "Título da Seção",
+          "position": {
+            "x": 50,
+            "y": 50
+          },
+          "size": {
+            "width": 1140,
+            "height": 60
+          },
+          "zIndex": 10,
+          "style": {
+            "textAlign": "left"
+          },
+          "textData": {
+            "content": "Workspace Essentials",
+            "fontFamily": "Orbitron, sans-serif",
+            "fontSize": 42,
+            "fontWeight": 800,
+            "textColor": "#0A0E27"
+          }
+        },
+        {
+          "logicalId": "product-4-card",
+          "type": "product-card",
+          "name": "Monitor Ultrawide",
+          "position": {
+            "x": 50,
+            "y": 150
+          },
+          "size": {
+            "width": 360,
+            "height": 480
+          },
+          "zIndex": 5,
+          "style": {
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#E2E8F0",
+            "borderWidth": 1,
+            "borderRadius": 12,
+            "boxShadow": "0 4px 12px rgba(0,0,0,0.08)"
+          },
+          "productData": {
+            "productId": 4,
+            "name": "Monitor Ultrawide 34\" Curvo",
+            "description": "UWQHD 3440x1440, 144Hz, 1ms, HDR400, FreeSync Premium",
+            "price": 2899.90,
+            "currency": "BRL",
+            "coverImage": "https://images.unsplash.com/photo-1585792180666-f7347c490ee2?w=400",
+            "layout": "vertical",
+            "showPrice": true,
+            "showDescription": true,
+            "specifications": [
+              { "label": "Resolução", "value": "3440x1440 UWQHD" },
+              { "label": "Taxa atualização", "value": "144Hz" },
+              { "label": "Tempo resposta", "value": "1ms MPRT" },
+              { "label": "Painel", "value": "VA Curvo 1500R" }
+            ]
+          }
+        },
+        {
+          "logicalId": "product-5-card",
+          "type": "product-card",
+          "name": "Webcam 4K",
+          "position": {
+            "x": 440,
+            "y": 150
+          },
+          "size": {
+            "width": 360,
+            "height": 480
+          },
+          "zIndex": 5,
+          "style": {
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#E2E8F0",
+            "borderWidth": 1,
+            "borderRadius": 12,
+            "boxShadow": "0 4px 12px rgba(0,0,0,0.08)"
+          },
+          "productData": {
+            "productId": 5,
+            "name": "Webcam 4K Pro Streaming",
+            "description": "Resolução 4K 30fps, Autofoco, Correção de luz, Microfone estéreo integrado",
+            "price": 1299.90,
+            "currency": "BRL",
+            "coverImage": "https://images.unsplash.com/photo-1588508065123-287b28e013da?w=400",
+            "layout": "vertical",
+            "showPrice": true,
+            "showDescription": true,
+            "specifications": [
+              { "label": "Resolução", "value": "4K 30fps / 1080p 60fps" },
+              { "label": "Campo visão", "value": "90° ajustável" },
+              { "label": "Foco", "value": "Autofoco inteligente" },
+              { "label": "Microfone", "value": "Estéreo duplo" }
+            ]
+          }
+        },
+        {
+          "logicalId": "product-6-card",
+          "type": "product-card",
+          "name": "Braço Articulado",
+          "position": {
+            "x": 830,
+            "y": 150
+          },
+          "size": {
+            "width": 360,
+            "height": 480
+          },
+          "zIndex": 5,
+          "style": {
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#E2E8F0",
+            "borderWidth": 1,
+            "borderRadius": 12,
+            "boxShadow": "0 4px 12px rgba(0,0,0,0.08)"
+          },
+          "productData": {
+            "productId": 6,
+            "name": "Braço Articulado Dual Monitor",
+            "description": "Suporta até 32\", VESA 75x75 e 100x100, Rotação 360°, Ajuste de altura",
+            "price": 599.90,
+            "currency": "BRL",
+            "coverImage": "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=400",
+            "layout": "vertical",
+            "showPrice": true,
+            "showDescription": true,
+            "specifications": [
+              { "label": "Capacidade", "value": "2 monitores até 8kg" },
+              { "label": "VESA", "value": "75x75 / 100x100mm" },
+              { "label": "Tamanho", "value": "17\" a 32\"" },
+              { "label": "Movimento", "value": "360° completo" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "logicalId": "page-info-a4",
+      "name": "Informações",
+      "order": 3,
+      "description": "Página de informações técnicas",
+      "elements": [
+        {
+          "logicalId": "info-bg",
+          "type": "shape-rectangle",
+          "name": "Background",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 1240,
+            "height": 1754
+          },
+          "zIndex": 0,
+          "style": {
+            "backgroundColor": "#0A0E27",
+            "borderWidth": 0
+          }
+        },
+        {
+          "logicalId": "info-header",
+          "type": "text-title",
+          "name": "Título",
+          "position": {
+            "x": 50,
+            "y": 50
+          },
+          "size": {
+            "width": 1140,
+            "height": 60
+          },
+          "zIndex": 10,
+          "style": {
+            "textAlign": "center"
+          },
+          "textData": {
+            "content": "Garantia e Especificações",
+            "fontFamily": "Orbitron, sans-serif",
+            "fontSize": 38,
+            "fontWeight": 800,
+            "textColor": "#00D9FF"
+          }
+        },
+        {
+          "logicalId": "specs-box",
+          "type": "shape-rectangle",
+          "name": "Box Especificações",
+          "position": {
+            "x": 50,
+            "y": 150
+          },
+          "size": {
+            "width": 540,
+            "height": 400
+          },
+          "zIndex": 1,
+          "style": {
+            "backgroundColor": "#1A1F3A",
+            "borderColor": "#00D9FF",
+            "borderWidth": 2,
+            "borderRadius": 16
+          }
+        },
+        {
+          "logicalId": "specs-title",
+          "type": "text-title",
+          "name": "Título Specs",
+          "position": {
+            "x": 80,
+            "y": 170
+          },
+          "size": {
+            "width": 480,
+            "height": 40
+          },
+          "zIndex": 2,
+          "textData": {
+            "content": "Todos os Produtos",
+            "fontFamily": "Orbitron, sans-serif",
+            "fontSize": 24,
+            "fontWeight": 700,
+            "textColor": "#00D9FF"
+          }
+        },
+        {
+          "logicalId": "specs-list",
+          "type": "text-paragraph",
+          "name": "Lista Especificações",
+          "position": {
+            "x": 80,
+            "y": 230
+          },
+          "size": {
+            "width": 480,
+            "height": 300
+          },
+          "zIndex": 2,
+          "textData": {
+            "content": "✓ Garantia de 2 anos\n✓ Suporte técnico 24/7\n✓ Devolução grátis em 30 dias\n✓ Certificação ANATEL\n✓ Nota Fiscal eletrônica\n✓ Frete grátis para todo Brasil\n✓ Parcele em até 12x sem juros\n✓ Programa de fidelidade TechGear+",
+            "fontFamily": "Roboto, sans-serif",
+            "fontSize": 16,
+            "fontWeight": 400,
+            "textColor": "#FFFFFF",
+            "lineHeight": 2.2
+          }
+        },
+        {
+          "logicalId": "qr-code",
+          "type": "qr-code",
+          "name": "QR Code Catálogo",
+          "position": {
+            "x": 650,
+            "y": 150
+          },
+          "size": {
+            "width": 300,
+            "height": 300
+          },
+          "zIndex": 5,
+          "style": {
+            "backgroundColor": "#FFFFFF",
+            "borderRadius": 16,
+            "padding": 20
+          },
+          "qrCodeData": {
+            "destinationType": "url",
+            "data": "https://techgear.com.br/catalogo-2025",
+            "customUrl": "https://techgear.com.br/catalogo-2025",
+            "fgColor": "#0A0E27",
+            "bgColor": "#FFFFFF",
+            "size": 260,
+            "level": "H",
+            "includeMargin": true
+          }
+        },
+        {
+          "logicalId": "qr-label",
+          "type": "text-paragraph",
+          "name": "Label QR Code",
+          "position": {
+            "x": 650,
+            "y": 470
+          },
+          "size": {
+            "width": 300,
+            "height": 40
+          },
+          "zIndex": 6,
+          "style": {
+            "textAlign": "center"
+          },
+          "textData": {
+            "content": "Acesse o catálogo online",
+            "fontFamily": "Roboto, sans-serif",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "textColor": "#A0AEC0"
+          }
+        },
+        {
+          "logicalId": "contact-title",
+          "type": "text-title",
+          "name": "Título Contato",
+          "position": {
+            "x": 50,
+            "y": 600
+          },
+          "size": {
+            "width": 1140,
+            "height": 40
+          },
+          "zIndex": 10,
+          "style": {
+            "textAlign": "center"
+          },
+          "textData": {
+            "content": "Fale Conosco",
+            "fontFamily": "Orbitron, sans-serif",
+            "fontSize": 28,
+            "fontWeight": 700,
+            "textColor": "#B026FF"
+          }
+        },
+        {
+          "logicalId": "contact-info",
+          "type": "text-paragraph",
+          "name": "Informações de Contato",
+          "position": {
+            "x": 320,
+            "y": 660
+          },
+          "size": {
+            "width": 600,
+            "height": 150
+          },
+          "zIndex": 10,
+          "style": {
+            "textAlign": "center"
+          },
+          "textData": {
+            "content": "📧 contato@techgear.com.br\n📱 (11) 9 8765-4321\n🌐 www.techgear.com.br\n📍 Av. Paulista, 1000 - São Paulo/SP",
+            "fontFamily": "Roboto, sans-serif",
+            "fontSize": 16,
+            "fontWeight": 400,
+            "textColor": "#A0AEC0",
+            "lineHeight": 2
+          }
+        },
+        {
+          "logicalId": "footer",
+          "type": "text-paragraph",
+          "name": "Footer",
+          "position": {
+            "x": 50,
+            "y": 1680
+          },
+          "size": {
+            "width": 1140,
+            "height": 40
+          },
+          "zIndex": 10,
+          "style": {
+            "textAlign": "center"
+          },
+          "textData": {
+            "content": "© 2025 TechGear Brasil - Todos os direitos reservados | CNPJ: 12.345.678/0001-90",
+            "fontFamily": "Roboto Mono, monospace",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "textColor": "#4A5568"
+          }
+        }
+      ]
+    }
+  ]
+}

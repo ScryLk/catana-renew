@@ -1,0 +1,94 @@
+{
+  "tema": "boutique",
+  "empresa": {
+    "nome": "Boutique Linho & Co",
+    "slogan": "Moda atemporal, feita para durar",
+    "sobre": "Peças de alfaiataria e linho natural, com curadoria minimalista. Tecidos nobres, caimento impecável e produção responsável.",
+    "contato": {
+      "telefone": "(11) 6060-7070",
+      "endereco": "Rua Estilo, 200 - Pinheiros, São Paulo - SP",
+      "instagram": "@linhoco",
+      "whatsapp": "(11) 94444-7070"
+    },
+    "logo": null
+  },
+  "categorias": [
+    "Camisas",
+    "Calças",
+    "Vestidos",
+    "Alfaiataria",
+    "Acessórios"
+  ],
+  "produtos": [
+    {
+      "nome": "Camisa de Linho",
+      "descricao": "Corte reto, off-white.",
+      "preco": "199.90",
+      "categoria": "Camisas",
+      "imagem": "camisa-de-linho.jpg"
+    },
+    {
+      "nome": "Camisa Social",
+      "descricao": "Algodão egípcio, slim.",
+      "preco": "229.90",
+      "categoria": "Camisas",
+      "imagem": "camisa-social.jpg"
+    },
+    {
+      "nome": "Calça Pantalona",
+      "descricao": "Linho, cintura alta.",
+      "preco": "249.90",
+      "categoria": "Calças",
+      "imagem": "calca-pantalona.jpg"
+    },
+    {
+      "nome": "Calça Alfaiataria",
+      "descricao": "Caimento reto, preto.",
+      "preco": "279.90",
+      "categoria": "Calças",
+      "imagem": "calca-alfaiataria.jpg"
+    },
+    {
+      "nome": "Vestido Midi",
+      "descricao": "Linho, manga curta.",
+      "preco": "299.90",
+      "categoria": "Vestidos",
+      "imagem": "vestido-midi.jpg"
+    },
+    {
+      "nome": "Vestido Slip",
+      "descricao": "Acetinado, nude.",
+      "preco": "259.90",
+      "categoria": "Vestidos",
+      "imagem": "vestido-slip.jpg"
+    },
+    {
+      "nome": "Blazer Estruturado",
+      "descricao": "Forrado, atemporal.",
+      "preco": "389.90",
+      "categoria": "Alfaiataria",
+      "imagem": "blazer-estruturado.jpg"
+    },
+    {
+      "nome": "Colete Alfaiataria",
+      "descricao": "Combina com tudo.",
+      "preco": "199.90",
+      "categoria": "Alfaiataria",
+      "imagem": "colete-alfaiataria.jpg"
+    },
+    {
+      "nome": "Cinto de Couro",
+      "descricao": "Fivela discreta, caramelo.",
+      "preco": "129.90",
+      "categoria": "Acessórios",
+      "imagem": "cinto-de-couro.jpg"
+    },
+    {
+      "nome": "Bolsa Tote",
+      "descricao": "Couro legítimo, nude.",
+      "preco": "349.90",
+      "categoria": "Acessórios",
+      "imagem": "bolsa-tote.jpg"
+    }
+  ]
+}

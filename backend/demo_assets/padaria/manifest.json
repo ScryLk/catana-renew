@@ -1,0 +1,122 @@
+{
+  "tema": "padaria",
+  "empresa": {
+    "nome": "Padaria Pão Dourado",
+    "slogan": "O sabor que abraça o seu dia",
+    "sobre": "Há mais de 30 anos assando pães artesanais com fermentação natural e ingredientes selecionados. Da nossa família para a sua mesa, com o cheirinho de pão quentinho todas as manhãs.",
+    "contato": {
+      "telefone": "(11) 4002-8922",
+      "endereco": "Rua das Massas, 123 - Vila do Trigo, São Paulo - SP",
+      "instagram": "@paodourado",
+      "whatsapp": "(11) 99999-0000"
+    },
+    "logo": null
+  },
+  "categorias": ["Pães", "Bolos e Tortas", "Salgados", "Doces", "Bebidas"],
+  "b2b": {
+    "titulo": "Atacado para cafeterias e mercados",
+    "faixas": [
+      { "quantidade": "10 a 49 un", "desconto": "10% off" },
+      { "quantidade": "50 a 99 un", "desconto": "18% off" },
+      { "quantidade": "100+ un", "desconto": "25% off" }
+    ],
+    "observacao": "Pedidos de atacado com 24h de antecedência. Entrega própria na região."
+  },
+  "produtos": [
+    {
+      "nome": "Pão Francês",
+      "descricao": "Crocante por fora, macio e aerado por dentro, do jeito que padaria de bairro tem que ser. Assado de hora em hora, sai quentinho da nossa fornada para o seu balcão. Perfeito com manteiga derretendo no café da manhã.",
+      "preco": "0.90", "categoria": "Pães", "imagem": "pao-frances.jpg",
+      "badge": "Mais vendido",
+      "specs": [{ "label": "Unidade", "value": "50g" }, { "label": "Fornadas", "value": "de hora em hora" }]
+    },
+    {
+      "nome": "Pão de Forma Integral",
+      "descricao": "Feito com farinha 100% integral, mix de grãos e fibras naturais. Fatiado no ponto certo para sanduíches e torradas, mantém a maciez por dias. Sem conservantes artificiais.",
+      "preco": "12.90", "categoria": "Pães", "imagem": "pao-integral.jpg",
+      "specs": [{ "label": "Peso", "value": "500g" }, { "label": "Fatias", "value": "18" }]
+    },
+    {
+      "nome": "Pão de Fermentação Natural",
+      "descricao": "Levain cultivado na casa e fermentação lenta de 48 horas. Casca rústica caramelizada, miolo aerado e aquele leve azedinho característico. O queridinho de quem entende de pão.",
+      "preco": "24.00", "categoria": "Pães", "imagem": "pao-natural.jpg",
+      "badge": "Artesanal",
+      "specs": [{ "label": "Peso", "value": "800g" }, { "label": "Fermentação", "value": "48h" }]
+    },
+    {
+      "nome": "Baguete Artesanal",
+      "descricao": "Receita tradicional francesa com casca dourada e crocante que estala. Miolo leve, ideal para bruschettas, sanduíches finos ou para acompanhar um bom queijo. Assada duas vezes ao dia.",
+      "preco": "9.50", "categoria": "Pães", "imagem": "baguete.jpg",
+      "specs": [{ "label": "Peso", "value": "250g" }, { "label": "Fornadas", "value": "2x ao dia" }]
+    },
+    {
+      "nome": "Bolo de Cenoura com Chocolate",
+      "descricao": "Massa fofinha de cenoura fresca ralada na hora, coberta com uma camada generosa de brigadeiro cremoso. O clássico brasileiro que atravessa gerações. Serve de 8 a 10 fatias.",
+      "preco": "39.90", "categoria": "Bolos e Tortas", "imagem": "bolo-cenoura.jpg",
+      "badge": "Mais vendido",
+      "specs": [{ "label": "Peso", "value": "1,2kg" }, { "label": "Rende", "value": "8-10 fatias" }]
+    },
+    {
+      "nome": "Torta de Limão",
+      "descricao": "Base crocante de biscoito amanteigado, recheio cremoso de limão tahiti e merengue maçaricado na hora. Equilíbrio perfeito entre o doce e o cítrico. Fatia individual ou torta inteira sob encomenda.",
+      "preco": "45.00", "categoria": "Bolos e Tortas", "imagem": "torta-limao.jpg",
+      "specs": [{ "label": "Diâmetro", "value": "22cm" }, { "label": "Rende", "value": "10 fatias" }]
+    },
+    {
+      "nome": "Bolo de Fubá Cremoso",
+      "descricao": "Receita da vovó com fubá mimoso, erva-doce e um coração cremoso que derrete na boca. Assado em forno lento para dourar por igual. Companheiro oficial do café passado na hora.",
+      "preco": "32.00", "categoria": "Bolos e Tortas", "imagem": "bolo-fuba.jpg",
+      "specs": [{ "label": "Peso", "value": "900g" }, { "label": "Rende", "value": "8 fatias" }]
+    },
+    {
+      "nome": "Coxinha de Frango",
+      "descricao": "Massa leve de batata, recheio generoso de frango desfiado temperado na casa e empanado crocante. Frita na hora do pedido para chegar sequinha. A campeã do balcão de salgados.",
+      "preco": "8.50", "categoria": "Salgados", "imagem": "coxinha.jpg",
+      "badge": "Mais vendido",
+      "specs": [{ "label": "Peso", "value": "120g" }, { "label": "Recheio", "value": "frango desfiado" }]
+    },
+    {
+      "nome": "Pão de Queijo",
+      "descricao": "Mineiro de verdade: polvilho azedo e queijo meia-cura ralado na hora. Casquinha crocante, interior puxa-puxa e sabor de fazenda. Vendido em porção de 6 unidades, sempre quentinho.",
+      "preco": "14.90", "categoria": "Salgados", "imagem": "pao-de-queijo.jpg",
+      "specs": [{ "label": "Porção", "value": "6 unidades" }, { "label": "Queijo", "value": "meia-cura" }]
+    },
+    {
+      "nome": "Empada de Palmito",
+      "descricao": "Massa amanteigada que desmancha, recheada com palmito pupunha refogado com azeitonas e um toque de catupiry. Assada diariamente em forminhas individuais. Elegante e reconfortante.",
+      "preco": "9.00", "categoria": "Salgados", "imagem": "empada-palmito.jpg",
+      "specs": [{ "label": "Peso", "value": "110g" }, { "label": "Recheio", "value": "palmito pupunha" }]
+    },
+    {
+      "nome": "Sonho de Creme",
+      "descricao": "Massa fofa frita no ponto, recheada com creme de baunilha feito com fava natural e finalizada com açúcar de confeiteiro. O doce de padaria mais pedido das tardes de domingo.",
+      "preco": "7.50", "categoria": "Doces", "imagem": "sonho.jpg",
+      "specs": [{ "label": "Peso", "value": "130g" }, { "label": "Recheio", "value": "creme de baunilha" }]
+    },
+    {
+      "nome": "Brigadeiro Gourmet",
+      "descricao": "Chocolate belga 54%, creme de leite fresco e granulado nobre. Enrolado à mão em caixinha presenteável com 6 unidades. Doce de festa com padrão de confeitaria.",
+      "preco": "24.00", "categoria": "Doces", "imagem": "brigadeiro.jpg",
+      "badge": "Novo",
+      "specs": [{ "label": "Caixa", "value": "6 unidades" }, { "label": "Cacau", "value": "54% belga" }]
+    },
+    {
+      "nome": "Croissant de Chocolate",
+      "descricao": "Folhado de manteiga francesa laminado em 27 camadas, recheado com barra de chocolate ao leite. Assado até o dourado perfeito. Crocante por fora, amanteigado por dentro.",
+      "preco": "11.00", "categoria": "Doces", "imagem": "croissant.jpg",
+      "specs": [{ "label": "Peso", "value": "95g" }, { "label": "Camadas", "value": "27" }]
+    },
+    {
+      "nome": "Café Coado 300ml",
+      "descricao": "Grãos 100% arábica torrados na casa toda semana, moídos na hora e coados no filtro de pano. Encorpado, aromático e sem amargor. O par ideal de qualquer item deste catálogo.",
+      "preco": "6.00", "categoria": "Bebidas", "imagem": "cafe.jpg",
+      "specs": [{ "label": "Volume", "value": "300ml" }, { "label": "Grão", "value": "100% arábica" }]
+    },
+    {
+      "nome": "Suco de Laranja Natural 400ml",
+      "descricao": "Laranjas selecionadas espremidas na hora do pedido, sem açúcar, sem água e sem conservantes. Gelado e espumante como tem que ser. Do pomar direto para o seu copo.",
+      "preco": "9.90", "categoria": "Bebidas", "imagem": "suco-laranja.jpg",
+      "specs": [{ "label": "Volume", "value": "400ml" }, { "label": "Adoçado", "value": "sem açúcar" }]
+    }
+  ]
+}

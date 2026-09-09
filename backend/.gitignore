@@ -1,0 +1,23 @@
+# Segredos e ambiente
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Sistema operacional
+.DS_Store
+
+# Arquivos pesados / artefatos
+*.zip
+
+# Mídia enviada em runtime
+media/
+
+# Bancos sqlite locais/CI
+*.db
+
+# Artefatos do rasterizador de verificação (scripts/render_catalogo.py)
+render_pro/
+*_preview.pdf

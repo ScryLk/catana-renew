@@ -1,0 +1,371 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap');
+
+/* SAFELIST de utilitárias para elementos de catálogo (element.className).
+   Tailwind compila no build varrendo os FONTES — classes vindas do banco só
+   existem no CSS se forçadas aqui. Lista fechada = vocabulário governado
+   (docs/CATALOG_JSON_SPEC.md). Fora dela, a classe é silenciosamente ignorada. */
+@source inline("shadow-{sm,md,lg,xl,2xl,none} rounded-{md,lg,xl,2xl,3xl,full} italic {upper,lower}case capitalize {underline,line-through} tracking-{tight,wide,widest} leading-{none,tight,snug,relaxed} font-{medium,semibold,bold,extrabold} line-clamp-{1,2,3,4} opacity-{25,50,75,90} mix-blend-{multiply,screen,overlay} backdrop-blur-{sm,md}");
+/* Paleta/tipografia curadas para catálogos 100% em classes (prova de conceito
+   "Tailwind Edition"). Cores limitadas a stone/amber/rose para não explodir o CSS. */
+@source inline("bg-white bg-stone-{50,100,200,900,950} bg-stone-950/50 bg-amber-{100,300,400,500,600} bg-rose-{100,700,800,900} bg-gradient-to-{r,br,b} from-{stone-900,amber-400,rose-900} via-{rose-900,amber-500} to-{stone-950,rose-800,amber-600} text-{white,stone-500,stone-600,stone-700,stone-900} text-{amber-300,amber-600,amber-700,rose-100,rose-800} text-{left,center,right} text-{xs,sm,base,lg,xl,2xl,3xl,4xl,5xl,6xl} border border-{stone-200,stone-300,amber-400,rose-800} font-{display,body}");
+
+/* Utilitárias de família tipográfica (webfonts abaixo): font-display / font-body */
+@theme {
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Inter', Arial, sans-serif;
+}
+
+/* Webfonts self-hosted (whitelist tipográfica dos catálogos — ver
+   docs/VISTORIA_VISUAL_CATALOGOS.md §1.3). Variáveis: 1 arquivo por família.
+   Self-host elimina o CDN no momento do export (html2canvas) e o FOUT no PDF. */
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-var.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat';
+  src: url('/fonts/montserrat-var.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Playfair Display';
+  src: url('/fonts/playfair-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    /* Catana Dark Theme */
+    --background: 0 0% 8%; /* Fundo escuro #141414 */
+    --foreground: 0 0% 95%; /* Texto claro */
+    --card: 0 0% 12%; /* Cards cinza escuro #1F1F1F */
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 0 0% 18%; /* Cinza escuro da logo Catana #2D2D2D */
+    --primary-foreground: 0 0% 95%;
+    --secondary: 0 5% 25%; /* Cinza escuro */
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 5% 60%;
+    --accent: 0 0% 18%; /* Cinza escuro da logo Catana */
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 20%; /* Bordas escuras */
+    --input: 0 0% 18%;
+    --ring: 0 0% 18%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 0 0% 5%; /* #0D0D0D */
+    --foreground: 0 0% 95%;
+    --card: 0 0% 25%; /* #404040 */
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 0 0% 18%; /* Cinza escuro da logo Catana #2D2D2D */
+    --primary-foreground: 0 0% 95%;
+    --secondary: 0 2% 54%; /* #89888C */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 25%;
+    --muted-foreground: 0 2% 54%;
+    --accent: 0 0% 18%;
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 72.2% 50.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 25%;
+    --input: 0 0% 25%;
+    --ring: 0 0% 18%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* ==========================================================================
+   CUSTOM SCROLLBAR SYSTEM - Minimalista & Cross-Browser
+   Compatível com Dark & Light theme, WebKit (Chrome/Safari/Edge) e Firefox.
+   ========================================================================== */
+
+/* Firefox Modern Standard */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+html:not(.dark) * {
+  scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+}
+
+/* WebKit / Blink (Chrome, Safari, Edge, Electron) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 9999px;
+  transition: background-color 0.15s ease-in-out;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Light Theme overrides for WebKit */
+html:not(.dark) ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+html:not(.dark) ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+html:not(.dark) ::-webkit-scrollbar-thumb:active {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Utilitárias específicas para componentes */
+.custom-scrollbar,
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+html:not(.dark) .custom-scrollbar,
+html:not(.dark) .scrollbar-thin {
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar,
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track,
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb,
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover,
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+html:not(.dark) .custom-scrollbar::-webkit-scrollbar-thumb,
+html:not(.dark) .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+html:not(.dark) .custom-scrollbar::-webkit-scrollbar-thumb:hover,
+html:not(.dark) .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+/* Utilitário para ocultar scrollbars mantendo rolagem nativa */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Garantir fidelidade de cores ao exportar PDF */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Eliminar margens e espaçamentos que criam linhas */
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Remover borders e outlines de todos os elementos */
+  * {
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  /* Garantir que não há espaços entre páginas */
+  .pdf-page-content {
+    margin: 0 !important;
+    border: none !important;
+  }
+
+  /* DiPack templates - apenas remover margem, manter bordas dos elementos */
+  [class*="DiPack"] {
+    margin: 0 !important;
+  }
+}
+
+/* Força cores exatas para preview e exportação de PDF */
+.pdf-preview-content *,
+.pdf-page-content * {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  color-adjust: exact !important;
+}
+
+/* Eliminar TODAS as bordas, sombras e espaçamentos no PDF */
+.pdf-page-content {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Garantir que elementos dentro do PDF tenham box-sizing correto */
+.pdf-page-content > *,
+.pdf-page-content * {
+  box-sizing: border-box !important;
+  /* REMOVED: border: none !important; - permitir bordas nos elementos */
+  outline: none !important;
+  /* REMOVED: box-shadow: none !important; - permitir sombras nos elementos */
+}
+
+/* Forçar background branco em todos os templates DiPACK */
+[class*="DiPack"] {
+  background-color: white !important;
+}
+
+/* Regras específicas para print - apenas remover decorações, manter bordas */
+@media print {
+  [class*="DiPack"] {
+    outline: none !important;
+  }
+
+  /* Remover sublinhado de links, mas manter bordas dos elementos */
+  [class*="DiPack"] a {
+    text-decoration: none !important;
+  }
+}
+
+/* Cores DiPACK específicas com valores RGB exatos */
+.dipack-gold {
+  color: #f5a623 !important;
+  background-color: #f5a623 !important;
+}
+
+.dipack-gold-text {
+  color: #f5a623 !important;
+}
+
+.dipack-gold-bg {
+  background-color: #f5a623 !important;
+}
+
+.dipack-gold-border {
+  border-color: #f5a623 !important;
+}
+
+/* ============================================
+   FIGMA CANVAS - FEEDBACK VISUAL DE SELEÇÃO
+   ============================================ */
+
+/* Micro-animação de seleção (aparece UMA VEZ ao selecionar) */
+@keyframes select-pulse {
+  0% {
+    transform: scale(0.98);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-select-pulse {
+  animation: select-pulse 150ms ease-out;
+}
+
+/* Animação de aparecimento dos handles */
+@keyframes handle-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-handle-appear {
+  animation: handle-appear 180ms ease-out;
+}
+
+/* Handles de resize com hover */
+.resize-handle {
+  transition: all 120ms ease-out;
+}
+
+.resize-handle:hover {
+  transform: scale(1.3);
+  border-width: 2.5px;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* ============================================
+   FIGMA TOOLBAR - FEEDBACK DE FERRAMENTAS
+   ============================================ */
+
+/* Micro-animação de ativação de ferramenta (uma vez) */
+@keyframes tool-activate {
+  0% {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-tool-activate {
+  animation: tool-activate 140ms ease-out;
+}

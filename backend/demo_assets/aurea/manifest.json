@@ -1,0 +1,73 @@
+{
+  "tema": "aurea",
+  "empresa": {
+    "nome": "ÁUREA",
+    "slogan": "O essencial, executado sem pressa.",
+    "sobre": "Atelier de moda e acessórios fundado sobre uma única convicção: poucas peças, feitas de forma irrepreensível, valem mais do que qualquer abundância. Trabalhamos couro italiano, seda e cashmere em série limitada, sob encomenda.",
+    "contato": {
+      "telefone": "+55 11 3061 0000",
+      "whatsapp": "+55 11 99061 0000",
+      "endereco": "Rua Oscar Freire 1200 · São Paulo",
+      "instagram": "@aurea.atelier",
+      "email": "atelier@aurea.com.br"
+    }
+  },
+  "colecao": "Coleção Inverno 2026",
+  "categorias": ["Acessórios", "Seda & Cashmere"],
+  "produtos": [
+    {
+      "nome": "Bolsa Aurelia",
+      "descricao": "Couro toscano de curtimento vegetal, forro em camurça, ferragens banhadas.",
+      "preco": "4.900",
+      "categoria": "Acessórios",
+      "imagem": "prod-bolsa.jpg"
+    },
+    {
+      "nome": "Cinto Fiora",
+      "descricao": "Corte único de couro integral, fivela em latão escovado.",
+      "preco": "890",
+      "categoria": "Acessórios",
+      "imagem": "prod-cinto.jpg"
+    },
+    {
+      "nome": "Luvas Alba",
+      "descricao": "Pelica forrada em cashmere, costura à mão em ponto sela.",
+      "preco": "1.190",
+      "categoria": "Acessórios",
+      "imagem": "prod-luvas.jpg"
+    },
+    {
+      "nome": "Camisa Solene",
+      "descricao": "Seda dupla de 22 momme, botões de madrepérola, corte atemporal.",
+      "preco": "2.300",
+      "categoria": "Seda & Cashmere",
+      "imagem": "prod-camisa.jpg"
+    },
+    {
+      "nome": "Echarpe Ligure",
+      "descricao": "Cashmere de fio duplo, tecida em tear manual, bainha cega.",
+      "preco": "1.590",
+      "categoria": "Seda & Cashmere",
+      "imagem": "prod-echarpe.jpg"
+    },
+    {
+      "nome": "Lenço Ária",
+      "descricao": "Twill de seda estampado a quadro, bainha enrolada à mão.",
+      "preco": "980",
+      "categoria": "Seda & Cashmere",
+      "imagem": "prod-lenco.jpg"
+    },
+    {
+      "nome": "Tricô Bruma",
+      "descricao": "Cashmere de seis fios, tricotado em peça única, sem costuras.",
+      "preco": "3.400",
+      "categoria": "Seda & Cashmere",
+      "imagem": "prod-trico.jpg"
+    }
+  ],
+  "imagens_editoriais": {
+    "div_acessorios": "div-acessorios.jpg",
+    "div_seda": "div-seda.jpg",
+    "det_costura": "det-costura.jpg"
+  }
+}

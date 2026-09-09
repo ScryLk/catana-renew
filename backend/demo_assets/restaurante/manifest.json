@@ -1,0 +1,94 @@
+{
+  "tema": "restaurante",
+  "empresa": {
+    "nome": "Restaurante Casa Bordô",
+    "slogan": "Alta gastronomia em cada detalhe",
+    "sobre": "Cozinha autoral que une técnica e ingredientes brasileiros. Ambiente acolhedor, carta de vinhos premiada e pratos que contam histórias.",
+    "contato": {
+      "telefone": "(11) 4040-5050",
+      "endereco": "Alameda dos Sabores, 12 - Jardins, São Paulo - SP",
+      "instagram": "@casabordo",
+      "whatsapp": "(11) 96666-5050"
+    },
+    "logo": null
+  },
+  "categorias": [
+    "Entradas",
+    "Principais",
+    "Massas",
+    "Sobremesas",
+    "Vinhos"
+  ],
+  "produtos": [
+    {
+      "nome": "Carpaccio de Filé",
+      "descricao": "Lâminas finas, alcaparras e parmesão.",
+      "preco": "42.00",
+      "categoria": "Entradas",
+      "imagem": "carpaccio-de-file.jpg"
+    },
+    {
+      "nome": "Bruschetta da Casa",
+      "descricao": "Tomate confitado e manjericão.",
+      "preco": "29.00",
+      "categoria": "Entradas",
+      "imagem": "bruschetta-da-casa.jpg"
+    },
+    {
+      "nome": "Filé ao Molho Madeira",
+      "descricao": "Acompanha risoto de açafrão.",
+      "preco": "89.00",
+      "categoria": "Principais",
+      "imagem": "file-ao-molho-madeira.jpg"
+    },
+    {
+      "nome": "Salmão Grelhado",
+      "descricao": "Crosta de ervas, legumes salteados.",
+      "preco": "78.00",
+      "categoria": "Principais",
+      "imagem": "salmao-grelhado.jpg"
+    },
+    {
+      "nome": "Risoto de Funghi",
+      "descricao": "Cremoso, finalizado com trufa.",
+      "preco": "69.00",
+      "categoria": "Massas",
+      "imagem": "risoto-de-funghi.jpg"
+    },
+    {
+      "nome": "Nhoque ao Pomodoro",
+      "descricao": "Massa fresca artesanal.",
+      "preco": "54.00",
+      "categoria": "Massas",
+      "imagem": "nhoque-ao-pomodoro.jpg"
+    },
+    {
+      "nome": "Petit Gâteau",
+      "descricao": "Vulcão de chocolate, sorvete de baunilha.",
+      "preco": "34.00",
+      "categoria": "Sobremesas",
+      "imagem": "petit-gateau.jpg"
+    },
+    {
+      "nome": "Cheesecake de Frutas",
+      "descricao": "Calda de frutas vermelhas.",
+      "preco": "32.00",
+      "categoria": "Sobremesas",
+      "imagem": "cheesecake-de-frutas.jpg"
+    },
+    {
+      "nome": "Malbec Reserva",
+      "descricao": "Taça, safra selecionada.",
+      "preco": "38.00",
+      "categoria": "Vinhos",
+      "imagem": "malbec-reserva.jpg"
+    },
+    {
+      "nome": "Espumante Brut",
+      "descricao": "Garrafa, brinde perfeito.",
+      "preco": "120.00",
+      "categoria": "Vinhos",
+      "imagem": "espumante-brut.jpg"
+    }
+  ]
+}

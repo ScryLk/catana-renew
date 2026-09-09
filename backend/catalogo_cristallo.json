@@ -1,0 +1,6191 @@
+{
+  "app": "Catana",
+  "schemaVersion": "1.0",
+  "exportedAt": "2026-06-30T12:00:00.000Z",
+  "catalog": {
+    "name": "Cristallo — Catálogo 2026",
+    "description": "Embalagens & utensílios para confeitaria e food service."
+  },
+  "settings": {
+    "gridSize": 8,
+    "snapToGrid": true,
+    "defaultZoom": 75
+  },
+  "designTokens": {
+    "name": "Cristallo — Framboesa & Caramelo",
+    "version": "1.0",
+    "description": "Paleta de marca para embalagens de confeitaria.",
+    "colors": {
+      "primary": {
+        "value": "#A82E4E"
+      },
+      "secondary": {
+        "value": "#C77D3A"
+      },
+      "accent": {
+        "value": "#E6B45C"
+      },
+      "background": {
+        "value": "#FBF7F2"
+      },
+      "surface": {
+        "value": "#FFFFFF"
+      },
+      "border": {
+        "value": "#ECE0D6"
+      },
+      "text": {
+        "primary": {
+          "value": "#2B2126"
+        },
+        "secondary": {
+          "value": "#7C6E72"
+        },
+        "disabled": {
+          "value": "#BDB3B6"
+        }
+      },
+      "success": {
+        "value": "#3F8F5B"
+      },
+      "warning": {
+        "value": "#C77D3A"
+      },
+      "error": {
+        "value": "#B23A48"
+      },
+      "info": {
+        "value": "#3A6EA8"
+      }
+    },
+    "typography": {
+      "h1": {
+        "fontFamily": "Georgia, 'Times New Roman', serif",
+        "fontSize": 56,
+        "fontWeight": 700,
+        "lineHeight": 1.1
+      },
+      "h2": {
+        "fontFamily": "Georgia, 'Times New Roman', serif",
+        "fontSize": 28,
+        "fontWeight": 700,
+        "lineHeight": 1.2
+      },
+      "h3": {
+        "fontFamily": "Georgia, 'Times New Roman', serif",
+        "fontSize": 22,
+        "fontWeight": 700,
+        "lineHeight": 1.25
+      },
+      "h4": {
+        "fontFamily": "Georgia, 'Times New Roman', serif",
+        "fontSize": 16,
+        "fontWeight": 700,
+        "lineHeight": 1.3
+      },
+      "h5": {
+        "fontFamily": "Inter, system-ui, sans-serif",
+        "fontSize": 14,
+        "fontWeight": 600,
+        "lineHeight": 1.4
+      },
+      "h6": {
+        "fontFamily": "Inter, system-ui, sans-serif",
+        "fontSize": 12,
+        "fontWeight": 600,
+        "lineHeight": 1.4
+      },
+      "body": {
+        "fontFamily": "Inter, system-ui, sans-serif",
+        "fontSize": 12.5,
+        "fontWeight": 400,
+        "lineHeight": 1.6
+      },
+      "bodySmall": {
+        "fontFamily": "Inter, system-ui, sans-serif",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "lineHeight": 1.5
+      },
+      "bodyLarge": {
+        "fontFamily": "Inter, system-ui, sans-serif",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "lineHeight": 1.6
+      },
+      "caption": {
+        "fontFamily": "Inter, system-ui, sans-serif",
+        "fontSize": 10.5,
+        "fontWeight": 400,
+        "lineHeight": 1.4
+      },
+      "button": {
+        "fontFamily": "Inter, system-ui, sans-serif",
+        "fontSize": 13,
+        "fontWeight": 600,
+        "lineHeight": 1,
+        "letterSpacing": 1,
+        "textTransform": "uppercase"
+      }
+    },
+    "spacing": {
+      "base": 8,
+      "xxs": 2,
+      "xs": 4,
+      "sm": 8,
+      "md": 16,
+      "lg": 24,
+      "xl": 32,
+      "xxl": 48,
+      "xxxl": 64
+    },
+    "borderRadius": {
+      "none": 0,
+      "sm": 4,
+      "md": 8,
+      "lg": 14,
+      "xl": 20,
+      "full": 9999
+    },
+    "shadows": {
+      "none": {
+        "value": "none"
+      },
+      "sm": {
+        "value": "0 1px 2px rgba(43,33,38,0.06)"
+      },
+      "md": {
+        "value": "0 4px 10px rgba(43,33,38,0.10)"
+      },
+      "lg": {
+        "value": "0 12px 24px rgba(43,33,38,0.12)"
+      },
+      "xl": {
+        "value": "0 24px 40px rgba(43,33,38,0.16)"
+      }
+    }
+  },
+  "pages": [
+    {
+      "name": "Capa",
+      "order": 0,
+      "elements": [
+        {
+          "type": "image",
+          "name": "Hero",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 794,
+            "height": 1123
+          },
+          "style": {
+            "borderRadius": 0,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/hero.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/hero.jpg",
+            "opacity": 1,
+            "borderRadius": 0,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 0
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Overlay",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 794,
+            "height": 1123
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "rgba(28,16,21,0.42)"
+          },
+          "zIndex": 1
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Faixa inferior",
+          "position": {
+            "x": 0,
+            "y": 720
+          },
+          "size": {
+            "width": 794,
+            "height": 403
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "rgba(24,13,18,0.58)"
+          },
+          "zIndex": 2
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Scrim topo",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 794,
+            "height": 132
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "rgba(18,10,14,0.50)"
+          },
+          "zIndex": 3
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Moldura",
+          "position": {
+            "x": 24,
+            "y": 24
+          },
+          "size": {
+            "width": 746,
+            "height": 1075
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "transparent",
+            "borderColor": "#FBF1E6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 4
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Selo",
+          "position": {
+            "x": 56,
+            "y": 64
+          },
+          "size": {
+            "width": 46,
+            "height": 46
+          },
+          "style": {
+            "borderRadius": 12,
+            "backgroundColor": "#A82E4E"
+          },
+          "zIndex": 5
+        },
+        {
+          "type": "text-title",
+          "name": "Monograma",
+          "position": {
+            "x": 56,
+            "y": 71
+          },
+          "size": {
+            "width": 46,
+            "height": 32
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 26,
+            "fontWeight": "bold",
+            "textColor": "#FBF1E6",
+            "textAlign": "center",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "C"
+          },
+          "zIndex": 6
+        },
+        {
+          "type": "text-title",
+          "name": "Wordmark",
+          "position": {
+            "x": 114,
+            "y": 68
+          },
+          "size": {
+            "width": 260,
+            "height": 22
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 18,
+            "fontWeight": "bold",
+            "textColor": "#FBF1E6",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 2
+          },
+          "content": {
+            "text": "CRISTALLO"
+          },
+          "zIndex": 7
+        },
+        {
+          "type": "text-title",
+          "name": "Sub-wordmark",
+          "position": {
+            "x": 114,
+            "y": 90
+          },
+          "size": {
+            "width": 260,
+            "height": 14
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 8,
+            "fontWeight": "normal",
+            "textColor": "#FBF1E6",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 2
+          },
+          "content": {
+            "text": "EMBALAGENS & UTENSÍLIOS"
+          },
+          "zIndex": 8
+        },
+        {
+          "type": "text-title",
+          "name": "Kicker",
+          "position": {
+            "x": 56,
+            "y": 690
+          },
+          "size": {
+            "width": 200,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 13,
+            "fontWeight": "bold",
+            "textColor": "#E6B45C",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 4
+          },
+          "content": {
+            "text": "CATÁLOGO 2026"
+          },
+          "zIndex": 9
+        },
+        {
+          "type": "text-title",
+          "name": "Título",
+          "position": {
+            "x": 56,
+            "y": 724
+          },
+          "size": {
+            "width": 682,
+            "height": 150
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 56,
+            "fontWeight": "bold",
+            "textColor": "#FBF1E6",
+            "textAlign": "left",
+            "lineHeight": 1.05,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Cristallo"
+          },
+          "zIndex": 10
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Régua",
+          "position": {
+            "x": 56,
+            "y": 854
+          },
+          "size": {
+            "width": 72,
+            "height": 4
+          },
+          "style": {
+            "borderRadius": 2,
+            "backgroundColor": "#E6B45C"
+          },
+          "zIndex": 11
+        },
+        {
+          "type": "text-title",
+          "name": "Tagline",
+          "position": {
+            "x": 56,
+            "y": 880
+          },
+          "size": {
+            "width": 562,
+            "height": 70
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 20,
+            "fontWeight": "normal",
+            "textColor": "#FBF1E6",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Transparência que valoriza cada criação."
+          },
+          "zIndex": 12
+        },
+        {
+          "type": "text-title",
+          "name": "Rodapé capa",
+          "position": {
+            "x": 56,
+            "y": 1033
+          },
+          "size": {
+            "width": 682,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12,
+            "fontWeight": "normal",
+            "textColor": "#FBF1E6",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "cristallo.com.br   ·   @cristallo.embalagens"
+          },
+          "zIndex": 13
+        }
+      ]
+    },
+    {
+      "name": "Apresentação",
+      "order": 1,
+      "elements": [
+        {
+          "type": "shape-rectangle",
+          "name": "Fundo",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 794,
+            "height": 1123
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#FBF7F2"
+          },
+          "zIndex": 0
+        },
+        {
+          "type": "text-title",
+          "name": "Kicker",
+          "position": {
+            "x": 56,
+            "y": 64
+          },
+          "size": {
+            "width": 682,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 3
+          },
+          "content": {
+            "text": "A MARCA"
+          },
+          "zIndex": 1
+        },
+        {
+          "type": "text-title",
+          "name": "Título",
+          "position": {
+            "x": 56,
+            "y": 86
+          },
+          "size": {
+            "width": 682,
+            "height": 50
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 28,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Apresentação"
+          },
+          "zIndex": 2
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Régua",
+          "position": {
+            "x": 56,
+            "y": 138
+          },
+          "size": {
+            "width": 64,
+            "height": 4
+          },
+          "style": {
+            "borderRadius": 2,
+            "backgroundColor": "#E6B45C"
+          },
+          "zIndex": 3
+        },
+        {
+          "type": "text-title",
+          "name": "Lead",
+          "position": {
+            "x": 56,
+            "y": 176
+          },
+          "size": {
+            "width": 682,
+            "height": 64
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 22,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.25,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "A embalagem é a primeira mordida."
+          },
+          "zIndex": 4
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Corpo 1",
+          "position": {
+            "x": 56,
+            "y": 250
+          },
+          "size": {
+            "width": 329,
+            "height": 220
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.65,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "A Cristallo nasceu nos bastidores da confeitaria — entre brigadeiros que precisavam brilhar e sobremesas que mereciam ser vistas. Desenhamos embalagens PET cristal,"
+          },
+          "zIndex": 5
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Corpo 2",
+          "position": {
+            "x": 409,
+            "y": 250
+          },
+          "size": {
+            "width": 329,
+            "height": 220
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.65,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "caixas e utensílios que protegem o sabor e transformam cada doce numa vitrine. Do ateliê ao food service, a embalagem é a primeira mordida — e ela entra pelos olhos."
+          },
+          "zIndex": 6
+        },
+        {
+          "type": "image",
+          "name": "Imagem",
+          "position": {
+            "x": 56,
+            "y": 506
+          },
+          "size": {
+            "width": 682,
+            "height": 430
+          },
+          "style": {
+            "borderRadius": 14,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/apresentacao.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/apresentacao.jpg",
+            "opacity": 1,
+            "borderRadius": 14,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 7
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Borda imagem",
+          "position": {
+            "x": 56,
+            "y": 506
+          },
+          "size": {
+            "width": 682,
+            "height": 430
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "transparent",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 8
+        },
+        {
+          "type": "text-title",
+          "name": "Legenda",
+          "position": {
+            "x": 56,
+            "y": 952
+          },
+          "size": {
+            "width": 682,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 13,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "center",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "“Do ateliê ao food service — protege o sabor, valoriza a vitrine.”"
+          },
+          "zIndex": 9
+        }
+      ]
+    },
+    {
+      "name": "Índice",
+      "order": 2,
+      "elements": [
+        {
+          "type": "shape-rectangle",
+          "name": "Fundo",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 794,
+            "height": 1123
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#FBF7F2"
+          },
+          "zIndex": 0
+        },
+        {
+          "type": "text-title",
+          "name": "Kicker",
+          "position": {
+            "x": 56,
+            "y": 64
+          },
+          "size": {
+            "width": 682,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 3
+          },
+          "content": {
+            "text": "NAVEGAÇÃO"
+          },
+          "zIndex": 1
+        },
+        {
+          "type": "text-title",
+          "name": "Título",
+          "position": {
+            "x": 56,
+            "y": 86
+          },
+          "size": {
+            "width": 682,
+            "height": 50
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 28,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Índice"
+          },
+          "zIndex": 2
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Régua",
+          "position": {
+            "x": 56,
+            "y": 138
+          },
+          "size": {
+            "width": 64,
+            "height": 4
+          },
+          "style": {
+            "borderRadius": 2,
+            "backgroundColor": "#E6B45C"
+          },
+          "zIndex": 3
+        },
+        {
+          "type": "text-title",
+          "name": "Num",
+          "position": {
+            "x": 56,
+            "y": 200
+          },
+          "size": {
+            "width": 44,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#E6B45C",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "01"
+          },
+          "zIndex": 4
+        },
+        {
+          "type": "text-title",
+          "name": "Item",
+          "position": {
+            "x": 112,
+            "y": 200
+          },
+          "size": {
+            "width": 566,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 16,
+            "fontWeight": "normal",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Apresentação"
+          },
+          "zIndex": 5
+        },
+        {
+          "type": "text-title",
+          "name": "Pág",
+          "position": {
+            "x": 678,
+            "y": 200
+          },
+          "size": {
+            "width": 60,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "02"
+          },
+          "zIndex": 6
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Linha",
+          "position": {
+            "x": 56,
+            "y": 240
+          },
+          "size": {
+            "width": 682,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 7
+        },
+        {
+          "type": "text-title",
+          "name": "Num",
+          "position": {
+            "x": 56,
+            "y": 258
+          },
+          "size": {
+            "width": 44,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#E6B45C",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "02"
+          },
+          "zIndex": 8
+        },
+        {
+          "type": "text-title",
+          "name": "Item",
+          "position": {
+            "x": 112,
+            "y": 258
+          },
+          "size": {
+            "width": 566,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 16,
+            "fontWeight": "normal",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Linha Confeitaria 2026"
+          },
+          "zIndex": 9
+        },
+        {
+          "type": "text-title",
+          "name": "Pág",
+          "position": {
+            "x": 678,
+            "y": 258
+          },
+          "size": {
+            "width": 60,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "04"
+          },
+          "zIndex": 10
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Linha",
+          "position": {
+            "x": 56,
+            "y": 298
+          },
+          "size": {
+            "width": 682,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 11
+        },
+        {
+          "type": "text-title",
+          "name": "Num",
+          "position": {
+            "x": 56,
+            "y": 316
+          },
+          "size": {
+            "width": 44,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#E6B45C",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "03"
+          },
+          "zIndex": 12
+        },
+        {
+          "type": "text-title",
+          "name": "Item",
+          "position": {
+            "x": 112,
+            "y": 316
+          },
+          "size": {
+            "width": 566,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 16,
+            "fontWeight": "normal",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Potes, Copos & Caixas"
+          },
+          "zIndex": 13
+        },
+        {
+          "type": "text-title",
+          "name": "Pág",
+          "position": {
+            "x": 678,
+            "y": 316
+          },
+          "size": {
+            "width": 60,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "05"
+          },
+          "zIndex": 14
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Linha",
+          "position": {
+            "x": 56,
+            "y": 356
+          },
+          "size": {
+            "width": 682,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 15
+        },
+        {
+          "type": "text-title",
+          "name": "Num",
+          "position": {
+            "x": 56,
+            "y": 374
+          },
+          "size": {
+            "width": 44,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#E6B45C",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "04"
+          },
+          "zIndex": 16
+        },
+        {
+          "type": "text-title",
+          "name": "Item",
+          "position": {
+            "x": 112,
+            "y": 374
+          },
+          "size": {
+            "width": 566,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 16,
+            "fontWeight": "normal",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Delivery & Finalização"
+          },
+          "zIndex": 17
+        },
+        {
+          "type": "text-title",
+          "name": "Pág",
+          "position": {
+            "x": 678,
+            "y": 374
+          },
+          "size": {
+            "width": 60,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "06"
+          },
+          "zIndex": 18
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Linha",
+          "position": {
+            "x": 56,
+            "y": 414
+          },
+          "size": {
+            "width": 682,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 19
+        },
+        {
+          "type": "text-title",
+          "name": "Num",
+          "position": {
+            "x": 56,
+            "y": 432
+          },
+          "size": {
+            "width": 44,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#E6B45C",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "05"
+          },
+          "zIndex": 20
+        },
+        {
+          "type": "text-title",
+          "name": "Item",
+          "position": {
+            "x": 112,
+            "y": 432
+          },
+          "size": {
+            "width": 566,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 16,
+            "fontWeight": "normal",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Tabela de Preços"
+          },
+          "zIndex": 21
+        },
+        {
+          "type": "text-title",
+          "name": "Pág",
+          "position": {
+            "x": 678,
+            "y": 432
+          },
+          "size": {
+            "width": 60,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "07"
+          },
+          "zIndex": 22
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Linha",
+          "position": {
+            "x": 56,
+            "y": 472
+          },
+          "size": {
+            "width": 682,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 23
+        },
+        {
+          "type": "text-title",
+          "name": "Num",
+          "position": {
+            "x": 56,
+            "y": 490
+          },
+          "size": {
+            "width": 44,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#E6B45C",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "06"
+          },
+          "zIndex": 24
+        },
+        {
+          "type": "text-title",
+          "name": "Item",
+          "position": {
+            "x": 112,
+            "y": 490
+          },
+          "size": {
+            "width": 566,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 16,
+            "fontWeight": "normal",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Diferenciais"
+          },
+          "zIndex": 25
+        },
+        {
+          "type": "text-title",
+          "name": "Pág",
+          "position": {
+            "x": 678,
+            "y": 490
+          },
+          "size": {
+            "width": 60,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "08"
+          },
+          "zIndex": 26
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Linha",
+          "position": {
+            "x": 56,
+            "y": 530
+          },
+          "size": {
+            "width": 682,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 27
+        },
+        {
+          "type": "text-title",
+          "name": "Num",
+          "position": {
+            "x": 56,
+            "y": 548
+          },
+          "size": {
+            "width": 44,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#E6B45C",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "07"
+          },
+          "zIndex": 28
+        },
+        {
+          "type": "text-title",
+          "name": "Item",
+          "position": {
+            "x": 112,
+            "y": 548
+          },
+          "size": {
+            "width": 566,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 16,
+            "fontWeight": "normal",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Contato"
+          },
+          "zIndex": 29
+        },
+        {
+          "type": "text-title",
+          "name": "Pág",
+          "position": {
+            "x": 678,
+            "y": 548
+          },
+          "size": {
+            "width": 60,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "09"
+          },
+          "zIndex": 30
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Linha",
+          "position": {
+            "x": 56,
+            "y": 588
+          },
+          "size": {
+            "width": 682,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 31
+        },
+        {
+          "type": "text-title",
+          "name": "Nota",
+          "position": {
+            "x": 56,
+            "y": 624
+          },
+          "size": {
+            "width": 682,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "12 produtos · 3 linhas · preços base 2026"
+          },
+          "zIndex": 32
+        }
+      ]
+    },
+    {
+      "name": "Divisor",
+      "order": 3,
+      "elements": [
+        {
+          "type": "image",
+          "name": "Fundo",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 794,
+            "height": 1123
+          },
+          "style": {
+            "borderRadius": 0,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/divisor.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/divisor.jpg",
+            "opacity": 1,
+            "borderRadius": 0,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 0
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Overlay",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 794,
+            "height": 1123
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "rgba(28,16,21,0.42)"
+          },
+          "zIndex": 1
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Faixa",
+          "position": {
+            "x": 0,
+            "y": 470
+          },
+          "size": {
+            "width": 794,
+            "height": 200
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "rgba(24,13,18,0.58)"
+          },
+          "zIndex": 2
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Acento",
+          "position": {
+            "x": 0,
+            "y": 470
+          },
+          "size": {
+            "width": 794,
+            "height": 6
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#E6B45C"
+          },
+          "zIndex": 3
+        },
+        {
+          "type": "text-title",
+          "name": "Kicker",
+          "position": {
+            "x": 56,
+            "y": 500
+          },
+          "size": {
+            "width": 682,
+            "height": 28
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 14,
+            "fontWeight": "bold",
+            "textColor": "#E6B45C",
+            "textAlign": "center",
+            "lineHeight": 1.3,
+            "letterSpacing": 5
+          },
+          "content": {
+            "text": "LINHA 2026"
+          },
+          "zIndex": 4
+        },
+        {
+          "type": "text-title",
+          "name": "Categoria",
+          "position": {
+            "x": 56,
+            "y": 530
+          },
+          "size": {
+            "width": 682,
+            "height": 90
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 46,
+            "fontWeight": "bold",
+            "textColor": "#FBF1E6",
+            "textAlign": "center",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Linha Confeitaria"
+          },
+          "zIndex": 5
+        },
+        {
+          "type": "text-title",
+          "name": "Sub",
+          "position": {
+            "x": 56,
+            "y": 624
+          },
+          "size": {
+            "width": 682,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 16,
+            "fontWeight": "normal",
+            "textColor": "#FBF1E6",
+            "textAlign": "center",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Embalagens PET cristal, caixas e finalização"
+          },
+          "zIndex": 6
+        }
+      ]
+    },
+    {
+      "name": "Potes, Copos & Caixas",
+      "order": 4,
+      "elements": [
+        {
+          "type": "shape-rectangle",
+          "name": "Fundo",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 794,
+            "height": 1123
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#FBF7F2"
+          },
+          "zIndex": 0
+        },
+        {
+          "type": "text-title",
+          "name": "Kicker",
+          "position": {
+            "x": 56,
+            "y": 64
+          },
+          "size": {
+            "width": 682,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 3
+          },
+          "content": {
+            "text": "CATÁLOGO · 01"
+          },
+          "zIndex": 1
+        },
+        {
+          "type": "text-title",
+          "name": "Título",
+          "position": {
+            "x": 56,
+            "y": 86
+          },
+          "size": {
+            "width": 682,
+            "height": 50
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 28,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Potes, Copos & Caixas"
+          },
+          "zIndex": 2
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Régua",
+          "position": {
+            "x": 56,
+            "y": 138
+          },
+          "size": {
+            "width": 64,
+            "height": 4
+          },
+          "style": {
+            "borderRadius": 2,
+            "backgroundColor": "#E6B45C"
+          },
+          "zIndex": 3
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Card",
+          "position": {
+            "x": 56,
+            "y": 176
+          },
+          "size": {
+            "width": 329,
+            "height": 281
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 4
+        },
+        {
+          "type": "image",
+          "name": "Foto",
+          "position": {
+            "x": 66,
+            "y": 186
+          },
+          "size": {
+            "width": 309,
+            "height": 119
+          },
+          "style": {
+            "borderRadius": 10,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/pote-250.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/pote-250.jpg",
+            "opacity": 1,
+            "borderRadius": 10,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 5
+        },
+        {
+          "type": "text-title",
+          "name": "Nome",
+          "position": {
+            "x": 72,
+            "y": 313
+          },
+          "size": {
+            "width": 297,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Pote Cristal 250ml"
+          },
+          "zIndex": 6
+        },
+        {
+          "type": "text-title",
+          "name": "Spec",
+          "position": {
+            "x": 72,
+            "y": 339
+          },
+          "size": {
+            "width": 297,
+            "height": 16
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 9.5,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "PET CRISTAL · C/ TAMPA"
+          },
+          "zIndex": 7
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Desc",
+          "position": {
+            "x": 72,
+            "y": 359
+          },
+          "size": {
+            "width": 297,
+            "height": 52
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Transparência total para brigadeiros e mousses."
+          },
+          "zIndex": 8
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Filete",
+          "position": {
+            "x": 72,
+            "y": 409
+          },
+          "size": {
+            "width": 297,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 9
+        },
+        {
+          "type": "text-title",
+          "name": "Preço",
+          "position": {
+            "x": 72,
+            "y": 417
+          },
+          "size": {
+            "width": 297,
+            "height": 28
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 19,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,89"
+          },
+          "zIndex": 10
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Card",
+          "position": {
+            "x": 409,
+            "y": 176
+          },
+          "size": {
+            "width": 329,
+            "height": 281
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 11
+        },
+        {
+          "type": "image",
+          "name": "Foto",
+          "position": {
+            "x": 419,
+            "y": 186
+          },
+          "size": {
+            "width": 309,
+            "height": 119
+          },
+          "style": {
+            "borderRadius": 10,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/copo-200.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/copo-200.jpg",
+            "opacity": 1,
+            "borderRadius": 10,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 12
+        },
+        {
+          "type": "text-title",
+          "name": "Nome",
+          "position": {
+            "x": 425,
+            "y": 313
+          },
+          "size": {
+            "width": 297,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Copo Sobremesa 200ml"
+          },
+          "zIndex": 13
+        },
+        {
+          "type": "text-title",
+          "name": "Spec",
+          "position": {
+            "x": 425,
+            "y": 339
+          },
+          "size": {
+            "width": 297,
+            "height": 16
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 9.5,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "PET · BASE REFORÇADA"
+          },
+          "zIndex": 14
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Desc",
+          "position": {
+            "x": 425,
+            "y": 359
+          },
+          "size": {
+            "width": 297,
+            "height": 52
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Para verrines e sobremesas em camadas."
+          },
+          "zIndex": 15
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Filete",
+          "position": {
+            "x": 425,
+            "y": 409
+          },
+          "size": {
+            "width": 297,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 16
+        },
+        {
+          "type": "text-title",
+          "name": "Preço",
+          "position": {
+            "x": 425,
+            "y": 417
+          },
+          "size": {
+            "width": 297,
+            "height": 28
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 19,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,75"
+          },
+          "zIndex": 17
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Card",
+          "position": {
+            "x": 56,
+            "y": 481
+          },
+          "size": {
+            "width": 329,
+            "height": 281
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 18
+        },
+        {
+          "type": "image",
+          "name": "Foto",
+          "position": {
+            "x": 66,
+            "y": 491
+          },
+          "size": {
+            "width": 309,
+            "height": 119
+          },
+          "style": {
+            "borderRadius": 10,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/pote-500.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/pote-500.jpg",
+            "opacity": 1,
+            "borderRadius": 10,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 19
+        },
+        {
+          "type": "text-title",
+          "name": "Nome",
+          "position": {
+            "x": 72,
+            "y": 618
+          },
+          "size": {
+            "width": 297,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Pote Redondo 500ml"
+          },
+          "zIndex": 20
+        },
+        {
+          "type": "text-title",
+          "name": "Spec",
+          "position": {
+            "x": 72,
+            "y": 644
+          },
+          "size": {
+            "width": 297,
+            "height": 16
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 9.5,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "PET · TAMPA DE PRESSÃO"
+          },
+          "zIndex": 21
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Desc",
+          "position": {
+            "x": 72,
+            "y": 664
+          },
+          "size": {
+            "width": 297,
+            "height": 52
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Versátil para doces, saladas e porções."
+          },
+          "zIndex": 22
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Filete",
+          "position": {
+            "x": 72,
+            "y": 714
+          },
+          "size": {
+            "width": 297,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 23
+        },
+        {
+          "type": "text-title",
+          "name": "Preço",
+          "position": {
+            "x": 72,
+            "y": 722
+          },
+          "size": {
+            "width": 297,
+            "height": 28
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 19,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 1,20"
+          },
+          "zIndex": 24
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Card",
+          "position": {
+            "x": 409,
+            "y": 481
+          },
+          "size": {
+            "width": 329,
+            "height": 281
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 25
+        },
+        {
+          "type": "image",
+          "name": "Foto",
+          "position": {
+            "x": 419,
+            "y": 491
+          },
+          "size": {
+            "width": 309,
+            "height": 119
+          },
+          "style": {
+            "borderRadius": 10,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/taca-petit.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/taca-petit.jpg",
+            "opacity": 1,
+            "borderRadius": 10,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 26
+        },
+        {
+          "type": "text-title",
+          "name": "Nome",
+          "position": {
+            "x": 425,
+            "y": 618
+          },
+          "size": {
+            "width": 297,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Taça Petit Gâteau 150ml"
+          },
+          "zIndex": 27
+        },
+        {
+          "type": "text-title",
+          "name": "Spec",
+          "position": {
+            "x": 425,
+            "y": 644
+          },
+          "size": {
+            "width": 297,
+            "height": 16
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 9.5,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "PET · FORMATO PREMIUM"
+          },
+          "zIndex": 28
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Desc",
+          "position": {
+            "x": 425,
+            "y": 664
+          },
+          "size": {
+            "width": 297,
+            "height": 52
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Apresentação elegante para o seu best-seller."
+          },
+          "zIndex": 29
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Filete",
+          "position": {
+            "x": 425,
+            "y": 714
+          },
+          "size": {
+            "width": 297,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 30
+        },
+        {
+          "type": "text-title",
+          "name": "Preço",
+          "position": {
+            "x": 425,
+            "y": 722
+          },
+          "size": {
+            "width": 297,
+            "height": 28
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 19,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,95"
+          },
+          "zIndex": 31
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Card",
+          "position": {
+            "x": 56,
+            "y": 786
+          },
+          "size": {
+            "width": 329,
+            "height": 281
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 32
+        },
+        {
+          "type": "image",
+          "name": "Foto",
+          "position": {
+            "x": 66,
+            "y": 796
+          },
+          "size": {
+            "width": 309,
+            "height": 119
+          },
+          "style": {
+            "borderRadius": 10,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/caixa-6.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/caixa-6.jpg",
+            "opacity": 1,
+            "borderRadius": 10,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 33
+        },
+        {
+          "type": "text-title",
+          "name": "Nome",
+          "position": {
+            "x": 72,
+            "y": 923
+          },
+          "size": {
+            "width": 297,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Caixa 6 Doces"
+          },
+          "zIndex": 34
+        },
+        {
+          "type": "text-title",
+          "name": "Spec",
+          "position": {
+            "x": 72,
+            "y": 949
+          },
+          "size": {
+            "width": 297,
+            "height": 16
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 9.5,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "CARTÃO · VISOR CRISTAL"
+          },
+          "zIndex": 35
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Desc",
+          "position": {
+            "x": 72,
+            "y": 969
+          },
+          "size": {
+            "width": 297,
+            "height": 52
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Janela transparente que mostra o conteúdo."
+          },
+          "zIndex": 36
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Filete",
+          "position": {
+            "x": 72,
+            "y": 1019
+          },
+          "size": {
+            "width": 297,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 37
+        },
+        {
+          "type": "text-title",
+          "name": "Preço",
+          "position": {
+            "x": 72,
+            "y": 1027
+          },
+          "size": {
+            "width": 297,
+            "height": 28
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 19,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 1,80"
+          },
+          "zIndex": 38
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Card",
+          "position": {
+            "x": 409,
+            "y": 786
+          },
+          "size": {
+            "width": 329,
+            "height": 281
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 39
+        },
+        {
+          "type": "image",
+          "name": "Foto",
+          "position": {
+            "x": 419,
+            "y": 796
+          },
+          "size": {
+            "width": 309,
+            "height": 119
+          },
+          "style": {
+            "borderRadius": 10,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/bolo-pote.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/bolo-pote.jpg",
+            "opacity": 1,
+            "borderRadius": 10,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 40
+        },
+        {
+          "type": "text-title",
+          "name": "Nome",
+          "position": {
+            "x": 425,
+            "y": 923
+          },
+          "size": {
+            "width": 297,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Bolo no Pote 250ml"
+          },
+          "zIndex": 41
+        },
+        {
+          "type": "text-title",
+          "name": "Spec",
+          "position": {
+            "x": 425,
+            "y": 949
+          },
+          "size": {
+            "width": 297,
+            "height": 16
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 9.5,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "PET · TAMPA ROSQUEÁVEL"
+          },
+          "zIndex": 42
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Desc",
+          "position": {
+            "x": 425,
+            "y": 969
+          },
+          "size": {
+            "width": 297,
+            "height": 52
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Veda de verdade — bolo no pote sem vazar."
+          },
+          "zIndex": 43
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Filete",
+          "position": {
+            "x": 425,
+            "y": 1019
+          },
+          "size": {
+            "width": 297,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 44
+        },
+        {
+          "type": "text-title",
+          "name": "Preço",
+          "position": {
+            "x": 425,
+            "y": 1027
+          },
+          "size": {
+            "width": 297,
+            "height": 28
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 19,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 1,10"
+          },
+          "zIndex": 45
+        }
+      ]
+    },
+    {
+      "name": "Delivery & Finalização",
+      "order": 5,
+      "elements": [
+        {
+          "type": "shape-rectangle",
+          "name": "Fundo",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 794,
+            "height": 1123
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#FBF7F2"
+          },
+          "zIndex": 0
+        },
+        {
+          "type": "text-title",
+          "name": "Kicker",
+          "position": {
+            "x": 56,
+            "y": 64
+          },
+          "size": {
+            "width": 682,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 3
+          },
+          "content": {
+            "text": "CATÁLOGO · 02"
+          },
+          "zIndex": 1
+        },
+        {
+          "type": "text-title",
+          "name": "Título",
+          "position": {
+            "x": 56,
+            "y": 86
+          },
+          "size": {
+            "width": 682,
+            "height": 50
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 28,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Delivery & Finalização"
+          },
+          "zIndex": 2
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Régua",
+          "position": {
+            "x": 56,
+            "y": 138
+          },
+          "size": {
+            "width": 64,
+            "height": 4
+          },
+          "style": {
+            "borderRadius": 2,
+            "backgroundColor": "#E6B45C"
+          },
+          "zIndex": 3
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Card",
+          "position": {
+            "x": 56,
+            "y": 176
+          },
+          "size": {
+            "width": 329,
+            "height": 281
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 4
+        },
+        {
+          "type": "image",
+          "name": "Foto",
+          "position": {
+            "x": 66,
+            "y": 186
+          },
+          "size": {
+            "width": 309,
+            "height": 119
+          },
+          "style": {
+            "borderRadius": 10,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/sacola.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/sacola.jpg",
+            "opacity": 1,
+            "borderRadius": 10,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 5
+        },
+        {
+          "type": "text-title",
+          "name": "Nome",
+          "position": {
+            "x": 72,
+            "y": 313
+          },
+          "size": {
+            "width": 297,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Sacola Delivery Kraft"
+          },
+          "zIndex": 6
+        },
+        {
+          "type": "text-title",
+          "name": "Spec",
+          "position": {
+            "x": 72,
+            "y": 339
+          },
+          "size": {
+            "width": 297,
+            "height": 16
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 9.5,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "KRAFT · ALÇA REFORÇADA"
+          },
+          "zIndex": 7
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Desc",
+          "position": {
+            "x": 72,
+            "y": 359
+          },
+          "size": {
+            "width": 297,
+            "height": 52
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Robustez e charme rústico para o delivery."
+          },
+          "zIndex": 8
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Filete",
+          "position": {
+            "x": 72,
+            "y": 409
+          },
+          "size": {
+            "width": 297,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 9
+        },
+        {
+          "type": "text-title",
+          "name": "Preço",
+          "position": {
+            "x": 72,
+            "y": 417
+          },
+          "size": {
+            "width": 297,
+            "height": 28
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 19,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,68"
+          },
+          "zIndex": 10
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Card",
+          "position": {
+            "x": 409,
+            "y": 176
+          },
+          "size": {
+            "width": 329,
+            "height": 281
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 11
+        },
+        {
+          "type": "image",
+          "name": "Foto",
+          "position": {
+            "x": 419,
+            "y": 186
+          },
+          "size": {
+            "width": 309,
+            "height": 119
+          },
+          "style": {
+            "borderRadius": 10,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/marmita.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/marmita.jpg",
+            "opacity": 1,
+            "borderRadius": 10,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 12
+        },
+        {
+          "type": "text-title",
+          "name": "Nome",
+          "position": {
+            "x": 425,
+            "y": 313
+          },
+          "size": {
+            "width": 297,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Marmita Bio 750ml"
+          },
+          "zIndex": 13
+        },
+        {
+          "type": "text-title",
+          "name": "Spec",
+          "position": {
+            "x": 425,
+            "y": 339
+          },
+          "size": {
+            "width": 297,
+            "height": 16
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 9.5,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "FIBRA · BIODEGRADÁVEL"
+          },
+          "zIndex": 14
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Desc",
+          "position": {
+            "x": 425,
+            "y": 359
+          },
+          "size": {
+            "width": 297,
+            "height": 52
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Compostável, resistente a calor e gordura."
+          },
+          "zIndex": 15
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Filete",
+          "position": {
+            "x": 425,
+            "y": 409
+          },
+          "size": {
+            "width": 297,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 16
+        },
+        {
+          "type": "text-title",
+          "name": "Preço",
+          "position": {
+            "x": 425,
+            "y": 417
+          },
+          "size": {
+            "width": 297,
+            "height": 28
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 19,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 1,45"
+          },
+          "zIndex": 17
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Card",
+          "position": {
+            "x": 56,
+            "y": 481
+          },
+          "size": {
+            "width": 329,
+            "height": 281
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 18
+        },
+        {
+          "type": "image",
+          "name": "Foto",
+          "position": {
+            "x": 66,
+            "y": 491
+          },
+          "size": {
+            "width": 309,
+            "height": 119
+          },
+          "style": {
+            "borderRadius": 10,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/forminha.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/forminha.jpg",
+            "opacity": 1,
+            "borderRadius": 10,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 19
+        },
+        {
+          "type": "text-title",
+          "name": "Nome",
+          "position": {
+            "x": 72,
+            "y": 618
+          },
+          "size": {
+            "width": 297,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Forminha Cupcake"
+          },
+          "zIndex": 20
+        },
+        {
+          "type": "text-title",
+          "name": "Spec",
+          "position": {
+            "x": 72,
+            "y": 644
+          },
+          "size": {
+            "width": 297,
+            "height": 16
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 9.5,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "PAPEL · FORNEÁVEL"
+          },
+          "zIndex": 21
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Desc",
+          "position": {
+            "x": 72,
+            "y": 664
+          },
+          "size": {
+            "width": 297,
+            "height": 52
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Mantém a forma e não solta a massa."
+          },
+          "zIndex": 22
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Filete",
+          "position": {
+            "x": 72,
+            "y": 714
+          },
+          "size": {
+            "width": 297,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 23
+        },
+        {
+          "type": "text-title",
+          "name": "Preço",
+          "position": {
+            "x": 72,
+            "y": 722
+          },
+          "size": {
+            "width": 297,
+            "height": 28
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 19,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,18"
+          },
+          "zIndex": 24
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Card",
+          "position": {
+            "x": 409,
+            "y": 481
+          },
+          "size": {
+            "width": 329,
+            "height": 281
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 25
+        },
+        {
+          "type": "image",
+          "name": "Foto",
+          "position": {
+            "x": 419,
+            "y": 491
+          },
+          "size": {
+            "width": 309,
+            "height": 119
+          },
+          "style": {
+            "borderRadius": 10,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/colher.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/colher.jpg",
+            "opacity": 1,
+            "borderRadius": 10,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 26
+        },
+        {
+          "type": "text-title",
+          "name": "Nome",
+          "position": {
+            "x": 425,
+            "y": 618
+          },
+          "size": {
+            "width": 297,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Colher Degustação"
+          },
+          "zIndex": 27
+        },
+        {
+          "type": "text-title",
+          "name": "Spec",
+          "position": {
+            "x": 425,
+            "y": 644
+          },
+          "size": {
+            "width": 297,
+            "height": 16
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 9.5,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "PS CRISTAL · 90MM"
+          },
+          "zIndex": 28
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Desc",
+          "position": {
+            "x": 425,
+            "y": 664
+          },
+          "size": {
+            "width": 297,
+            "height": 52
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "O toque final para provas e sobremesas."
+          },
+          "zIndex": 29
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Filete",
+          "position": {
+            "x": 425,
+            "y": 714
+          },
+          "size": {
+            "width": 297,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 30
+        },
+        {
+          "type": "text-title",
+          "name": "Preço",
+          "position": {
+            "x": 425,
+            "y": 722
+          },
+          "size": {
+            "width": 297,
+            "height": 28
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 19,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,09"
+          },
+          "zIndex": 31
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Card",
+          "position": {
+            "x": 56,
+            "y": 786
+          },
+          "size": {
+            "width": 329,
+            "height": 281
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 32
+        },
+        {
+          "type": "image",
+          "name": "Foto",
+          "position": {
+            "x": 66,
+            "y": 796
+          },
+          "size": {
+            "width": 309,
+            "height": 119
+          },
+          "style": {
+            "borderRadius": 10,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/tag.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/tag.jpg",
+            "opacity": 1,
+            "borderRadius": 10,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 33
+        },
+        {
+          "type": "text-title",
+          "name": "Nome",
+          "position": {
+            "x": 72,
+            "y": 923
+          },
+          "size": {
+            "width": 297,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Tag Kraft Personalizável"
+          },
+          "zIndex": 34
+        },
+        {
+          "type": "text-title",
+          "name": "Spec",
+          "position": {
+            "x": 72,
+            "y": 949
+          },
+          "size": {
+            "width": 297,
+            "height": 16
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 9.5,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "KRAFT · C/ FURO"
+          },
+          "zIndex": 35
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Desc",
+          "position": {
+            "x": 72,
+            "y": 969
+          },
+          "size": {
+            "width": 297,
+            "height": 52
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Sua marca em cada embalagem entregue."
+          },
+          "zIndex": 36
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Filete",
+          "position": {
+            "x": 72,
+            "y": 1019
+          },
+          "size": {
+            "width": 297,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 37
+        },
+        {
+          "type": "text-title",
+          "name": "Preço",
+          "position": {
+            "x": 72,
+            "y": 1027
+          },
+          "size": {
+            "width": 297,
+            "height": 28
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 19,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,22"
+          },
+          "zIndex": 38
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Card",
+          "position": {
+            "x": 409,
+            "y": 786
+          },
+          "size": {
+            "width": 329,
+            "height": 281
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 39
+        },
+        {
+          "type": "image",
+          "name": "Foto",
+          "position": {
+            "x": 419,
+            "y": 796
+          },
+          "size": {
+            "width": 309,
+            "height": 119
+          },
+          "style": {
+            "borderRadius": 10,
+            "objectFit": "cover"
+          },
+          "imageUrl": "/media/catalog_pro/fita.jpg",
+          "imageData": {
+            "src": "/media/catalog_pro/fita.jpg",
+            "opacity": 1,
+            "borderRadius": 10,
+            "objectFit": "cover",
+            "aspectRatioLocked": false
+          },
+          "zIndex": 40
+        },
+        {
+          "type": "text-title",
+          "name": "Nome",
+          "position": {
+            "x": 425,
+            "y": 923
+          },
+          "size": {
+            "width": 297,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Fita de Cetim 10mm"
+          },
+          "zIndex": 41
+        },
+        {
+          "type": "text-title",
+          "name": "Spec",
+          "position": {
+            "x": 425,
+            "y": 949
+          },
+          "size": {
+            "width": 297,
+            "height": 16
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 9.5,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "POLIÉSTER · ROLO 10M"
+          },
+          "zIndex": 42
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Desc",
+          "position": {
+            "x": 425,
+            "y": 969
+          },
+          "size": {
+            "width": 297,
+            "height": 52
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Acabamento que assina o seu cuidado."
+          },
+          "zIndex": 43
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Filete",
+          "position": {
+            "x": 425,
+            "y": 1019
+          },
+          "size": {
+            "width": 297,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 44
+        },
+        {
+          "type": "text-title",
+          "name": "Preço",
+          "position": {
+            "x": 425,
+            "y": 1027
+          },
+          "size": {
+            "width": 297,
+            "height": 28
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 19,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,40"
+          },
+          "zIndex": 45
+        }
+      ]
+    },
+    {
+      "name": "Tabela de Preços",
+      "order": 6,
+      "elements": [
+        {
+          "type": "shape-rectangle",
+          "name": "Fundo",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 794,
+            "height": 1123
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#FBF7F2"
+          },
+          "zIndex": 0
+        },
+        {
+          "type": "text-title",
+          "name": "Kicker",
+          "position": {
+            "x": 56,
+            "y": 64
+          },
+          "size": {
+            "width": 682,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 3
+          },
+          "content": {
+            "text": "REFERÊNCIA"
+          },
+          "zIndex": 1
+        },
+        {
+          "type": "text-title",
+          "name": "Título",
+          "position": {
+            "x": 56,
+            "y": 86
+          },
+          "size": {
+            "width": 682,
+            "height": 50
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 28,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Tabela de Preços"
+          },
+          "zIndex": 2
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Régua",
+          "position": {
+            "x": 56,
+            "y": 138
+          },
+          "size": {
+            "width": 64,
+            "height": 4
+          },
+          "style": {
+            "borderRadius": 2,
+            "backgroundColor": "#E6B45C"
+          },
+          "zIndex": 3
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Cabeçalho",
+          "position": {
+            "x": 56,
+            "y": 180
+          },
+          "size": {
+            "width": 682,
+            "height": 38
+          },
+          "style": {
+            "borderRadius": 6,
+            "backgroundColor": "#A82E4E"
+          },
+          "zIndex": 4
+        },
+        {
+          "type": "text-title",
+          "name": "h1",
+          "position": {
+            "x": 70,
+            "y": 189
+          },
+          "size": {
+            "width": 250,
+            "height": 22
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11,
+            "fontWeight": "bold",
+            "textColor": "#FBF1E6",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "PRODUTO"
+          },
+          "zIndex": 5
+        },
+        {
+          "type": "text-title",
+          "name": "h2",
+          "position": {
+            "x": 320,
+            "y": 189
+          },
+          "size": {
+            "width": 230,
+            "height": 22
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11,
+            "fontWeight": "bold",
+            "textColor": "#FBF1E6",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "ESPECIFICAÇÃO"
+          },
+          "zIndex": 6
+        },
+        {
+          "type": "text-title",
+          "name": "h3",
+          "position": {
+            "x": 550,
+            "y": 189
+          },
+          "size": {
+            "width": 110,
+            "height": 22
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11,
+            "fontWeight": "bold",
+            "textColor": "#FBF1E6",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "LINHA"
+          },
+          "zIndex": 7
+        },
+        {
+          "type": "text-title",
+          "name": "h4",
+          "position": {
+            "x": 632,
+            "y": 189
+          },
+          "size": {
+            "width": 92,
+            "height": 22
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11,
+            "fontWeight": "bold",
+            "textColor": "#FBF1E6",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "PREÇO"
+          },
+          "zIndex": 8
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Zebra",
+          "position": {
+            "x": 56,
+            "y": 218
+          },
+          "size": {
+            "width": 682,
+            "height": 33
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#F3EBE2"
+          },
+          "zIndex": 9
+        },
+        {
+          "type": "text-title",
+          "name": "c1",
+          "position": {
+            "x": 70,
+            "y": 226
+          },
+          "size": {
+            "width": 250,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Pote Cristal 250ml"
+          },
+          "zIndex": 10
+        },
+        {
+          "type": "text-title",
+          "name": "c2",
+          "position": {
+            "x": 320,
+            "y": 226
+          },
+          "size": {
+            "width": 230,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "PET cristal · c/ tampa"
+          },
+          "zIndex": 11
+        },
+        {
+          "type": "text-title",
+          "name": "c3",
+          "position": {
+            "x": 550,
+            "y": 226
+          },
+          "size": {
+            "width": 110,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#C77D3A",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Potes"
+          },
+          "zIndex": 12
+        },
+        {
+          "type": "text-title",
+          "name": "c4",
+          "position": {
+            "x": 632,
+            "y": 226
+          },
+          "size": {
+            "width": 92,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 13,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,89"
+          },
+          "zIndex": 13
+        },
+        {
+          "type": "text-title",
+          "name": "c1",
+          "position": {
+            "x": 70,
+            "y": 259
+          },
+          "size": {
+            "width": 250,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Copo Sobremesa 200ml"
+          },
+          "zIndex": 14
+        },
+        {
+          "type": "text-title",
+          "name": "c2",
+          "position": {
+            "x": 320,
+            "y": 259
+          },
+          "size": {
+            "width": 230,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "PET · base reforçada"
+          },
+          "zIndex": 15
+        },
+        {
+          "type": "text-title",
+          "name": "c3",
+          "position": {
+            "x": 550,
+            "y": 259
+          },
+          "size": {
+            "width": 110,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#C77D3A",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Potes"
+          },
+          "zIndex": 16
+        },
+        {
+          "type": "text-title",
+          "name": "c4",
+          "position": {
+            "x": 632,
+            "y": 259
+          },
+          "size": {
+            "width": 92,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 13,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,75"
+          },
+          "zIndex": 17
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Zebra",
+          "position": {
+            "x": 56,
+            "y": 284
+          },
+          "size": {
+            "width": 682,
+            "height": 33
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#F3EBE2"
+          },
+          "zIndex": 18
+        },
+        {
+          "type": "text-title",
+          "name": "c1",
+          "position": {
+            "x": 70,
+            "y": 292
+          },
+          "size": {
+            "width": 250,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Pote Redondo 500ml"
+          },
+          "zIndex": 19
+        },
+        {
+          "type": "text-title",
+          "name": "c2",
+          "position": {
+            "x": 320,
+            "y": 292
+          },
+          "size": {
+            "width": 230,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "PET · tampa de pressão"
+          },
+          "zIndex": 20
+        },
+        {
+          "type": "text-title",
+          "name": "c3",
+          "position": {
+            "x": 550,
+            "y": 292
+          },
+          "size": {
+            "width": 110,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#C77D3A",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Potes"
+          },
+          "zIndex": 21
+        },
+        {
+          "type": "text-title",
+          "name": "c4",
+          "position": {
+            "x": 632,
+            "y": 292
+          },
+          "size": {
+            "width": 92,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 13,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 1,20"
+          },
+          "zIndex": 22
+        },
+        {
+          "type": "text-title",
+          "name": "c1",
+          "position": {
+            "x": 70,
+            "y": 325
+          },
+          "size": {
+            "width": 250,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Taça Petit Gâteau 150ml"
+          },
+          "zIndex": 23
+        },
+        {
+          "type": "text-title",
+          "name": "c2",
+          "position": {
+            "x": 320,
+            "y": 325
+          },
+          "size": {
+            "width": 230,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "PET · formato premium"
+          },
+          "zIndex": 24
+        },
+        {
+          "type": "text-title",
+          "name": "c3",
+          "position": {
+            "x": 550,
+            "y": 325
+          },
+          "size": {
+            "width": 110,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#C77D3A",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Potes"
+          },
+          "zIndex": 25
+        },
+        {
+          "type": "text-title",
+          "name": "c4",
+          "position": {
+            "x": 632,
+            "y": 325
+          },
+          "size": {
+            "width": 92,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 13,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,95"
+          },
+          "zIndex": 26
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Zebra",
+          "position": {
+            "x": 56,
+            "y": 350
+          },
+          "size": {
+            "width": 682,
+            "height": 33
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#F3EBE2"
+          },
+          "zIndex": 27
+        },
+        {
+          "type": "text-title",
+          "name": "c1",
+          "position": {
+            "x": 70,
+            "y": 358
+          },
+          "size": {
+            "width": 250,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Caixa 6 Doces"
+          },
+          "zIndex": 28
+        },
+        {
+          "type": "text-title",
+          "name": "c2",
+          "position": {
+            "x": 320,
+            "y": 358
+          },
+          "size": {
+            "width": 230,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Cartão · visor cristal"
+          },
+          "zIndex": 29
+        },
+        {
+          "type": "text-title",
+          "name": "c3",
+          "position": {
+            "x": 550,
+            "y": 358
+          },
+          "size": {
+            "width": 110,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#C77D3A",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Caixas"
+          },
+          "zIndex": 30
+        },
+        {
+          "type": "text-title",
+          "name": "c4",
+          "position": {
+            "x": 632,
+            "y": 358
+          },
+          "size": {
+            "width": 92,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 13,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 1,80"
+          },
+          "zIndex": 31
+        },
+        {
+          "type": "text-title",
+          "name": "c1",
+          "position": {
+            "x": 70,
+            "y": 391
+          },
+          "size": {
+            "width": 250,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Bolo no Pote 250ml"
+          },
+          "zIndex": 32
+        },
+        {
+          "type": "text-title",
+          "name": "c2",
+          "position": {
+            "x": 320,
+            "y": 391
+          },
+          "size": {
+            "width": 230,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "PET · tampa rosqueável"
+          },
+          "zIndex": 33
+        },
+        {
+          "type": "text-title",
+          "name": "c3",
+          "position": {
+            "x": 550,
+            "y": 391
+          },
+          "size": {
+            "width": 110,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#C77D3A",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Caixas"
+          },
+          "zIndex": 34
+        },
+        {
+          "type": "text-title",
+          "name": "c4",
+          "position": {
+            "x": 632,
+            "y": 391
+          },
+          "size": {
+            "width": 92,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 13,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 1,10"
+          },
+          "zIndex": 35
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Zebra",
+          "position": {
+            "x": 56,
+            "y": 416
+          },
+          "size": {
+            "width": 682,
+            "height": 33
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#F3EBE2"
+          },
+          "zIndex": 36
+        },
+        {
+          "type": "text-title",
+          "name": "c1",
+          "position": {
+            "x": 70,
+            "y": 424
+          },
+          "size": {
+            "width": 250,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Sacola Delivery Kraft"
+          },
+          "zIndex": 37
+        },
+        {
+          "type": "text-title",
+          "name": "c2",
+          "position": {
+            "x": 320,
+            "y": 424
+          },
+          "size": {
+            "width": 230,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Kraft · alça reforçada"
+          },
+          "zIndex": 38
+        },
+        {
+          "type": "text-title",
+          "name": "c3",
+          "position": {
+            "x": 550,
+            "y": 424
+          },
+          "size": {
+            "width": 110,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#C77D3A",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Caixas"
+          },
+          "zIndex": 39
+        },
+        {
+          "type": "text-title",
+          "name": "c4",
+          "position": {
+            "x": 632,
+            "y": 424
+          },
+          "size": {
+            "width": 92,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 13,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,68"
+          },
+          "zIndex": 40
+        },
+        {
+          "type": "text-title",
+          "name": "c1",
+          "position": {
+            "x": 70,
+            "y": 457
+          },
+          "size": {
+            "width": 250,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Marmita Bio 750ml"
+          },
+          "zIndex": 41
+        },
+        {
+          "type": "text-title",
+          "name": "c2",
+          "position": {
+            "x": 320,
+            "y": 457
+          },
+          "size": {
+            "width": 230,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Fibra · biodegradável"
+          },
+          "zIndex": 42
+        },
+        {
+          "type": "text-title",
+          "name": "c3",
+          "position": {
+            "x": 550,
+            "y": 457
+          },
+          "size": {
+            "width": 110,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#C77D3A",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Caixas"
+          },
+          "zIndex": 43
+        },
+        {
+          "type": "text-title",
+          "name": "c4",
+          "position": {
+            "x": 632,
+            "y": 457
+          },
+          "size": {
+            "width": 92,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 13,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 1,45"
+          },
+          "zIndex": 44
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Zebra",
+          "position": {
+            "x": 56,
+            "y": 482
+          },
+          "size": {
+            "width": 682,
+            "height": 33
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#F3EBE2"
+          },
+          "zIndex": 45
+        },
+        {
+          "type": "text-title",
+          "name": "c1",
+          "position": {
+            "x": 70,
+            "y": 490
+          },
+          "size": {
+            "width": 250,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Forminha Cupcake"
+          },
+          "zIndex": 46
+        },
+        {
+          "type": "text-title",
+          "name": "c2",
+          "position": {
+            "x": 320,
+            "y": 490
+          },
+          "size": {
+            "width": 230,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Papel · forneável"
+          },
+          "zIndex": 47
+        },
+        {
+          "type": "text-title",
+          "name": "c3",
+          "position": {
+            "x": 550,
+            "y": 490
+          },
+          "size": {
+            "width": 110,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#C77D3A",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Finalização"
+          },
+          "zIndex": 48
+        },
+        {
+          "type": "text-title",
+          "name": "c4",
+          "position": {
+            "x": 632,
+            "y": 490
+          },
+          "size": {
+            "width": 92,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 13,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,18"
+          },
+          "zIndex": 49
+        },
+        {
+          "type": "text-title",
+          "name": "c1",
+          "position": {
+            "x": 70,
+            "y": 523
+          },
+          "size": {
+            "width": 250,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Colher Degustação"
+          },
+          "zIndex": 50
+        },
+        {
+          "type": "text-title",
+          "name": "c2",
+          "position": {
+            "x": 320,
+            "y": 523
+          },
+          "size": {
+            "width": 230,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "PS cristal · 90mm"
+          },
+          "zIndex": 51
+        },
+        {
+          "type": "text-title",
+          "name": "c3",
+          "position": {
+            "x": 550,
+            "y": 523
+          },
+          "size": {
+            "width": 110,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#C77D3A",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Finalização"
+          },
+          "zIndex": 52
+        },
+        {
+          "type": "text-title",
+          "name": "c4",
+          "position": {
+            "x": 632,
+            "y": 523
+          },
+          "size": {
+            "width": 92,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 13,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,09"
+          },
+          "zIndex": 53
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Zebra",
+          "position": {
+            "x": 56,
+            "y": 548
+          },
+          "size": {
+            "width": 682,
+            "height": 33
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#F3EBE2"
+          },
+          "zIndex": 54
+        },
+        {
+          "type": "text-title",
+          "name": "c1",
+          "position": {
+            "x": 70,
+            "y": 556
+          },
+          "size": {
+            "width": 250,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Tag Kraft Personalizável"
+          },
+          "zIndex": 55
+        },
+        {
+          "type": "text-title",
+          "name": "c2",
+          "position": {
+            "x": 320,
+            "y": 556
+          },
+          "size": {
+            "width": 230,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Kraft · c/ furo"
+          },
+          "zIndex": 56
+        },
+        {
+          "type": "text-title",
+          "name": "c3",
+          "position": {
+            "x": 550,
+            "y": 556
+          },
+          "size": {
+            "width": 110,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#C77D3A",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Finalização"
+          },
+          "zIndex": 57
+        },
+        {
+          "type": "text-title",
+          "name": "c4",
+          "position": {
+            "x": 632,
+            "y": 556
+          },
+          "size": {
+            "width": 92,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 13,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,22"
+          },
+          "zIndex": 58
+        },
+        {
+          "type": "text-title",
+          "name": "c1",
+          "position": {
+            "x": 70,
+            "y": 589
+          },
+          "size": {
+            "width": 250,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Fita de Cetim 10mm"
+          },
+          "zIndex": 59
+        },
+        {
+          "type": "text-title",
+          "name": "c2",
+          "position": {
+            "x": 320,
+            "y": 589
+          },
+          "size": {
+            "width": 230,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Poliéster · rolo 10m"
+          },
+          "zIndex": 60
+        },
+        {
+          "type": "text-title",
+          "name": "c3",
+          "position": {
+            "x": 550,
+            "y": 589
+          },
+          "size": {
+            "width": 110,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 11.5,
+            "fontWeight": "normal",
+            "textColor": "#C77D3A",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Finalização"
+          },
+          "zIndex": 61
+        },
+        {
+          "type": "text-title",
+          "name": "c4",
+          "position": {
+            "x": 632,
+            "y": 589
+          },
+          "size": {
+            "width": 92,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 13,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "right",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R$ 0,40"
+          },
+          "zIndex": 62
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Base",
+          "position": {
+            "x": 56,
+            "y": 614
+          },
+          "size": {
+            "width": 682,
+            "height": 1
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#ECE0D6"
+          },
+          "zIndex": 63
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Box B2B",
+          "position": {
+            "x": 56,
+            "y": 636
+          },
+          "size": {
+            "width": 682,
+            "height": 112
+          },
+          "style": {
+            "borderRadius": 10,
+            "backgroundColor": "#F6EEF1",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 64
+        },
+        {
+          "type": "text-title",
+          "name": "B2B título",
+          "position": {
+            "x": 76,
+            "y": 654
+          },
+          "size": {
+            "width": 642,
+            "height": 26
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Atacado & food service"
+          },
+          "zIndex": 65
+        },
+        {
+          "type": "text-paragraph",
+          "name": "B2B texto",
+          "position": {
+            "x": 76,
+            "y": 686
+          },
+          "size": {
+            "width": 642,
+            "height": 50
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.45,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Acima de 500 un.: -12%   ·   acima de 2.000 un.: -20%   ·   frete CIF a partir de R$ 300."
+          },
+          "zIndex": 66
+        }
+      ]
+    },
+    {
+      "name": "Diferenciais",
+      "order": 7,
+      "elements": [
+        {
+          "type": "shape-rectangle",
+          "name": "Fundo",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 794,
+            "height": 1123
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#FBF7F2"
+          },
+          "zIndex": 0
+        },
+        {
+          "type": "text-title",
+          "name": "Kicker",
+          "position": {
+            "x": 56,
+            "y": 64
+          },
+          "size": {
+            "width": 682,
+            "height": 20
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 3
+          },
+          "content": {
+            "text": "POR QUE CRISTALLO"
+          },
+          "zIndex": 1
+        },
+        {
+          "type": "text-title",
+          "name": "Título",
+          "position": {
+            "x": 56,
+            "y": 86
+          },
+          "size": {
+            "width": 682,
+            "height": 50
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 28,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Diferenciais"
+          },
+          "zIndex": 2
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Régua",
+          "position": {
+            "x": 56,
+            "y": 138
+          },
+          "size": {
+            "width": 64,
+            "height": 4
+          },
+          "style": {
+            "borderRadius": 2,
+            "backgroundColor": "#E6B45C"
+          },
+          "zIndex": 3
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Bloco",
+          "position": {
+            "x": 56,
+            "y": 184
+          },
+          "size": {
+            "width": 329,
+            "height": 150
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 4
+        },
+        {
+          "type": "text-title",
+          "name": "Num",
+          "position": {
+            "x": 76,
+            "y": 202
+          },
+          "size": {
+            "width": 60,
+            "height": 40
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 30,
+            "fontWeight": "bold",
+            "textColor": "#E6B45C",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "01"
+          },
+          "zIndex": 5
+        },
+        {
+          "type": "text-title",
+          "name": "Tít",
+          "position": {
+            "x": 76,
+            "y": 244
+          },
+          "size": {
+            "width": 289,
+            "height": 26
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Cristal de verdade"
+          },
+          "zIndex": 6
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Txt",
+          "position": {
+            "x": 76,
+            "y": 272
+          },
+          "size": {
+            "width": 289,
+            "height": 50
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.4,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "PET de alta transparência que mostra o produto sem distorcer a cor."
+          },
+          "zIndex": 7
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Bloco",
+          "position": {
+            "x": 409,
+            "y": 184
+          },
+          "size": {
+            "width": 329,
+            "height": 150
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 8
+        },
+        {
+          "type": "text-title",
+          "name": "Num",
+          "position": {
+            "x": 429,
+            "y": 202
+          },
+          "size": {
+            "width": 60,
+            "height": 40
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 30,
+            "fontWeight": "bold",
+            "textColor": "#E6B45C",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "02"
+          },
+          "zIndex": 9
+        },
+        {
+          "type": "text-title",
+          "name": "Tít",
+          "position": {
+            "x": 429,
+            "y": 244
+          },
+          "size": {
+            "width": 289,
+            "height": 26
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Veda e protege"
+          },
+          "zIndex": 10
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Txt",
+          "position": {
+            "x": 429,
+            "y": 272
+          },
+          "size": {
+            "width": 289,
+            "height": 50
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.4,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Tampas testadas contra vazamento — seguro para delivery e transporte."
+          },
+          "zIndex": 11
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Bloco",
+          "position": {
+            "x": 56,
+            "y": 358
+          },
+          "size": {
+            "width": 329,
+            "height": 150
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 12
+        },
+        {
+          "type": "text-title",
+          "name": "Num",
+          "position": {
+            "x": 76,
+            "y": 376
+          },
+          "size": {
+            "width": 60,
+            "height": 40
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 30,
+            "fontWeight": "bold",
+            "textColor": "#E6B45C",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "03"
+          },
+          "zIndex": 13
+        },
+        {
+          "type": "text-title",
+          "name": "Tít",
+          "position": {
+            "x": 76,
+            "y": 418
+          },
+          "size": {
+            "width": 289,
+            "height": 26
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Linha completa"
+          },
+          "zIndex": 14
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Txt",
+          "position": {
+            "x": 76,
+            "y": 446
+          },
+          "size": {
+            "width": 289,
+            "height": 50
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.4,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Da forminha à sacola: tudo combinando numa só identidade."
+          },
+          "zIndex": 15
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Bloco",
+          "position": {
+            "x": 409,
+            "y": 358
+          },
+          "size": {
+            "width": 329,
+            "height": 150
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#FFFFFF",
+            "borderColor": "#ECE0D6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 16
+        },
+        {
+          "type": "text-title",
+          "name": "Num",
+          "position": {
+            "x": 429,
+            "y": 376
+          },
+          "size": {
+            "width": 60,
+            "height": 40
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 30,
+            "fontWeight": "bold",
+            "textColor": "#E6B45C",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "04"
+          },
+          "zIndex": 17
+        },
+        {
+          "type": "text-title",
+          "name": "Tít",
+          "position": {
+            "x": 429,
+            "y": 418
+          },
+          "size": {
+            "width": 289,
+            "height": 26
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 16,
+            "fontWeight": "bold",
+            "textColor": "#2B2126",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Sob medida"
+          },
+          "zIndex": 18
+        },
+        {
+          "type": "text-paragraph",
+          "name": "Txt",
+          "position": {
+            "x": 429,
+            "y": 446
+          },
+          "size": {
+            "width": 289,
+            "height": 50
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12.5,
+            "fontWeight": "normal",
+            "textColor": "#7C6E72",
+            "textAlign": "left",
+            "lineHeight": 1.4,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Personalização com sua marca a partir de tiragens pequenas."
+          },
+          "zIndex": 19
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Faixa CTA",
+          "position": {
+            "x": 56,
+            "y": 538
+          },
+          "size": {
+            "width": 682,
+            "height": 92
+          },
+          "style": {
+            "borderRadius": 14,
+            "backgroundColor": "#A82E4E"
+          },
+          "zIndex": 20
+        },
+        {
+          "type": "text-title",
+          "name": "CTA",
+          "position": {
+            "x": 80,
+            "y": 560
+          },
+          "size": {
+            "width": 634,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 20,
+            "fontWeight": "bold",
+            "textColor": "#FBF1E6",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Monte seu kit e peça uma amostra grátis."
+          },
+          "zIndex": 21
+        },
+        {
+          "type": "text-title",
+          "name": "CTA contato",
+          "position": {
+            "x": 80,
+            "y": 592
+          },
+          "size": {
+            "width": 634,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 13,
+            "fontWeight": "normal",
+            "textColor": "#FBF1E6",
+            "textAlign": "left",
+            "lineHeight": 1.3,
+            "letterSpacing": 1
+          },
+          "content": {
+            "text": "cristallo.com.br   ·   (11) 4002-8922"
+          },
+          "zIndex": 22
+        }
+      ]
+    },
+    {
+      "name": "Contracapa",
+      "order": 8,
+      "elements": [
+        {
+          "type": "shape-rectangle",
+          "name": "Fundo",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 794,
+            "height": 1123
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "#A82E4E"
+          },
+          "zIndex": 0
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Moldura",
+          "position": {
+            "x": 24,
+            "y": 24
+          },
+          "size": {
+            "width": 746,
+            "height": 1075
+          },
+          "style": {
+            "borderRadius": 0,
+            "backgroundColor": "transparent",
+            "borderColor": "#FBF1E6",
+            "borderWidth": 1,
+            "borderStyle": "solid"
+          },
+          "zIndex": 1
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Selo",
+          "position": {
+            "x": 365,
+            "y": 300
+          },
+          "size": {
+            "width": 64,
+            "height": 64
+          },
+          "style": {
+            "borderRadius": 16,
+            "backgroundColor": "#FBF1E6"
+          },
+          "zIndex": 2
+        },
+        {
+          "type": "text-title",
+          "name": "Mono",
+          "position": {
+            "x": 365,
+            "y": 312
+          },
+          "size": {
+            "width": 64,
+            "height": 44
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 38,
+            "fontWeight": "bold",
+            "textColor": "#A82E4E",
+            "textAlign": "center",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "C"
+          },
+          "zIndex": 3
+        },
+        {
+          "type": "text-title",
+          "name": "Wordmark",
+          "position": {
+            "x": 56,
+            "y": 392
+          },
+          "size": {
+            "width": 682,
+            "height": 60
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 40,
+            "fontWeight": "bold",
+            "textColor": "#FBF1E6",
+            "textAlign": "center",
+            "lineHeight": 1.3,
+            "letterSpacing": 4
+          },
+          "content": {
+            "text": "CRISTALLO"
+          },
+          "zIndex": 4
+        },
+        {
+          "type": "text-title",
+          "name": "Sub",
+          "position": {
+            "x": 56,
+            "y": 452
+          },
+          "size": {
+            "width": 682,
+            "height": 26
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 12,
+            "fontWeight": "normal",
+            "textColor": "#E6B45C",
+            "textAlign": "center",
+            "lineHeight": 1.3,
+            "letterSpacing": 4
+          },
+          "content": {
+            "text": "EMBALAGENS & UTENSÍLIOS"
+          },
+          "zIndex": 5
+        },
+        {
+          "type": "shape-rectangle",
+          "name": "Régua",
+          "position": {
+            "x": 361,
+            "y": 502
+          },
+          "size": {
+            "width": 72,
+            "height": 4
+          },
+          "style": {
+            "borderRadius": 2,
+            "backgroundColor": "#E6B45C"
+          },
+          "zIndex": 6
+        },
+        {
+          "type": "text-title",
+          "name": "Tagline",
+          "position": {
+            "x": 56,
+            "y": 532
+          },
+          "size": {
+            "width": 682,
+            "height": 30
+          },
+          "style": {
+            "fontFamily": "Georgia, 'Times New Roman', serif",
+            "fontSize": 18,
+            "fontWeight": "normal",
+            "textColor": "#FBF1E6",
+            "textAlign": "center",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "Transparência que valoriza cada criação."
+          },
+          "zIndex": 7
+        },
+        {
+          "type": "text-title",
+          "name": "Contato",
+          "position": {
+            "x": 56,
+            "y": 760
+          },
+          "size": {
+            "width": 682,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 14,
+            "fontWeight": "normal",
+            "textColor": "#FBF1E6",
+            "textAlign": "center",
+            "lineHeight": 1.5,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "(11) 4002-8922"
+          },
+          "zIndex": 8
+        },
+        {
+          "type": "text-title",
+          "name": "Contato",
+          "position": {
+            "x": 56,
+            "y": 794
+          },
+          "size": {
+            "width": 682,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 14,
+            "fontWeight": "normal",
+            "textColor": "#FBF1E6",
+            "textAlign": "center",
+            "lineHeight": 1.5,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "vendas@cristallo.com.br"
+          },
+          "zIndex": 9
+        },
+        {
+          "type": "text-title",
+          "name": "Contato",
+          "position": {
+            "x": 56,
+            "y": 828
+          },
+          "size": {
+            "width": 682,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 14,
+            "fontWeight": "normal",
+            "textColor": "#FBF1E6",
+            "textAlign": "center",
+            "lineHeight": 1.5,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "cristallo.com.br"
+          },
+          "zIndex": 10
+        },
+        {
+          "type": "text-title",
+          "name": "Contato",
+          "position": {
+            "x": 56,
+            "y": 862
+          },
+          "size": {
+            "width": 682,
+            "height": 24
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 14,
+            "fontWeight": "normal",
+            "textColor": "#FBF1E6",
+            "textAlign": "center",
+            "lineHeight": 1.5,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "R. das Confeitarias, 250 — São Paulo, SP"
+          },
+          "zIndex": 11
+        },
+        {
+          "type": "text-title",
+          "name": "Legal",
+          "position": {
+            "x": 56,
+            "y": 1027
+          },
+          "size": {
+            "width": 682,
+            "height": 22
+          },
+          "style": {
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "fontSize": 10.5,
+            "fontWeight": "normal",
+            "textColor": "#E6B45C",
+            "textAlign": "center",
+            "lineHeight": 1.3,
+            "letterSpacing": 0
+          },
+          "content": {
+            "text": "© 2026 Cristallo Embalagens · Imagens meramente ilustrativas"
+          },
+          "zIndex": 12
+        }
+      ]
+    }
+  ]
+}

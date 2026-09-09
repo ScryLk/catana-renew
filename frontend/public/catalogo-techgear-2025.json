@@ -1,0 +1,924 @@
+{
+  "schemaVersion": "1.0",
+  "exportedAt": "2025-12-31T05:00:00.000Z",
+  "app": "Catana",
+  "catalog": {
+    "name": "TechGear - Catálogo Digital 2025",
+    "description": "Acessórios premium para o seu setup tecnológico",
+    "dimensions": {
+      "width": 1920,
+      "height": 2560,
+      "unit": "px"
+    },
+    "organization": "TechGear Brasil",
+    "sede": "São Paulo - Tech Hub",
+    "tags": ["tecnologia", "gadgets", "acessórios", "gamer", "produtividade"],
+    "language": "pt-BR"
+  },
+  "settings": {
+    "gridSize": 8,
+    "snapToGrid": true,
+    "defaultZoom": 75
+  },
+  "designTokens": {
+    "name": "TechGear Dark Theme",
+    "version": "1.0.0",
+    "description": "Tema moderno e tecnológico com visual dark mode",
+    "colors": {
+      "primary": {
+        "value": "#00D9FF",
+        "description": "Ciano tech - cor principal da marca",
+        "contrast": "#000000"
+      },
+      "secondary": {
+        "value": "#B026FF",
+        "description": "Roxo neon - cor secundária",
+        "contrast": "#FFFFFF"
+      },
+      "accent": {
+        "value": "#FF3D71",
+        "description": "Rosa vibrante - call-to-action",
+        "contrast": "#FFFFFF"
+      },
+      "background": {
+        "value": "#0A0E27",
+        "description": "Azul escuro quase preto",
+        "contrast": "#FFFFFF"
+      },
+      "surface": {
+        "value": "#1A1F3A",
+        "description": "Superfície elevada",
+        "contrast": "#FFFFFF"
+      },
+      "border": {
+        "value": "#2D3250",
+        "description": "Bordas sutis",
+        "contrast": "#FFFFFF"
+      },
+      "text": {
+        "primary": {
+          "value": "#FFFFFF",
+          "description": "Texto principal branco"
+        },
+        "secondary": {
+          "value": "#A8B2D1",
+          "description": "Texto secundário azul claro"
+        },
+        "disabled": {
+          "value": "#4A5578",
+          "description": "Texto desabilitado"
+        }
+      },
+      "success": {
+        "value": "#00E676",
+        "description": "Verde neon de sucesso",
+        "contrast": "#000000"
+      },
+      "warning": {
+        "value": "#FFD600",
+        "description": "Amarelo de atenção",
+        "contrast": "#000000"
+      },
+      "error": {
+        "value": "#FF1744",
+        "description": "Vermelho de erro",
+        "contrast": "#FFFFFF"
+      },
+      "glow": {
+        "value": "#00D9FF",
+        "description": "Efeito de brilho tech",
+        "contrast": "#000000"
+      }
+    },
+    "typography": {
+      "h1": {
+        "fontFamily": "Orbitron, sans-serif",
+        "fontSize": 64,
+        "fontWeight": 900,
+        "lineHeight": 1.1,
+        "letterSpacing": -1.5,
+        "textTransform": "uppercase"
+      },
+      "h2": {
+        "fontFamily": "Orbitron, sans-serif",
+        "fontSize": 48,
+        "fontWeight": 800,
+        "lineHeight": 1.2,
+        "letterSpacing": -1
+      },
+      "h3": {
+        "fontFamily": "Orbitron, sans-serif",
+        "fontSize": 36,
+        "fontWeight": 700,
+        "lineHeight": 1.3,
+        "letterSpacing": -0.5
+      },
+      "h4": {
+        "fontFamily": "Orbitron, sans-serif",
+        "fontSize": 28,
+        "fontWeight": 700,
+        "lineHeight": 1.4
+      },
+      "body": {
+        "fontFamily": "Roboto, sans-serif",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "lineHeight": 1.6
+      },
+      "bodyLarge": {
+        "fontFamily": "Roboto, sans-serif",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "lineHeight": 1.6
+      },
+      "caption": {
+        "fontFamily": "Roboto Mono, monospace",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "lineHeight": 1.5
+      },
+      "button": {
+        "fontFamily": "Orbitron, sans-serif",
+        "fontSize": 14,
+        "fontWeight": 700,
+        "lineHeight": 1,
+        "letterSpacing": 2,
+        "textTransform": "uppercase"
+      }
+    },
+    "spacing": {
+      "base": 8,
+      "xxs": 4,
+      "xs": 8,
+      "sm": 16,
+      "md": 24,
+      "lg": 32,
+      "xl": 48,
+      "xxl": 64,
+      "xxxl": 96
+    },
+    "borderRadius": {
+      "none": 0,
+      "sm": 4,
+      "md": 8,
+      "lg": 16,
+      "xl": 24,
+      "full": 9999
+    },
+    "shadows": {
+      "none": {
+        "value": "none"
+      },
+      "sm": {
+        "value": "0 2px 8px rgba(0, 217, 255, 0.1)"
+      },
+      "md": {
+        "value": "0 4px 16px rgba(0, 217, 255, 0.2)"
+      },
+      "lg": {
+        "value": "0 8px 24px rgba(0, 217, 255, 0.3)"
+      },
+      "xl": {
+        "value": "0 16px 48px rgba(0, 217, 255, 0.4)"
+      },
+      "glow": {
+        "value": "0 0 20px rgba(0, 217, 255, 0.6)"
+      }
+    }
+  },
+  "pages": [
+    {
+      "logicalId": "page-cover",
+      "name": "Capa",
+      "order": 0,
+      "description": "Capa futurista do catálogo TechGear",
+      "elements": [
+        {
+          "logicalId": "cover-bg",
+          "type": "shape-rectangle",
+          "name": "Background",
+          "position": {"x": 0, "y": 0, "unit": "px"},
+          "size": {"width": 1920, "height": 2560, "unit": "px"},
+          "zIndex": 0,
+          "style": {
+            "backgroundColor": "$tokens.colors.background.value"
+          }
+        },
+        {
+          "logicalId": "cover-grid-pattern",
+          "type": "shape-rectangle",
+          "name": "Grid Pattern",
+          "position": {"x": 0, "y": 0, "unit": "px"},
+          "size": {"width": 1920, "height": 2560, "unit": "px"},
+          "zIndex": 1,
+          "opacity": 0.05,
+          "style": {
+            "backgroundColor": "$tokens.colors.primary.value"
+          }
+        },
+        {
+          "logicalId": "cover-circle-1",
+          "type": "shape-circle",
+          "name": "Círculo Glow 1",
+          "position": {"x": -200, "y": 400, "unit": "px"},
+          "size": {"width": 600, "height": 600, "unit": "px"},
+          "zIndex": 2,
+          "opacity": 0.15,
+          "style": {
+            "backgroundColor": "$tokens.colors.primary.value",
+            "boxShadow": "$tokens.shadows.glow.value"
+          }
+        },
+        {
+          "logicalId": "cover-circle-2",
+          "type": "shape-circle",
+          "name": "Círculo Glow 2",
+          "position": {"x": 1500, "y": 1800, "unit": "px"},
+          "size": {"width": 800, "height": 800, "unit": "px"},
+          "zIndex": 2,
+          "opacity": 0.12,
+          "style": {
+            "backgroundColor": "$tokens.colors.secondary.value",
+            "boxShadow": "$tokens.shadows.glow.value"
+          }
+        },
+        {
+          "logicalId": "cover-logo-text",
+          "type": "text-title",
+          "name": "Logo TechGear",
+          "position": {"x": 160, "y": 900, "unit": "px"},
+          "size": {"width": 1600, "height": 150, "unit": "px"},
+          "zIndex": 3,
+          "textData": {
+            "content": "TECHGEAR",
+            "fontSize": "$tokens.typography.h1.fontSize",
+            "fontFamily": "$tokens.typography.h1.fontFamily",
+            "fontWeight": "$tokens.typography.h1.fontWeight",
+            "lineHeight": "$tokens.typography.h1.lineHeight",
+            "letterSpacing": "$tokens.typography.h1.letterSpacing",
+            "textTransform": "uppercase",
+            "textColor": "$tokens.colors.primary.value",
+            "textAlign": "center"
+          },
+          "style": {
+            "boxShadow": "$tokens.shadows.glow.value"
+          }
+        },
+        {
+          "logicalId": "cover-tagline",
+          "type": "text-paragraph",
+          "name": "Tagline",
+          "position": {"x": 160, "y": 1080, "unit": "px"},
+          "size": {"width": 1600, "height": 80, "unit": "px"},
+          "zIndex": 3,
+          "textData": {
+            "content": "Premium Tech Accessories",
+            "fontSize": "$tokens.typography.h4.fontSize",
+            "fontFamily": "$tokens.typography.body.fontFamily",
+            "fontWeight": 300,
+            "lineHeight": 1.4,
+            "letterSpacing": 4,
+            "textTransform": "uppercase",
+            "textColor": "$tokens.colors.text.secondary.value",
+            "textAlign": "center"
+          }
+        },
+        {
+          "logicalId": "cover-year",
+          "type": "text",
+          "name": "Ano",
+          "position": {"x": 160, "y": 2300, "unit": "px"},
+          "size": {"width": 1600, "height": 60, "unit": "px"},
+          "zIndex": 3,
+          "textData": {
+            "content": "CATÁLOGO 2025",
+            "fontSize": "$tokens.typography.button.fontSize",
+            "fontFamily": "$tokens.typography.button.fontFamily",
+            "fontWeight": "$tokens.typography.button.fontWeight",
+            "letterSpacing": "$tokens.typography.button.letterSpacing",
+            "textTransform": "uppercase",
+            "textColor": "$tokens.colors.text.primary.value",
+            "textAlign": "center"
+          }
+        },
+        {
+          "logicalId": "cover-badge",
+          "type": "certification-badge",
+          "name": "Badge Premium",
+          "position": {"x": 810, "y": 1200, "unit": "px"},
+          "size": {"width": 300, "height": 300, "unit": "px"},
+          "zIndex": 4,
+          "content": {
+            "text": "PREMIUM\nQUALITY",
+            "badgeColor": "$tokens.colors.accent.value",
+            "textColor": "$tokens.colors.text.primary.value"
+          }
+        }
+      ],
+      "footer": {
+        "show": false
+      }
+    },
+    {
+      "logicalId": "page-peripherals",
+      "name": "Periféricos Gamer",
+      "order": 1,
+      "description": "Mouse, teclados e headsets gamers",
+      "elements": [
+        {
+          "logicalId": "p1-bg",
+          "type": "shape-rectangle",
+          "name": "Background",
+          "position": {"x": 0, "y": 0, "unit": "px"},
+          "size": {"width": 1920, "height": 2560, "unit": "px"},
+          "zIndex": 0,
+          "style": {
+            "backgroundColor": "$tokens.colors.background.value"
+          }
+        },
+        {
+          "logicalId": "p1-header",
+          "type": "shape-rectangle",
+          "name": "Header Bar",
+          "position": {"x": 0, "y": 0, "unit": "px"},
+          "size": {"width": 1920, "height": 180, "unit": "px"},
+          "zIndex": 1,
+          "style": {
+            "backgroundColor": "$tokens.colors.surface.value",
+            "borderColor": "$tokens.colors.border.value",
+            "borderWidth": 2
+          }
+        },
+        {
+          "logicalId": "p1-title",
+          "type": "text-title",
+          "name": "Título da Seção",
+          "position": {"x": 160, "y": 60, "unit": "px"},
+          "size": {"width": 1200, "height": 80, "unit": "px"},
+          "zIndex": 2,
+          "textData": {
+            "content": "PERIFÉRICOS GAMER",
+            "fontSize": "$tokens.typography.h2.fontSize",
+            "fontFamily": "$tokens.typography.h2.fontFamily",
+            "fontWeight": "$tokens.typography.h2.fontWeight",
+            "textColor": "$tokens.colors.primary.value",
+            "textAlign": "left"
+          }
+        },
+        {
+          "logicalId": "p1-accent-line",
+          "type": "line",
+          "name": "Linha de Destaque",
+          "position": {"x": 160, "y": 150, "unit": "px"},
+          "size": {"width": 200, "height": 4, "unit": "px"},
+          "zIndex": 3,
+          "lineData": {
+            "start": {"x": 160, "y": 150},
+            "end": {"x": 360, "y": 150},
+            "strokeColor": "$tokens.colors.primary.value",
+            "strokeWidth": 4,
+            "style": "solid"
+          },
+          "style": {
+            "boxShadow": "$tokens.shadows.glow.value"
+          }
+        },
+        {
+          "logicalId": "p1-product-1",
+          "type": "product-card",
+          "name": "Mouse Gamer RGB",
+          "position": {"x": 160, "y": 260, "unit": "px"},
+          "size": {"width": 520, "height": 700, "unit": "px"},
+          "zIndex": 1,
+          "style": {
+            "backgroundColor": "$tokens.colors.surface.value",
+            "borderColor": "$tokens.colors.border.value",
+            "borderWidth": 2,
+            "borderRadius": "$tokens.borderRadius.lg",
+            "boxShadow": "$tokens.shadows.md.value"
+          },
+          "productData": {
+            "name": "Mouse Gamer RGB X-Force",
+            "sku": "TG-MOUSE-001",
+            "description": "16.000 DPI, sensor óptico de alta precisão, 7 botões programáveis e iluminação RGB customizável.",
+            "price": 349.90,
+            "currency": "BRL",
+            "category": "Periféricos",
+            "badge": "BESTSELLER",
+            "specs": [
+              {"label": "DPI", "value": "16.000"},
+              {"label": "Botões", "value": "7 programáveis"},
+              {"label": "RGB", "value": "16.8M cores"},
+              {"label": "Conexão", "value": "USB 2.0"},
+              {"label": "Peso", "value": "95g"},
+              {"label": "Garantia", "value": "2 anos"}
+            ]
+          }
+        },
+        {
+          "logicalId": "p1-product-2",
+          "type": "product-card",
+          "name": "Teclado Mecânico",
+          "position": {"x": 720, "y": 260, "unit": "px"},
+          "size": {"width": 520, "height": 700, "unit": "px"},
+          "zIndex": 1,
+          "style": {
+            "backgroundColor": "$tokens.colors.surface.value",
+            "borderColor": "$tokens.colors.border.value",
+            "borderWidth": 2,
+            "borderRadius": "$tokens.borderRadius.lg",
+            "boxShadow": "$tokens.shadows.md.value"
+          },
+          "productData": {
+            "name": "Teclado Mecânico TKL RGB",
+            "sku": "TG-KB-002",
+            "description": "Switch mecânico red, layout compacto 87 teclas, retroiluminação RGB por tecla, estrutura em alumínio.",
+            "price": 599.90,
+            "currency": "BRL",
+            "category": "Periféricos",
+            "badge": "NOVO",
+            "specs": [
+              {"label": "Switch", "value": "Mecânico Red"},
+              {"label": "Layout", "value": "TKL 87 teclas"},
+              {"label": "RGB", "value": "Por tecla"},
+              {"label": "Material", "value": "Alumínio"},
+              {"label": "NKRO", "value": "Full"},
+              {"label": "Garantia", "value": "3 anos"}
+            ]
+          }
+        },
+        {
+          "logicalId": "p1-product-3",
+          "type": "product-card",
+          "name": "Headset 7.1",
+          "position": {"x": 1280, "y": 260, "unit": "px"},
+          "size": {"width": 520, "height": 700, "unit": "px"},
+          "zIndex": 1,
+          "style": {
+            "backgroundColor": "$tokens.colors.surface.value",
+            "borderColor": "$tokens.colors.border.value",
+            "borderWidth": 2,
+            "borderRadius": "$tokens.borderRadius.lg",
+            "boxShadow": "$tokens.shadows.md.value"
+          },
+          "productData": {
+            "name": "Headset Gamer 7.1 Surround",
+            "sku": "TG-HS-003",
+            "description": "Áudio surround 7.1 virtual, drivers 50mm, microfone retrátil com cancelamento de ruído, almofadas memory foam.",
+            "price": 449.90,
+            "currency": "BRL",
+            "category": "Periféricos",
+            "specs": [
+              {"label": "Áudio", "value": "7.1 Virtual Surround"},
+              {"label": "Drivers", "value": "50mm neodímio"},
+              {"label": "Microfone", "value": "Retrátil noise-cancel"},
+              {"label": "Almofadas", "value": "Memory foam"},
+              {"label": "Conexão", "value": "USB 2.0"},
+              {"label": "Garantia", "value": "2 anos"}
+            ]
+          }
+        },
+        {
+          "logicalId": "p1-promo-box",
+          "type": "shape-rectangle",
+          "name": "Box Promocional",
+          "position": {"x": 160, "y": 1040, "unit": "px"},
+          "size": {"width": 1640, "height": 200, "unit": "px"},
+          "zIndex": 0,
+          "style": {
+            "backgroundColor": "$tokens.colors.surface.value",
+            "borderColor": "$tokens.colors.primary.value",
+            "borderWidth": 2,
+            "borderRadius": "$tokens.borderRadius.md",
+            "boxShadow": "$tokens.shadows.glow.value"
+          }
+        },
+        {
+          "logicalId": "p1-promo-text",
+          "type": "text-paragraph",
+          "name": "Texto Promocional",
+          "position": {"x": 220, "y": 1090, "unit": "px"},
+          "size": {"width": 1520, "height": 100, "unit": "px"},
+          "zIndex": 1,
+          "textData": {
+            "content": "⚡ COMBO GAMER COMPLETO: Mouse + Teclado + Headset por R$ 1.199,90 (economize R$ 199,80)",
+            "fontSize": "$tokens.typography.bodyLarge.fontSize",
+            "fontFamily": "$tokens.typography.body.fontFamily",
+            "lineHeight": 1.8,
+            "textColor": "$tokens.colors.primary.value",
+            "textAlign": "center"
+          }
+        }
+      ],
+      "header": {
+        "show": true,
+        "logoUrl": "",
+        "showPageNumber": true
+      },
+      "footer": {
+        "show": true,
+        "fields": [
+          {"key": "company", "label": "Empresa", "value": "TechGear Brasil"},
+          {"key": "contact", "label": "Contato", "value": "vendas@techgear.com.br"}
+        ]
+      }
+    },
+    {
+      "logicalId": "page-workspace",
+      "name": "Setup & Produtividade",
+      "order": 2,
+      "description": "Monitores, webcams e acessórios para home office",
+      "elements": [
+        {
+          "logicalId": "p2-bg",
+          "type": "shape-rectangle",
+          "name": "Background",
+          "position": {"x": 0, "y": 0, "unit": "px"},
+          "size": {"width": 1920, "height": 2560, "unit": "px"},
+          "zIndex": 0,
+          "style": {
+            "backgroundColor": "$tokens.colors.background.value"
+          }
+        },
+        {
+          "logicalId": "p2-header",
+          "type": "shape-rectangle",
+          "name": "Header Bar",
+          "position": {"x": 0, "y": 0, "unit": "px"},
+          "size": {"width": 1920, "height": 180, "unit": "px"},
+          "zIndex": 1,
+          "style": {
+            "backgroundColor": "$tokens.colors.surface.value",
+            "borderColor": "$tokens.colors.border.value",
+            "borderWidth": 2
+          }
+        },
+        {
+          "logicalId": "p2-title",
+          "type": "text-title",
+          "name": "Título da Seção",
+          "position": {"x": 160, "y": 60, "unit": "px"},
+          "size": {"width": 1200, "height": 80, "unit": "px"},
+          "zIndex": 2,
+          "textData": {
+            "content": "SETUP & PRODUTIVIDADE",
+            "fontSize": "$tokens.typography.h2.fontSize",
+            "fontFamily": "$tokens.typography.h2.fontFamily",
+            "fontWeight": "$tokens.typography.h2.fontWeight",
+            "textColor": "$tokens.colors.secondary.value",
+            "textAlign": "left"
+          }
+        },
+        {
+          "logicalId": "p2-accent-line",
+          "type": "line",
+          "name": "Linha de Destaque",
+          "position": {"x": 160, "y": 150, "unit": "px"},
+          "size": {"width": 200, "height": 4, "unit": "px"},
+          "zIndex": 3,
+          "lineData": {
+            "start": {"x": 160, "y": 150},
+            "end": {"x": 360, "y": 150},
+            "strokeColor": "$tokens.colors.secondary.value",
+            "strokeWidth": 4,
+            "style": "solid"
+          }
+        },
+        {
+          "logicalId": "p2-product-4",
+          "type": "product-card",
+          "name": "Monitor 4K",
+          "position": {"x": 160, "y": 260, "unit": "px"},
+          "size": {"width": 520, "height": 700, "unit": "px"},
+          "zIndex": 1,
+          "style": {
+            "backgroundColor": "$tokens.colors.surface.value",
+            "borderColor": "$tokens.colors.border.value",
+            "borderWidth": 2,
+            "borderRadius": "$tokens.borderRadius.lg",
+            "boxShadow": "$tokens.shadows.md.value"
+          },
+          "productData": {
+            "name": "Monitor 27\" 4K UHD",
+            "sku": "TG-MON-004",
+            "description": "Painel IPS 27 polegadas, resolução 4K UHD (3840x2160), 99% sRGB, HDR10, 60Hz, ajuste de altura.",
+            "price": 1899.90,
+            "currency": "BRL",
+            "category": "Monitores",
+            "badge": "PREMIUM",
+            "specs": [
+              {"label": "Tela", "value": "27\" IPS"},
+              {"label": "Resolução", "value": "3840 x 2160 4K"},
+              {"label": "Cores", "value": "99% sRGB"},
+              {"label": "HDR", "value": "HDR10"},
+              {"label": "Taxa", "value": "60Hz"},
+              {"label": "Garantia", "value": "3 anos"}
+            ]
+          }
+        },
+        {
+          "logicalId": "p2-product-5",
+          "type": "product-card",
+          "name": "Webcam Full HD",
+          "position": {"x": 720, "y": 260, "unit": "px"},
+          "size": {"width": 520, "height": 700, "unit": "px"},
+          "zIndex": 1,
+          "style": {
+            "backgroundColor": "$tokens.colors.surface.value",
+            "borderColor": "$tokens.colors.border.value",
+            "borderWidth": 2,
+            "borderRadius": "$tokens.borderRadius.lg",
+            "boxShadow": "$tokens.shadows.md.value"
+          },
+          "productData": {
+            "name": "Webcam Full HD 1080p",
+            "sku": "TG-WEB-005",
+            "description": "Resolução 1080p 60fps, autofoco, correção de luz automática, microfones estéreo integrados, suporte universal.",
+            "price": 389.90,
+            "currency": "BRL",
+            "category": "Áudio/Vídeo",
+            "specs": [
+              {"label": "Resolução", "value": "1080p 60fps"},
+              {"label": "Foco", "value": "Autofoco"},
+              {"label": "Luz", "value": "Correção automática"},
+              {"label": "Microfones", "value": "Estéreo dual"},
+              {"label": "Conexão", "value": "USB 3.0"},
+              {"label": "Garantia", "value": "1 ano"}
+            ]
+          }
+        },
+        {
+          "logicalId": "p2-product-6",
+          "type": "product-card",
+          "name": "Suporte Monitor",
+          "position": {"x": 1280, "y": 260, "unit": "px"},
+          "size": {"width": 520, "height": 700, "unit": "px"},
+          "zIndex": 1,
+          "style": {
+            "backgroundColor": "$tokens.colors.surface.value",
+            "borderColor": "$tokens.colors.border.value",
+            "borderWidth": 2,
+            "borderRadius": "$tokens.borderRadius.lg",
+            "boxShadow": "$tokens.shadows.md.value"
+          },
+          "productData": {
+            "name": "Suporte Articulado Duplo",
+            "sku": "TG-ARM-006",
+            "description": "Suporte de mesa para 2 monitores até 32\", ajuste de altura, rotação 360°, inclinação, VESA 75x75/100x100.",
+            "price": 299.90,
+            "currency": "BRL",
+            "category": "Acessórios",
+            "badge": "NOVO",
+            "specs": [
+              {"label": "Monitores", "value": "Até 2x 32\""},
+              {"label": "Peso máx.", "value": "8kg por braço"},
+              {"label": "VESA", "value": "75x75 / 100x100"},
+              {"label": "Movimento", "value": "360° rotação"},
+              {"label": "Material", "value": "Aço reforçado"},
+              {"label": "Garantia", "value": "2 anos"}
+            ]
+          }
+        },
+        {
+          "logicalId": "p2-banner",
+          "type": "banner",
+          "name": "Banner Home Office",
+          "position": {"x": 160, "y": 1040, "unit": "px"},
+          "size": {"width": 1640, "height": 280, "unit": "px"},
+          "zIndex": 0,
+          "style": {
+            "backgroundColor": "$tokens.colors.surface.value",
+            "borderColor": "$tokens.colors.secondary.value",
+            "borderWidth": 2,
+            "borderRadius": "$tokens.borderRadius.lg",
+            "boxShadow": "$tokens.shadows.lg.value"
+          },
+          "content": {
+            "title": "HOME OFFICE PREMIUM",
+            "subtitle": "Monte seu setup profissional com 15% OFF em combos de produtividade",
+            "buttonText": "VER COMBOS",
+            "titleColor": "$tokens.colors.secondary.value",
+            "subtitleColor": "$tokens.colors.text.primary.value"
+          }
+        }
+      ],
+      "header": {
+        "show": true,
+        "logoUrl": "",
+        "showPageNumber": true
+      },
+      "footer": {
+        "show": true,
+        "fields": [
+          {"key": "company", "label": "Empresa", "value": "TechGear Brasil"},
+          {"key": "contact", "label": "Contato", "value": "vendas@techgear.com.br"}
+        ]
+      }
+    },
+    {
+      "logicalId": "page-info",
+      "name": "Informações & Contato",
+      "order": 3,
+      "description": "Certificações, garantia e canais de contato",
+      "elements": [
+        {
+          "logicalId": "p3-bg",
+          "type": "shape-rectangle",
+          "name": "Background",
+          "position": {"x": 0, "y": 0, "unit": "px"},
+          "size": {"width": 1920, "height": 2560, "unit": "px"},
+          "zIndex": 0,
+          "style": {
+            "backgroundColor": "$tokens.colors.background.value"
+          }
+        },
+        {
+          "logicalId": "p3-title",
+          "type": "text-title",
+          "name": "Título Principal",
+          "position": {"x": 160, "y": 160, "unit": "px"},
+          "size": {"width": 1600, "height": 100, "unit": "px"},
+          "zIndex": 1,
+          "textData": {
+            "content": "QUALIDADE GARANTIDA",
+            "fontSize": "$tokens.typography.h2.fontSize",
+            "fontFamily": "$tokens.typography.h2.fontFamily",
+            "fontWeight": "$tokens.typography.h2.fontWeight",
+            "textColor": "$tokens.colors.primary.value",
+            "textAlign": "center"
+          }
+        },
+        {
+          "logicalId": "p3-cert-1",
+          "type": "certification-badge",
+          "name": "Certificação Anatel",
+          "position": {"x": 360, "y": 360, "unit": "px"},
+          "size": {"width": 220, "height": 220, "unit": "px"},
+          "zIndex": 2,
+          "content": {
+            "text": "ANATEL\nCERTIFIED",
+            "badgeColor": "$tokens.colors.success.value",
+            "textColor": "#000000"
+          }
+        },
+        {
+          "logicalId": "p3-cert-2",
+          "type": "certification-badge",
+          "name": "Garantia",
+          "position": {"x": 850, "y": 360, "unit": "px"},
+          "size": {"width": 220, "height": 220, "unit": "px"},
+          "zIndex": 2,
+          "content": {
+            "text": "3 ANOS\nGARANTIA",
+            "badgeColor": "$tokens.colors.primary.value",
+            "textColor": "#000000"
+          }
+        },
+        {
+          "logicalId": "p3-cert-3",
+          "type": "certification-badge",
+          "name": "Frete Grátis",
+          "position": {"x": 1340, "y": 360, "unit": "px"},
+          "size": {"width": 220, "height": 220, "unit": "px"},
+          "zIndex": 2,
+          "content": {
+            "text": "FRETE\nGRÁTIS",
+            "badgeColor": "$tokens.colors.accent.value",
+            "textColor": "$tokens.colors.text.primary.value"
+          }
+        },
+        {
+          "logicalId": "p3-info-box",
+          "type": "shape-rectangle",
+          "name": "Box de Informações",
+          "position": {"x": 160, "y": 680, "unit": "px"},
+          "size": {"width": 1600, "height": 600, "unit": "px"},
+          "zIndex": 1,
+          "style": {
+            "backgroundColor": "$tokens.colors.surface.value",
+            "borderColor": "$tokens.colors.border.value",
+            "borderWidth": 2,
+            "borderRadius": "$tokens.borderRadius.lg",
+            "boxShadow": "$tokens.shadows.lg.value"
+          }
+        },
+        {
+          "logicalId": "p3-info-title",
+          "type": "text-title",
+          "name": "Título Info",
+          "position": {"x": 220, "y": 740, "unit": "px"},
+          "size": {"width": 1480, "height": 60, "unit": "px"},
+          "zIndex": 2,
+          "textData": {
+            "content": "POR QUE ESCOLHER A TECHGEAR?",
+            "fontSize": "$tokens.typography.h3.fontSize",
+            "fontFamily": "$tokens.typography.h3.fontFamily",
+            "fontWeight": "$tokens.typography.h3.fontWeight",
+            "textColor": "$tokens.colors.primary.value",
+            "textAlign": "left"
+          }
+        },
+        {
+          "logicalId": "p3-info-list",
+          "type": "text-list",
+          "name": "Lista de Vantagens",
+          "position": {"x": 220, "y": 840, "unit": "px"},
+          "size": {"width": 700, "height": 380, "unit": "px"},
+          "zIndex": 2,
+          "content": {
+            "items": [
+              "✓ Produtos originais com garantia de fábrica",
+              "✓ Certificação Anatel em todos os produtos wireless",
+              "✓ Garantia estendida de até 3 anos",
+              "✓ Suporte técnico especializado 24/7",
+              "✓ Frete grátis para todo o Brasil acima de R$ 299",
+              "✓ Parcelamento em até 12x sem juros",
+              "✓ Devolução grátis em até 30 dias",
+              "✓ Estoque próprio com entrega rápida"
+            ],
+            "fontSize": "$tokens.typography.body.fontSize",
+            "fontFamily": "$tokens.typography.body.fontFamily",
+            "lineHeight": 2.2,
+            "textColor": "$tokens.colors.text.primary.value"
+          }
+        },
+        {
+          "logicalId": "p3-icon-grid",
+          "type": "icon-grid",
+          "name": "Ícones de Recursos",
+          "position": {"x": 1000, "y": 840, "unit": "px"},
+          "size": {"width": 660, "height": 380, "unit": "px"},
+          "zIndex": 2,
+          "content": {
+            "icons": [
+              {"name": "shield", "label": "Compra Segura", "color": "$tokens.colors.success.value"},
+              {"name": "truck", "label": "Entrega Rápida", "color": "$tokens.colors.primary.value"},
+              {"name": "support", "label": "Suporte 24/7", "color": "$tokens.colors.secondary.value"},
+              {"name": "verified", "label": "100% Original", "color": "$tokens.colors.accent.value"},
+              {"name": "warranty", "label": "3 Anos Garantia", "color": "$tokens.colors.warning.value"},
+              {"name": "payment", "label": "12x Sem Juros", "color": "$tokens.colors.glow.value"}
+            ]
+          }
+        },
+        {
+          "logicalId": "p3-qr-code",
+          "type": "qr-code",
+          "name": "QR Code Loja Online",
+          "position": {"x": 760, "y": 1400, "unit": "px"},
+          "size": {"width": 400, "height": 400, "unit": "px"},
+          "zIndex": 3,
+          "qrCodeData": {
+            "destinationType": "url",
+            "customUrl": "https://techgear.com.br/catalogo-2025",
+            "data": "https://techgear.com.br/catalogo-2025",
+            "color": "$tokens.colors.primary.value",
+            "backgroundColor": "$tokens.colors.surface.value",
+            "errorCorrection": "H",
+            "quality": "high",
+            "label": "Acesse nossa loja online"
+          }
+        },
+        {
+          "logicalId": "p3-qr-label",
+          "type": "text-paragraph",
+          "name": "Label QR Code",
+          "position": {"x": 460, "y": 1830, "unit": "px"},
+          "size": {"width": 1000, "height": 80, "unit": "px"},
+          "zIndex": 3,
+          "textData": {
+            "content": "Escaneie o QR Code para acessar nossa loja online e fazer seu pedido",
+            "fontSize": "$tokens.typography.bodyLarge.fontSize",
+            "fontFamily": "$tokens.typography.body.fontFamily",
+            "textColor": "$tokens.colors.text.secondary.value",
+            "textAlign": "center",
+            "lineHeight": 1.6
+          }
+        },
+        {
+          "logicalId": "p3-contact",
+          "type": "text-paragraph",
+          "name": "Informações de Contato",
+          "position": {"x": 160, "y": 2000, "unit": "px"},
+          "size": {"width": 1600, "height": 300, "unit": "px"},
+          "zIndex": 1,
+          "textData": {
+            "content": "TechGear Brasil - Premium Tech Accessories\nSão Paulo - SP | Tech Hub | CNPJ 12.345.678/0001-90\n\n📱 WhatsApp: (11) 99999-8888\n📧 Email: vendas@techgear.com.br\n🌐 Site: www.techgear.com.br\n📍 Rua da Tecnologia, 1000 - Vila Digital\n\n© 2025 TechGear Brasil. Todos os direitos reservados.",
+            "fontSize": "$tokens.typography.caption.fontSize",
+            "fontFamily": "$tokens.typography.caption.fontFamily",
+            "textColor": "$tokens.colors.text.secondary.value",
+            "textAlign": "center",
+            "lineHeight": 2
+          }
+        }
+      ],
+      "header": {
+        "show": true,
+        "logoUrl": "",
+        "showPageNumber": false
+      },
+      "footer": {
+        "show": false
+      }
+    }
+  ]
+}
