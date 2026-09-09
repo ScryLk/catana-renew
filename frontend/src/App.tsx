@@ -19,6 +19,7 @@ import { Inbox } from './pages/Inbox';
 import { SearchResults } from './pages/SearchResults';
 import { PublicProfilePage } from './pages/PublicProfile';
 import { ResetPassword } from './pages/ResetPassword';
+import { Transparency } from './pages/Transparency';
 import { Toaster } from 'sonner';
 
 function App() {
@@ -68,6 +69,10 @@ function App() {
           <Route path="/" element={<KatanaStudio />} />
           <Route path="/studio" element={<KatanaStudio />} />
           <Route path="/studio-demo" element={<KatanaStudio />} />
+
+          {/* Transparencia & Governanca de IA */}
+          <Route path="/transparency" element={<Transparency />} />
+          <Route path="/transparencia" element={<Transparency />} />
 
           {/* Management Hubs */}
           <Route
