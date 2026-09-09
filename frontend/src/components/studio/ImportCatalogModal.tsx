@@ -9,9 +9,9 @@ import {
   Sparkles,
   Scissors,
   Layers,
+  Palette,
 } from 'lucide-react';
 import { useStudioStore, API_BASE_URL } from '../../store/studioStore';
-import { STUDIO_PALETTE_PRESETS, StudioPalette } from '../../data/aureaCatalog.mock';
 import { toast } from 'sonner';
 
 interface ImportCatalogModalProps {
@@ -38,7 +38,6 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [removeBackground, setRemoveBackground] = useState(true);
   const [reconstructionMode, setReconstructionMode] = useState<'redesign' | 'faithful'>('redesign');
-  const [selectedPalette, setSelectedPalette] = useState<StudioPalette>(STUDIO_PALETTE_PRESETS[0]);
   const [catalogTitleInput, setCatalogTitleInput] = useState('');
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -63,7 +62,7 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
     'Leitura estrutural das páginas e vetores do documento...',
     'Isolamento e remoção de fundo dos produtos (IA)...',
     'Decomposição de diagramação e tipografia (Gemini Multimodal)...',
-    'Construção dos spreads A4 e montagem no Living Canvas...',
+    'Extração da paleta de cores e montagem dos spreads A4...',
   ];
 
   const handleFileChange = (file: File) => {
@@ -110,7 +109,7 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
       formData.append('title', catalogTitleInput.trim() || selectedFile.name);
       formData.append('remove_background', String(removeBackground));
       formData.append('mode', reconstructionMode);
-      formData.append('style_preset', selectedPalette.name.toLowerCase().includes('noir') ? 'noir_or' : 'editorial_clean');
+      formData.append('style_preset', 'auto');
 
       const token = localStorage.getItem('access_token');
       const response = await fetch(`${API_BASE_URL}/api/v2/studio/catalogs/import-document/`, {
@@ -140,7 +139,9 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
       if (result.title) {
         setCatalogTitle(result.title);
       }
-      setActivePalette(selectedPalette);
+      if (result.palette) {
+        setActivePalette(result.palette);
+      }
       setHasStartedSession(true);
 
       toast.success(result.message || 'Catálogo reconstruído com sucesso!');
@@ -161,7 +162,7 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
       }}
     >
       <div
-        className={`w-full max-w-2xl rounded-2xl border flex flex-col max-h-[90vh] overflow-hidden transition-colors ${
+        className={`w-full max-w-xl rounded-2xl border flex flex-col max-h-[92vh] overflow-hidden transition-colors ${
           isDark
             ? 'bg-[#101013] border-zinc-800 text-zinc-100 shadow-[0_30px_70px_rgba(0,0,0,0.95)]'
             : 'bg-white border-zinc-200 text-zinc-900 shadow-[0_20px_50px_rgba(0,0,0,0.15)]'
@@ -214,7 +215,7 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="p-6 overflow-y-auto space-y-6">
+        <div className="p-6 overflow-y-auto space-y-5">
           {/* File Upload Dropzone */}
           {!isProcessing && (
             <div>
@@ -239,7 +240,7 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
                   onDragLeave={() => setIsDragging(false)}
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+                  className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
                     isDragging
                       ? isDark
                         ? 'border-zinc-400 bg-zinc-800/40'
@@ -249,37 +250,43 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
                       : 'border-zinc-200 hover:border-zinc-300 bg-zinc-50/50'
                   }`}
                 >
-                  <div className="flex flex-col items-center gap-3">
+                  <div className="flex flex-col items-center gap-2.5">
                     <div
-                      className={`p-3 rounded-full ${
-                        isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-zinc-200 text-zinc-700'
+                      className={`p-2.5 rounded-full ${
+                        isDark ? 'bg-zinc-800/90 text-zinc-300' : 'bg-zinc-200 text-zinc-700'
                       }`}
                     >
-                      <UploadCloud className="size-6" />
+                      <UploadCloud className="size-5" />
                     </div>
                     <div>
-                      <p className={`text-sm font-medium ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
+                      <p className={`text-xs font-medium ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
                         Arraste seu catálogo em PDF ou Word aqui
                       </p>
-                      <p className="text-xs text-zinc-400 mt-1">
-                        ou clique para selecionar do seu computador (máximo 50 MB)
+                      <p className="text-[11px] text-zinc-400 mt-0.5">
+                        ou clique para selecionar do computador (máximo 50 MB)
                       </p>
                     </div>
                   </div>
                 </div>
               ) : (
                 <div
-                  className={`p-4 rounded-xl border flex items-center justify-between ${
+                  className={`p-3.5 rounded-xl border flex items-center justify-between ${
                     isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 shrink-0">
-                      <FileText className="size-5" />
+                    <div
+                      className={`p-2 rounded-lg border shrink-0 ${
+                        isDark
+                          ? 'bg-zinc-800/80 border-zinc-700/60 text-zinc-200'
+                          : 'bg-zinc-200 border-zinc-300 text-zinc-800'
+                      }`}
+                    >
+                      <FileText className="size-4.5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{selectedFile.name}</p>
-                      <p className="text-xs text-zinc-400 font-mono">
+                      <p className="text-xs font-medium truncate">{selectedFile.name}</p>
+                      <p className="text-[11px] text-zinc-400 font-mono">
                         {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
                       </p>
                     </div>
@@ -288,7 +295,11 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setSelectedFile(null)}
-                    className="p-1 rounded-md text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                      isDark
+                        ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+                        : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60'
+                    }`}
                     title="Remover arquivo"
                   >
                     <X className="size-4" />
@@ -307,13 +318,23 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
             >
               <div className="flex justify-center">
                 <div className="relative">
-                  <div className="w-14 h-14 rounded-full border-2 border-zinc-700 border-t-amber-500 animate-spin" />
-                  <Sparkles className="size-5 text-amber-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                  <div
+                    className={`w-12 h-12 rounded-full border-2 animate-spin ${
+                      isDark
+                        ? 'border-zinc-800 border-t-zinc-200'
+                        : 'border-zinc-300 border-t-zinc-900'
+                    }`}
+                  />
+                  <Sparkles
+                    className={`size-4 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${
+                      isDark ? 'text-zinc-200' : 'text-zinc-800'
+                    }`}
+                  />
                 </div>
               </div>
 
               <div>
-                <h3 className={`text-base font-semibold ${isDark ? 'text-white' : 'text-zinc-950'}`}>
+                <h3 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-zinc-950'}`}>
                   Reconstruindo Catálogo Editorial...
                 </h3>
                 <p className="text-xs text-zinc-400 mt-1">
@@ -321,9 +342,9 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
                 </p>
               </div>
 
-              <div className="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+              <div className={`w-full h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`}>
                 <div
-                  className="bg-amber-500 h-full transition-all duration-700"
+                  className={`h-full transition-all duration-700 ${isDark ? 'bg-zinc-100' : 'bg-zinc-900'}`}
                   style={{ width: `${((currentStepIndex + 1) / STEPS.length) * 100}%` }}
                 />
               </div>
@@ -332,18 +353,24 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
                 {STEPS.map((step, idx) => (
                   <div
                     key={idx}
-                    className={`flex items-center gap-2 text-xs p-2 rounded-lg ${
+                    className={`flex items-center gap-2 text-xs p-2 rounded-lg border ${
                       idx < currentStepIndex
-                        ? 'text-emerald-400 bg-emerald-500/10'
+                        ? isDark
+                          ? 'text-zinc-300 bg-zinc-800/40 border-zinc-700/40'
+                          : 'text-zinc-700 bg-zinc-100 border-zinc-200'
                         : idx === currentStepIndex
-                        ? 'text-amber-400 bg-amber-500/10 font-medium'
-                        : 'text-zinc-500 opacity-60'
+                        ? isDark
+                          ? 'text-white bg-zinc-800 border-zinc-600 font-medium'
+                          : 'text-zinc-950 bg-white border-zinc-300 font-medium shadow-2xs'
+                        : isDark
+                        ? 'text-zinc-600 border-transparent opacity-50'
+                        : 'text-zinc-400 border-transparent opacity-50'
                     }`}
                   >
                     {idx < currentStepIndex ? (
-                      <Check className="size-3.5 shrink-0" />
+                      <Check className="size-3.5 shrink-0 text-zinc-400" />
                     ) : idx === currentStepIndex ? (
-                      <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                      <Loader2 className="size-3.5 shrink-0 animate-spin text-zinc-200" />
                     ) : (
                       <span className="size-3.5 flex items-center justify-center font-mono text-[10px] border rounded-full">
                         {idx + 1}
@@ -361,7 +388,7 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
             <div className="space-y-4">
               {/* Title input */}
               <div>
-                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-1.5">
                   Título do Projeto
                 </label>
                 <input
@@ -369,54 +396,83 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
                   value={catalogTitleInput}
                   onChange={(e) => setCatalogTitleInput(e.target.value)}
                   placeholder="Ex: Coleção Verão 2026"
-                  className={`w-full text-xs px-3 py-2 rounded-xl border outline-none transition-colors ${
+                  className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none transition-all ${
                     isDark
-                      ? 'bg-zinc-900 border-zinc-800 text-zinc-100 focus:border-zinc-600'
-                      : 'bg-white border-zinc-300 text-zinc-900 focus:border-zinc-400'
+                      ? 'bg-zinc-900/60 border-zinc-800 text-zinc-100 focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600/40'
+                      : 'bg-zinc-50 border-zinc-200 text-zinc-900 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-300'
                   }`}
                 />
               </div>
 
-              {/* Automatic Background Removal Toggle */}
+              {/* Automatic Background Removal Toggle Switch */}
               <div
-                className={`p-3.5 rounded-xl border flex items-start justify-between gap-4 cursor-pointer transition-colors ${
+                className={`p-3.5 rounded-xl border flex items-center justify-between gap-4 transition-colors ${
                   isDark
-                    ? 'bg-zinc-900/40 border-zinc-800 hover:border-zinc-700'
-                    : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300'
+                    ? 'bg-zinc-900/40 border-zinc-800'
+                    : 'bg-zinc-50 border-zinc-200'
                 }`}
-                onClick={() => setRemoveBackground(!removeBackground)}
               >
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0 mt-0.5">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div
+                    className={`p-2 rounded-lg border shrink-0 mt-0.5 ${
+                      isDark
+                        ? 'bg-zinc-800/80 border-zinc-700/60 text-zinc-300'
+                        : 'bg-zinc-200/80 border-zinc-300 text-zinc-700'
+                    }`}
+                  >
                     <Scissors className="size-4" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={`text-xs font-semibold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
-                        Isolar produtos e remover fundo automaticamente (IA)
+                        Isolar produtos e remover fundo (IA)
                       </span>
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <span
+                        className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                          isDark
+                            ? 'bg-zinc-800 text-zinc-300 border-zinc-700/70'
+                            : 'bg-zinc-200/60 text-zinc-600 border-zinc-300'
+                        }`}
+                      >
                         Recomendado
                       </span>
                     </div>
-                    <p className="text-xs text-zinc-400 mt-1">
-                      Detecta as fotos de produtos, remove fundos ruidosos e gera recortes transparentes para integração perfeita ao layout editorial.
+                    <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
+                      Recorta fotos de produtos com fundo transparente para integração harmoniosa ao layout.
                     </p>
                   </div>
                 </div>
 
-                <input
-                  type="checkbox"
-                  checked={removeBackground}
-                  onChange={(e) => setRemoveBackground(e.target.checked)}
-                  className="mt-1 size-4 accent-amber-500 cursor-pointer"
-                  onClick={(e) => e.stopPropagation()}
-                />
+                {/* Sleek Toggle Switch */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={removeBackground}
+                  onClick={() => setRemoveBackground(!removeBackground)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                    removeBackground
+                      ? isDark ? 'bg-zinc-100' : 'bg-zinc-900'
+                      : isDark ? 'bg-zinc-800' : 'bg-zinc-300'
+                  }`}
+                  title={removeBackground ? 'Remoção de fundo ativada' : 'Remoção de fundo desativada'}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full shadow-xs transition duration-200 ease-in-out mt-[3px] ${
+                      removeBackground
+                        ? isDark
+                          ? 'translate-x-4.5 bg-zinc-950'
+                          : 'translate-x-4.5 bg-white'
+                        : isDark
+                          ? 'translate-x-1 bg-zinc-400'
+                          : 'translate-x-1 bg-white'
+                    }`}
+                  />
+                </button>
               </div>
 
               {/* Reconstruction Mode */}
               <div>
-                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                <label className="block text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">
                   Modo de Reconstrução
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -426,7 +482,7 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
                     className={`p-3 rounded-xl border text-left transition-all cursor-pointer relative ${
                       reconstructionMode === 'redesign'
                         ? isDark
-                          ? 'bg-zinc-800/80 border-zinc-600 text-white shadow-xs ring-1 ring-zinc-600'
+                          ? 'bg-zinc-800/90 border-zinc-600 text-white shadow-xs ring-1 ring-zinc-600'
                           : 'bg-zinc-100 border-zinc-400 text-zinc-950 shadow-xs ring-1 ring-zinc-400'
                         : isDark
                         ? 'bg-zinc-900/30 border-zinc-800 text-zinc-400 hover:border-zinc-700'
@@ -435,14 +491,14 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <Layers className="size-3.5 text-amber-400" />
+                        <Layers className="size-3.5 text-zinc-300" />
                         <span className="text-xs font-semibold">Rediagramação Catana 2.0</span>
                       </div>
                       {reconstructionMode === 'redesign' && (
-                        <Check className="size-3.5 text-amber-400 shrink-0" />
+                        <Check className="size-3.5 text-zinc-200 shrink-0" />
                       )}
                     </div>
-                    <p className="text-[11px] text-zinc-400 mt-1">
+                    <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
                       Adapta os produtos aos arquétipos editoriais A4 (794x1123 px) com proporções nobres e respiro visual.
                     </p>
                   </button>
@@ -453,7 +509,7 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
                     className={`p-3 rounded-xl border text-left transition-all cursor-pointer relative ${
                       reconstructionMode === 'faithful'
                         ? isDark
-                          ? 'bg-zinc-800/80 border-zinc-600 text-white shadow-xs ring-1 ring-zinc-600'
+                          ? 'bg-zinc-800/90 border-zinc-600 text-white shadow-xs ring-1 ring-zinc-600'
                           : 'bg-zinc-100 border-zinc-400 text-zinc-950 shadow-xs ring-1 ring-zinc-400'
                         : isDark
                         ? 'bg-zinc-900/30 border-zinc-800 text-zinc-400 hover:border-zinc-700'
@@ -466,63 +522,35 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
                         <span className="text-xs font-semibold">Fiel ao Original</span>
                       </div>
                       {reconstructionMode === 'faithful' && (
-                        <Check className="size-3.5 text-amber-400 shrink-0" />
+                        <Check className="size-3.5 text-zinc-200 shrink-0" />
                       )}
                     </div>
-                    <p className="text-[11px] text-zinc-400 mt-1">
+                    <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
                       Preserva a quantidade de itens e a estrutura de página detectada no documento original.
                     </p>
                   </button>
                 </div>
               </div>
 
-              {/* Palette Choice */}
-              <div>
-                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-                  Paleta Editorial de Aplicação
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {STUDIO_PALETTE_PRESETS.map((p) => (
-                    <button
-                      key={p.name}
-                      type="button"
-                      onClick={() => setSelectedPalette(p)}
-                      className={`p-2.5 rounded-xl border flex items-center justify-between text-left transition-all cursor-pointer ${
-                        selectedPalette.name === p.name
-                          ? isDark
-                            ? 'bg-zinc-800/90 border-zinc-600 ring-1 ring-zinc-600'
-                            : 'bg-zinc-100 border-zinc-400 ring-1 ring-zinc-400'
-                          : isDark
-                          ? 'bg-zinc-900/30 border-zinc-800 hover:border-zinc-700'
-                          : 'bg-white border-zinc-200 hover:border-zinc-300'
-                      }`}
-                    >
-                      <div className="min-w-0 pr-1">
-                        <div className="flex items-center gap-1.5">
-                          {selectedPalette.name === p.name && (
-                            <Check className="size-3 text-amber-500 shrink-0" />
-                          )}
-                          <span className={`block text-xs font-medium truncate ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
-                            {p.name.split('·')[0].trim()}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-zinc-400 font-mono pl-0.5">
-                          {p.contrastRatio?.split(' ')[0]}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span
-                          className="size-3 rounded-full border border-zinc-600/40"
-                          style={{ backgroundColor: p.primary }}
-                        />
-                        <span
-                          className="size-3 rounded-full border border-zinc-600/40"
-                          style={{ backgroundColor: p.accent }}
-                        />
-                      </div>
-                    </button>
-                  ))}
+              {/* Automatic Brand Palette Note */}
+              <div
+                className={`p-3 rounded-xl border flex items-center justify-between gap-3 text-xs ${
+                  isDark ? 'bg-zinc-900/30 border-zinc-800 text-zinc-400' : 'bg-zinc-50 border-zinc-200 text-zinc-600'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Palette className="size-3.5 text-zinc-400 shrink-0" />
+                  <span className="truncate">Paleta e identidade visual extraídas do próprio catálogo importado</span>
                 </div>
+                <span
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded border shrink-0 ${
+                    isDark
+                      ? 'bg-zinc-800/60 text-zinc-400 border-zinc-700/60'
+                      : 'bg-zinc-200/60 text-zinc-600 border-zinc-300'
+                  }`}
+                >
+                  Automático
+                </span>
               </div>
             </div>
           )}
@@ -564,7 +592,7 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
               </>
             ) : (
               <>
-                <Sparkles className="size-3.5 text-amber-500" />
+                <Sparkles className="size-3.5 shrink-0" />
                 <span>Importar e Reconstruir Catálogo</span>
               </>
             )}
