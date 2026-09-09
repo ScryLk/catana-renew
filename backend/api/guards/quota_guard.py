@@ -1,3 +1,4 @@
+from decimal import Decimal
 import time
 from collections import defaultdict
 from typing import Optional, Tuple
@@ -58,40 +59,88 @@ rate_limiter = InMemoryRateLimiter()
 
 def get_or_create_default_plan(tier: str = "free") -> SubscriptionPlan:
     """
-    Retorna ou inicializa os planos padrao de assinatura do Catana Studio.
+    Retorna ou inicializa os planos padrao de assinatura do Catana Studio (Cenario A).
     """
     defaults = {
         "free": {
             "name": "Plano Gratuito",
+            "price_monthly_brl": Decimal("0.00"),
+            "price_annual_brl": Decimal("0.00"),
+            "description": "Ideal para experimentar a IA editorial e criar os primeiros catalogos.",
+            "is_popular": False,
             "monthly_token_quota": 100000,
             "max_active_catalogs": 5,
             "rate_limit_rpm": 15,
             "can_use_council": False,
             "can_export_pdf": True,
+            "features": [
+                "100.000 tokens de IA / mes",
+                "Ate 5 catalogos ativos",
+                "Importacao basica (PDF/Word ate 10MB)",
+                "Remocao de fundo (ate 20 fotos/mes)",
+                "Exportacao em PDF Web (72/150 DPI)",
+                "Agente Orquestrador de IA",
+            ],
         },
         "pro": {
-            "name": "Plano Profissional",
-            "monthly_token_quota": 1000000,
+            "name": "Plano Pro",
+            "price_monthly_brl": Decimal("67.00"),
+            "price_annual_brl": Decimal("49.00"),
+            "description": "Para marcas, criadores e agencias que precisam de escala e acabamento de alto padrao.",
+            "is_popular": True,
+            "monthly_token_quota": 1500000,
             "max_active_catalogs": 30,
             "rate_limit_rpm": 60,
             "can_use_council": True,
             "can_export_pdf": True,
+            "features": [
+                "1.500.000 tokens de IA / mes",
+                "Ate 30 catalogos ativos",
+                "Conselho Editorial com IA Multi-Agente (4 agentes)",
+                "Remocao de fundo em lote ilimitada",
+                "Exportacao Grafica em Alta Resolucao (300 DPI CMYK)",
+                "Importacao sem restricao de tamanho (ate 50MB)",
+                "Taxa de requisicoes acelerada (60 RPM)",
+            ],
         },
         "enterprise": {
             "name": "Plano Enterprise",
+            "price_monthly_brl": Decimal("197.00"),
+            "price_annual_brl": Decimal("159.00"),
+            "description": "Para distribuidoras, grandes redes de varejo e industrias com alto volume de SKUs.",
+            "is_popular": False,
             "monthly_token_quota": 10000000,
             "max_active_catalogs": 999,
             "rate_limit_rpm": 120,
             "can_use_council": True,
             "can_export_pdf": True,
+            "features": [
+                "10.000.000+ tokens de IA / mes",
+                "Catalogos ativos ilimitados",
+                "Tudo do Plano Pro incluso",
+                "Workspaces Multi-Usuarios e Sedes",
+                "Manual de Marca e Diretrizes Customizadas",
+                "Taxa de requisicoes dedicada (120 RPM)",
+                "Suporte prioritario via canal exclusivo",
+            ],
         },
     }
 
     config = defaults.get(tier, defaults["free"])
-    plan, _ = SubscriptionPlan.objects.get_or_create(
+    plan, created = SubscriptionPlan.objects.get_or_create(
         tier=tier,
         defaults=config,
     )
+    if not created:
+        # Garante que os campos de preco e features estejam sempre sincronizados
+        updated = False
+        for k, v in config.items():
+            if getattr(plan, k) != v:
+                setattr(plan, k, v)
+                updated = True
+        if updated:
+            plan.save()
+
     return plan
 
 

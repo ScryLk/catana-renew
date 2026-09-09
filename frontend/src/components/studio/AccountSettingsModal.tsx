@@ -4,6 +4,14 @@ import {
   User,
   Sparkles,
   Lock,
+  CreditCard,
+  Check,
+  ArrowLeft,
+  Receipt,
+  Copy,
+  CheckCircle2,
+  ShieldCheck,
+  QrCode,
   Upload,
   Save,
   LogOut,
@@ -12,6 +20,7 @@ import {
   Clock,
   Loader2,
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { profileService, type UserProfile } from '@/services/profileService';
+import { billingService, type BillingPlan, type SubscriptionInfo } from '@/services/billingService';
 import api from '@/services/api';
 import { useStudioStore } from '../../store/studioStore';
 import { toast } from 'sonner';
@@ -49,7 +59,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
   const { theme } = useStudioStore();
   const isDark = theme === 'dark';
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'plan' | 'security'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'plan' | 'billing' | 'security'>('profile');
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -57,6 +67,23 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [quota, setQuota] = useState<StudioQuotaInfo | null>(null);
+
+  // Estados de Faturamento & Planos
+  const [plans, setPlans] = useState<BillingPlan[]>([]);
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
+  const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState<BillingPlan | null>(null);
+  const [checkoutPaymentType, setCheckoutPaymentType] = useState<'credit_card' | 'pix'>('credit_card');
+  const [isViewingInvoices, setIsViewingInvoices] = useState(false);
+  const [isSubmittingCheckout, setIsSubmittingCheckout] = useState(false);
+  const [pixCopied, setPixCopied] = useState(false);
+
+  const [cardData, setCardData] = useState({
+    number: '•••• •••• •••• 4242',
+    name: '',
+    expiry: '12/28',
+    cvv: '888',
+  });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -92,12 +119,17 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
       try {
         setIsLoading(true);
 
-        const [profileData, preferencesData] = await Promise.all([
+        const [profileData, preferencesData, plansData, subscriptionData] = await Promise.all([
           profileService.getProfile(),
           profileService.getPreferences().catch(() => null),
+          billingService.getPlans().catch(() => []),
+          billingService.getSubscription().catch(() => null),
         ]);
 
         setProfile(profileData);
+        setPlans(plansData);
+        setSubscription(subscriptionData);
+
         setFormData({
           name: profileData.name || '',
           email: profileData.email || '',
@@ -105,16 +137,20 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
           language: preferencesData?.language || 'pt-BR',
         });
 
+        if (subscriptionData?.billing_interval) {
+          setBillingInterval(subscriptionData.billing_interval);
+        }
+
         try {
           const quotaRes = await api.get('/api/v2/studio/quotas/');
           if (quotaRes.data) {
             setQuota(quotaRes.data);
           }
         } catch {
-          // Ignorar se cotas indisponíveis
+          // Ignorar se cotas indisponiveis
         }
       } catch (error) {
-        console.error('Erro ao carregar dados do perfil:', error);
+        console.error('Erro ao carregar dados da conta:', error);
       } finally {
         setIsLoading(false);
       }
@@ -225,6 +261,50 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
     }
   };
 
+  const handleExecuteCheckout = async () => {
+    if (!selectedPlanForCheckout) return;
+
+    try {
+      setIsSubmittingCheckout(true);
+      const res = await billingService.checkout({
+        tier: selectedPlanForCheckout.tier,
+        interval: billingInterval,
+        payment_method_type: checkoutPaymentType,
+        payment_details: {
+          last4: cardData.number.replace(/\D/g, '').slice(-4) || '4242',
+          brand: 'mastercard',
+          holder_name: cardData.name || formData.name || 'Assinante Catana',
+        },
+      });
+
+      toast.success(res.message || 'Plano atualizado com sucesso');
+
+      const [updatedSub, quotaRes] = await Promise.all([
+        billingService.getSubscription(),
+        api.get('/api/v2/studio/quotas/').catch(() => null),
+      ]);
+      setSubscription(updatedSub);
+      if (quotaRes?.data) {
+        setQuota(quotaRes.data);
+      }
+
+      setSelectedPlanForCheckout(null);
+    } catch (error: any) {
+      const msg = error.response?.data?.error || 'Erro ao processar assinatura.';
+      toast.error(msg);
+    } finally {
+      setIsSubmittingCheckout(false);
+    }
+  };
+
+  const handleCopyPix = () => {
+    const pixCode = '00020126580014br.gov.bcb.pix0136342c1290-7cb2-4a0b-9df2-catana20265204000053039865802BR5920Catana Studio Ltda6009Sao Paulo62070503***6304E8A2';
+    navigator.clipboard.writeText(pixCode);
+    setPixCopied(true);
+    toast.success('Chave PIX copiada para a area de transferencia');
+    setTimeout(() => setPixCopied(false), 2500);
+  };
+
   const getInitials = (name: string) => {
     if (!name) return 'C';
     return name
@@ -314,7 +394,28 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Plano & IA</span>
+            <span>Consumo & IA</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('billing');
+              setIsViewingInvoices(false);
+              setSelectedPlanForCheckout(null);
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+              activeTab === 'billing'
+                ? isDark
+                  ? 'bg-zinc-800 text-white border border-zinc-700/80 shadow-xs'
+                  : 'bg-zinc-900 text-white shadow-xs'
+                : isDark
+                ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+                : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
+            }`}
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            <span>Planos & Cobrança</span>
           </button>
 
           <button
@@ -547,7 +648,448 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                 </div>
               )}
 
-              {/* ABA 3: SEGURANCA */}
+              {/* ABA 3: PLANOS & COBRANCA */}
+              {activeTab === 'billing' && (
+                <div className="space-y-3.5">
+                  {selectedPlanForCheckout ? (
+                    /* SUB-TELA: CHECKOUT INTEGRADO */
+                    <div className="space-y-3 animate-in fade-in-50 duration-150">
+                      <div className="flex items-center justify-between pb-1.5 border-b border-inherit">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPlanForCheckout(null)}
+                          className={`flex items-center gap-1.5 text-xs transition-colors cursor-pointer ${
+                            isDark ? 'text-zinc-400 hover:text-zinc-100' : 'text-zinc-500 hover:text-zinc-900'
+                          }`}
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                          <span>Voltar aos planos</span>
+                        </button>
+                        <span className="text-xs font-semibold">
+                          Contratação &bull; {selectedPlanForCheckout.name}
+                        </span>
+                      </div>
+
+                      {/* Resumo do Pedido */}
+                      <div className="p-3 rounded-xl border border-inherit bg-zinc-500/5 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold">{selectedPlanForCheckout.name}</span>
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] font-mono capitalize ${
+                                isDark
+                                  ? 'bg-zinc-800/80 border-zinc-700 text-zinc-300'
+                                  : 'bg-zinc-200/80 border-zinc-300 text-zinc-700'
+                              }`}
+                            >
+                              {billingInterval === 'annual' ? 'Ciclo Anual (-25% OFF)' : 'Ciclo Mensal'}
+                            </Badge>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-semibold tracking-tight">
+                              R${' '}
+                              {billingInterval === 'annual'
+                                ? (selectedPlanForCheckout.price_annual_brl * 12)
+                                    .toFixed(2)
+                                    .replace('.', ',')
+                                : selectedPlanForCheckout.price_monthly_brl
+                                    .toFixed(2)
+                                    .replace('.', ',')}
+                            </span>
+                            <span className="text-[11px] text-zinc-400 ml-1">
+                              {billingInterval === 'annual' ? '/ano' : '/mês'}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 leading-tight">
+                          {selectedPlanForCheckout.description}
+                        </p>
+                      </div>
+
+                      {/* Seletor de Forma de Pagamento */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Forma de Pagamento</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setCheckoutPaymentType('credit_card')}
+                            className={`flex items-center justify-center gap-2 p-2 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
+                              checkoutPaymentType === 'credit_card'
+                                ? isDark
+                                  ? 'bg-zinc-800 border-zinc-600 text-white shadow-xs'
+                                  : 'bg-zinc-900 border-zinc-900 text-white shadow-xs'
+                                : isDark
+                                ? 'bg-zinc-900/30 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                                : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:text-zinc-900'
+                            }`}
+                          >
+                            <CreditCard className="w-3.5 h-3.5" />
+                            <span>Cartão de Crédito</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setCheckoutPaymentType('pix')}
+                            className={`flex items-center justify-center gap-2 p-2 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
+                              checkoutPaymentType === 'pix'
+                                ? isDark
+                                  ? 'bg-zinc-800 border-zinc-600 text-white shadow-xs'
+                                  : 'bg-zinc-900 border-zinc-900 text-white shadow-xs'
+                                : isDark
+                                ? 'bg-zinc-900/30 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                                : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:text-zinc-900'
+                            }`}
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                            <span>PIX Instantâneo</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Campos do Meio de Pagamento */}
+                      {checkoutPaymentType === 'credit_card' ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-[11px] text-zinc-400">Número do Cartão</Label>
+                            <Input
+                              value={cardData.number}
+                              onChange={(e) => setCardData({ ...cardData, number: e.target.value })}
+                              placeholder="4242 4242 4242 4242"
+                              className="h-8 text-xs font-mono"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label className="text-[11px] text-zinc-400">Nome do Titular</Label>
+                            <Input
+                              value={cardData.name}
+                              onChange={(e) => setCardData({ ...cardData, name: e.target.value })}
+                              placeholder="Como gravado no cartão"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <div className="space-y-1">
+                              <Label className="text-[11px] text-zinc-400">Validade</Label>
+                              <Input
+                                value={cardData.expiry}
+                                onChange={(e) => setCardData({ ...cardData, expiry: e.target.value })}
+                                placeholder="MM/AA"
+                                className="h-8 text-xs font-mono"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[11px] text-zinc-400">CVV</Label>
+                              <Input
+                                value={cardData.cvv}
+                                onChange={(e) => setCardData({ ...cardData, cvv: e.target.value })}
+                                placeholder="123"
+                                className="h-8 text-xs font-mono"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 rounded-xl border border-inherit bg-zinc-500/5 flex items-center gap-3">
+                          <div className="p-1.5 rounded-lg bg-white shrink-0">
+                            <QRCodeSVG
+                              value="00020126580014br.gov.bcb.pix0136342c1290-7cb2-4a0b-9df2-catana20265204000053039865802BR5920Catana Studio Ltda6009Sao Paulo62070503***6304E8A2"
+                              size={68}
+                            />
+                          </div>
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <p className="text-xs font-medium">QR Code PIX com Aprovação Instantânea</p>
+                            <p className="text-[10.5px] text-zinc-400 leading-tight">
+                              Escaneie ou copie o código. A liberação de tokens e novos limites ocorre na hora.
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleCopyPix}
+                              className="h-7 px-2.5 text-[11px] cursor-pointer gap-1.5"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>{pixCopied ? 'Chave Copiada' : 'Copiar Chave PIX'}</span>
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      <Button
+                        type="button"
+                        onClick={handleExecuteCheckout}
+                        disabled={isSubmittingCheckout}
+                        className={`w-full h-8 text-xs cursor-pointer gap-1.5 rounded-lg transition-all ${
+                          isDark
+                            ? 'bg-zinc-100 hover:bg-white text-zinc-950 font-medium shadow-xs'
+                            : 'bg-zinc-900 hover:bg-zinc-800 text-white font-medium shadow-xs'
+                        }`}
+                      >
+                        {isSubmittingCheckout ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Processando ativação...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Confirmar e Ativar {selectedPlanForCheckout.name}</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ) : isViewingInvoices ? (
+                    /* SUB-TELA: HISTORICO DE FATURAS */
+                    <div className="space-y-3 animate-in fade-in-50 duration-150">
+                      <div className="flex items-center justify-between pb-1.5 border-b border-inherit">
+                        <button
+                          type="button"
+                          onClick={() => setIsViewingInvoices(false)}
+                          className={`flex items-center gap-1.5 text-xs transition-colors cursor-pointer ${
+                            isDark ? 'text-zinc-400 hover:text-zinc-100' : 'text-zinc-500 hover:text-zinc-900'
+                          }`}
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                          <span>Voltar aos planos</span>
+                        </button>
+                        <span className="text-xs font-semibold">
+                          Histórico de Faturas ({subscription?.invoices?.length || 0})
+                        </span>
+                      </div>
+
+                      {!subscription?.invoices || subscription.invoices.length === 0 ? (
+                        <div className="py-12 text-center text-xs text-zinc-500">
+                          Nenhuma fatura anterior registrada nesta conta.
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                          {subscription.invoices.map((inv) => (
+                            <div
+                              key={inv.id}
+                              className="p-2.5 rounded-xl border border-inherit flex items-center justify-between text-xs"
+                            >
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-[11px] font-semibold">
+                                    {inv.receipt_code}
+                                  </span>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                  >
+                                    Pago
+                                  </Badge>
+                                </div>
+                                <p className="text-[10.5px] text-zinc-400">
+                                  {inv.plan_name} &bull; {inv.billing_interval === 'annual' ? 'Anual' : 'Mensal'} &bull;{' '}
+                                  {inv.payment_method_summary || 'Cartão'}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <span className="font-semibold font-mono">
+                                  R$ {inv.amount_brl.toFixed(2).replace('.', ',')}
+                                </span>
+                                <p className="text-[10px] text-zinc-500">
+                                  {inv.paid_at ? new Date(inv.paid_at).toLocaleDateString('pt-BR') : 'Hoje'}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* SUB-TELA PRINCIPAL: COMPARATIVO DOS 3 PLANOS */
+                    <div className="space-y-3">
+                      {/* Barra Superior: Plano Atual + Toggle de Ciclo */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-zinc-400">Plano Atual:</span>
+                          <Badge
+                            variant="outline"
+                            className={`text-[10.5px] font-mono ${
+                              isDark
+                                ? 'bg-zinc-800/80 border-zinc-700 text-zinc-300'
+                                : 'bg-zinc-200/80 border-zinc-300 text-zinc-700'
+                            }`}
+                          >
+                            {subscription?.plan_name || quota?.plan_name || 'Plano Gratuito'}
+                          </Badge>
+                        </div>
+
+                        {/* Toggle Ciclo Mensal / Anual */}
+                        <div
+                          className={`flex items-center p-0.5 rounded-lg border text-xs ${
+                            isDark ? 'border-zinc-800 bg-zinc-900/60' : 'border-zinc-200 bg-zinc-100'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setBillingInterval('monthly')}
+                            className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                              billingInterval === 'monthly'
+                                ? isDark
+                                  ? 'bg-zinc-800 text-white shadow-xs'
+                                  : 'bg-white text-zinc-950 shadow-xs'
+                                : isDark
+                                ? 'text-zinc-400 hover:text-zinc-200'
+                                : 'text-zinc-500 hover:text-zinc-900'
+                            }`}
+                          >
+                            Mensal
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setBillingInterval('annual')}
+                            className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                              billingInterval === 'annual'
+                                ? isDark
+                                  ? 'bg-zinc-800 text-white shadow-xs'
+                                  : 'bg-white text-zinc-950 shadow-xs'
+                                : isDark
+                                ? 'text-zinc-400 hover:text-zinc-200'
+                                : 'text-zinc-500 hover:text-zinc-900'
+                            }`}
+                          >
+                            Anual (-25%)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Grid de 3 Cards de Planos */}
+                      <div className="grid grid-cols-3 gap-2">
+                        {plans.map((planItem) => {
+                          const currentTier = subscription?.tier || quota?.tier || 'free';
+                          const isCurrent = currentTier === planItem.tier;
+                          const price =
+                            billingInterval === 'annual'
+                              ? planItem.price_annual_brl
+                              : planItem.price_monthly_brl;
+
+                          return (
+                            <div
+                              key={planItem.id}
+                              className={`p-2.5 rounded-xl border flex flex-col justify-between transition-all ${
+                                planItem.is_popular
+                                  ? isDark
+                                    ? 'border-zinc-600 bg-zinc-900/70 relative shadow-sm'
+                                    : 'border-zinc-400 bg-zinc-50 relative shadow-sm'
+                                  : isDark
+                                  ? 'border-zinc-800/80 bg-zinc-500/5'
+                                  : 'border-zinc-200 bg-zinc-50/50'
+                              }`}
+                            >
+                              {planItem.is_popular && (
+                                <div className="absolute -top-2 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-zinc-100 text-zinc-950 tracking-tight shadow-xs">
+                                  Mais Escolhido
+                                </div>
+                              )}
+
+                              <div className="space-y-1.5">
+                                <h4 className="text-xs font-semibold tracking-tight">{planItem.name}</h4>
+                                <div>
+                                  <div className="flex items-baseline gap-0.5">
+                                    <span className="text-sm font-bold tracking-tight">
+                                      R$ {price.toFixed(0)}
+                                    </span>
+                                    <span className="text-[10px] text-zinc-400">/mês</span>
+                                  </div>
+                                  {billingInterval === 'annual' && price > 0 && (
+                                    <p className="text-[9px] text-zinc-400 font-mono">
+                                      Cobrado R$ {(price * 12).toFixed(0)}/ano
+                                    </p>
+                                  )}
+                                </div>
+
+                                <ul className="space-y-1 pt-1.5 border-t border-inherit">
+                                  {planItem.features.slice(0, 3).map((feat, idx) => (
+                                    <li
+                                      key={idx}
+                                      className="flex items-start gap-1 text-[10px] text-zinc-300 leading-tight"
+                                    >
+                                      <Check className="w-2.5 h-2.5 text-zinc-400 shrink-0 mt-0.5" />
+                                      <span className="line-clamp-2">{feat}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+
+                              <div className="pt-2">
+                                {isCurrent ? (
+                                  <Button
+                                    disabled
+                                    size="sm"
+                                    variant="outline"
+                                    className="w-full h-7 text-[10.5px] opacity-60 cursor-not-allowed"
+                                  >
+                                    Plano Atual
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => setSelectedPlanForCheckout(planItem)}
+                                    className={`w-full h-7 text-[10.5px] font-medium cursor-pointer transition-all ${
+                                      planItem.is_popular
+                                        ? 'bg-zinc-100 hover:bg-white text-zinc-950 shadow-xs'
+                                        : isDark
+                                        ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-100'
+                                        : 'bg-zinc-900 hover:bg-zinc-800 text-white'
+                                    }`}
+                                  >
+                                    <span>
+                                      {planItem.tier === 'free'
+                                        ? 'Plano Gratuito'
+                                        : `Assinar ${planItem.name.replace('Plano ', '')}`}
+                                    </span>
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Barra de Status e Link de Faturas */}
+                      <div className="p-2.5 rounded-xl border border-inherit flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="text-[11px] text-zinc-400">
+                            {subscription?.tier && subscription.tier !== 'free'
+                              ? `Renovação automática via ${
+                                  subscription.payment_method_type === 'pix'
+                                    ? 'PIX'
+                                    : subscription.payment_method_details?.last4
+                                    ? `Cartão final ${subscription.payment_method_details.last4}`
+                                    : 'Cartão'
+                                } em ${
+                                  subscription.current_period_end
+                                    ? new Date(subscription.current_period_end).toLocaleDateString('pt-BR')
+                                    : 'breve'
+                                }`
+                              : 'Plano gratuito sem cobrança recorrente ativa.'}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsViewingInvoices(true)}
+                          className={`text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                            isDark ? 'text-zinc-300 hover:text-white' : 'text-zinc-700 hover:text-zinc-950'
+                          }`}
+                        >
+                          <Receipt className="w-3 h-3" />
+                          <span>Faturas ({subscription?.invoices?.length || 0})</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ABA 4: SEGURANCA */}
               {activeTab === 'security' && (
                 <div className="space-y-4">
                   <form onSubmit={handleChangePassword} className="space-y-3">
@@ -679,6 +1221,16 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
               >
                 {quota?.plan_name || 'Plano Gratuito'}
               </Badge>
+            </>
+          ) : activeTab === 'billing' ? (
+            <>
+              <span className="text-[11px] text-zinc-500">
+                Cobrança segura com ativação imediata de tokens e ferramentas de IA.
+              </span>
+              <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono">
+                <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                <span>SSL Seguro 256-bit</span>
+              </div>
             </>
           ) : (
             <>

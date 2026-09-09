@@ -332,5 +332,85 @@ class StudioBackendTests(TestCase):
         self.assertIn("processed_url", response.data)
         self.assertTrue(response.data["has_transparency"])
 
+    def test_billing_plans_list(self):
+        """Verifica a rota GET /api/v2/studio/billing/plans/ e precificacao do Cenario A"""
+        url = reverse('studio_billing_plans')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        plans = response.data.get("plans", [])
+        self.assertEqual(len(plans), 3)
+
+        tiers = {p["tier"]: p for p in plans}
+        self.assertIn("free", tiers)
+        self.assertIn("pro", tiers)
+        self.assertIn("enterprise", tiers)
+
+        # Checa valores do Cenario A
+        self.assertEqual(tiers["free"]["price_monthly_brl"], 0.0)
+        self.assertEqual(tiers["pro"]["price_monthly_brl"], 67.0)
+        self.assertEqual(tiers["pro"]["price_annual_brl"], 49.0)
+        self.assertTrue(tiers["pro"]["is_popular"])
+        self.assertTrue(tiers["pro"]["can_use_council"])
+        self.assertEqual(tiers["enterprise"]["price_monthly_brl"], 197.0)
+
+    def test_billing_subscription_and_checkout_flow(self):
+        """Verifica o fluxo completo de consulta de assinatura, checkout com cartao e atualizacao de cota"""
+        # 1. Consulta inicial (Plano Gratuito)
+        sub_url = reverse('studio_billing_subscription')
+        res_sub = self.client.get(sub_url)
+        self.assertEqual(res_sub.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_sub.data["tier"], "free")
+        self.assertEqual(len(res_sub.data["invoices"]), 0)
+
+        # 2. Realizar Upgrade para Pro via Cartao
+        checkout_url = reverse('studio_billing_checkout')
+        payload = {
+            "tier": "pro",
+            "interval": "monthly",
+            "payment_method_type": "credit_card",
+            "payment_details": {
+                "last4": "5521",
+                "brand": "mastercard",
+                "holder_name": "Designer Catana"
+            }
+        }
+        res_checkout = self.client.post(checkout_url, payload, format="json")
+        self.assertEqual(res_checkout.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_checkout.data["success"])
+        self.assertEqual(res_checkout.data["tier"], "pro")
+        self.assertEqual(res_checkout.data["amount_brl"], 67.0)
+
+        # 3. Verificar se a cota do usuario foi atualizada imediatamente
+        quota_url = reverse('studio_quota_status')
+        res_quota = self.client.get(quota_url)
+        self.assertEqual(res_quota.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_quota.data["tier"], "pro")
+        self.assertEqual(res_quota.data["monthly_token_quota"], 1500000)
+        self.assertTrue(res_quota.data["can_use_council"])
+
+        # 4. Verificar se a fatura foi gravada no historico
+        res_sub_after = self.client.get(sub_url)
+        self.assertEqual(res_sub_after.data["tier"], "pro")
+        self.assertEqual(len(res_sub_after.data["invoices"]), 1)
+        inv = res_sub_after.data["invoices"][0]
+        self.assertEqual(inv["amount_brl"], 67.0)
+        self.assertEqual(inv["status"], "paid")
+        self.assertIn("5521", inv["payment_method_summary"])
+
+    def test_billing_checkout_pix(self):
+        """Verifica upgrade utilizando PIX"""
+        checkout_url = reverse('studio_billing_checkout')
+        payload = {
+            "tier": "enterprise",
+            "interval": "annual",
+            "payment_method_type": "pix",
+            "payment_details": {}
+        }
+        res_checkout = self.client.post(checkout_url, payload, format="json")
+        self.assertEqual(res_checkout.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_checkout.data["tier"], "enterprise")
+        # 159 * 12 = 1908
+        self.assertEqual(res_checkout.data["amount_brl"], 1908.0)
+
 
 

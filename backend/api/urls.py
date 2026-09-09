@@ -37,6 +37,12 @@ from .views_studio import (
     StudioCatalogImportDocumentView,
     StudioMediaRemoveBackgroundView,
 )
+from .views_billing import (
+    StudioBillingPlansView,
+    StudioSubscriptionView,
+    StudioCheckoutView,
+    StudioCancelSubscriptionView,
+)
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
@@ -128,6 +134,10 @@ urlpatterns = [
     path('v2/studio/templates/save-from-spread/', StudioTemplateSaveFromSpreadView.as_view(), name='studio_templates_save_from_spread'),
     path('v2/studio/catalogs/import-document/', StudioCatalogImportDocumentView.as_view(), name='studio_catalog_import_document'),
     path('v2/studio/media/remove-background/', StudioMediaRemoveBackgroundView.as_view(), name='studio_media_remove_background'),
+    path('v2/studio/billing/plans/', StudioBillingPlansView.as_view(), name='studio_billing_plans'),
+    path('v2/studio/billing/subscription/', StudioSubscriptionView.as_view(), name='studio_billing_subscription'),
+    path('v2/studio/billing/checkout/', StudioCheckoutView.as_view(), name='studio_billing_checkout'),
+    path('v2/studio/billing/cancel/', StudioCancelSubscriptionView.as_view(), name='studio_billing_cancel'),
 
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

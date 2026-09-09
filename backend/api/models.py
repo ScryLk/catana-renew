@@ -519,6 +519,11 @@ class SubscriptionPlan(models.Model):
     """
     name = models.CharField(max_length=100)
     tier = models.CharField(max_length=50, unique=True, default='free')
+    price_monthly_brl = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
+    price_annual_brl = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
+    description = models.TextField(blank=True, default='')
+    features = models.JSONField(default=list, blank=True)
+    is_popular = models.BooleanField(default=False)
     monthly_token_quota = models.BigIntegerField(default=100000)
     max_active_catalogs = models.PositiveIntegerField(default=5)
     rate_limit_rpm = models.PositiveIntegerField(default=15)
@@ -551,6 +556,75 @@ class OrganizationQuota(models.Model):
 
     def __str__(self):
         return f"Quota: {self.organization.name} ({self.tokens_used_this_month} tokens)"
+
+
+class OrganizationSubscription(models.Model):
+    """
+    Estado da assinatura, ciclo de faturamento e metodo de pagamento da organizacao
+    """
+    STATUS_CHOICES = [
+        ('active', 'Ativa'),
+        ('trialing', 'Em Avaliacao'),
+        ('past_due', 'Pendente'),
+        ('canceled', 'Cancelada'),
+    ]
+    INTERVAL_CHOICES = [
+        ('monthly', 'Mensal'),
+        ('annual', 'Anual'),
+    ]
+    PAYMENT_METHOD_CHOICES = [
+        ('credit_card', 'Cartao de Credito'),
+        ('pix', 'PIX'),
+        ('none', 'Nenhum'),
+    ]
+
+    organization = models.OneToOneField(Organization, on_delete=models.CASCADE, related_name='subscription')
+    plan = models.ForeignKey(SubscriptionPlan, null=True, blank=True, on_delete=models.SET_NULL, related_name='subscriptions')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    billing_interval = models.CharField(max_length=20, choices=INTERVAL_CHOICES, default='monthly')
+    payment_method_type = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='none')
+    payment_method_details = models.JSONField(default=dict, blank=True)
+    current_period_start = models.DateTimeField(auto_now_add=True)
+    current_period_end = models.DateTimeField(null=True, blank=True)
+    cancel_at_period_end = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'organization_subscriptions'
+
+    def __str__(self):
+        return f"Subscription: {self.organization.name} - {self.plan.name if self.plan else 'Sem Plano'} ({self.status})"
+
+
+class BillingInvoice(models.Model):
+    """
+    Faturas e recibos de pagamento do Catana Studio
+    """
+    STATUS_CHOICES = [
+        ('paid', 'Pago'),
+        ('pending', 'Pendente'),
+        ('failed', 'Falhou'),
+        ('refunded', 'Estornado'),
+    ]
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='billing_invoices')
+    plan = models.ForeignKey(SubscriptionPlan, null=True, blank=True, on_delete=models.SET_NULL, related_name='invoices')
+    amount_brl = models.DecimalField(max_digits=8, decimal_places=2)
+    billing_interval = models.CharField(max_length=20, default='monthly')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='paid')
+    payment_method_type = models.CharField(max_length=20, default='credit_card')
+    payment_method_summary = models.CharField(max_length=100, blank=True, default='')
+    receipt_code = models.CharField(max_length=64, unique=True)
+    paid_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'billing_invoices'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Invoice {self.receipt_code}: R$ {self.amount_brl} ({self.status})"
 
 
 class TokenUsageLog(models.Model):
