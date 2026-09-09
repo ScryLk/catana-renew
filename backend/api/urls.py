@@ -43,6 +43,9 @@ from .views_billing import (
     StudioCheckoutView,
     StudioCancelSubscriptionView,
 )
+from .views_transparency import (
+    StudioDataExportView,
+)
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
@@ -138,6 +141,7 @@ urlpatterns = [
     path('v2/studio/billing/subscription/', StudioSubscriptionView.as_view(), name='studio_billing_subscription'),
     path('v2/studio/billing/checkout/', StudioCheckoutView.as_view(), name='studio_billing_checkout'),
     path('v2/studio/billing/cancel/', StudioCancelSubscriptionView.as_view(), name='studio_billing_cancel'),
+    path('v2/studio/transparency/export-data/', StudioDataExportView.as_view(), name='studio_data_export'),
 
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

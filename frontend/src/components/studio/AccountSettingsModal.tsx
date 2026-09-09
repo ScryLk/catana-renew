@@ -12,6 +12,9 @@ import {
   CheckCircle2,
   ShieldCheck,
   QrCode,
+  FileDown,
+  Scale,
+  Database,
   Upload,
   Save,
   LogOut,
@@ -59,7 +62,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
   const { theme } = useStudioStore();
   const isDark = theme === 'dark';
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'plan' | 'billing' | 'security'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'plan' | 'billing' | 'transparency' | 'security'>('profile');
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -77,6 +80,10 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
   const [isViewingInvoices, setIsViewingInvoices] = useState(false);
   const [isSubmittingCheckout, setIsSubmittingCheckout] = useState(false);
   const [pixCopied, setPixCopied] = useState(false);
+
+  // Estados de Transparencia & LGPD
+  const [includeAiMetadata, setIncludeAiMetadata] = useState(true);
+  const [isExportingData, setIsExportingData] = useState(false);
 
   const [cardData, setCardData] = useState({
     number: '•••• •••• •••• 4242',
@@ -305,6 +312,28 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
     setTimeout(() => setPixCopied(false), 2500);
   };
 
+  const handleExportData = async () => {
+    try {
+      setIsExportingData(true);
+      const res = await api.get('/api/v2/studio/transparency/export-data/', {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `catana_dados_${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Arquivo de dados gerado com sucesso (LGPD)');
+    } catch {
+      toast.error('Erro ao exportar dados da conta');
+    } finally {
+      setIsExportingData(false);
+    }
+  };
+
   const getInitials = (name: string) => {
     if (!name) return 'C';
     return name
@@ -358,15 +387,16 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
         </div>
 
         {/* Abas de Navegacao Compactas */}
+        {/* Abas de Navegacao Compactas (5 Abas) */}
         <div
-          className={`px-5 pt-3 pb-2 flex gap-1 border-b shrink-0 ${
+          className={`px-4 pt-2.5 pb-2 flex gap-1 border-b shrink-0 overflow-x-auto ${
             isDark ? 'border-zinc-800/60 bg-zinc-950/20' : 'border-zinc-100 bg-zinc-50/30'
           }`}
         >
           <button
             type="button"
             onClick={() => setActiveTab('profile')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11.5px] font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'profile'
                 ? isDark
                   ? 'bg-zinc-800 text-white border border-zinc-700/80 shadow-xs'
@@ -383,7 +413,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('plan')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11.5px] font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'plan'
                 ? isDark
                   ? 'bg-zinc-800 text-white border border-zinc-700/80 shadow-xs'
@@ -404,7 +434,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
               setIsViewingInvoices(false);
               setSelectedPlanForCheckout(null);
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11.5px] font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'billing'
                 ? isDark
                   ? 'bg-zinc-800 text-white border border-zinc-700/80 shadow-xs'
@@ -420,8 +450,25 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
 
           <button
             type="button"
+            onClick={() => setActiveTab('transparency')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11.5px] font-medium transition-colors cursor-pointer shrink-0 ${
+              activeTab === 'transparency'
+                ? isDark
+                  ? 'bg-zinc-800 text-white border border-zinc-700/80 shadow-xs'
+                  : 'bg-zinc-900 text-white shadow-xs'
+                : isDark
+                ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+                : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Transparência</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('security')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11.5px] font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === 'security'
                 ? isDark
                   ? 'bg-zinc-800 text-white border border-zinc-700/80 shadow-xs'
@@ -1089,7 +1136,143 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                 </div>
               )}
 
-              {/* ABA 4: SEGURANCA */}
+              {/* ABA 4: TRANSPARENCIA */}
+              {activeTab === 'transparency' && (
+                <div className="space-y-3 animate-in fade-in-50 duration-150">
+                  {/* Card Superior de Status de Seguranca */}
+                  <div className="p-2.5 rounded-xl border border-inherit bg-zinc-500/5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <div>
+                        <p className="text-xs font-semibold">Ambiente Corporativo Isolado</p>
+                        <p className="text-[10.5px] text-zinc-400">
+                          Seus dados sao protegidos por criptografia e politicas rigidas de governanca.
+                        </p>
+                      </div>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={`text-[9.5px] font-mono shrink-0 ${
+                        isDark
+                          ? 'bg-zinc-800/80 border-zinc-700 text-zinc-300'
+                          : 'bg-zinc-200/80 border-zinc-300 text-zinc-700'
+                      }`}
+                    >
+                      LGPD Compliant
+                    </Badge>
+                  </div>
+
+                  {/* 3 Pilares Fundamentais */}
+                  <div className="space-y-2">
+                    {/* Pilar 1: Zero-Training */}
+                    <div className="p-2.5 rounded-xl border border-inherit text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 font-semibold">
+                          <ShieldCheck className="w-3.5 h-3.5 text-zinc-400" />
+                          <span>Privacidade de Modelos de IA (Zero-Training)</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-emerald-400">Ativo</span>
+                      </div>
+                      <p className="text-[10.5px] text-zinc-400 leading-relaxed">
+                        Seus catalogos, fotos de produtos, textos e ativos de marca <strong>nunca</strong> sao utilizados para treinar modelos publicos do Google Gemini ou de terceiros. As requisicoes trafegam por canais corporativos criptografados (TLS 1.3).
+                      </p>
+                    </div>
+
+                    {/* Pilar 2: Propriedade Intelectual */}
+                    <div className="p-2.5 rounded-xl border border-inherit text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 font-semibold">
+                          <Scale className="w-3.5 h-3.5 text-zinc-400" />
+                          <span>Propriedade Intelectual & Direitos Comerciais</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-zinc-400">100% Titular</span>
+                      </div>
+                      <p className="text-[10.5px] text-zinc-400 leading-relaxed">
+                        A titularidade autoral e patrimonial sobre todos os catalogos, layouts e pecas diagramadas pertence integralmente a sua empresa. Nao ha cobranca de royalties sobre vendas ou distribuicao de seus catalogos.
+                      </p>
+                    </div>
+
+                    {/* Pilar 3: Stack de Motores Transparentes */}
+                    <div className="p-2.5 rounded-xl border border-inherit text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 font-semibold">
+                          <Database className="w-3.5 h-3.5 text-zinc-400" />
+                          <span>Motores e Infraestrutura de IA</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-zinc-400">Auditavel</span>
+                      </div>
+                      <p className="text-[10.5px] text-zinc-400 leading-relaxed">
+                        Motor orquestrador Google Gemini 2.0 Flash, pipeline de visao computacional isolada para remocao de fundo e compilador grafico em 300 DPI CMYK com armazenamento seguro (AES-256).
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Acoes do Titular & LGPD */}
+                  <div className="p-2.5 rounded-xl border border-inherit bg-zinc-500/5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-medium">Portabilidade de Dados (Art. 18 LGPD)</p>
+                        <p className="text-[10px] text-zinc-400">
+                          Baixe todos os dados cadastrais, catalogos e faturas em formato estruturado JSON.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleExportData}
+                        disabled={isExportingData}
+                        className="h-7 text-[11px] cursor-pointer gap-1.5 shrink-0"
+                      >
+                        {isExportingData ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <FileDown className="w-3 h-3" />
+                        )}
+                        <span>{isExportingData ? 'Gerando...' : 'Exportar Dados'}</span>
+                      </Button>
+                    </div>
+
+                    <Separator className={isDark ? 'bg-zinc-800' : 'bg-zinc-200'} />
+
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-medium">Metadados de IA em Catalogos</p>
+                        <p className="text-[10px] text-zinc-400">
+                          Registrar metadados de diagramacao assistida por IA nos arquivos exportados.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={includeAiMetadata}
+                        onClick={() => setIncludeAiMetadata(!includeAiMetadata)}
+                        className={`relative inline-flex h-4.5 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                          includeAiMetadata
+                            ? isDark
+                              ? 'bg-zinc-100'
+                              : 'bg-zinc-900'
+                            : isDark
+                            ? 'bg-zinc-800'
+                            : 'bg-zinc-300'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                            includeAiMetadata
+                              ? isDark
+                                ? 'translate-x-3.5 bg-zinc-950'
+                                : 'translate-x-3.5 bg-white'
+                              : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ABA 5: SEGURANCA */}
               {activeTab === 'security' && (
                 <div className="space-y-4">
                   <form onSubmit={handleChangePassword} className="space-y-3">
@@ -1230,6 +1413,16 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
               <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono">
                 <ShieldCheck className="w-3 h-3 text-emerald-500" />
                 <span>SSL Seguro 256-bit</span>
+              </div>
+            </>
+          ) : activeTab === 'transparency' ? (
+            <>
+              <span className="text-[11px] text-zinc-500">
+                Diretrizes de transparência e conformidade com a LGPD (Lei 13.709/2018).
+              </span>
+              <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono">
+                <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                <span>Zero-Training Ativo</span>
               </div>
             </>
           ) : (

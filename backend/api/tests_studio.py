@@ -412,5 +412,20 @@ class StudioBackendTests(TestCase):
         # 159 * 12 = 1908
         self.assertEqual(res_checkout.data["amount_brl"], 1908.0)
 
+    def test_data_export_lgpd(self):
+        """Verifica o endpoint de portabilidade e exportacao de dados em conformidade com a LGPD"""
+        url = reverse('studio_data_export')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "application/json; charset=utf-8")
+        self.assertIn("attachment", response["Content-Disposition"])
+
+        data = json.loads(response.content.decode("utf-8"))
+        self.assertIn("export_metadata", data)
+        self.assertIn("user_profile", data)
+        self.assertEqual(data["user_profile"]["username"], "test_studio_user")
+        self.assertIn("catalogs", data)
+        self.assertIn("ai_quota", data)
+
 
 
