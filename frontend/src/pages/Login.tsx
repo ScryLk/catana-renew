@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { GoogleLoginButton } from '../components/auth/GoogleLoginButton';
+import { MultiAgentShowcase } from '../components/auth/MultiAgentShowcase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,7 +37,7 @@ export const Login = () => {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-950 p-4">
-      <div className="w-full max-w-[1000px] h-[640px] bg-white dark:bg-zinc-900 rounded-[32px] shadow-2xl overflow-hidden flex">
+      <div className="w-full max-w-[1040px] h-[640px] bg-white dark:bg-zinc-900 rounded-[32px] shadow-2xl overflow-hidden flex border border-zinc-200/80 dark:border-zinc-800/80">
 
         {/* Left Side - Form Area */}
         <div className="w-full lg:w-5/12 p-8 sm:p-12 flex flex-col justify-center relative">
@@ -162,38 +163,9 @@ export const Login = () => {
           </div>
         </div>
 
-        {/* Right Side - Illustration Area */}
-        <div className="hidden lg:block w-7/12 relative bg-zinc-50 dark:bg-zinc-900 overflow-hidden">
-          {/* Background elements */}
-          <div className="absolute inset-0 bg-gradient-to-br from-zinc-100 to-white dark:from-zinc-900 dark:to-black" />
-
-          {/* Abstract Illustration Composition */}
-          <div className="absolute inset-0 flex items-center justify-center p-12">
-            <div className="relative w-full h-full">
-              {/* Floating Cards simulating catalog elements */}
-              <div className="absolute top-[15%] right-[10%] w-64 h-80 bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl rotate-[-6deg] z-10 p-4 border border-zinc-100 dark:border-zinc-700 animate-in fade-in zoom-in duration-1000">
-                <div className="w-full h-32 bg-zinc-100 dark:bg-zinc-700/50 rounded-lg mb-4" />
-                <div className="h-4 w-3/4 bg-zinc-100 dark:bg-zinc-700 rounded mb-2" />
-                <div className="h-4 w-1/2 bg-zinc-100 dark:bg-zinc-700 rounded" />
-              </div>
-
-              <div className="absolute top-[30%] left-[15%] w-56 h-72 bg-zinc-900 rounded-2xl shadow-2xl shadow-zinc-500/20 rotate-[12deg] z-20 p-6 flex flex-col justify-between animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-200">
-                <div className="w-12 h-12 bg-white/10 rounded-full" />
-                <div className="space-y-2">
-                  <div className="h-3 w-full bg-white/10 rounded" />
-                  <div className="h-3 w-2/3 bg-white/10 rounded" />
-                </div>
-              </div>
-
-              <div className="absolute bottom-[20%] right-[20%] w-48 h-48 bg-white dark:bg-zinc-800 rounded-2xl shadow-xl rotate-[3deg] z-0 p-4 border border-zinc-100 dark:border-zinc-700 opacity-80">
-                <div className="w-full h-full rounded-lg bg-gradient-to-br from-green-50 to-blue-50 dark:from-zinc-800 dark:to-zinc-900" />
-              </div>
-
-              {/* Decorative flowing shapes */}
-              <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-zinc-200/50 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-screen" />
-              <div className="absolute -top-20 -right-20 w-96 h-96 bg-zinc-200/50 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-screen" />
-            </div>
-          </div>
+        {/* Right Side - Multi-Agent Showcase */}
+        <div className="hidden lg:block w-7/12 relative bg-zinc-950 overflow-hidden">
+          <MultiAgentShowcase />
         </div>
       </div>
     </div>
