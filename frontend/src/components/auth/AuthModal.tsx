@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, AlertCircle, Loader2 } from 'lucide-react';
+import { X, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useStudioStore } from '../../store/studioStore';
 import { GoogleLoginButton } from './GoogleLoginButton';
@@ -24,6 +24,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     login,
     googleLogin,
     register,
+    requestPasswordReset,
     isLoading,
     error,
     clearError,
@@ -40,17 +41,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   // Sync modal view
   const isRegisterView = authModalView === 'register';
+  const isForgotPasswordView = authModalView === 'forgot-password';
 
   useEffect(() => {
     if (isOpen) {
       clearError();
       setLocalError(null);
+      setResetSent(false);
     }
   }, [isOpen, clearError, authModalView]);
 
@@ -130,6 +135,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError(null);
+
+    if (!resetEmail.trim()) {
+      setLocalError('Informe o seu e-mail cadastrado.');
+      return;
+    }
+
+    try {
+      await requestPasswordReset(resetEmail.trim());
+      setResetSent(true);
+    } catch {
+      // Erro tratado pela store
+    }
+  };
+
   const displayedError = localError || error;
 
   return (
@@ -178,11 +200,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
 
             <h2 className="text-xl font-bold tracking-tight mb-1">
-              {isRegisterView ? 'Criar sua conta' : 'Bem-vindo(a)'}
+              {isForgotPasswordView
+                ? 'Recuperar senha'
+                : isRegisterView
+                ? 'Criar sua conta'
+                : 'Bem-vindo(a)'}
             </h2>
             <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-              {isRegisterView
-                ? 'Comece a criar catalogos inteligentes com o Catana 2.0.'
+              {isForgotPasswordView
+                ? 'Informe seu e-mail cadastrado para receber o link de redefinição.'
+                : isRegisterView
+                ? 'Comece a criar catálogos inteligentes com o Catana 2.0.'
                 : 'Insira seus dados para continuar no Catana.'}
             </p>
           </div>
@@ -195,44 +223,117 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           )}
 
-          {/* Login com Google Oficial */}
-          <div className="mb-4">
-            <GoogleLoginButton
-              onSuccess={async (credential) => {
-                try {
-                  await googleLogin(credential);
-                  if (onClose) onClose();
-                } catch {
-                  // Erro tratado pela store
-                }
-              }}
-              isLoading={isLoading}
-            />
-          </div>
+          {/* Login com Google Oficial (apenas em login/registro) */}
+          {!isForgotPasswordView && (
+            <>
+              <div className="mb-4">
+                <GoogleLoginButton
+                  onSuccess={async (credential) => {
+                    try {
+                      await googleLogin(credential);
+                      if (onClose) onClose();
+                    } catch {
+                      // Erro tratado pela store
+                    }
+                  }}
+                  isLoading={isLoading}
+                />
+              </div>
 
-          {/* Divisor Visual Monocromatico */}
-          <div className="relative flex items-center justify-center my-3">
-            <div
-              className={`border-t w-full ${
-                isDark ? 'border-zinc-800' : 'border-zinc-200'
-              }`}
-            />
-            <span
-              className={`px-3 text-[10px] uppercase tracking-wider font-mono shrink-0 ${
-                isDark ? 'bg-[#131316] text-zinc-500' : 'bg-white text-zinc-400'
-              }`}
-            >
-              ou continue com
-            </span>
-            <div
-              className={`border-t w-full ${
-                isDark ? 'border-zinc-800' : 'border-zinc-200'
-              }`}
-            />
-          </div>
+              {/* Divisor Visual Monocromatico */}
+              <div className="relative flex items-center justify-center my-3">
+                <div
+                  className={`border-t w-full ${
+                    isDark ? 'border-zinc-800' : 'border-zinc-200'
+                  }`}
+                />
+                <span
+                  className={`px-3 text-[10px] uppercase tracking-wider font-mono shrink-0 ${
+                    isDark ? 'bg-[#131316] text-zinc-500' : 'bg-white text-zinc-400'
+                  }`}
+                >
+                  ou continue com
+                </span>
+                <div
+                  className={`border-t w-full ${
+                    isDark ? 'border-zinc-800' : 'border-zinc-200'
+                  }`}
+                />
+              </div>
+            </>
+          )}
 
-          {/* Formularios Alternaveis (Login vs Registro) */}
-          {!isRegisterView ? (
+          {/* Formularios Alternaveis (Esqueci Senha vs Login vs Registro) */}
+          {isForgotPasswordView ? (
+            resetSent ? (
+              <div className="space-y-4 my-2">
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-start gap-3 text-xs text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-sm text-emerald-700 dark:text-emerald-300">
+                      Link enviado com sucesso!
+                    </p>
+                    <p className="leading-relaxed opacity-90">
+                      Se o e-mail informado estiver cadastrado em nossa base, enviamos as instruções com o link de recuperação.
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  onClick={() => openAuthModal('login')}
+                  className={`w-full h-10 rounded-xl font-medium text-xs shadow-md transition-all cursor-pointer ${
+                    isDark
+                      ? 'bg-zinc-100 hover:bg-white text-zinc-950 font-semibold shadow-black/40'
+                      : 'bg-zinc-900 hover:bg-zinc-800 text-white shadow-zinc-500/10'
+                  }`}
+                >
+                  Voltar para o login
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-3.5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="auth-reset-email" className="text-xs font-medium">
+                    E-mail cadastrado
+                  </Label>
+                  <Input
+                    id="auth-reset-email"
+                    type="email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    disabled={isLoading}
+                    placeholder="seu.email@exemplo.com"
+                    autoFocus
+                    className={`h-10 rounded-xl text-xs transition-all ${
+                      isDark
+                        ? 'bg-zinc-800/70 border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 focus:text-white focus:border-zinc-500'
+                        : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:text-zinc-900 focus:border-zinc-400'
+                    }`}
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  className={`w-full h-10 rounded-xl font-medium text-xs shadow-md transition-all cursor-pointer mt-1 ${
+                    isDark
+                      ? 'bg-zinc-100 hover:bg-white text-zinc-950 font-semibold shadow-black/40'
+                      : 'bg-zinc-900 hover:bg-zinc-800 text-white shadow-zinc-500/10'
+                  }`}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                      Enviando link...
+                    </>
+                  ) : (
+                    'Enviar link de recuperação'
+                  )}
+                </Button>
+              </form>
+            )
+          ) : !isRegisterView ? (
             <form onSubmit={handleLoginSubmit} className="space-y-3">
               <div className="space-y-1.5">
                 <Label htmlFor="auth-username" className="text-xs font-medium">
@@ -258,16 +359,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <Label htmlFor="auth-password" className="text-xs font-medium">
                     Senha
                   </Label>
-                  <a
-                    href="/forgot-password"
-                    className={`text-[11px] font-medium transition-colors hover:underline ${
+                  <button
+                    type="button"
+                    onClick={() => openAuthModal('forgot-password')}
+                    className={`text-[11px] font-medium transition-colors hover:underline cursor-pointer ${
                       isDark
                         ? 'text-zinc-400 hover:text-zinc-200'
                         : 'text-zinc-500 hover:text-zinc-800'
                     }`}
                   >
                     Esqueci a senha
-                  </a>
+                  </button>
                 </div>
                 <Input
                   id="auth-password"
@@ -417,10 +519,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </form>
           )}
 
-          {/* Rodape de Alternancia entre Login e Cadastro */}
+          {/* Rodape de Alternancia entre Telas */}
           <div className="mt-4 text-center">
             <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-              {!isRegisterView ? (
+              {isForgotPasswordView ? (
+                <>
+                  Lembrou a sua senha?{' '}
+                  <button
+                    type="button"
+                    onClick={() => openAuthModal('login')}
+                    className={`font-semibold underline cursor-pointer transition-colors ${
+                      isDark ? 'text-zinc-200 hover:text-white' : 'text-zinc-900 hover:text-black'
+                    }`}
+                  >
+                    Entrar
+                  </button>
+                </>
+              ) : !isRegisterView ? (
                 <>
                   Nao tem uma conta?{' '}
                   <button

@@ -201,3 +201,8 @@ JWT_AUTH_COOKIE_SECURE = not DEBUG
 # Google OAuth 2.0
 GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID', default='')
 GOOGLE_CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET', default='')
+
+# Password Reset & Email Configuration
+FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5174')
+EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Catana <noreply@catana.dev>')

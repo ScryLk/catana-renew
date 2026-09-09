@@ -37,8 +37,8 @@ interface AuthStore {
   isLoading: boolean;
   error: string | null;
   isAuthModalOpen: boolean;
-  authModalView: 'login' | 'register';
-  openAuthModal: (view?: 'login' | 'register') => void;
+  authModalView: 'login' | 'register' | 'forgot-password';
+  openAuthModal: (view?: 'login' | 'register' | 'forgot-password') => void;
   closeAuthModal: () => void;
   login: (credentials: { username: string; password: string }) => Promise<void>;
   googleLogin: (credential: string) => Promise<void>;
@@ -48,6 +48,8 @@ interface AuthStore {
   clearError: () => void;
   register: (user: any) => Promise<void>;
   autoLogin: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<{ message: string }>;
+  confirmPasswordReset: (payload: { uid: string; token: string; new_password: string }) => Promise<{ message: string }>;
 }
 
 // Helper para selecionar organizacao e sede padrao apos login
@@ -390,6 +392,46 @@ export const useAuthStore = create<AuthStore>()(
             error: errorMessage,
             isLoading: false,
           });
+          throw err;
+        }
+      },
+
+      requestPasswordReset: async (email: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await axios.post(
+            `${API_BASE_URL}/api/auth/password-reset/`,
+            { email }
+          );
+          set({ isLoading: false });
+          return response.data;
+        } catch (err: any) {
+          const errorMessage =
+            err.response?.data?.error ||
+            err.response?.data?.detail ||
+            err.message ||
+            'Erro ao solicitar redefinicao de senha';
+          set({ error: errorMessage, isLoading: false });
+          throw err;
+        }
+      },
+
+      confirmPasswordReset: async (payload: { uid: string; token: string; new_password: string }) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await axios.post(
+            `${API_BASE_URL}/api/auth/password-reset/confirm/`,
+            payload
+          );
+          set({ isLoading: false });
+          return response.data;
+        } catch (err: any) {
+          const errorMessage =
+            err.response?.data?.error ||
+            err.response?.data?.detail ||
+            err.message ||
+            'Erro ao redefinir senha';
+          set({ error: errorMessage, isLoading: false });
           throw err;
         }
       },

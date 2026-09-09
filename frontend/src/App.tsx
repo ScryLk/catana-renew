@@ -18,6 +18,7 @@ import { Categories } from './pages/Categories';
 import { Inbox } from './pages/Inbox';
 import { SearchResults } from './pages/SearchResults';
 import { PublicProfilePage } from './pages/PublicProfile';
+import { ResetPassword } from './pages/ResetPassword';
 import { Toaster } from 'sonner';
 
 function App() {
@@ -59,6 +60,8 @@ function App() {
           {/* Public Auth Routes & AI Studio Experience */}
           <Route path="/login" element={<KatanaStudio />} />
           <Route path="/register" element={<KatanaStudio />} />
+          <Route path="/forgot-password" element={<KatanaStudio />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/showcase/:id" element={<CatalogShowcase />} />
 
           {/* Katana 2.0 AI Studio: Primary Experience */}

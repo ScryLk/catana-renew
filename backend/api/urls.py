@@ -21,6 +21,8 @@ from .views_auth import (
     CatanaLogoutView,
     CatanaLogoutAllView,
     GoogleAuthView,
+    PasswordResetRequestView,
+    PasswordResetConfirmView,
 )
 from .views_studio import (
     StudioAgentsListView,
@@ -61,6 +63,8 @@ urlpatterns = [
     path('auth/logout/', CatanaLogoutView.as_view(), name='token_logout'),
     path('auth/logout-all/', CatanaLogoutAllView.as_view(), name='token_logout_all'),
     path('auth/google/', GoogleAuthView.as_view(), name='google_auth'),
+    path('auth/password-reset/', PasswordResetRequestView.as_view(), name='password_reset_request'),
+    path('auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('register/', register_user, name='register'),
     path('dashboard/stats/', dashboard_stats, name='dashboard_stats'),
 

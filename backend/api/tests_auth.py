@@ -1,5 +1,8 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
@@ -166,3 +169,61 @@ class CatanaAuthTests(TestCase):
         # 3. Usuario 1 tentando acessar Catalogo 2 diretamente -> 404
         res_detail = self.client.get(f'/api/v2/studio/catalogs/{cat2.id}/')
         self.assertEqual(res_detail.status_code, 404)
+
+    def test_password_reset_request_valid_email(self):
+        res = self.client.post('/api/auth/password-reset/', {
+            'email': 'designer1@catana.dev'
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('message', res.data)
+
+    def test_password_reset_request_nonexistent_email(self):
+        # Deve retornar 200 para nao revelar emails cadastrados (prevencao de enumeracao)
+        res = self.client.post('/api/auth/password-reset/', {
+            'email': 'inexistente@catana.dev'
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('message', res.data)
+
+    def test_password_reset_confirm_success(self):
+        uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = default_token_generator.make_token(self.user)
+
+        res = self.client.post('/api/auth/password-reset/confirm/', {
+            'uid': uidb64,
+            'token': token,
+            'new_password': 'BrandNewPassword456!'
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('message', res.data)
+
+        # Confirma que a nova senha funciona para login
+        login_res = self.client.post('/api/auth/token/', {
+            'username': 'designer1',
+            'password': 'BrandNewPassword456!'
+        })
+        self.assertEqual(login_res.status_code, 200)
+        self.assertIn('access', login_res.data)
+
+    def test_password_reset_confirm_invalid_token(self):
+        uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
+        res = self.client.post('/api/auth/password-reset/confirm/', {
+            'uid': uidb64,
+            'token': 'token-invalido-123',
+            'new_password': 'BrandNewPassword456!'
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('error', res.data)
+
+    def test_password_reset_confirm_short_password(self):
+        uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = default_token_generator.make_token(self.user)
+
+        res = self.client.post('/api/auth/password-reset/confirm/', {
+            'uid': uidb64,
+            'token': token,
+            'new_password': '123'
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('error', res.data)
+

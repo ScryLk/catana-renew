@@ -1,7 +1,11 @@
 import logging
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import send_mail
 from django.db import transaction
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -334,3 +338,117 @@ class GoogleAuthView(APIView):
 
         set_refresh_cookie(response, str(refresh))
         return response
+
+
+class PasswordResetRequestView(APIView):
+    """
+    Solicita a redefinicao de senha para um usuario ativo.
+    Gera um token criptografico seguro via default_token_generator e envia
+    o link por e-mail (ou console em dev).
+    Retorna sempre HTTP 200 para evitar enumeracao de usuarios.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email', '').strip()
+
+        if not email:
+            return Response(
+                {'error': 'Informe o e-mail cadastrado.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        if user:
+            uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+
+            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5174').rstrip('/')
+            reset_url = f"{frontend_url}/reset-password?uid={uidb64}&token={token}"
+
+            logger.info("Solicitacao de redefinicao de senha para %s: %s", user.email, reset_url)
+
+            subject = "Recuperacao de Senha - Catana"
+            user_name = user.first_name or user.username
+            message = (
+                f"Ola, {user_name}!\n\n"
+                f"Recebemos uma solicitacao para redefinir a sua senha no Catana.\n"
+                f"Para definir uma nova senha, acesse o link abaixo:\n\n"
+                f"{reset_url}\n\n"
+                f"Se voce nao solicitou a redefinicao de senha, ignore esta mensagem.\n\n"
+                f"Equipe Catana"
+            )
+            from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@catana.dev')
+
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=from_email,
+                    recipient_list=[user.email],
+                    fail_silently=True,
+                )
+            except Exception as e:
+                logger.warning("Falha ao enviar e-mail de redefinicao de senha: %s", e)
+
+        return Response(
+            {'message': 'Se o e-mail informado estiver cadastrado, um link de recuperacao foi enviado.'},
+            status=status.HTTP_200_OK
+        )
+
+
+class PasswordResetConfirmView(APIView):
+    """
+    Valida o token criptografico e define a nova senha do usuario.
+    Invalida sessoes ativas anteriores garantindo seguranca pos-redefinicao.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        uidb64 = request.data.get('uid')
+        token = request.data.get('token')
+        new_password = request.data.get('new_password')
+
+        if not uidb64 or not token or not new_password:
+            return Response(
+                {'error': 'Dados incompletos para redefinicao de senha.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if len(new_password) < 6:
+            return Response(
+                {'error': 'A nova senha deve ter no minimo 6 caracteres.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+
+        if user is None or not default_token_generator.check_token(user, token):
+            return Response(
+                {'error': 'Link de recuperacao invalido ou expirado.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user.set_password(new_password)
+        user.save()
+
+        # Invalida sessoes ativas anteriores
+        try:
+            tokens = OutstandingToken.objects.filter(user=user)
+            for t in tokens:
+                try:
+                    BlacklistedToken.objects.get_or_create(token=t)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        return Response(
+            {'message': 'Senha redefinida com sucesso. Faca login com a nova senha.'},
+            status=status.HTTP_200_OK
+        )
+

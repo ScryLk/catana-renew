@@ -34,14 +34,19 @@ export const KatanaStudio: React.FC = () => {
     }
   }, [checkAuth, autoLogin]);
 
-  // Se acessar /login ou /register via URL direta, abre a respectiva visao no modal
+  // Se acessar /login, /register, /forgot-password ou via query param ?auth=..., abre a respectiva visao no modal
   useEffect(() => {
-    if (location.pathname === '/login') {
+    const searchParams = new URLSearchParams(location.search);
+    const authParam = searchParams.get('auth');
+
+    if (location.pathname === '/login' || authParam === 'login') {
       openAuthModal('login');
-    } else if (location.pathname === '/register') {
+    } else if (location.pathname === '/register' || authParam === 'register') {
       openAuthModal('register');
+    } else if (location.pathname === '/forgot-password' || authParam === 'forgot-password') {
+      openAuthModal('forgot-password');
     }
-  }, [location.pathname, openAuthModal]);
+  }, [location.pathname, location.search, openAuthModal]);
 
   const {
     hasStartedSession,
