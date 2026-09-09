@@ -1,6 +1,5 @@
 import { useState, useEffect, type FC } from 'react';
-import { Sidebar } from '../components/Sidebar';
-import { Header } from '../components/Header';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,35 +9,97 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { User, Lock, Building2, Settings, Activity, Upload, Save, LogOut } from 'lucide-react';
-import { profileService, type UserProfile, type UserPreferences, type ActivityLog } from '@/services/profileService';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import {
+  ArrowLeft,
+  User,
+  Sparkles,
+  ShieldCheck,
+  Activity,
+  Upload,
+  Save,
+  LogOut,
+  Sun,
+  Moon,
+  KeyRound,
+  CheckCircle2,
+  Lock,
+  Zap,
+  Cpu,
+  Clock,
+  Mail,
+  Briefcase,
+  Layers,
+} from 'lucide-react';
+import {
+  profileService,
+  type UserProfile,
+  type ActivityLog,
+} from '@/services/profileService';
+import api from '@/services/api';
+import { useStudioStore } from '../store/studioStore';
 import { toast } from 'sonner';
 import { LoadingScreen } from '@/components/common/LoadingScreen';
 
+interface StudioQuotaInfo {
+  tier: string;
+  plan_name: string;
+  tokens_used_this_month: number;
+  monthly_token_quota: number;
+  tokens_remaining: number;
+  percentage_used: number;
+  max_active_catalogs: number;
+  rate_limit_rpm: number;
+  can_use_council: boolean;
+  can_export_pdf: boolean;
+}
+
 export const Profile: FC = () => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const navigate = useNavigate();
+  const { theme, toggleTheme } = useStudioStore();
+  const isDark = theme === 'dark';
+
   const [isLoading, setIsLoading] = useState(true);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  // Estados do backend
+  // Estados dos dados
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
+  const [quota, setQuota] = useState<StudioQuotaInfo | null>(null);
 
-  // Estados do formulário
+  // Estados do formulario geral
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     position: '',
     language: 'pt-BR',
-    theme: 'dark',
     notifyOnPublish: true,
     notifyOnUpdates: true,
   });
 
-  // Carregar dados do perfil
+  // Estados do formulario de senha
+  const [passwordData, setPasswordData] = useState({
+    old_password: '',
+    new_password: '',
+    confirm_password: '',
+  });
+
+  // Atalho de teclado: tecla Escape retorna ao Studio
   useEffect(() => {
-    const loadProfileData = async () => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        navigate('/');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate]);
+
+  // Carregar dados de perfil, preferencias, atividades e cotas
+  useEffect(() => {
+    const loadData = async () => {
       try {
         setIsLoading(true);
 
@@ -49,19 +110,26 @@ export const Profile: FC = () => {
         ]);
 
         setProfile(profileData);
-        setPreferences(preferencesData);
         setRecentActivity(activityData);
 
-        // Atualizar formData com os dados do backend
         setFormData({
           name: profileData.name || '',
           email: profileData.email || '',
           position: profileData.position || '',
-          language: preferencesData.language,
-          theme: preferencesData.theme,
-          notifyOnPublish: preferencesData.notify_on_publish,
-          notifyOnUpdates: preferencesData.notify_on_updates,
+          language: preferencesData.language || 'pt-BR',
+          notifyOnPublish: preferencesData.notify_on_publish ?? true,
+          notifyOnUpdates: preferencesData.notify_on_updates ?? true,
         });
+
+        // Buscar dados de cota do Studio
+        try {
+          const quotaRes = await api.get('/api/v2/studio/quotas/');
+          if (quotaRes.data) {
+            setQuota(quotaRes.data);
+          }
+        } catch (quotaErr) {
+          console.warn('Nao foi possivel carregar cotas em tempo real:', quotaErr);
+        }
       } catch (error) {
         console.error('Erro ao carregar dados do perfil:', error);
         toast.error('Erro ao carregar dados do perfil');
@@ -70,39 +138,34 @@ export const Profile: FC = () => {
       }
     };
 
-    loadProfileData();
+    loadData();
   }, []);
 
-  const handleSave = async () => {
+  const handleSaveProfile = async () => {
     if (!profile) return;
 
     try {
-      setIsSaving(true);
+      setIsSavingProfile(true);
 
-      // Atualizar perfil
-      const updatedProfile = await profileService.updateProfile({
-        name: formData.name,
-        position: formData.position,
-      });
-
-      // Atualizar preferências
-      const updatedPreferences = await profileService.updatePreferences({
-        language: formData.language,
-        theme: formData.theme,
-        notify_on_publish: formData.notifyOnPublish,
-        notify_on_updates: formData.notifyOnUpdates,
-      });
+      const [updatedProfile] = await Promise.all([
+        profileService.updateProfile({
+          name: formData.name,
+          position: formData.position,
+        }),
+        profileService.updatePreferences({
+          language: formData.language,
+          notify_on_publish: formData.notifyOnPublish,
+          notify_on_updates: formData.notifyOnUpdates,
+        }),
+      ]);
 
       setProfile(updatedProfile);
-      setPreferences(updatedPreferences);
-
-      toast.success('Perfil atualizado com sucesso!');
-      setIsEditing(false);
+      toast.success('Informacoes atualizadas com sucesso');
     } catch (error) {
-      console.error('Erro ao salvar perfil:', error);
-      toast.error('Erro ao salvar alterações');
+      console.error('Erro ao salvar informacoes:', error);
+      toast.error('Erro ao salvar alteracoes do perfil');
     } finally {
-      setIsSaving(false);
+      setIsSavingProfile(false);
     }
   };
 
@@ -110,499 +173,846 @@ export const Profile: FC = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validar tamanho do arquivo (2MB)
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('Arquivo muito grande. Máximo: 2MB');
+      toast.error('Arquivo muito grande. O limite e de 2MB');
       return;
     }
 
-    // Validar tipo do arquivo
-    if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
-      toast.error('Formato inválido. Use PNG ou JPG');
+    if (!['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.type)) {
+      toast.error('Formato invalido. Envie uma imagem PNG, JPG ou WEBP');
       return;
     }
 
     try {
+      setIsUploadingAvatar(true);
       const updatedProfile = await profileService.uploadAvatar(file);
       setProfile(updatedProfile);
-      toast.success('Avatar atualizado com sucesso!');
+      toast.success('Foto de perfil atualizada com sucesso');
     } catch (error) {
-      console.error('Erro ao fazer upload do avatar:', error);
-      toast.error('Erro ao atualizar avatar');
+      console.error('Erro ao fazer upload da imagem:', error);
+      toast.error('Erro ao atualizar foto de perfil');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!passwordData.old_password || !passwordData.new_password || !passwordData.confirm_password) {
+      toast.error('Preencha todos os campos para alterar a senha');
+      return;
+    }
+
+    if (passwordData.new_password.length < 8) {
+      toast.error('A nova senha deve ter no minimo 8 caracteres');
+      return;
+    }
+
+    if (passwordData.new_password !== passwordData.confirm_password) {
+      toast.error('A confirmacao de senha nao coincide com a nova senha');
+      return;
+    }
+
+    try {
+      setIsChangingPassword(true);
+      await profileService.changePassword(passwordData);
+      toast.success('Senha atualizada com sucesso');
+      setPasswordData({
+        old_password: '',
+        new_password: '',
+        confirm_password: '',
+      });
+    } catch (error: any) {
+      console.error('Erro ao alterar senha:', error);
+      const msg =
+        error.response?.data?.error ||
+        error.response?.data?.detail ||
+        'Erro ao alterar senha. Verifique a senha atual informada.';
+      toast.error(msg);
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
   const handleLogoutAllSessions = async () => {
     try {
       await profileService.logoutAllSessions();
-      toast.success('Todas as sessões foram encerradas');
+      toast.success('Todas as sessoes ativas foram encerradas');
     } catch (error) {
-      console.error('Erro ao encerrar sessões:', error);
-      toast.error('Erro ao encerrar sessões');
+      console.error('Erro ao encerrar sessoes:', error);
+      toast.error('Erro ao encerrar outras sessoes');
     }
   };
 
   const getInitials = (name: string) => {
+    if (!name) return 'C';
     return name
+      .trim()
       .split(' ')
-      .map(n => n[0])
+      .filter(Boolean)
+      .map((n) => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
   };
 
-  const getRoleBadge = (role: string) => {
-    const colors = {
-      'Proprietário': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-      'Administrador': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-      'Membro': 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
-    };
-    return colors[role as keyof typeof colors] || colors['Membro'];
-  };
-
-  // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-zinc-950">
-        <Sidebar />
-        <Header />
-        <main className="ml-16 pt-20">
-          <div className="p-8 max-w-[1400px] mx-auto">
-            <LoadingScreen message="Carregando perfil..." />
-          </div>
-        </main>
+      <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-[#09090b]' : 'bg-[#fafafa]'}`}>
+        <LoadingScreen message="Carregando configuracoes da conta..." />
       </div>
     );
   }
 
-  if (!profile || !preferences) {
+  if (!profile) {
     return (
-      <div className="min-h-screen bg-zinc-950">
-        <Sidebar />
-        <Header />
-        <main className="ml-16 pt-20">
-          <div className="p-8 max-w-[1400px] mx-auto">
-            <div className="text-center text-zinc-400 py-12">
-              Erro ao carregar dados do perfil
-            </div>
-          </div>
-        </main>
+      <div className={`min-h-screen flex flex-col items-center justify-center p-6 ${isDark ? 'bg-[#09090b] text-zinc-100' : 'bg-[#fafafa] text-zinc-900'}`}>
+        <p className="text-sm text-zinc-400 mb-4">Nao foi possivel carregar os dados do seu perfil.</p>
+        <Button onClick={() => navigate('/')} variant="outline">
+          Voltar ao Studio
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950">
-      <Sidebar />
-      <Header />
+    <div
+      className={`min-h-screen transition-colors duration-200 ${
+        isDark ? 'bg-[#09090b] text-zinc-100' : 'bg-[#fafafa] text-zinc-900'
+      }`}
+    >
+      {/* Barra Superior Editorial Catana 2.0 */}
+      <header
+        className={`sticky top-0 z-40 border-b backdrop-blur-md transition-colors ${
+          isDark
+            ? 'bg-[#09090b]/85 border-zinc-800/80 text-zinc-100'
+            : 'bg-white/85 border-zinc-200 text-zinc-900'
+        }`}
+      >
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          {/* Esquerda: Retorno ao Studio e Marca */}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/')}
+              className={`gap-2 text-xs font-medium cursor-pointer transition-colors ${
+                isDark
+                  ? 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80'
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
+              }`}
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Voltar ao Studio</span>
+              <kbd
+                className={`hidden sm:inline-block text-[10px] px-1.5 py-0.5 rounded font-mono border ${
+                  isDark
+                    ? 'bg-zinc-800/80 border-zinc-700 text-zinc-400'
+                    : 'bg-zinc-100 border-zinc-300 text-zinc-500'
+                }`}
+              >
+                Esc
+              </kbd>
+            </Button>
 
-      {/* Main Content */}
-      <main className="ml-16 pt-20">
-        <div className="p-8 max-w-[1400px] mx-auto">
-          {/* Title Section */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-zinc-100 mb-2">Meu Perfil</h1>
-            <p className="text-zinc-400">Gerencie suas informações pessoais e preferências</p>
+            <Separator
+              orientation="vertical"
+              className={`h-4 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`}
+            />
+
+            {/* Logo de assinatura Catana 2.0 */}
+            <div className="flex items-center gap-2">
+              <svg
+                viewBox="40 10 640 170"
+                className={`h-4.5 fill-none stroke-current ${
+                  isDark ? 'text-white' : 'text-zinc-950'
+                }`}
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path
+                  d="M 132 96 C 124 82 104 76 88 86 C 70 97 62 122 74 138 C 84 150 104 148 116 136 C 128 148 146 142 158 120 C 170 100 190 90 206 90 C 194 78 172 80 160 94 C 148 108 148 128 160 140 C 170 149 186 145 196 132 C 202 124 206 108 208 92 C 206 112 206 130 214 142 C 222 152 236 146 244 128 C 256 102 270 66 282 44 C 280 70 276 110 278 132 C 280 148 294 152 308 138 C 322 124 344 100 384 90 C 370 78 348 80 336 94 C 324 108 324 128 336 140 C 346 149 362 145 372 132 C 378 124 382 108 384 92 C 382 112 382 130 390 142 C 398 152 412 146 420 128 C 428 110 438 96 446 88 C 448 106 446 128 448 142 C 458 116 472 94 486 88 C 494 84 498 92 498 104 C 498 120 496 132 502 142 C 508 150 520 146 528 128 C 536 112 560 92 592 90 C 578 78 556 80 544 94 C 532 108 532 128 544 140 C 554 149 570 145 580 132 C 586 124 590 108 592 92 C 590 112 590 130 598 142 C 608 154 626 148 640 124"
+                />
+                <path d="M 250 76 C 272 68 300 64 328 70" />
+              </svg>
+              <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border bg-purple-500/10 border-purple-500/20 text-purple-400">
+                2.0
+              </span>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column - Main Info */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* 1️⃣ Informações do Perfil */}
-              <Card className="bg-zinc-900 border-zinc-800">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-500/10 rounded-lg">
-                      <User className="w-5 h-5 text-blue-500" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-zinc-100">Informações do Perfil</CardTitle>
-                      <CardDescription className="text-zinc-400">
-                        Seus dados pessoais e informações de contato
-                      </CardDescription>
-                    </div>
+          {/* Direita: Alternador de Tema e Avatar */}
+          <div className="flex items-center gap-2.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className={`w-8 h-8 rounded-lg cursor-pointer transition-colors ${
+                isDark
+                  ? 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
+              }`}
+              title={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+            >
+              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </Button>
+
+            <div
+              className={`hidden sm:flex items-center gap-2 pl-2 border-l ${
+                isDark ? 'border-zinc-800' : 'border-zinc-200'
+              }`}
+            >
+              <Avatar className="w-7 h-7">
+                <AvatarImage src={profile.avatar} />
+                <AvatarFallback className="bg-purple-600 text-white text-xs">
+                  {getInitials(profile.name || profile.username)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-xs font-medium text-zinc-300 truncate max-w-[140px]">
+                {profile.name || profile.username}
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Conteudo Principal */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        {/* Cabecalho da Pagina */}
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2.5 mb-1">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                Configuracoes da Conta
+              </h1>
+              <Badge
+                variant="outline"
+                className="bg-purple-500/10 border-purple-500/20 text-purple-400 text-xs"
+              >
+                {quota?.plan_name || 'Plano Gratuito'}
+              </Badge>
+            </div>
+            <p className={`text-sm ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+              Gerencie dados cadastrais, cotas de IA do Google Gemini e diretrizes de seguranca.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-xs px-2.5 py-1 rounded-md border font-mono ${
+                isDark
+                  ? 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                  : 'bg-zinc-100 border-zinc-200 text-zinc-600'
+              }`}
+            >
+              ID: {profile.username || profile.email}
+            </span>
+          </div>
+        </div>
+
+        {/* Sistema de Abas */}
+        <Tabs defaultValue="profile" className="space-y-6">
+          <TabsList
+            className={`p-1 rounded-xl border flex flex-wrap h-auto gap-1 ${
+              isDark
+                ? 'bg-zinc-900/90 border-zinc-800 text-zinc-400'
+                : 'bg-zinc-100 border-zinc-200 text-zinc-600'
+            }`}
+          >
+            <TabsTrigger
+              value="profile"
+              className="gap-2 cursor-pointer data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm py-2 px-3.5 rounded-lg transition-all"
+            >
+              <User className="w-4 h-4" />
+              Geral & Perfil
+            </TabsTrigger>
+            <TabsTrigger
+              value="plan"
+              className="gap-2 cursor-pointer data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm py-2 px-3.5 rounded-lg transition-all"
+            >
+              <Sparkles className="w-4 h-4" />
+              Plano & IA (Gemini)
+            </TabsTrigger>
+            <TabsTrigger
+              value="security"
+              className="gap-2 cursor-pointer data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm py-2 px-3.5 rounded-lg transition-all"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              Seguranca & Acesso
+            </TabsTrigger>
+            <TabsTrigger
+              value="activity"
+              className="gap-2 cursor-pointer data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm py-2 px-3.5 rounded-lg transition-all"
+            >
+              <Activity className="w-4 h-4" />
+              Historico de Atividades
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ABA 1: Geral & Perfil */}
+          <TabsContent value="profile" className="space-y-6 mt-0">
+            <Card
+              className={`border transition-colors ${
+                isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-zinc-200 shadow-sm'
+              }`}
+            >
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                    <User className="w-5 h-5" />
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Avatar */}
-                  <div className="flex items-center gap-6">
-                    <Avatar className="w-24 h-24">
-                      <AvatarImage src={profile.avatar || `https://ui-avatars.com/api/?name=${formData.name}&background=8b5cf6&color=fff&size=96`} />
-                      <AvatarFallback className="bg-purple-500 text-white text-2xl">
-                        {getInitials(formData.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="space-y-2">
-                      <label htmlFor="avatar-upload">
+                  <div>
+                    <CardTitle className="text-base sm:text-lg">Informacoes Pessoais</CardTitle>
+                    <CardDescription className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>
+                      Atualize seu nome, cargo institucional e imagem de perfil do Studio.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Secao de Avatar */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 p-4 rounded-xl border border-dashed border-inherit">
+                  <Avatar className="w-20 h-20 border-2 border-purple-500/40">
+                    <AvatarImage src={profile.avatar} />
+                    <AvatarFallback className="bg-purple-600 text-white text-xl font-medium">
+                      {getInitials(formData.name || profile.username)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="avatar-upload-field">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="bg-zinc-800 border-zinc-700 text-zinc-100 hover:bg-zinc-700 cursor-pointer"
+                          disabled={isUploadingAvatar}
+                          className="cursor-pointer gap-2"
                           asChild
                         >
                           <span>
-                            <Upload className="w-4 h-4 mr-2" />
-                            Alterar foto
+                            <Upload className="w-3.5 h-3.5" />
+                            {isUploadingAvatar ? 'Enviando imagem...' : 'Alterar foto de perfil'}
                           </span>
                         </Button>
                       </label>
                       <input
-                        id="avatar-upload"
+                        id="avatar-upload-field"
                         type="file"
-                        accept="image/png,image/jpeg,image/jpg"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
                         onChange={handleAvatarUpload}
                         className="hidden"
                       />
-                      <p className="text-xs text-zinc-500">PNG, JPG até 2MB</p>
                     </div>
+                    <p className={`text-xs ${isDark ? 'text-zinc-500' : 'text-zinc-500'}`}>
+                      Formatos recomendados: PNG, JPG ou WEBP. Tamanho maximo: 2MB.
+                    </p>
                   </div>
+                </div>
 
-                  <Separator className="bg-zinc-800" />
+                <Separator className={isDark ? 'bg-zinc-800' : 'bg-zinc-200'} />
 
-                  {/* Form Fields */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name" className="text-zinc-300">Nome completo</Label>
+                {/* Campos do Formulario */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="field-name" className="text-xs font-semibold uppercase tracking-wider">
+                      Nome Completo
+                    </Label>
+                    <div className="relative">
+                      <User className="w-4 h-4 absolute left-3 top-3 text-zinc-500" />
                       <Input
-                        id="name"
+                        id="field-name"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        disabled={!isEditing}
-                        className="bg-zinc-800 border-zinc-700 text-zinc-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                        placeholder="Seu nome completo"
+                        className="pl-9"
                       />
                     </div>
+                  </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="text-zinc-300">E-mail</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="field-email" className="text-xs font-semibold uppercase tracking-wider">
+                      E-mail Institucional
+                    </Label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 absolute left-3 top-3 text-zinc-500" />
                       <Input
-                        id="email"
-                        type="email"
+                        id="field-email"
                         value={formData.email}
                         disabled
-                        className="bg-zinc-800 border-zinc-700 text-zinc-100 opacity-60 cursor-not-allowed"
+                        className="pl-9 opacity-70 cursor-not-allowed"
                       />
-                      <p className="text-xs text-zinc-500">O e-mail não pode ser alterado</p>
                     </div>
+                    <p className={`text-[11px] ${isDark ? 'text-zinc-500' : 'text-zinc-500'}`}>
+                      O e-mail e vinculado a sua autenticacao e nao pode ser alterado diretamente.
+                    </p>
+                  </div>
 
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="position" className="text-zinc-300">Cargo ou função (opcional)</Label>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="field-position" className="text-xs font-semibold uppercase tracking-wider">
+                      Cargo ou Funcao
+                    </Label>
+                    <div className="relative">
+                      <Briefcase className="w-4 h-4 absolute left-3 top-3 text-zinc-500" />
                       <Input
-                        id="position"
+                        id="field-position"
                         value={formData.position}
                         onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                        disabled={!isEditing}
-                        placeholder="Ex: Gerente de Marketing"
-                        className="bg-zinc-800 border-zinc-700 text-zinc-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                        placeholder="Ex: Diretor de Arte / Especialista em Catalogos"
+                        className="pl-9"
                       />
                     </div>
                   </div>
+                </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-3 pt-4">
-                    {!isEditing ? (
-                      <Button
-                        onClick={() => setIsEditing(true)}
-                        className="bg-zinc-100 hover:bg-zinc-200 text-zinc-900 cursor-pointer"
+                <Separator className={isDark ? 'bg-zinc-800' : 'bg-zinc-200'} />
+
+                {/* Preferencias de Idioma e Notificacoes */}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold mb-1">Preferencias do Studio</h3>
+                    <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                      Configure linguagem e alertas de publicacao no sistema.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                    <div className="space-y-2">
+                      <Label htmlFor="field-lang" className="text-xs">
+                        Idioma da Interface
+                      </Label>
+                      <Select
+                        value={formData.language}
+                        onValueChange={(val) => setFormData({ ...formData, language: val })}
                       >
-                        Editar informações
-                      </Button>
-                    ) : (
-                      <>
-                        <Button
-                          onClick={handleSave}
-                          disabled={isSaving}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
-                        >
-                          {isSaving ? (
-                            <>Salvando...</>
-                          ) : (
-                            <>
-                              <Save className="w-4 h-4 mr-2" />
-                              Salvar alterações
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          onClick={() => setIsEditing(false)}
-                          variant="outline"
-                          className="bg-zinc-800 border-zinc-700 text-zinc-100 hover:bg-zinc-700 cursor-pointer"
-                        >
-                          Cancelar
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* 2️⃣ Segurança da Conta */}
-              <Card className="bg-zinc-900 border-zinc-800">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-red-500/10 rounded-lg">
-                      <Lock className="w-5 h-5 text-red-500" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-zinc-100">Segurança da Conta</CardTitle>
-                      <CardDescription className="text-zinc-400">
-                        Mantenha sua conta protegida
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-lg border border-zinc-800">
-                    <div>
-                      <p className="text-sm font-medium text-zinc-100">Senha</p>
-                      <p className="text-xs text-zinc-500">Última alteração: {profile.updated_at ? new Date(profile.updated_at).toLocaleDateString('pt-BR') : 'Não disponível'}</p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="bg-zinc-800 border-zinc-700 text-zinc-100 hover:bg-zinc-700 cursor-pointer"
-                    >
-                      Alterar senha
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-lg border border-zinc-800">
-                    <div>
-                      <p className="text-sm font-medium text-zinc-100">Último acesso</p>
-                      <p className="text-xs text-zinc-500">
-                        {profile.last_login
-                          ? new Date(profile.last_login).toLocaleString('pt-BR', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })
-                          : 'Não disponível'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <Separator className="bg-zinc-800" />
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-zinc-100">Encerrar todas as sessões</p>
-                      <p className="text-xs text-zinc-500">Sair de todos os dispositivos conectados</p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleLogoutAllSessions}
-                      className="bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20 cursor-pointer"
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Encerrar sessões
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* 4️⃣ Preferências do Usuário */}
-              <Card className="bg-zinc-900 border-zinc-800">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-purple-500/10 rounded-lg">
-                      <Settings className="w-5 h-5 text-purple-500" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-zinc-100">Preferências</CardTitle>
-                      <CardDescription className="text-zinc-400">
-                        Personalize sua experiência no Catana
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="language" className="text-zinc-300">Idioma</Label>
-                      <Select value={formData.language} onValueChange={(value) => setFormData({ ...formData, language: value })}>
-                        <SelectTrigger className="bg-zinc-800 border-zinc-700 text-zinc-100">
-                          <SelectValue />
+                        <SelectTrigger id="field-lang">
+                          <SelectValue placeholder="Selecione o idioma" />
                         </SelectTrigger>
-                        <SelectContent className="bg-zinc-800 border-zinc-700">
-                          <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
-                          <SelectItem value="en">English</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="theme" className="text-zinc-300">Tema</Label>
-                      <Select value={formData.theme} onValueChange={(value) => setFormData({ ...formData, theme: value })}>
-                        <SelectTrigger className="bg-zinc-800 border-zinc-700 text-zinc-100">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-zinc-800 border-zinc-700">
-                          <SelectItem value="light">Claro</SelectItem>
-                          <SelectItem value="dark">Escuro</SelectItem>
-                          <SelectItem value="auto">Automático</SelectItem>
+                        <SelectContent>
+                          <SelectItem value="pt-BR">Portugues (Brasil)</SelectItem>
+                          <SelectItem value="en">English (US)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
 
-                  <Separator className="bg-zinc-800" />
-
-                  <div className="space-y-4">
-                    <p className="text-sm font-medium text-zinc-100">Notificações</p>
-
-                    <div className="flex items-center justify-between">
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between p-3.5 rounded-xl border border-inherit">
                       <div>
-                        <p className="text-sm text-zinc-300">Publicação de catálogo</p>
-                        <p className="text-xs text-zinc-500">Receber notificação quando um catálogo for publicado</p>
+                        <p className="text-xs font-medium">Notificacoes de Publicacao</p>
+                        <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                          Receber alertas no painel ao finalizar a geracao e publicacao de um catalogo.
+                        </p>
                       </div>
                       <Switch
                         checked={formData.notifyOnPublish}
-                        onCheckedChange={(checked) => setFormData({ ...formData, notifyOnPublish: checked })}
+                        onCheckedChange={(val) => setFormData({ ...formData, notifyOnPublish: val })}
                       />
                     </div>
 
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between p-3.5 rounded-xl border border-inherit">
                       <div>
-                        <p className="text-sm text-zinc-300">Atualizações importantes</p>
-                        <p className="text-xs text-zinc-500">Novidades e mudanças na plataforma</p>
+                        <p className="text-xs font-medium">Atualizacoes da Plataforma</p>
+                        <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                          Receber informativos sobre novos agentes de IA e recursos editoriais do Catana 2.0.
+                        </p>
                       </div>
                       <Switch
                         checked={formData.notifyOnUpdates}
-                        onCheckedChange={(checked) => setFormData({ ...formData, notifyOnUpdates: checked })}
+                        onCheckedChange={(val) => setFormData({ ...formData, notifyOnUpdates: val })}
                       />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                </div>
 
-            {/* Right Column - Organization & Activity */}
-            <div className="space-y-6">
-              {/* 3️⃣ Organização / Empresa Ativa */}
-              <Card className="bg-zinc-900 border-zinc-800">
-                <CardHeader>
+                {/* Botao de Salvar */}
+                <div className="pt-2 flex justify-end">
+                  <Button
+                    onClick={handleSaveProfile}
+                    disabled={isSavingProfile}
+                    className="bg-purple-600 hover:bg-purple-700 text-white cursor-pointer gap-2 font-medium"
+                  >
+                    <Save className="w-4 h-4" />
+                    {isSavingProfile ? 'Salvando...' : 'Salvar Alteracoes'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ABA 2: Plano & IA (Google Gemini) */}
+          <TabsContent value="plan" className="space-y-6 mt-0">
+            {/* Card de Quota e Tokens */}
+            <Card
+              className={`border transition-colors ${
+                isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-zinc-200 shadow-sm'
+              }`}
+            >
+              <CardHeader>
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-emerald-500/10 rounded-lg">
-                      <Building2 className="w-5 h-5 text-emerald-500" />
+                    <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                      <Zap className="w-5 h-5" />
                     </div>
                     <div>
-                      <CardTitle className="text-zinc-100">Minha Empresa</CardTitle>
-                      <CardDescription className="text-zinc-400">
-                        Organização ativa
+                      <CardTitle className="text-base sm:text-lg">Plano de Assinatura & Cotas de IA</CardTitle>
+                      <CardDescription className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>
+                        Consumo mensal de processamento multi-agente e capacidade de geracao.
                       </CardDescription>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-800">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-lg">
-                        {profile.username?.[0]?.toUpperCase() || 'C'}
-                      </div>
-                      <div>
-                        <p className="font-medium text-zinc-100">{profile.name || 'Organização'}</p>
-                        <p className="text-xs text-zinc-500">Membro desde {new Date(profile.created_at).toLocaleDateString('pt-BR')}</p>
-                      </div>
-                    </div>
 
+                  <Badge
+                    variant="outline"
+                    className="bg-emerald-500/10 border-emerald-500/20 text-emerald-400 text-xs uppercase tracking-wider font-semibold"
+                  >
+                    {quota?.plan_name || 'Plano Gratuito'}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Barra de Progresso de Tokens */}
+                <div className="space-y-2.5 p-4 rounded-xl border border-inherit">
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
+                    <span className="font-medium">Consumo Mensal de Tokens de IA</span>
+                    <span className="font-mono text-xs">
+                      {quota?.tokens_used_this_month?.toLocaleString('pt-BR') || '0'} /{' '}
+                      {quota?.monthly_token_quota?.toLocaleString('pt-BR') || '100.000'} tokens ({quota?.percentage_used || 0}%)
+                    </span>
+                  </div>
+
+                  <div className={`w-full h-3 rounded-full overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`}>
+                    <div
+                      className="h-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, quota?.percentage_used || 0)}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-zinc-500">
+                    <span>
+                      Restantes: {quota?.tokens_remaining?.toLocaleString('pt-BR') || '100.000'} tokens
+                    </span>
+                    <span>Renovacao automatica no dia 1 de cada mes</span>
+                  </div>
+                </div>
+
+                {/* Grade de Recursos e Limites */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+                  <div className="p-3.5 rounded-xl border border-inherit space-y-1">
+                    <div className="flex items-center gap-1.5 text-zinc-500 text-xs">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Taxa de Requisicoes</span>
+                    </div>
+                    <p className="text-lg font-bold">{quota?.rate_limit_rpm || 15} RPM</p>
+                    <p className="text-[11px] text-zinc-500">Requisicoes por minuto</p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl border border-inherit space-y-1">
+                    <div className="flex items-center gap-1.5 text-zinc-500 text-xs">
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>Catalogos Simultaneos</span>
+                    </div>
+                    <p className="text-lg font-bold">Ate {quota?.max_active_catalogs || 5}</p>
+                    <p className="text-[11px] text-zinc-500">Projetos ativos no Studio</p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl border border-inherit space-y-1">
+                    <div className="flex items-center gap-1.5 text-zinc-500 text-xs">
+                      <Cpu className="w-3.5 h-3.5" />
+                      <span>Conselho Editorial</span>
+                    </div>
+                    <p className="text-sm font-semibold text-emerald-400 flex items-center gap-1 mt-1">
+                      <CheckCircle2 className="w-4 h-4" />
+                      6 Agentes Ativos
+                    </p>
+                    <p className="text-[11px] text-zinc-500">Diretor, Copy, Comercial...</p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl border border-inherit space-y-1">
+                    <div className="flex items-center gap-1.5 text-zinc-500 text-xs">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Exportacao PDF A4</span>
+                    </div>
+                    <p className="text-sm font-semibold text-emerald-400 flex items-center gap-1 mt-1">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Habilitada
+                    </p>
+                    <p className="text-[11px] text-zinc-500">Renderizacao em alta definicao</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card de Integracao Google Gemini */}
+            <Card
+              className={`border transition-colors ${
+                isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-zinc-200 shadow-sm'
+              }`}
+            >
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                    <Cpu className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base sm:text-lg">
+                      Motor de Inteligencia Artificial (Google Gemini)
+                    </CardTitle>
+                    <CardDescription className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>
+                      Arquitetura de processamento neural e integracao com a API Google GenAI.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 rounded-xl border border-inherit space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <Badge className={`${getRoleBadge(profile.role)} border`}>
-                        {profile.role}
-                      </Badge>
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-sm font-semibold">Provedor Ativo: Google Gemini 2.0 Flash</span>
+                    </div>
+                    <Badge variant="outline" className="bg-blue-500/10 border-blue-500/20 text-blue-400 text-xs">
+                      Conexao Estavel
+                    </Badge>
+                  </div>
+                  <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                    O Catana 2.0 executa o pipeline multi-agente utilizando o SDK oficial da Google (google-genai).
+                    Os prompts estruturados coordenam o Diretor de Arte, Copywriter, Estrategista Comercial e
+                    Analista de Branding com streaming em tempo real (SSE).
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl border border-inherit space-y-3">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-semibold uppercase tracking-wider">
+                      Politica BYOK (Bring Your Own Key)
+                    </span>
+                  </div>
+                  <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                    Para conectar a cota dedicada da sua organizacao da Google Cloud Platform, defina a chave na variavel
+                    de ambiente <code className="font-mono bg-zinc-800/80 px-1 py-0.5 rounded text-zinc-300">GEMINI_API_KEY</code> no arquivo de configuracao do backend.
+                    Caso nenhuma chave seja informada, o sistema aciona de forma transparente o provedor simulado inteligente para testes sem bloqueio.
+                  </p>
+                  <div className="pt-1">
+                    <Badge variant="outline" className="text-[11px] text-zinc-400 border-zinc-700">
+                      Modo Atual: Integracao Nativa Ativa
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ABA 3: Seguranca & Acesso */}
+          <TabsContent value="security" className="space-y-6 mt-0">
+            {/* Formulario de Alteracao de Senha */}
+            <Card
+              className={`border transition-colors ${
+                isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-zinc-200 shadow-sm'
+              }`}
+            >
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base sm:text-lg">Alteracao de Senha</CardTitle>
+                    <CardDescription className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>
+                      Mantenha suas credenciais seguras. A nova senha deve ter no minimo 8 caracteres.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleChangePassword} className="space-y-4 max-w-xl">
+                  <div className="space-y-2">
+                    <Label htmlFor="old-pass" className="text-xs font-semibold uppercase tracking-wider">
+                      Senha Atual
+                    </Label>
+                    <Input
+                      id="old-pass"
+                      type="password"
+                      value={passwordData.old_password}
+                      onChange={(e) => setPasswordData({ ...passwordData, old_password: e.target.value })}
+                      placeholder="Digite a senha atual"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="new-pass" className="text-xs font-semibold uppercase tracking-wider">
+                        Nova Senha
+                      </Label>
+                      <Input
+                        id="new-pass"
+                        type="password"
+                        value={passwordData.new_password}
+                        onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
+                        placeholder="Minimo 8 caracteres"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="confirm-pass" className="text-xs font-semibold uppercase tracking-wider">
+                        Confirmar Nova Senha
+                      </Label>
+                      <Input
+                        id="confirm-pass"
+                        type="password"
+                        value={passwordData.confirm_password}
+                        onChange={(e) => setPasswordData({ ...passwordData, confirm_password: e.target.value })}
+                        placeholder="Repita a nova senha"
+                        required
+                      />
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <p className="text-sm font-medium text-zinc-100">Permissões</p>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-zinc-400">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                        Criar e editar catálogos
-                      </div>
-                      <div className="flex items-center gap-2 text-zinc-400">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                        Gerenciar produtos
-                      </div>
-                      <div className="flex items-center gap-2 text-zinc-400">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                        Convidar membros
-                      </div>
-                      <div className="flex items-center gap-2 text-zinc-400">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                        Configurações da empresa
-                      </div>
-                    </div>
+                  <div className="pt-2">
+                    <Button
+                      type="submit"
+                      disabled={isChangingPassword}
+                      className="bg-purple-600 hover:bg-purple-700 text-white cursor-pointer text-xs font-medium"
+                    >
+                      <KeyRound className="w-4 h-4 mr-2" />
+                      {isChangingPassword ? 'Atualizando senha...' : 'Salvar Nova Senha'}
+                    </Button>
                   </div>
+                </form>
+              </CardContent>
+            </Card>
 
+            {/* Sessoes e Ultimo Acesso */}
+            <Card
+              className={`border transition-colors ${
+                isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-zinc-200 shadow-sm'
+              }`}
+            >
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base sm:text-lg">Sessoes Ativas & Acessos</CardTitle>
+                    <CardDescription className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>
+                      Controle os dispositivos autenticados na sua conta.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-inherit">
+                  <div>
+                    <p className="text-xs font-semibold">Ultimo Acesso Registrado</p>
+                    <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                      {profile.last_login
+                        ? new Date(profile.last_login).toLocaleString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : 'Sessao ativa no navegador atual'}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-[11px] self-start sm:self-center">
+                    Sessao Atual Segura
+                  </Badge>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-inherit">
+                  <div>
+                    <p className="text-xs font-semibold">Encerrar Todas as Outras Sessoes</p>
+                    <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                      Desconecta outros navegadores ou computadores previamente autenticados.
+                    </p>
+                  </div>
                   <Button
                     variant="outline"
-                    className="w-full bg-zinc-800 border-zinc-700 text-zinc-100 hover:bg-zinc-700 cursor-pointer"
+                    size="sm"
+                    onClick={handleLogoutAllSessions}
+                    className="border-red-500/30 text-red-400 hover:bg-red-500/10 cursor-pointer self-start sm:self-center"
                   >
-                    Gerenciar empresa
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Encerrar Sessoes
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-              {/* 5️⃣ Atividade Recente */}
-              <Card className="bg-zinc-900 border-zinc-800 flex flex-col h-[790px]">
-                <CardHeader className="flex-shrink-0">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-orange-500/10 rounded-lg">
-                      <Activity className="w-5 h-5 text-orange-500" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-zinc-100">Atividade Recente</CardTitle>
-                      <CardDescription className="text-zinc-400">
-                        Suas últimas ações
-                      </CardDescription>
-                    </div>
+          {/* ABA 4: Historico de Atividades */}
+          <TabsContent value="activity" className="space-y-6 mt-0">
+            <Card
+              className={`border transition-colors ${
+                isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-zinc-200 shadow-sm'
+              }`}
+            >
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400">
+                    <Activity className="w-5 h-5" />
                   </div>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto">
-                  {recentActivity.length > 0 ? (
-                    <div className="space-y-3">
-                      {recentActivity.map((activity, index) => {
-                        const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-orange-500'];
-                        const color = colors[index % colors.length];
-
-                        return (
-                          <div key={activity.id}>
-                            <div className="flex items-start gap-3">
-                              <div className={`w-2 h-2 rounded-full ${color} mt-2`}></div>
-                              <div>
-                                <p className="text-sm text-zinc-100">{activity.action}</p>
-                                <p className="text-xs text-zinc-500">{activity.description}</p>
-                                {activity.catalog_title && (
-                                  <p className="text-xs text-zinc-500">{activity.catalog_title}</p>
-                                )}
-                                <p className="text-xs text-zinc-600">
-                                  {new Date(activity.created_at).toLocaleString('pt-BR', {
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </p>
-                              </div>
-                            </div>
-                            {index < recentActivity.length - 1 && (
-                              <Separator className="bg-zinc-800 my-3" />
+                  <div>
+                    <CardTitle className="text-base sm:text-lg">Historico Recente de Acoes</CardTitle>
+                    <CardDescription className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>
+                      Registro cronologico de alteracoes, publicacoes e manipulacoes no Studio.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {recentActivity && recentActivity.length > 0 ? (
+                  <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-inherit">
+                    {recentActivity.map((act) => (
+                      <div key={act.id} className="relative group">
+                        <div className="absolute -left-6 top-1.5 w-2.5 h-2.5 rounded-full bg-purple-500 ring-4 ring-[#09090b]" />
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold">{act.action}</span>
+                            {act.catalog_title && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0 bg-purple-500/5 text-purple-400 border-purple-500/20"
+                              >
+                                {act.catalog_title}
+                              </Badge>
                             )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center text-zinc-500 text-sm py-6">
-                      Nenhuma atividade recente
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
+                          <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                            {act.description}
+                          </p>
+                          <p className="text-[10px] text-zinc-500 font-mono">
+                            {new Date(act.created_at).toLocaleString('pt-BR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 space-y-2">
+                    <Activity className="w-8 h-8 mx-auto text-zinc-500 opacity-50" />
+                    <p className="text-xs font-medium text-zinc-400">Nenhuma atividade recente registrada.</p>
+                    <p className="text-[11px] text-zinc-500">
+                      Suas acoes de edicao, criacao de paginas e publicacoes aparecerao aqui.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
