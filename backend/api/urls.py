@@ -32,6 +32,8 @@ from .views_studio import (
     StudioCatalogDetailView,
     StudioSpreadManageView,
     StudioThreadMessagesView,
+    StudioTemplateListView,
+    StudioTemplateSaveFromSpreadView,
 )
 
 router = DefaultRouter()
@@ -120,6 +122,8 @@ urlpatterns = [
     path('v2/studio/catalogs/<int:pk>/', StudioCatalogDetailView.as_view(), name='studio_catalog_detail'),
     path('v2/studio/catalogs/<int:catalog_id>/spreads/', StudioSpreadManageView.as_view(), name='studio_spread_manage'),
     path('v2/studio/threads/<int:thread_id>/messages/', StudioThreadMessagesView.as_view(), name='studio_thread_messages'),
+    path('v2/studio/templates/', StudioTemplateListView.as_view(), name='studio_templates_list'),
+    path('v2/studio/templates/save-from-spread/', StudioTemplateSaveFromSpreadView.as_view(), name='studio_templates_save_from_spread'),
 
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

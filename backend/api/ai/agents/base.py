@@ -1,6 +1,7 @@
 import json
 from typing import Iterator, Dict, Any, Optional, List
 from api.ai.provider import get_ai_provider, AIResponseChunk
+from api.services.template_rag import TemplateRAGService
 
 class BaseAgent:
     """
@@ -79,6 +80,50 @@ class BaseAgent:
                     context_parts.append(f"[ESTADO ATUAL DO SPREAD VISIVEL (JSON)]:\n{spread_json}")
                 except Exception:
                     pass
+
+        # RAG de Templates Editoriais (Blueprints)
+        # Ativado para Diretor de Arte, Orquestrador ou quando o usuario expressa intencao visual
+        msg_lower = user_message.lower()
+        should_query_rag = (
+            self.role in ["director", "orchestrator"]
+            or any(
+                kw in msg_lower
+                for kw in [
+                    "template", "modelo", "layout", "spread", "lamina", "capa", "cover",
+                    "manifesto", "hero", "destaque", "grade", "grid", "criar", "pagina",
+                    "produtos", "b2b", "tabela", "novo spread"
+                ]
+            )
+        )
+
+        if should_query_rag:
+            inferred_category = None
+            if any(k in msg_lower for k in ["capa", "cover"]):
+                inferred_category = "cover"
+            elif "manifesto" in msg_lower:
+                inferred_category = "manifesto"
+            elif any(k in msg_lower for k in ["hero", "destaque", "unico"]):
+                inferred_category = "hero"
+            elif any(k in msg_lower for k in ["duo", "dupla", "dois", "par"]):
+                inferred_category = "duo"
+            elif any(k in msg_lower for k in ["grade", "grid", "4 produtos", "quatro", "tabela", "atacado", "b2b"]):
+                inferred_category = "grid_4"
+            elif any(k in msg_lower for k in ["divisor", "transicao", "secao"]):
+                inferred_category = "divider"
+            elif any(k in msg_lower for k in ["contracapa", "verso"]):
+                inferred_category = "backcover"
+
+            try:
+                template_prompt = TemplateRAGService.retrieve_best_template_prompt(
+                    query=user_message,
+                    category=inferred_category,
+                    industry=(catalog_context or {}).get("industry"),
+                    organization_id=(catalog_context or {}).get("organization_id"),
+                )
+                if template_prompt:
+                    context_parts.append(template_prompt)
+            except Exception:
+                pass
 
         if attachments:
             context_parts.append(f"[TOTAL DE ANEXOS RECEBIDOS]: {len(attachments)}")

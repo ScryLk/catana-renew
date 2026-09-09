@@ -672,3 +672,43 @@ class ChatMessage(models.Model):
 
     def __str__(self):
         return f"[{self.sender_type}:{self.agent_role}] {self.content[:40]}"
+
+
+class CatalogTemplate(models.Model):
+    """
+    Modelos e Blueprints de Laminas e Catalogos para alimentacao RAG dos Agentes
+    """
+    CATEGORY_CHOICES = [
+        ('cover', 'Capa'),
+        ('manifesto', 'Manifesto Editorial'),
+        ('hero', 'Destaque Heroico (1 Produto)'),
+        ('duo', 'Lamina Dupla (2 Produtos)'),
+        ('single', 'Produto Individual'),
+        ('grid_4', 'Grade Comercial (4 Produtos)'),
+        ('divider', 'Divisor de Secao'),
+        ('backcover', 'Contracapa'),
+        ('full_catalog', 'Catalogo Completo'),
+    ]
+
+    title = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255, unique=True)
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='hero')
+    industry = models.CharField(max_length=100, default='luxury_fashion')
+    style_preset = models.CharField(max_length=50, default='editorial_clean')
+    product_capacity = models.PositiveIntegerField(default=1)
+    description = models.TextField(blank=True, default='')
+    editorial_reasoning = models.TextField(blank=True, default='')
+    blueprint_data = models.JSONField(default=dict, blank=True)
+    embedding = models.JSONField(default=list, blank=True)
+    thumbnail_url = models.CharField(max_length=500, blank=True, default='')
+    is_system = models.BooleanField(default=True)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, null=True, blank=True, related_name='catalog_templates')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'catalog_templates'
+        ordering = ['category', 'title']
+
+    def __str__(self):
+        return f"{self.title} ({self.category})"

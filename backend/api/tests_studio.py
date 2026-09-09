@@ -1,6 +1,7 @@
 import json
 from django.test import TestCase
 from django.urls import reverse
+from django.core.management import call_command
 from rest_framework.test import APIClient
 from rest_framework import status
 from django.contrib.auth import get_user_model
@@ -12,6 +13,7 @@ from api.models import (
     SubscriptionPlan,
     OrganizationQuota,
     TokenUsageLog,
+    CatalogTemplate,
 )
 from api.ai.agents.registry import get_agent, list_agents
 from api.guards.quota_guard import (
@@ -169,4 +171,86 @@ class StudioBackendTests(TestCase):
         self.assertEqual(patch["spread_index"], 1)
         self.assertEqual(len(patch["updates"]), 1)
         self.assertEqual(patch["updates"][0]["value"], "R$ 1.100")
+
+    def test_seed_templates_command(self):
+        """Verifica se o comando de seed popula os templates canonicos e seus vetores"""
+        call_command('seed_catalog_templates')
+        templates = CatalogTemplate.objects.filter(is_system=True)
+        self.assertGreaterEqual(templates.count(), 7)
+
+        for tpl in templates:
+            self.assertTrue(len(tpl.embedding) > 0, f"Template {tpl.slug} sem embedding!")
+            self.assertTrue("type" in tpl.blueprint_data or "left_page" in tpl.blueprint_data)
+
+    def test_rag_search_with_filtering_and_similarity(self):
+        """Verifica a busca hibrida (filtros deterministas + cosseno) do TemplateRAGService"""
+        from api.services.template_rag import TemplateRAGService
+        call_command('seed_catalog_templates')
+
+        # Busca por capa
+        cover_results = TemplateRAGService.search_templates("capa minimalista elegante", category="cover", limit=1)
+        self.assertEqual(len(cover_results), 1)
+        self.assertEqual(cover_results[0].category, "cover")
+
+        # Busca por grade comercial B2B
+        grid_results = TemplateRAGService.search_templates("grade de 4 produtos com precos e atacado", limit=1)
+        self.assertEqual(len(grid_results), 1)
+        self.assertEqual(grid_results[0].slug, "commercial-grid-4-b2b")
+
+    def test_director_prompt_with_rag_injection(self):
+        """Verifica se o prompt montado para o Diretor de Arte recebe a referencia RAG"""
+        call_command('seed_catalog_templates')
+        director = get_agent('director')
+        self.assertIsNotNone(director)
+
+        prompt = director.build_user_prompt(
+            user_message="Crie uma capa sofisticada para a colecao de joias",
+            catalog_context={"brand_name": "Aurea Joias", "style_preset": "noir_or"}
+        )
+
+        self.assertIn("[REFERENCIA EDITORIAL DE TEMPLATE (RAG)]", prompt)
+        self.assertIn("Blueprint Estrutural de Referencia", prompt)
+
+    def test_template_list_api_endpoint(self):
+        """Verifica o endpoint GET /api/v2/studio/templates/ com e sem filtros"""
+        call_command('seed_catalog_templates')
+        url = reverse('studio_templates_list')
+
+        # Listagem global
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(response.data["count"], 7)
+
+        # Filtragem por categoria
+        cover_resp = self.client.get(f"{url}?category=cover")
+        self.assertEqual(cover_resp.status_code, status.HTTP_200_OK)
+        for tpl in cover_resp.data["templates"]:
+            self.assertEqual(tpl["category"], "cover")
+
+        # Busca semantica via parametro q
+        search_resp = self.client.get(f"{url}?q=grade+de+produtos+b2b")
+        self.assertEqual(search_resp.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(search_resp.data["count"], 1)
+
+    def test_template_save_from_spread_endpoint(self):
+        """Verifica o endpoint POST /api/v2/studio/templates/save-from-spread/"""
+        url = reverse('studio_templates_save_from_spread')
+        payload = {
+            "title": "Meu Template Customizado Lookbook",
+            "category": "duo",
+            "industry": "luxury_fashion",
+            "style_preset": "atelier_silver",
+            "description": "Template exclusivo criado pelo usuario.",
+            "left_page": {"type": "single", "title": "Pagina Esquerda"},
+            "right_page": {"type": "single", "title": "Pagina Direita"},
+        }
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn("id", response.data)
+
+        created_tpl = CatalogTemplate.objects.get(id=response.data["id"])
+        self.assertEqual(created_tpl.title, "Meu Template Customizado Lookbook")
+        self.assertFalse(created_tpl.is_system)
+        self.assertTrue(len(created_tpl.embedding) > 0)
+
 

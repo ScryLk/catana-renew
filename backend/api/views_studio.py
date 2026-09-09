@@ -17,6 +17,7 @@ from api.models import (
     ChatMessage,
     SubscriptionPlan,
     OrganizationQuota,
+    CatalogTemplate,
 )
 from api.ai.agents.registry import get_agent, list_agents
 from api.guards.quota_guard import (
@@ -27,6 +28,7 @@ from api.guards.quota_guard import (
     RateLimitExceededException,
 )
 from api.services.file_processor import FileAttachmentProcessor
+from api.services.template_rag import TemplateRAGService, generate_embedding
 
 logger = logging.getLogger(__name__)
 
@@ -522,3 +524,132 @@ class StudioChatStreamView(APIView):
         response["Cache-Control"] = "no-cache"
         response["X-Accel-Buffering"] = "no"
         return response
+
+
+class StudioTemplateListView(APIView):
+    """
+    Listagem e busca semantica de templates para o Studio
+    GET /api/v2/studio/templates/?category=...&industry=...&q=...
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        category = request.query_params.get("category")
+        industry = request.query_params.get("industry")
+        style = request.query_params.get("style")
+        q = request.query_params.get("q")
+
+        user_org_id = None
+        if request.user and request.user.is_authenticated:
+            first_org = request.user.organizations.first()
+            if first_org:
+                user_org_id = first_org.id
+
+        if q:
+            templates = TemplateRAGService.search_templates(
+                query=q,
+                category=category,
+                industry=industry,
+                organization_id=user_org_id,
+                limit=10,
+            )
+        else:
+            qs = CatalogTemplate.objects.all()
+            if user_org_id:
+                qs = qs.filter(organization_id=user_org_id) | qs.filter(is_system=True)
+            else:
+                qs = qs.filter(is_system=True)
+
+            if category:
+                qs = qs.filter(category=category)
+            if industry:
+                qs = qs.filter(industry=industry)
+            if style:
+                qs = qs.filter(style_preset=style)
+
+            templates = list(qs)
+
+        results = [
+            {
+                "id": t.id,
+                "title": t.title,
+                "slug": t.slug,
+                "category": t.category,
+                "category_label": t.get_category_display(),
+                "industry": t.industry,
+                "style_preset": t.style_preset,
+                "product_capacity": t.product_capacity,
+                "description": t.description,
+                "editorial_reasoning": t.editorial_reasoning,
+                "blueprint_data": t.blueprint_data,
+                "thumbnail_url": t.thumbnail_url,
+                "is_system": t.is_system,
+                "created_at": t.created_at.isoformat(),
+            }
+            for t in templates
+        ]
+
+        return Response({"count": len(results), "templates": results}, status=status.HTTP_200_OK)
+
+
+class StudioTemplateSaveFromSpreadView(APIView):
+    """
+    Salva o spread atual do Studio como um novo template reutilizavel
+    POST /api/v2/studio/templates/save-from-spread/
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        data = request.data
+        title = (data.get("title") or "").strip()
+        if not title:
+            return Response({"error": "O titulo do template e obrigatorio."}, status=status.HTTP_400_BAD_REQUEST)
+
+        import uuid
+        from django.utils.text import slugify
+        base_slug = slugify(title) or "template"
+        slug = f"{base_slug}-{uuid.uuid4().hex[:6]}"
+
+        category = data.get("category", "hero")
+        industry = data.get("industry", "luxury_fashion")
+        style_preset = data.get("style_preset", "editorial_clean")
+        description = data.get("description", "")
+        editorial_reasoning = data.get("editorial_reasoning", "Template personalizado criado no Catana Studio.")
+
+        blueprint_data = data.get("blueprint_data") or {
+            "left_page": data.get("left_page"),
+            "right_page": data.get("right_page"),
+        }
+
+        user_org = None
+        if request.user and request.user.is_authenticated:
+            user_org = request.user.organizations.first()
+
+        enrich_text = f"{title} {category} {industry} {description} {editorial_reasoning}"
+        embedding_vec = generate_embedding(enrich_text)
+
+        template = CatalogTemplate.objects.create(
+            title=title,
+            slug=slug,
+            category=category,
+            industry=industry,
+            style_preset=style_preset,
+            product_capacity=data.get("product_capacity", 1),
+            description=description,
+            editorial_reasoning=editorial_reasoning,
+            blueprint_data=blueprint_data,
+            embedding=embedding_vec,
+            is_system=False,
+            organization=user_org,
+        )
+
+        return Response(
+            {
+                "id": template.id,
+                "title": template.title,
+                "slug": template.slug,
+                "message": "Template salvo com sucesso!",
+            },
+            status=status.HTTP_201_CREATED,
+        )
+

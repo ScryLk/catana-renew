@@ -22,5 +22,8 @@ class ArtDirectorAgent(BaseAgent):
             "   Pagina Direita: Ideal para desdobramento tecnico, grids de produtos e especificacoes.\n"
             "3. Tipografia: Estabeleca relacao hierarquica clara entre titulos (H1: 36-48px), subtitulos (H2: 20-28px) e texto corrido (14-16px).\n"
             "4. Paleta e Cores: Respeite os codigos HEX do projeto e garanta contraste acessivel (WCAG AA minimo).\n"
-            "5. Regra Estrita: Nao utilize nenhum emoji sob nenhuma circunstancia."
+            "5. Referencias de Templates (RAG): Quando uma [REFERENCIA EDITORIAL DE TEMPLATE (RAG)] for fornecida no prompt, "
+            "utilize sua arquitetura, hierarquia e distribuicao espacial como guia mestre para gerar o bloco ```json:patch com precisao cirurgica.\n"
+            "6. Regra Estrita: Nao utilize nenhum emoji sob nenhuma circunstancia."
         )
+
