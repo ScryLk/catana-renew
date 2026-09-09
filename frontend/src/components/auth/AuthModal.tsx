@@ -247,8 +247,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   placeholder="exemplo@email.com ou usuario"
                   className={`h-10 rounded-xl text-xs transition-all ${
                     isDark
-                      ? 'bg-zinc-800/70 border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500'
-                      : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400'
+                      ? 'bg-zinc-800/70 border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 focus:text-white focus:border-zinc-500'
+                      : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:text-zinc-900 focus:border-zinc-400'
                   }`}
                 />
               </div>
@@ -278,8 +278,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   placeholder="••••••••"
                   className={`h-10 rounded-xl text-xs transition-all ${
                     isDark
-                      ? 'bg-zinc-800/70 border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500'
-                      : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400'
+                      ? 'bg-zinc-800/70 border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 focus:text-white focus:border-zinc-500'
+                      : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:text-zinc-900 focus:border-zinc-400'
                   }`}
                 />
               </div>
@@ -335,8 +335,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   placeholder="Seu nome"
                   className={`h-9 rounded-xl text-xs transition-all ${
                     isDark
-                      ? 'bg-zinc-800/70 border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500'
-                      : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400'
+                      ? 'bg-zinc-800/70 border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 focus:text-white focus:border-zinc-500'
+                      : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:text-zinc-900 focus:border-zinc-400'
                   }`}
                 />
               </div>
@@ -354,8 +354,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   placeholder="nome@empresa.com"
                   className={`h-9 rounded-xl text-xs transition-all ${
                     isDark
-                      ? 'bg-zinc-800/70 border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500'
-                      : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400'
+                      ? 'bg-zinc-800/70 border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 focus:text-white focus:border-zinc-500'
+                      : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:text-zinc-900 focus:border-zinc-400'
                   }`}
                 />
               </div>
@@ -373,8 +373,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   placeholder="Minimo de 6 caracteres"
                   className={`h-9 rounded-xl text-xs transition-all ${
                     isDark
-                      ? 'bg-zinc-800/70 border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500'
-                      : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400'
+                      ? 'bg-zinc-800/70 border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 focus:text-white focus:border-zinc-500'
+                      : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:text-zinc-900 focus:border-zinc-400'
                   }`}
                 />
               </div>
