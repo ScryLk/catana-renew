@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { PanelLeftOpen, Plus } from 'lucide-react';
 import { StudioSidebar } from '../components/studio/StudioSidebar';
 import { AgentCoPilot } from '../components/studio/AgentCoPilot';
@@ -6,10 +7,42 @@ import { CatalogCanvasWorkspace } from '../components/studio/CatalogCanvasWorksp
 import { StudioHomeChat } from '../components/studio/StudioHomeChat';
 import { KatanaSplashScreen } from '../components/studio/KatanaSplashScreen';
 import { AccountSettingsModal } from '../components/studio/AccountSettingsModal';
+import { AuthModal } from '../components/auth/AuthModal';
 import { useStudioStore } from '../store/studioStore';
+import { useAuthStore, isAutoLoginSettled } from '../store/authStore';
 
 export const KatanaStudio: React.FC = () => {
+  const location = useLocation();
   const [showSplash, setShowSplash] = useState(true);
+  const {
+    isAuthenticated,
+    isAuthModalOpen,
+    openAuthModal,
+    closeAuthModal,
+    checkAuth,
+    autoLogin,
+  } = useAuthStore();
+
+  const [checkingAuth, setCheckingAuth] = useState(!isAutoLoginSettled());
+
+  useEffect(() => {
+    checkAuth();
+    if (isAutoLoginSettled()) {
+      setCheckingAuth(false);
+    } else {
+      autoLogin().finally(() => setCheckingAuth(false));
+    }
+  }, [checkAuth, autoLogin]);
+
+  // Se acessar /login ou /register via URL direta, abre a respectiva visao no modal
+  useEffect(() => {
+    if (location.pathname === '/login') {
+      openAuthModal('login');
+    } else if (location.pathname === '/register') {
+      openAuthModal('register');
+    }
+  }, [location.pathname, openAuthModal]);
+
   const {
     hasStartedSession,
     isStudioSidebarOpen,
@@ -99,6 +132,13 @@ export const KatanaStudio: React.FC = () => {
       <AccountSettingsModal
         isOpen={isAccountSettingsOpen}
         onClose={closeAccountSettings}
+      />
+
+      {/* Modal de Autenticacao In-Context (Light/Dark Mode) */}
+      <AuthModal
+        isOpen={!checkingAuth && (isAuthModalOpen || !isAuthenticated)}
+        onClose={closeAuthModal}
+        canDismiss={isAuthenticated}
       />
     </div>
   );

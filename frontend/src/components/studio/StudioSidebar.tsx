@@ -58,7 +58,7 @@ const RECENT_CATALOGS: RecentCatalogItem[] = [
 
 export const StudioSidebar: React.FC = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, logout, isAuthenticated, openAuthModal } = useAuthStore();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -128,7 +128,6 @@ export const StudioSidebar: React.FC = () => {
   const handleLogout = () => {
     logout();
     setIsProfileMenuOpen(false);
-    navigate('/login');
   };
 
   const filteredCatalogs = useMemo(() => {
@@ -455,7 +454,13 @@ export const StudioSidebar: React.FC = () => {
             {/* User Account Trigger Button */}
             <button
               type="button"
-              onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+              onClick={() => {
+                if (!isAuthenticated) {
+                  openAuthModal('login');
+                } else {
+                  setIsProfileMenuOpen((prev) => !prev);
+                }
+              }}
               className={`w-full p-2 rounded-xl flex items-center justify-between border transition-all cursor-pointer text-left ${
                 isProfileMenuOpen
                   ? isDark
@@ -467,15 +472,19 @@ export const StudioSidebar: React.FC = () => {
               }`}
               aria-expanded={isProfileMenuOpen}
               aria-haspopup="true"
-              title="Opções de perfil e configurações"
+              title={isAuthenticated ? 'Opções de perfil e configurações' : 'Entrar na sua conta'}
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="size-7 rounded-full bg-zinc-800 border border-zinc-700 text-white flex items-center justify-center font-semibold text-xs shrink-0">
                   {displayInitial}
                 </div>
                 <div className="truncate">
-                  <div className="text-xs font-semibold truncate leading-tight">{displayName}</div>
-                  <div className="text-[10px] text-zinc-500 truncate leading-tight mt-0.5">Workspace Pessoal</div>
+                  <div className="text-xs font-semibold truncate leading-tight">
+                    {isAuthenticated ? displayName : 'Entrar na Conta'}
+                  </div>
+                  <div className="text-[10px] text-zinc-500 truncate leading-tight mt-0.5">
+                    {isAuthenticated ? 'Workspace Pessoal' : 'Clique para autenticar'}
+                  </div>
                 </div>
               </div>
               <ChevronUp

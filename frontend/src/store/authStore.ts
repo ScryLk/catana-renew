@@ -36,6 +36,10 @@ interface AuthStore {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  isAuthModalOpen: boolean;
+  authModalView: 'login' | 'register';
+  openAuthModal: (view?: 'login' | 'register') => void;
+  closeAuthModal: () => void;
   login: (credentials: { username: string; password: string }) => Promise<void>;
   googleLogin: (credential: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -82,6 +86,13 @@ export const useAuthStore = create<AuthStore>()(
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      isAuthModalOpen: false,
+      authModalView: 'login',
+
+      openAuthModal: (view = 'login') =>
+        set({ isAuthModalOpen: true, authModalView: view, error: null }),
+
+      closeAuthModal: () => set({ isAuthModalOpen: false, error: null }),
 
       login: async (credentials) => {
         set({ isLoading: true, error: null });
@@ -135,6 +146,7 @@ export const useAuthStore = create<AuthStore>()(
             token: access,
             isAuthenticated: true,
             isLoading: false,
+            isAuthModalOpen: false,
           });
         } catch (err: any) {
           setInMemoryAccessToken(null);
@@ -187,6 +199,7 @@ export const useAuthStore = create<AuthStore>()(
             token: access,
             isAuthenticated: true,
             isLoading: false,
+            isAuthModalOpen: false,
           });
         } catch (err: any) {
           setInMemoryAccessToken(null);
@@ -280,7 +293,7 @@ export const useAuthStore = create<AuthStore>()(
           localStorage.removeItem('refresh_token');
           localStorage.removeItem('active_organization');
           localStorage.removeItem('active_sede');
-          set({ user: null, token: null, isAuthenticated: false });
+          set({ user: null, token: null, isAuthenticated: false, isAuthModalOpen: true, authModalView: 'login' });
         }
       },
 
@@ -365,6 +378,7 @@ export const useAuthStore = create<AuthStore>()(
             token: access,
             isAuthenticated: true,
             isLoading: false,
+            isAuthModalOpen: false,
           });
         } catch (err: any) {
           const errorMessage =
@@ -389,3 +403,10 @@ export const useAuthStore = create<AuthStore>()(
     }
   )
 );
+
+// Listener global para tratar expiracao de sessao (HTTP 401) sem destruir a tela atual
+if (typeof window !== 'undefined') {
+  window.addEventListener('catana:unauthorized', () => {
+    useAuthStore.getState().logout();
+  });
+}

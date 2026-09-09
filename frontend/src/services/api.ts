@@ -14,7 +14,7 @@ export function getInMemoryAccessToken(): string | null {
   return inMemoryAccessToken;
 }
 
-// Limpa a sessao e manda para o login (usado em 401 sem refresh)
+// Limpa a sessao e sinaliza abertura do AuthModal sem perder estado
 function forceLogout() {
   inMemoryAccessToken = null;
   localStorage.removeItem('access_token');
@@ -22,8 +22,8 @@ function forceLogout() {
   localStorage.removeItem('user');
   localStorage.removeItem('active_organization');
   localStorage.removeItem('active_sede');
-  if (typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/register') {
-    window.location.href = '/login';
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('catana:unauthorized'));
   }
 }
 

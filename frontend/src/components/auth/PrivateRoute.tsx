@@ -35,8 +35,8 @@ export const PrivateRoute: FC<PrivateRouteProps> = ({ children }) => {
   }
 
   if (!isAuthenticated) {
-    // Redirecionar para login, salvando a rota atual
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Redireciona para o Studio na raiz, onde o AuthModal abrira preservando tema e contexto
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

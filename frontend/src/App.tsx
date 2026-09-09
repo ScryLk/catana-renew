@@ -3,8 +3,6 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { KatanaStudio } from './pages/KatanaStudio';
 import { Dashboard } from './pages/Dashboard';
 import { MediaLibrary } from './pages/MediaLibrary';
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
 import { UserCatalogs } from './pages/UserCatalogs';
 import { Organizations } from './pages/Organizations';
 import { Profile } from './pages/Profile';
@@ -58,28 +56,14 @@ function App() {
       <Toaster position="top-right" theme="dark" richColors />
       <Router>
         <Routes>
-          {/* Public Auth Routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          {/* Public Auth Routes & AI Studio Experience */}
+          <Route path="/login" element={<KatanaStudio />} />
+          <Route path="/register" element={<KatanaStudio />} />
           <Route path="/showcase/:id" element={<CatalogShowcase />} />
 
           {/* Katana 2.0 AI Studio: Primary Experience */}
-          <Route
-            path="/"
-            element={
-              <PrivateRoute>
-                <KatanaStudio />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/studio"
-            element={
-              <PrivateRoute>
-                <KatanaStudio />
-              </PrivateRoute>
-            }
-          />
+          <Route path="/" element={<KatanaStudio />} />
+          <Route path="/studio" element={<KatanaStudio />} />
           <Route path="/studio-demo" element={<KatanaStudio />} />
 
           {/* Management Hubs */}
