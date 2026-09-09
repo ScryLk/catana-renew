@@ -240,35 +240,37 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
                   onDragLeave={() => setIsDragging(false)}
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
-                  className={`border border-dashed rounded-xl p-3.5 text-center cursor-pointer transition-all flex items-center justify-center gap-3 ${
+                  className={`border-2 border-dashed rounded-xl py-7 px-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2.5 ${
                     isDragging
                       ? isDark
                         ? 'border-zinc-400 bg-zinc-800/40'
                         : 'border-zinc-600 bg-zinc-100'
                       : isDark
-                      ? 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/30'
-                      : 'border-zinc-200 hover:border-zinc-300 bg-zinc-50/50'
+                      ? 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/20 hover:bg-zinc-900/40'
+                      : 'border-zinc-200 hover:border-zinc-300 bg-zinc-50/50 hover:bg-zinc-50'
                   }`}
                 >
                   <div
-                    className={`p-2 rounded-lg ${
-                      isDark ? 'bg-zinc-800/90 text-zinc-300' : 'bg-zinc-200 text-zinc-700'
+                    className={`p-3 rounded-full border ${
+                      isDark
+                        ? 'bg-zinc-800/80 border-zinc-700/60 text-zinc-300'
+                        : 'bg-zinc-200/80 border-zinc-300 text-zinc-700'
                     }`}
                   >
-                    <UploadCloud className="size-4" />
+                    <UploadCloud className="size-5" />
                   </div>
-                  <div className="text-left">
+                  <div>
                     <p className={`text-xs font-medium ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
                       Arraste seu catálogo em PDF ou Word aqui
                     </p>
-                    <p className="text-[10px] text-zinc-400">
+                    <p className="text-[11px] text-zinc-400 mt-0.5">
                       ou clique para selecionar do computador (máximo 50 MB)
                     </p>
                   </div>
                 </div>
               ) : (
                 <div
-                  className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                  className={`p-3 rounded-xl border flex items-center justify-between ${
                     isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
                   }`}
                 >
