@@ -5,7 +5,6 @@ import {
   Grid3X3,
   Minus,
   Plus,
-  ChevronDown,
   Palette,
   Lock,
   ChevronLeft,
@@ -98,23 +97,16 @@ export const CanvasTopToolbar: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo, canUndo, canRedo]);
 
-  const isConsecutive =
-    currentSpread[1] === currentSpread[0] + 1 && currentSpread[0] % 2 === 1;
-  const spreadLabelText = isConsecutive
-    ? `Spread ${String(currentSpread[0]).padStart(2, '0')}-${String(currentSpread[1]).padStart(2, '0')}`
-    : `Págs ${String(currentSpread[0]).padStart(2, '0')}-${String(currentSpread[1]).padStart(2, '0')}`;
-
   return (
     <div
       className={`h-11 w-full border-b px-3 flex items-center justify-between text-xs select-none z-20 transition-colors gap-2 ${
         isDark ? 'bg-[#0e0e11] border-zinc-800 text-zinc-300' : 'bg-white border-zinc-200 text-zinc-700'
       }`}
     >
-      {/* LEFT: Catalog Title + Spread Navigator */}
-      <div className="flex items-center gap-2.5 min-w-0">
-
+      {/* LEFT: Catalog Title + Spread Navigator + Undo/Redo + Autosave */}
+      <div className="flex items-center gap-2 min-w-0">
         {/* Editable Title */}
-        <div className="flex items-center gap-1.5 truncate">
+        <div className="flex items-center gap-1.5 truncate max-w-[130px] sm:max-w-[180px] md:max-w-[220px]">
           {isEditingTitle ? (
             <input
               type="text"
@@ -137,7 +129,7 @@ export const CanvasTopToolbar: React.FC = () => {
                 setIsEditingTitle(true);
               }}
               className="group flex items-center gap-1.5 text-xs font-semibold hover:opacity-80 transition-opacity truncate cursor-pointer"
-              title="Clique para editar o título"
+              title="Clique para renomear o catálogo"
             >
               <span className="truncate">{catalogTitle}</span>
               <Edit2 className="size-3 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
@@ -145,11 +137,12 @@ export const CanvasTopToolbar: React.FC = () => {
           )}
         </div>
 
-        {/* Spread Navigation Pill */}
+        {/* Spread Navigation Pill (Compact) */}
         <div
           className={`flex items-center rounded-lg border p-0.5 shrink-0 transition-colors ${
             isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-100 border-zinc-200'
           }`}
+          title={`Spread atual: páginas ${currentSpread[0]} e ${currentSpread[1]} de ${totalPages}`}
         >
           <button
             type="button"
@@ -160,10 +153,10 @@ export const CanvasTopToolbar: React.FC = () => {
             title="Spread anterior"
             aria-label="Spread anterior"
           >
-            <ChevronLeft className="size-3" />
+            <ChevronLeft className="size-3.5" />
           </button>
-          <span className="px-2 font-mono text-[10px] tracking-tight font-medium text-inherit">
-            {spreadLabelText} de {totalPages}
+          <span className="px-1.5 font-mono text-[10px] tracking-tight font-medium text-inherit">
+            {String(currentSpread[0]).padStart(2, '0')}-{String(currentSpread[1]).padStart(2, '0')} / {totalPages}
           </span>
           <button
             type="button"
@@ -174,7 +167,7 @@ export const CanvasTopToolbar: React.FC = () => {
             title="Próximo spread"
             aria-label="Próximo spread"
           >
-            <ChevronRight className="size-3" />
+            <ChevronRight className="size-3.5" />
           </button>
         </div>
 
@@ -191,10 +184,10 @@ export const CanvasTopToolbar: React.FC = () => {
             className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
               isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
             }`}
-            title="Desfazer (Ctrl+Z / Cmd+Z)"
+            title="Desfazer alteração (Ctrl+Z / Cmd+Z)"
             aria-label="Desfazer"
           >
-            <Undo2 className="size-3" />
+            <Undo2 className="size-3.5" />
           </button>
           <button
             type="button"
@@ -203,54 +196,50 @@ export const CanvasTopToolbar: React.FC = () => {
             className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
               isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
             }`}
-            title="Refazer (Ctrl+Shift+Z / Cmd+Shift+Z / Ctrl+Y)"
+            title="Refazer alteração (Ctrl+Shift+Z / Cmd+Shift+Z)"
             aria-label="Refazer"
           >
-            <Redo2 className="size-3" />
+            <Redo2 className="size-3.5" />
           </button>
         </div>
 
-        {/* Autosave Status Indicator */}
-        <div className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium text-zinc-400 shrink-0">
+        {/* Autosave Status Indicator (Icon with tooltip) */}
+        <div className="flex items-center px-1 py-1 rounded-md shrink-0">
           {saveStatus === 'saving' && (
-            <>
-              <Loader2 className="size-3 animate-spin text-amber-500" />
-              <span className="text-amber-500 font-mono text-[10px]">Salvando...</span>
-            </>
+            <div title="Salvando alterações na nuvem...">
+              <Loader2 className="size-3.5 animate-spin text-amber-500" />
+            </div>
           )}
           {saveStatus === 'saved' && (
-            <>
-              <Check className="size-3 text-emerald-500" />
-              <span className="text-zinc-400 font-mono text-[10px]">Salvo na nuvem</span>
-            </>
+            <div title="Todas as alterações foram salvas na nuvem">
+              <Check className="size-3.5 text-emerald-500" />
+            </div>
           )}
           {saveStatus === 'error' && (
-            <>
-              <CloudOff className="size-3 text-red-500" />
-              <span className="text-red-500 font-mono text-[10px]">Erro ao salvar</span>
-            </>
+            <div title="Erro ao salvar alterações na nuvem">
+              <CloudOff className="size-3.5 text-red-500" />
+            </div>
           )}
           {saveStatus === 'unsaved' && (
-            <>
-              <Cloud className="size-3 text-zinc-400 opacity-60" />
-              <span className="text-zinc-400 font-mono text-[10px]">Alterações pendentes</span>
-            </>
+            <div title="Alterações pendentes de sincronização">
+              <Cloud className="size-3.5 text-zinc-400 opacity-60" />
+            </div>
           )}
         </div>
       </div>
 
-      {/* RIGHT: View Modes + Zoom + Palette + Export Buttons */}
-      <div className="flex items-center gap-2 shrink-0">
-        {/* View Mode Tabs */}
+      {/* RIGHT: View Modes (Icons only) + Zoom + Palette (Compact) + Share (Icon) + PDF (Icon) */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {/* View Mode Tabs - Icons Only with Tooltips */}
         <div
-          className={`hidden xl:flex items-center p-0.5 rounded-lg border transition-colors ${
+          className={`flex items-center p-0.5 rounded-lg border transition-colors ${
             isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-100 border-zinc-200'
           }`}
         >
           <button
             type="button"
             onClick={() => setViewMode('spread')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
+            className={`p-1.5 rounded transition-colors cursor-pointer ${
               viewMode === 'spread'
                 ? isDark
                   ? 'bg-zinc-800 text-white shadow-2xs'
@@ -259,15 +248,16 @@ export const CanvasTopToolbar: React.FC = () => {
                 ? 'text-zinc-400 hover:text-zinc-200'
                 : 'text-zinc-600 hover:text-zinc-950'
             }`}
+            title="Visualização em Lâmina Dupla (Spread)"
+            aria-label="Visualização em Lâmina Dupla"
           >
-            <BookOpen className="size-3" />
-            <span>Lâmina</span>
+            <BookOpen className="size-3.5" />
           </button>
 
           <button
             type="button"
             onClick={() => setViewMode('single')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
+            className={`p-1.5 rounded transition-colors cursor-pointer ${
               viewMode === 'single'
                 ? isDark
                   ? 'bg-zinc-800 text-white shadow-2xs'
@@ -276,15 +266,16 @@ export const CanvasTopToolbar: React.FC = () => {
                 ? 'text-zinc-400 hover:text-zinc-200'
                 : 'text-zinc-600 hover:text-zinc-950'
             }`}
+            title="Visualização em Página Única"
+            aria-label="Visualização em Página Única"
           >
-            <FileText className="size-3" />
-            <span>Única</span>
+            <FileText className="size-3.5" />
           </button>
 
           <button
             type="button"
             onClick={() => setViewMode('grid')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
+            className={`p-1.5 rounded transition-colors cursor-pointer ${
               viewMode === 'grid'
                 ? isDark
                   ? 'bg-zinc-800 text-white shadow-2xs'
@@ -293,9 +284,10 @@ export const CanvasTopToolbar: React.FC = () => {
                 ? 'text-zinc-400 hover:text-zinc-200'
                 : 'text-zinc-600 hover:text-zinc-950'
             }`}
+            title="Visualização em Grade de Páginas"
+            aria-label="Visualização em Grade de Páginas"
           >
-            <Grid3X3 className="size-3" />
-            <span>Grade</span>
+            <Grid3X3 className="size-3.5" />
           </button>
         </div>
 
@@ -311,7 +303,7 @@ export const CanvasTopToolbar: React.FC = () => {
             className={`p-1 rounded transition-colors cursor-pointer ${
               isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
             }`}
-            title="Reduzir zoom"
+            title="Reduzir zoom (-10%)"
             aria-label="Reduzir zoom"
           >
             <Minus className="size-3" />
@@ -319,10 +311,10 @@ export const CanvasTopToolbar: React.FC = () => {
           <button
             type="button"
             onClick={handleResetZoom}
-            className={`px-1.5 font-mono text-[11px] cursor-pointer bg-transparent border-none ${
+            className={`px-1.5 font-mono text-[10px] cursor-pointer bg-transparent border-none ${
               isDark ? 'text-zinc-300 hover:text-white' : 'text-zinc-700 hover:text-zinc-950'
             }`}
-            title="Clique para 100%"
+            title="Clique para redefinir zoom para 100%"
             aria-label="Redefinir zoom para 100%"
           >
             {zoomLevel}%
@@ -333,71 +325,69 @@ export const CanvasTopToolbar: React.FC = () => {
             className={`p-1 rounded transition-colors cursor-pointer ${
               isDark ? 'hover:text-white hover:bg-zinc-800 text-zinc-400' : 'hover:text-zinc-950 hover:bg-zinc-200 text-zinc-600'
             }`}
-            title="Aumentar zoom"
+            title="Aumentar zoom (+10%)"
             aria-label="Aumentar zoom"
           >
             <Plus className="size-3" />
           </button>
         </div>
 
-        {/* Active Theme Palette Indicator */}
+        {/* Active Theme Palette Indicator - Compact Icon + Swatches with Tooltip */}
         <button
           type="button"
           onClick={() => setIsPalettePanelOpen(true)}
-          className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border cursor-pointer transition-colors text-left ${
+          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border cursor-pointer transition-colors ${
             isDark
               ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
               : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300'
           }`}
-          title="Abrir Sistema de Cores e Tokens"
+          title={`Sistema de Cores & Design Tokens: ${activePalette.name} (Clique para gerenciar)`}
+          aria-label={`Sistema de Cores: ${activePalette.name}`}
         >
-          <Palette className="size-3 text-zinc-400 shrink-0" />
-          <span className={`text-[11px] truncate max-w-[100px] hidden sm:inline ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
-            {activePalette.name}
-          </span>
+          <Palette className="size-3.5 text-zinc-400 shrink-0" />
           <div className="flex items-center gap-1">
             <span
-              className="size-2 rounded-full border border-zinc-600/40"
+              className="size-2.5 rounded-full border border-zinc-600/40"
               style={{ backgroundColor: activePalette.primary }}
             />
             <span
-              className="size-2 rounded-full border border-zinc-600/40"
+              className="size-2.5 rounded-full border border-zinc-600/40"
               style={{ backgroundColor: activePalette.accent }}
             />
           </div>
           {activePalette.locked && (
             <Lock className="size-2.5 text-amber-400 shrink-0" />
           )}
-          <ChevronDown className="size-3 text-zinc-400 shrink-0" />
         </button>
 
-        {/* Quick Export Actions */}
+        {/* Quick Export Action: Compartilhar (Icon only with Tooltip) */}
         <button
           type="button"
           onClick={() => toast.success('Link do catálogo copiado para a área de transferência!')}
-          className={`hidden md:flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors cursor-pointer text-xs ${
+          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
             isDark
               ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white'
               : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300 text-zinc-700 hover:text-zinc-950'
           }`}
-          title="Compartilhar catálogo"
+          title="Compartilhar catálogo (copiar link público)"
+          aria-label="Compartilhar catálogo"
         >
-          <Share2 className="size-3" />
-          <span>Compartilhar</span>
+          <Share2 className="size-3.5" />
         </button>
 
+        {/* Quick Export Action: Exportar PDF (Icon only with Tooltip) */}
         <button
           type="button"
           onClick={() => toast.info('Gerando PDF gráfico em alta resolução (300 DPI)...')}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-xs ${
+          className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-xs ${
             isDark
               ? 'bg-zinc-100 hover:bg-white text-zinc-950'
               : 'bg-zinc-900 hover:bg-zinc-800 text-white'
           }`}
-          title="Exportar catálogo em PDF para impressão gráfica"
+          title="Exportar catálogo em PDF para impressão gráfica (300 DPI)"
+          aria-label="Exportar catálogo em PDF"
         >
-          <Download className="size-3" />
-          <span>PDF</span>
+          <Download className="size-3.5" />
         </button>
       </div>
     </div>
