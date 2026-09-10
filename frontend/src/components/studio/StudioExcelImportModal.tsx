@@ -348,8 +348,8 @@ export const StudioExcelImportModal: React.FC = () => {
             <div
               className={`p-2 rounded-xl border ${
                 isDark
-                  ? 'bg-zinc-900 border-zinc-800 text-emerald-400'
-                  : 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                  ? 'bg-zinc-900 border-zinc-800 text-zinc-300'
+                  : 'bg-zinc-100 border-zinc-200 text-zinc-700'
               }`}
             >
               <FileSpreadsheet className="size-5" />
@@ -357,7 +357,7 @@ export const StudioExcelImportModal: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold tracking-tight">Importador Inteligente de Produtos</h2>
-                <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700/80 font-medium">
                   Excel & CSV
                 </span>
               </div>
@@ -495,7 +495,7 @@ export const StudioExcelImportModal: React.FC = () => {
                       Suporta formatos .xlsx, .xls e .csv exportados de qualquer ERP ou gerados manualmente.
                     </p>
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800/80 text-zinc-300 border border-zinc-700/60">
-                      <FileSpreadsheet className="size-3.5 text-emerald-400" />
+                      <FileSpreadsheet className="size-3.5 text-zinc-400" />
                       Selecionar Arquivo
                     </span>
                   </>
@@ -531,10 +531,10 @@ export const StudioExcelImportModal: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded border font-mono ${
+                  <span className={`text-xs px-2.5 py-0.5 rounded border font-mono ${
                     isNameMapped && isPriceMapped
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                      : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                      ? 'bg-zinc-800 text-zinc-200 border-zinc-700'
+                      : 'bg-zinc-900/60 text-zinc-400 border-zinc-800'
                   }`}>
                     {isNameMapped && isPriceMapped ? 'Campos obrigatórios definidos' : 'Defina Nome e Preço'}
                   </span>
@@ -610,8 +610,8 @@ export const StudioExcelImportModal: React.FC = () => {
               </div>
 
               {(!isNameMapped || !isPriceMapped) && (
-                <div className="flex items-center gap-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-xl">
-                  <AlertCircle className="size-4 shrink-0" />
+                <div className="flex items-center gap-2.5 text-xs text-zinc-300 bg-zinc-900/60 border border-zinc-800 px-3.5 py-2.5 rounded-xl">
+                  <AlertCircle className="size-4 shrink-0 text-zinc-400" />
                   <span>Para continuar, associe ao menos as colunas de Nome do Produto e Preço de Venda.</span>
                 </div>
               )}
@@ -623,19 +623,19 @@ export const StudioExcelImportModal: React.FC = () => {
             <div className="space-y-6">
               {/* Summary Cards */}
               <div className="grid grid-cols-3 gap-3">
-                <div className="p-3.5 rounded-xl border border-zinc-800 bg-zinc-900/40 flex flex-col">
-                  <span className="text-[11px] font-mono uppercase text-zinc-400">Total Identificado</span>
+                <div className="p-3.5 rounded-xl border border-zinc-800/80 bg-zinc-900/40 flex flex-col">
+                  <span className="text-[10.5px] font-mono uppercase tracking-wider text-zinc-500">Total Identificado</span>
                   <span className="text-xl font-semibold font-mono text-zinc-100 mt-1">{totalItems} itens</span>
                 </div>
 
-                <div className="p-3.5 rounded-xl border border-zinc-800 bg-zinc-900/40 flex flex-col">
-                  <span className="text-[11px] font-mono uppercase text-zinc-400">Com Link de Foto</span>
-                  <span className="text-xl font-semibold font-mono text-emerald-400 mt-1">{itemsWithImage}</span>
+                <div className="p-3.5 rounded-xl border border-zinc-800/80 bg-zinc-900/40 flex flex-col">
+                  <span className="text-[10.5px] font-mono uppercase tracking-wider text-zinc-500">Com Link de Foto</span>
+                  <span className="text-xl font-semibold font-mono text-zinc-200 mt-1">{itemsWithImage}</span>
                 </div>
 
-                <div className="p-3.5 rounded-xl border border-zinc-800 bg-zinc-900/40 flex flex-col">
-                  <span className="text-[11px] font-mono uppercase text-zinc-400">Sem Foto Fornecida</span>
-                  <span className="text-xl font-semibold font-mono text-amber-400 mt-1">{itemsWithoutImage}</span>
+                <div className="p-3.5 rounded-xl border border-zinc-800/80 bg-zinc-900/40 flex flex-col">
+                  <span className="text-[10.5px] font-mono uppercase tracking-wider text-zinc-500">Sem Foto Fornecida</span>
+                  <span className="text-xl font-semibold font-mono text-zinc-400 mt-1">{itemsWithoutImage}</span>
                 </div>
               </div>
 
@@ -643,20 +643,20 @@ export const StudioExcelImportModal: React.FC = () => {
               <div
                 className={`p-4 rounded-xl border flex items-start justify-between gap-4 transition-all ${
                   generateAIPhotos
-                    ? 'bg-zinc-900 border-zinc-700'
-                    : 'bg-zinc-900/30 border-zinc-800 opacity-80'
+                    ? 'bg-zinc-900/80 border-zinc-700/80 shadow-xs'
+                    : 'bg-zinc-900/30 border-zinc-800/80 opacity-70'
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-xl bg-black/40 border border-zinc-700 text-zinc-200 shrink-0">
-                    <Sparkles className="size-4 text-amber-400" />
+                  <div className="p-2 rounded-xl bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 shrink-0">
+                    <Sparkles className="size-4 text-zinc-300" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <h4 className="text-xs font-semibold text-zinc-100">
                         Gerar fotos de estúdio com Inteligência Artificial
                       </h4>
-                      <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold">
+                      <span className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 font-semibold">
                         Google Gemini
                       </span>
                     </div>
@@ -705,12 +705,12 @@ export const StudioExcelImportModal: React.FC = () => {
                           <td className="py-2 px-3 font-mono text-zinc-200 font-bold">{item.price}</td>
                           <td className="py-2 px-3">
                             {item.image ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400">
-                                <Check className="size-3" /> Link Fornecido
+                              <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-300 bg-zinc-800/60 border border-zinc-700/50 px-2 py-0.5 rounded">
+                                <Check className="size-3 text-zinc-400" /> Link Fornecido
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-400">
-                                <Sparkles className="size-3" /> Síntese IA
+                              <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-400 bg-zinc-800/30 border border-zinc-800 px-2 py-0.5 rounded">
+                                <Sparkles className="size-3 text-zinc-500" /> Síntese IA
                               </span>
                             )}
                           </td>

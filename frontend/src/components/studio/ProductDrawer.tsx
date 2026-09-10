@@ -306,8 +306,8 @@ export const ProductDrawer: React.FC = () => {
                 onClick={openExcelImportModal}
                 className={`p-2 rounded-xl border transition-colors cursor-pointer ${
                   isDark
-                    ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-emerald-400 hover:text-emerald-300'
-                    : 'bg-zinc-100 border-zinc-200 hover:border-zinc-300 text-emerald-600 hover:text-emerald-700'
+                    ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white'
+                    : 'bg-zinc-100 border-zinc-200 hover:border-zinc-300 text-zinc-600 hover:text-zinc-950'
                 }`}
                 aria-label="Importar planilha de produtos"
               >
@@ -355,14 +355,14 @@ export const ProductDrawer: React.FC = () => {
         >
           <div className="flex flex-col">
             <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">Alocados</span>
-            <span className="text-xs font-semibold text-emerald-400">
+            <span className="text-xs font-semibold text-zinc-200">
               {metrics.allocatedCount} no catálogo
             </span>
           </div>
 
           <div className="flex flex-col">
             <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">Disponíveis</span>
-            <span className="text-xs font-semibold text-amber-400">
+            <span className="text-xs font-semibold text-zinc-400">
               {metrics.unassignedCount} no acervo
             </span>
           </div>
@@ -597,14 +597,14 @@ export const ProductDrawer: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleJumpToPage(prod.pageNumber)}
-                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-mono font-bold cursor-pointer hover:bg-emerald-500/20 transition-colors"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700/80 text-[9px] font-mono font-bold cursor-pointer hover:bg-zinc-700/80 transition-colors"
                                 >
                                   <span>Pág. {String(prod.pageNumber).padStart(2, '0')}</span>
                                   <ArrowUpRight className="size-2.5" />
                                 </button>
                               </Tooltip>
                             ) : (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] font-mono font-medium">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-zinc-800/60 text-zinc-400 border border-zinc-700/50 text-[9px] font-mono font-medium">
                                 Disponível
                               </span>
                             )}
@@ -654,13 +654,13 @@ export const ProductDrawer: React.FC = () => {
                                   disabled={isGeneratingAIPhoto === prod.id}
                                   className={`p-1 rounded transition-colors cursor-pointer ${
                                     isDark
-                                      ? 'hover:bg-zinc-800 text-amber-400/80 hover:text-amber-300'
-                                      : 'hover:bg-zinc-200 text-amber-600 hover:text-amber-700'
+                                      ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                                      : 'hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900'
                                   }`}
                                   aria-label="Gerar foto com IA"
                                 >
                                   {isGeneratingAIPhoto === prod.id ? (
-                                    <Loader2 className="size-3 animate-spin text-amber-400" />
+                                    <Loader2 className="size-3 animate-spin text-zinc-300" />
                                   ) : (
                                     <Sparkles className="size-3" />
                                   )}
