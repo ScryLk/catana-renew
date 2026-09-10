@@ -12,6 +12,7 @@ import {
   LogOut,
   ChevronUp,
   Sparkles,
+  Cpu,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
 import { useAuthStore } from '../../store/authStore';
@@ -81,6 +82,7 @@ export const StudioSidebar: React.FC = () => {
     theme,
     toggleTheme,
     openAccountSettings,
+    openSystemDesignModal,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -429,6 +431,22 @@ export const StudioSidebar: React.FC = () => {
                   >
                     <ImageIcon className="size-3.5 text-zinc-400" />
                     <span className="flex-1">Biblioteca de Mídias</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileMenuOpen(false);
+                      openSystemDesignModal();
+                    }}
+                    className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors cursor-pointer text-left ${
+                      isDark
+                        ? 'hover:bg-zinc-800/80 hover:text-white text-zinc-300'
+                        : 'hover:bg-zinc-100 hover:text-zinc-950 text-zinc-700'
+                    }`}
+                  >
+                    <Cpu className="size-3.5 text-zinc-400" />
+                    <span className="flex-1">System Design & Agentes</span>
                   </button>
                 </div>
 

@@ -279,6 +279,11 @@ export interface StudioState {
     description?: string
   ) => Promise<string | null>;
 
+  // System Design & Agent Playground
+  isSystemDesignModalOpen: boolean;
+  openSystemDesignModal: () => void;
+  closeSystemDesignModal: () => void;
+
   // Catalog Generation Experience (Lovable style)
   isGeneratingCatalog: boolean;
   generationStage: number;
@@ -653,6 +658,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
     return null;
   },
+
+  isSystemDesignModalOpen: false,
+  openSystemDesignModal: () => set({ isSystemDesignModalOpen: true }),
+  closeSystemDesignModal: () => set({ isSystemDesignModalOpen: false }),
 
   isGeneratingCatalog: false,
   generationStage: 1,
