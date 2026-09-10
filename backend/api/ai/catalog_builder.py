@@ -333,3 +333,66 @@ def generate_catalog_from_gemini(prompt: str) -> Dict[str, Any]:
         "initialPrompt": prompt,
         "councilDelegations": [],
     }
+
+
+def generate_product_image_with_ai(name: str, category: str = "", description: str = "") -> Dict[str, Any]:
+    """
+    Sintetiza prompt fotografico comercial e resolve uma imagem de alta resolucao
+    para produtos importados de planilhas.
+    """
+    name_clean = name.strip()
+    cat_clean = category.strip()
+    desc_clean = description.strip()
+
+    prompt_used = (
+        f"Fotografia comercial de estudio em alta resolucao, fundo neutro infinito suave, "
+        f"iluminacao difusa editorial de luxo: {name_clean}"
+    )
+    if cat_clean:
+        prompt_used += f", categoria: {cat_clean}"
+    if desc_clean:
+        prompt_used += f", acabamento: {desc_clean[:60]}"
+    prompt_used += ", acabamento impecavel, sem ruido."
+
+    # Tenta usar o provider para obter geracao real caso suportado
+    provider = get_ai_provider()
+    if provider.client:
+        try:
+            from google.genai import types
+            # Tentativa de geracao direta
+            res = provider.client.models.generate_content(
+                model="gemini-2.5-flash-image",
+                contents=f"Generate a professional product photo: {prompt_used}"
+            )
+            if res.candidates and res.candidates[0].content and res.candidates[0].content.parts:
+                for part in res.candidates[0].content.parts:
+                    if getattr(part, 'inline_data', None):
+                        import base64
+                        b64_data = base64.b64encode(part.inline_data.data).decode('utf-8')
+                        mime = part.inline_data.mime_type or "image/png"
+                        return {
+                            "image_url": f"data:{mime};base64,{b64_data}",
+                            "prompt_used": prompt_used,
+                            "source": "ai_generated",
+                        }
+        except Exception as ai_err:
+            logger.info(f"[ProductImageAI] API generativa indisponivel ou cota zerada, aplicando acervo de estudio: {ai_err}")
+
+    # Fallback contextual inteligente por nicho do produto
+    search_text = f"{name_clean} {cat_clean} {desc_clean}"
+    stock = resolve_images_for_prompt(search_text)
+    prod_images = stock.get("products", [])
+
+    if prod_images:
+        # Selecao deterministica baseada no hash do nome do produto
+        idx = abs(hash(name_clean)) % len(prod_images)
+        chosen_img = prod_images[idx]
+    else:
+        chosen_img = "/aurea/images/prod-bolsa.jpg"
+
+    return {
+        "image_url": chosen_img,
+        "prompt_used": prompt_used,
+        "source": "studio_stock",
+    }
+

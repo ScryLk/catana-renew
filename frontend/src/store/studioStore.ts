@@ -256,6 +256,29 @@ export interface StudioState {
   deleteProductFromRepository: (productId: string) => void;
   assignProductToSpread: (product: ProductItem, targetPageNumber: number, slotIndex?: number) => void;
 
+  // Excel Product Importer & AI Image Generation
+  isExcelImportModalOpen: boolean;
+  openExcelImportModal: () => void;
+  closeExcelImportModal: () => void;
+  importProductsFromExcel: (
+    items: Array<{
+      name: string;
+      price: string;
+      category?: string;
+      sku?: string;
+      description?: string;
+      image?: string;
+      tag?: string;
+    }>,
+    options?: { openDrawer?: boolean; generateCatalog?: boolean }
+  ) => void;
+  generateAIProductImage: (
+    productId: string,
+    name: string,
+    category?: string,
+    description?: string
+  ) => Promise<string | null>;
+
   // Catalog Generation Experience (Lovable style)
   isGeneratingCatalog: boolean;
   generationStage: number;
@@ -568,6 +591,67 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
     get().debouncedSaveCurrentSpread();
     toast.success(`Produto "${product.name}" alocado na Pagina ${String(targetPageNumber).padStart(2, '0')}!`);
+  },
+
+  isExcelImportModalOpen: false,
+  openExcelImportModal: () => set({ isExcelImportModalOpen: true }),
+  closeExcelImportModal: () => set({ isExcelImportModalOpen: false }),
+
+  importProductsFromExcel: (items, options = {}) => {
+    if (!items || items.length === 0) return;
+
+    const newProducts: ProductItem[] = items.map((item, idx) => {
+      const rawPrice = item.price ? String(item.price).trim() : '0,00';
+      const formattedPrice = rawPrice.startsWith('R$') ? rawPrice : `R$ ${rawPrice.replace(/^[^\d]+/, '')}`;
+      return {
+        id: `prod-excel-${Date.now()}-${idx}`,
+        name: (item.name || 'Produto sem nome').trim(),
+        price: formattedPrice || 'R$ 0,00',
+        category: (item.category || 'COLECAO 2026').trim(),
+        sku: (item.sku || `SKU-${String(idx + 1).padStart(3, '0')}`).trim(),
+        description: (item.description || 'Item catalogado via importacao de planilha comercial.').trim(),
+        image: item.image && item.image.trim().startsWith('http') ? item.image.trim() : (item.image?.trim() || '/aurea/images/prod-bolsa.jpg'),
+        tag: (item.tag || 'Importado').trim(),
+        index: String(idx + 1).padStart(2, '0'),
+      };
+    });
+
+    set((s) => ({
+      unassignedProducts: [...newProducts, ...s.unassignedProducts],
+      isExcelImportModalOpen: false,
+    }));
+
+    toast.success(`${newProducts.length} produtos importados com sucesso para o acervo!`);
+
+    if (options.openDrawer) {
+      set({ isProductDrawerOpen: true });
+    }
+
+    if (options.generateCatalog) {
+      const categorySummary = newProducts[0]?.category || 'Editorial';
+      const prompt = `Catalogo de produtos para a colecao ${categorySummary} com ${newProducts.length} itens importados da planilha`;
+      get().triggerCatalogGeneration(prompt);
+    }
+  },
+
+  generateAIProductImage: async (productId, name, category, description) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/v2/studio/products/generate-image/`, {
+        name,
+        category: category || '',
+        description: description || '',
+      });
+      const imageUrl = response.data?.image_url;
+      if (imageUrl) {
+        get().updateProduct(productId, { image: imageUrl });
+        toast.success(`Fotografia de estudio gerada para "${name}"!`);
+        return imageUrl;
+      }
+    } catch (err) {
+      console.warn('[generateAIProductImage] Falha ao gerar imagem com IA:', err);
+      toast.error('Falha ao gerar imagem com IA para o produto.');
+    }
+    return null;
   },
 
   isGeneratingCatalog: false,

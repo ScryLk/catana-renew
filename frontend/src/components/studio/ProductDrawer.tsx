@@ -10,6 +10,8 @@ import {
   ArrowUpRight,
   ChevronRight,
   Loader2,
+  FileSpreadsheet,
+  Sparkles,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
 import { ProductItem } from '../../data/aureaCatalog.mock';
@@ -29,6 +31,8 @@ export const ProductDrawer: React.FC = () => {
     deleteProductFromRepository,
     updateProduct,
     removeProductBackground,
+    openExcelImportModal,
+    generateAIProductImage,
     theme,
   } = useStudioStore();
 
@@ -187,6 +191,17 @@ export const ProductDrawer: React.FC = () => {
     }
   };
 
+  // Ação: Gerar fotografia de estúdio com IA
+  const [isGeneratingAIPhoto, setIsGeneratingAIPhoto] = useState<string | null>(null);
+  const handleGenerateAIPhoto = async (prod: typeof allProducts[0]) => {
+    try {
+      setIsGeneratingAIPhoto(prod.id);
+      await generateAIProductImage(prod.id, prod.name, prod.category, prod.description);
+    } finally {
+      setIsGeneratingAIPhoto(null);
+    }
+  };
+
   // Ação: Criar novo produto no acervo
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
@@ -285,6 +300,21 @@ export const ProductDrawer: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-1.5">
+            <Tooltip text="Importar produtos de planilha Excel / CSV" position="bottom">
+              <button
+                type="button"
+                onClick={openExcelImportModal}
+                className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                  isDark
+                    ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-emerald-400 hover:text-emerald-300'
+                    : 'bg-zinc-100 border-zinc-200 hover:border-zinc-300 text-emerald-600 hover:text-emerald-700'
+                }`}
+                aria-label="Importar planilha de produtos"
+              >
+                <FileSpreadsheet className="size-4" />
+              </button>
+            </Tooltip>
+
             <Tooltip text="Adicionar novo produto ao acervo" position="bottom">
               <button
                 type="button"
@@ -613,6 +643,27 @@ export const ProductDrawer: React.FC = () => {
                                   aria-label="Editar dados"
                                 >
                                   <Edit3 className="size-3" />
+                                </button>
+                              </Tooltip>
+
+                              {/* AI Photo Generation Button */}
+                              <Tooltip text="Gerar nova fotografia de estúdio com IA" position="bottom">
+                                <button
+                                  type="button"
+                                  onClick={() => handleGenerateAIPhoto(prod)}
+                                  disabled={isGeneratingAIPhoto === prod.id}
+                                  className={`p-1 rounded transition-colors cursor-pointer ${
+                                    isDark
+                                      ? 'hover:bg-zinc-800 text-amber-400/80 hover:text-amber-300'
+                                      : 'hover:bg-zinc-200 text-amber-600 hover:text-amber-700'
+                                  }`}
+                                  aria-label="Gerar foto com IA"
+                                >
+                                  {isGeneratingAIPhoto === prod.id ? (
+                                    <Loader2 className="size-3 animate-spin text-amber-400" />
+                                  ) : (
+                                    <Sparkles className="size-3" />
+                                  )}
                                 </button>
                               </Tooltip>
 

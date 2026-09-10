@@ -30,6 +30,7 @@ export const StudioHomeChat: React.FC = () => {
 
   const {
     triggerCatalogGeneration,
+    openExcelImportModal,
     theme,
   } = useStudioStore();
 
@@ -309,6 +310,21 @@ export const StudioHomeChat: React.FC = () => {
                 >
                   <FileUp className="size-3.5" />
                   <span>Importar Catálogo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={openExcelImportModal}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    isDark
+                      ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/80'
+                      : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
+                  }`}
+                  title="Importar produtos de planilha Excel ou CSV com confirmação de colunas e IA"
+                  aria-label="Importar produtos de planilha"
+                >
+                  <FileSpreadsheet className="size-3.5 text-emerald-400" />
+                  <span>Importar Planilha</span>
                 </button>
               </div>
 

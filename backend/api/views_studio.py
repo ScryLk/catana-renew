@@ -764,4 +764,30 @@ class StudioCatalogGenerateView(APIView):
             return Response({"error": "Falha na sintese generativa do catalogo."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class StudioProductImageGenerateView(APIView):
+    """
+    Gera ou resolve fotografia comercial de estudio para um produto via IA / acervo editorial.
+    POST /api/v2/studio/products/generate-image/
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        from api.ai.catalog_builder import generate_product_image_with_ai
+
+        name = request.data.get("name", "").strip()
+        category = request.data.get("category", "").strip()
+        description = request.data.get("description", "").strip()
+
+        if not name:
+            return Response({"error": "O campo name e obrigatorio."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            result = generate_product_image_with_ai(name=name, category=category, description=description)
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as err:
+            logger.error(f"[StudioProductImageGenerate] Falha ao gerar imagem: {err}")
+            return Response({"error": "Falha na geracao de imagem para o produto."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
 

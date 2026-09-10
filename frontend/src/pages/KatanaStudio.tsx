@@ -10,6 +10,7 @@ import { KatanaSplashScreen } from '../components/studio/KatanaSplashScreen';
 import { AccountSettingsModal } from '../components/studio/AccountSettingsModal';
 import { ExportCatalogModal } from '../components/studio/ExportCatalogModal';
 import { ProductDrawer } from '../components/studio/ProductDrawer';
+import { StudioExcelImportModal } from '../components/studio/StudioExcelImportModal';
 import { AuthModal } from '../components/auth/AuthModal';
 import { useStudioStore } from '../store/studioStore';
 import { useAuthStore, isAutoLoginSettled } from '../store/authStore';
@@ -168,6 +169,9 @@ export const KatanaStudio: React.FC = () => {
 
       {/* Gaveta de Produtos & Acervo Editorial */}
       <ProductDrawer />
+
+      {/* Modal de Importação de Produtos via Planilha Excel / CSV */}
+      <StudioExcelImportModal />
 
       {/* Modal de Autenticacao In-Context (Light/Dark Mode) */}
       <AuthModal
