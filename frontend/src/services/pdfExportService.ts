@@ -1,4 +1,3 @@
-import { logger } from '../utils/logger';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
 
@@ -8,7 +7,7 @@ export interface PDFExportOptions {
   scale?: number;
   compress?: boolean;
   pageIds?: string[]; // Export only specific pages
-  onProgress?: (progress: number) => void; // Progress callback
+  onProgress?: (progress: number, stage?: string) => void; // Progress callback
 }
 
 class PDFExportService {
@@ -35,8 +34,11 @@ class PDFExportService {
     } = options;
 
     try {
-      // Garante que as webfonts terminaram de carregar ANTES do snapshot —
-      // sem isso o html2canvas pode rasterizar o fallback do sistema no PDF.
+      if (onProgress) {
+        onProgress(5, 'Carregando tipografias e recursos...');
+      }
+
+      // Garante que as webfonts terminaram de carregar ANTES do snapshot
       await document.fonts.ready;
 
       // Filter pages if pageIds is specified
@@ -64,8 +66,8 @@ class PDFExportService {
 
         // Report progress
         if (onProgress) {
-          const progress = Math.round(((i + 1) / totalPages) * 100);
-          onProgress(progress);
+          const progress = Math.round(5 + ((i) / totalPages) * 85);
+          onProgress(progress, `Renderizando lâmina ${i + 1} de ${totalPages}...`);
         }
 
         // Adicionar nova página no PDF (exceto para a primeira)
@@ -98,12 +100,16 @@ class PDFExportService {
         canvas.remove();
       }
 
+      if (onProgress) {
+        onProgress(95, 'Finalizando compressão e salvando arquivo...');
+      }
+
       // Salvar PDF final
       pdf.save(fileName);
 
       // Report 100% completion
       if (onProgress) {
-        onProgress(100);
+        onProgress(100, 'Download concluído!');
       }
 
     } catch (error) {
@@ -112,10 +118,27 @@ class PDFExportService {
     }
   }
 
-  // Helper to export specific pages (future implementation)
-  async generateMultiPagePDF(pageIds: string[], options: PDFExportOptions = {}): Promise<void> {
-    // TODO: Implement logic to render each page individually and add to PDF
-    logger.debug('Multi-page export not yet implemented', pageIds, options);
+  // Gera snapshot de imagem PNG de alta resolução de um elemento DOM
+  async generatePNG(element: HTMLElement, scale: number = 2): Promise<string> {
+    await document.fonts.ready;
+    const canvas = await html2canvas(element, {
+      scale,
+      useCORS: true,
+      logging: false,
+      allowTaint: true,
+      backgroundColor: null,
+      imageTimeout: 15000,
+      onclone: (clonedDoc) => {
+        const images = clonedDoc.getElementsByTagName('img');
+        for (let j = 0; j < images.length; j++) {
+          images[j].crossOrigin = 'Anonymous';
+        }
+      }
+    });
+
+    const dataUrl = canvas.toDataURL('image/png');
+    canvas.remove();
+    return dataUrl;
   }
 }
 

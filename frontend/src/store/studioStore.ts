@@ -240,6 +240,12 @@ export interface StudioState {
   setHasStartedSession: (started: boolean) => void;
   loadExistingCatalog: (catalogId: string) => void;
 
+  // Export Catalog Modal
+  isExportModalOpen: boolean;
+  exportModalTab: 'pdf' | 'share' | 'catana' | 'images';
+  openExportModal: (tab?: 'pdf' | 'share' | 'catana' | 'images') => void;
+  closeExportModal: () => void;
+
   // Catalog Generation Experience (Lovable style)
   isGeneratingCatalog: boolean;
   generationStage: number;
@@ -451,6 +457,12 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   activeCatalogId: null,
   setActiveCatalogId: (id) => set({ activeCatalogId: id }),
   setHasStartedSession: (started) => set({ hasStartedSession: started }),
+
+  // Export Catalog Modal
+  isExportModalOpen: false,
+  exportModalTab: 'pdf',
+  openExportModal: (tab = 'pdf') => set({ isExportModalOpen: true, exportModalTab: tab }),
+  closeExportModal: () => set({ isExportModalOpen: false }),
 
   isGeneratingCatalog: false,
   generationStage: 1,

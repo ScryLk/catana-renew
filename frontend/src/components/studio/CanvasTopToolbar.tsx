@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
 import { Tooltip } from '../ui/Tooltip';
-import { toast } from 'sonner';
 
 export const CanvasTopToolbar: React.FC = () => {
   const {
@@ -46,6 +45,7 @@ export const CanvasTopToolbar: React.FC = () => {
     saveStatus,
     isCoPilotOpen,
     toggleCoPilot,
+    openExportModal,
   } = useStudioStore();
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -407,7 +407,7 @@ export const CanvasTopToolbar: React.FC = () => {
         <Tooltip text="Compartilhar catálogo (copiar link público)" position="bottom">
           <button
             type="button"
-            onClick={() => toast.success('Link do catálogo copiado para a área de transferência!')}
+            onClick={() => openExportModal('share')}
             className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
               isDark
                 ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white'
@@ -423,7 +423,7 @@ export const CanvasTopToolbar: React.FC = () => {
         <Tooltip text="Exportar em PDF para impressão gráfica (300 DPI)" position="bottom">
           <button
             type="button"
-            onClick={() => toast.info('Gerando PDF gráfico em alta resolução (300 DPI)...')}
+            onClick={() => openExportModal('pdf')}
             className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-xs ${
               isDark
                 ? 'bg-zinc-100 hover:bg-white text-zinc-950'

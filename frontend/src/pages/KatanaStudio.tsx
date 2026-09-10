@@ -8,6 +8,7 @@ import { StudioHomeChat } from '../components/studio/StudioHomeChat';
 import { CatalogGenerationExperience } from '../components/studio/CatalogGenerationExperience';
 import { KatanaSplashScreen } from '../components/studio/KatanaSplashScreen';
 import { AccountSettingsModal } from '../components/studio/AccountSettingsModal';
+import { ExportCatalogModal } from '../components/studio/ExportCatalogModal';
 import { AuthModal } from '../components/auth/AuthModal';
 import { useStudioStore } from '../store/studioStore';
 import { useAuthStore, isAutoLoginSettled } from '../store/authStore';
@@ -156,6 +157,9 @@ export const KatanaStudio: React.FC = () => {
         isOpen={isAccountSettingsOpen}
         onClose={closeAccountSettings}
       />
+
+      {/* Modal de Exportação Editorial e Distribuição Multiformato */}
+      <ExportCatalogModal />
 
       {/* Modal de Autenticacao In-Context (Light/Dark Mode) */}
       <AuthModal
