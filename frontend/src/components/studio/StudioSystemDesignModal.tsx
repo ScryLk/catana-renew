@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   X,
   Cpu,
@@ -12,6 +13,7 @@ import {
   ChevronUp,
   RefreshCw,
   Eye,
+  Maximize2,
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -69,6 +71,7 @@ export const StudioSystemDesignModal: React.FC = () => {
     closeSystemDesignModal,
     theme,
   } = useStudioStore();
+  const navigate = useNavigate();
 
   const isDark = theme === 'dark';
 
@@ -185,18 +188,38 @@ export const StudioSystemDesignModal: React.FC = () => {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={closeSystemDesignModal}
-            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-              isDark
-                ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'
-                : 'bg-zinc-100 border-zinc-200 text-zinc-600 hover:text-zinc-950'
-            }`}
-            aria-label="Fechar"
-          >
-            <X className="size-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                closeSystemDesignModal();
+                navigate('/system-design');
+              }}
+              className={`px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-medium ${
+                isDark
+                  ? 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800'
+                  : 'bg-zinc-100 border-zinc-200 text-zinc-700 hover:text-zinc-950'
+              }`}
+              title="Abrir em pagina inteira"
+              aria-label="Abrir em pagina inteira"
+            >
+              <Maximize2 className="size-3.5" />
+              <span className="hidden sm:inline">Tela Cheia</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={closeSystemDesignModal}
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                isDark
+                  ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'
+                  : 'bg-zinc-100 border-zinc-200 text-zinc-600 hover:text-zinc-950'
+              }`}
+              aria-label="Fechar"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
         </div>
 
         {/* Tab Navigation */}

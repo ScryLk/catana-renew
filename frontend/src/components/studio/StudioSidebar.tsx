@@ -82,7 +82,6 @@ export const StudioSidebar: React.FC = () => {
     theme,
     toggleTheme,
     openAccountSettings,
-    openSystemDesignModal,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -437,7 +436,7 @@ export const StudioSidebar: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setIsProfileMenuOpen(false);
-                      openSystemDesignModal();
+                      navigate('/system-design');
                     }}
                     className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors cursor-pointer text-left ${
                       isDark

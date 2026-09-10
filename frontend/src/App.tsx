@@ -20,6 +20,7 @@ import { SearchResults } from './pages/SearchResults';
 import { PublicProfilePage } from './pages/PublicProfile';
 import { ResetPassword } from './pages/ResetPassword';
 import { Transparency } from './pages/Transparency';
+import { SystemDesignPage } from './pages/SystemDesignPage';
 import { Toaster } from 'sonner';
 
 function App() {
@@ -73,6 +74,10 @@ function App() {
           {/* Transparencia & Governanca de IA */}
           <Route path="/transparency" element={<Transparency />} />
           <Route path="/transparencia" element={<Transparency />} />
+
+          {/* Katana System Design & Laboratorio de Agentes */}
+          <Route path="/system-design" element={<SystemDesignPage />} />
+          <Route path="/studio/system-design" element={<SystemDesignPage />} />
 
           {/* Management Hubs */}
           <Route
