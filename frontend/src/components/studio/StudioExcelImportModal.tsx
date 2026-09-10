@@ -27,59 +27,6 @@ export type TargetFieldKey =
   | 'image'
   | 'tag'
   | 'ignore';
-
-interface TargetFieldDef {
-  key: TargetFieldKey;
-  label: string;
-  required: boolean;
-  synonyms: string[];
-}
-
-const TARGET_FIELDS: TargetFieldDef[] = [
-  {
-    key: 'name',
-    label: 'Nome do Produto',
-    required: true,
-    synonyms: ['nome', 'produto', 'titulo', 'item', 'descricao_item', 'desc_produto', 'name', 'product', 'denominacao', 'mercadoria'],
-  },
-  {
-    key: 'price',
-    label: 'Preço de Venda',
-    required: true,
-    synonyms: ['preco', 'preço', 'valor', 'vlr_venda', 'preco_venda', 'price', 'custo', 'tabela', 'unitario', 'valor_unitario'],
-  },
-  {
-    key: 'category',
-    label: 'Categoria / Linha',
-    required: false,
-    synonyms: ['categoria', 'departamento', 'grupo', 'secao', 'seção', 'familia', 'família', 'linha', 'tipo', 'category'],
-  },
-  {
-    key: 'sku',
-    label: 'Código / SKU',
-    required: false,
-    synonyms: ['sku', 'codigo', 'código', 'ref', 'referencia', 'referência', 'cod', 'id', 'code'],
-  },
-  {
-    key: 'description',
-    label: 'Descrição Detalhada',
-    required: false,
-    synonyms: ['descricao', 'descrição', 'detalhes', 'especificacao', 'especificação', 'obs', 'observacao', 'observação', 'description'],
-  },
-  {
-    key: 'image',
-    label: 'Link da Imagem / URL',
-    required: false,
-    synonyms: ['imagem', 'foto', 'url_imagem', 'image', 'link_foto', 'foto_principal', 'picture', 'photo'],
-  },
-  {
-    key: 'tag',
-    label: 'Tag / Selo Comercial',
-    required: false,
-    synonyms: ['tag', 'destaque', 'selo', 'lancamento', 'lançamento', 'novidade', 'badge'],
-  },
-];
-
 type Step = 'upload' | 'mapping' | 'preview' | 'importing';
 
 interface ParsedProductItem {
@@ -135,39 +82,99 @@ export const StudioExcelImportModal: React.FC = () => {
     closeExcelImportModal();
   };
 
-  const detectAutoMapping = (headers: string[]) => {
+  const detectAutoMapping = (headers: string[], rows: any[][]) => {
     const mapping: Record<string, TargetFieldKey> = {};
-    const usedTargets = new Set<TargetFieldKey>();
+    const firstRow = rows[0] || [];
 
-    headers.forEach((header) => {
-      const normalized = header
+    type Candidate = {
+      header: string;
+      field: TargetFieldKey;
+      score: number;
+    };
+
+    const candidates: Candidate[] = [];
+
+    headers.forEach((header, idx) => {
+      const rawNorm = header
         .toLowerCase()
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]/g, '');
+        .replace(/[\u0300-\u036f]/g, '');
+      const sample = String(firstRow[idx] || '').trim().toLowerCase();
 
-      let matchedKey: TargetFieldKey = 'ignore';
+      // 1. SKU / CODIGO
+      let skuScore = 0;
+      if (rawNorm.includes('sku')) skuScore += 95;
+      if (rawNorm.includes('cod_') || rawNorm.startsWith('cod') || rawNorm.includes('codigo') || rawNorm.includes('código')) skuScore += 90;
+      if (rawNorm.includes('ref') || rawNorm.includes('referencia') || rawNorm.includes('ean') || rawNorm.includes('gtin')) skuScore += 80;
+      if (rawNorm.includes('item') && (rawNorm.includes('cod') || rawNorm.includes('num') || rawNorm.includes('id'))) skuScore += 90;
+      if (sample && sample.length <= 12 && /[0-9]/.test(sample) && (sample.includes('-') || !sample.includes(' '))) skuScore += 25;
+      if (skuScore > 20) candidates.push({ header, field: 'sku', score: skuScore });
 
-      for (const field of TARGET_FIELDS) {
-        if (usedTargets.has(field.key)) continue;
-
-        const isMatch = field.synonyms.some((synonym) => {
-          const normSyn = synonym
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9]/g, '');
-          return normalized.includes(normSyn) || normSyn.includes(normalized);
-        });
-
-        if (isMatch) {
-          matchedKey = field.key;
-          usedTargets.add(field.key);
-          break;
-        }
+      // 2. NOME DO PRODUTO
+      let nameScore = 0;
+      // Se tiver 'cod', 'sku', 'ref', 'id', penaliza fortemente para nao ser confundido com nome
+      if (rawNorm.includes('cod') || rawNorm.includes('sku') || rawNorm.includes('id_') || rawNorm.startsWith('id') || rawNorm.includes('preco') || rawNorm.includes('valor')) {
+        nameScore -= 100;
       }
+      if (rawNorm.includes('titulo') || rawNorm.includes('title')) nameScore += 95;
+      if (rawNorm.includes('nome') || rawNorm === 'name') nameScore += 90;
+      if (rawNorm.includes('produto') && !rawNorm.includes('cod') && !rawNorm.includes('categoria')) nameScore += 85;
+      if (rawNorm === 'descricao' || rawNorm === 'item') nameScore += 40;
+      if (sample && sample.length > 8 && sample.includes(' ') && !sample.includes('r$')) nameScore += 20;
+      if (nameScore > 20) candidates.push({ header, field: 'name', score: nameScore });
 
-      mapping[header] = matchedKey;
+      // 3. PRECO DE VENDA
+      let priceScore = 0;
+      if (rawNorm.includes('preco') || rawNorm.includes('preço')) priceScore += 95;
+      if (rawNorm.includes('valor') || rawNorm.includes('vlr')) priceScore += 90;
+      if (rawNorm.includes('price') || rawNorm.includes('custo') || rawNorm.includes('tabela')) priceScore += 80;
+      if (sample && (sample.includes('r$') || sample.includes('$') || /^[0-9]+[.,][0-9]{2}$/.test(sample.replace(/[^\d.,]/g, '')))) priceScore += 30;
+      if (priceScore > 20) candidates.push({ header, field: 'price', score: priceScore });
+
+      // 4. CATEGORIA / LINHA
+      let catScore = 0;
+      if (rawNorm.includes('categoria') || rawNorm.includes('category')) catScore += 95;
+      if (rawNorm.includes('familia') || rawNorm.includes('família')) catScore += 90;
+      if (rawNorm.includes('departamento') || rawNorm.includes('grupo') || rawNorm.includes('secao') || rawNorm.includes('seção') || rawNorm.includes('linha')) catScore += 85;
+      if (catScore > 20) candidates.push({ header, field: 'category', score: catScore });
+
+      // 5. DESCRICAO
+      let descScore = 0;
+      if (rawNorm.includes('descricao') || rawNorm.includes('descrição') || rawNorm.includes('detalhes')) descScore += 95;
+      if (rawNorm.includes('especificacao') || rawNorm.includes('obs') || rawNorm.includes('description')) descScore += 85;
+      if (sample && sample.length > 25) descScore += 30;
+      if (descScore > 20) candidates.push({ header, field: 'description', score: descScore });
+
+      // 6. IMAGEM / FOTO
+      let imgScore = 0;
+      if (rawNorm.includes('imagem') || rawNorm.includes('foto') || rawNorm.includes('image') || rawNorm.includes('link_foto') || rawNorm.includes('picture')) imgScore += 95;
+      if (sample && (sample.startsWith('http') || sample.includes('.jpg') || sample.includes('.png') || sample.includes('.webp'))) imgScore += 40;
+      if (imgScore > 20) candidates.push({ header, field: 'image', score: imgScore });
+
+      // 7. TAG / SELO
+      let tagScore = 0;
+      if (rawNorm.includes('selo') || rawNorm.includes('tag') || rawNorm.includes('destaque') || rawNorm.includes('badge')) tagScore += 95;
+      if (rawNorm.includes('lancamento') || rawNorm.includes('novidade')) tagScore += 85;
+      if (tagScore > 20) candidates.push({ header, field: 'tag', score: tagScore });
+    });
+
+    candidates.sort((a, b) => b.score - a.score);
+
+    const assignedHeaders = new Set<string>();
+    const assignedFields = new Set<TargetFieldKey>();
+
+    for (const c of candidates) {
+      if (!assignedHeaders.has(c.header) && !assignedFields.has(c.field)) {
+        mapping[c.header] = c.field;
+        assignedHeaders.add(c.header);
+        assignedFields.add(c.field);
+      }
+    }
+
+    headers.forEach((h) => {
+      if (!mapping[h]) {
+        mapping[h] = 'ignore';
+      }
     });
 
     return mapping;
@@ -203,7 +210,7 @@ export const StudioExcelImportModal: React.FC = () => {
       setRawHeaders(headers);
       setRawRows(rows);
 
-      const autoMap = detectAutoMapping(headers);
+      const autoMap = detectAutoMapping(headers, rows);
       setColumnMapping(autoMap);
       setStep('mapping');
       toast.success(`Planilha processada: ${rows.length} itens encontrados.`);
