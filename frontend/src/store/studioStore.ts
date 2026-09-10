@@ -292,7 +292,7 @@ export interface StudioState {
   }>;
   generationTargetCatalog: GeneratedCatalogResult | null;
   lastGenerationPrompt?: string;
-  triggerCatalogGeneration: (prompt: string, attachments?: ChatAttachment[]) => void | Promise<void>;
+  triggerCatalogGeneration: (prompt: string, attachments?: ChatAttachment[], products?: ProductItem[]) => void | Promise<void>;
   finishCatalogGeneration: () => void;
   cancelCatalogGeneration: () => void;
 
@@ -628,9 +628,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
 
     if (options.generateCatalog) {
-      const categorySummary = newProducts[0]?.category || 'Editorial';
-      const prompt = `Catalogo de produtos para a colecao ${categorySummary} com ${newProducts.length} itens importados da planilha`;
-      get().triggerCatalogGeneration(prompt);
+      const categorySummary = newProducts[0]?.category || 'Produtos';
+      const prompt = `Catalogo comercial para a colecao ${categorySummary} com ${newProducts.length} itens cadastrados`;
+      get().triggerCatalogGeneration(prompt, undefined, newProducts);
     }
   },
 
@@ -661,9 +661,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   generationTargetCatalog: null,
   lastGenerationPrompt: undefined,
 
-  triggerCatalogGeneration: async (prompt: string, attachments?: ChatAttachment[]) => {
+  triggerCatalogGeneration: async (prompt: string, attachments?: ChatAttachment[], products?: ProductItem[]) => {
     const nowTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const shortPrompt = prompt.length > 55 ? `${prompt.slice(0, 52)}...` : prompt;
+    const hasProducts = products && products.length > 0;
 
     set({
       isGeneratingCatalog: true,
@@ -677,7 +678,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           time: nowTime(),
           roleId: 'orchestrator',
           roleName: 'Orquestrador',
-          text: `Iniciando sintese generativa via Google Gemini para: "${shortPrompt}".`,
+          text: hasProducts
+            ? `Iniciando síntese generativa via Google Gemini com ${products.length} produtos reais e análise de utilidade comercial.`
+            : `Iniciando síntese generativa via Google Gemini para: "${shortPrompt}".`,
         },
       ],
     });
@@ -694,7 +697,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             time: nowTime(),
             roleId: 'director',
             roleName: 'Editor-Chefe',
-            text: 'Conselho Editorial ativado. Gemini sintetizando conceito de marca, manifesto e mix de produtos.',
+            text: hasProducts
+              ? 'Conselho Editorial ativado. Gemini investigando a função prática dos produtos para compor manifesto e conceito.'
+              : 'Conselho Editorial ativado. Gemini sintetizando conceito de marca, manifesto e mix de produtos.',
           },
         ],
       }));
@@ -721,8 +726,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     try {
       const response = await axios.post(
         `${API_BASE_URL}/api/v2/studio/catalogs/generate/`,
-        { prompt },
-        { timeout: 45000 }
+        { prompt, products },
+        { timeout: 50000 }
       );
 
       clearTimeout(timer2);

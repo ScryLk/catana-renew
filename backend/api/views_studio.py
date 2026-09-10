@@ -753,11 +753,16 @@ class StudioCatalogGenerateView(APIView):
         from api.ai.catalog_builder import generate_catalog_from_gemini
 
         prompt = request.data.get("prompt", "").strip()
-        if not prompt:
-            return Response({"error": "O campo prompt e obrigatorio."}, status=status.HTTP_400_BAD_REQUEST)
+        products = request.data.get("products", [])
+        if not prompt and not products:
+            return Response({"error": "O campo prompt ou uma lista de produtos e obrigatorio."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not prompt and products:
+            first_cat = products[0].get("category") or "Produtos"
+            prompt = f"Catálogo comercial para a linha {first_cat} com {len(products)} itens cadastrados."
 
         try:
-            result = generate_catalog_from_gemini(prompt)
+            result = generate_catalog_from_gemini(prompt=prompt, products=products)
             return Response(result, status=status.HTTP_200_OK)
         except Exception as err:
             logger.error(f"[StudioCatalogGenerate] Falha ao gerar catalogo: {err}")
