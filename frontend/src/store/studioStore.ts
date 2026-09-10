@@ -246,6 +246,16 @@ export interface StudioState {
   openExportModal: (tab?: 'pdf' | 'share' | 'catana' | 'images') => void;
   closeExportModal: () => void;
 
+  // Product Drawer & Inventory Repository
+  isProductDrawerOpen: boolean;
+  unassignedProducts: ProductItem[];
+  openProductDrawer: () => void;
+  closeProductDrawer: () => void;
+  toggleProductDrawer: () => void;
+  addProductToRepository: (product: Omit<ProductItem, 'id'>) => ProductItem;
+  deleteProductFromRepository: (productId: string) => void;
+  assignProductToSpread: (product: ProductItem, targetPageNumber: number, slotIndex?: number) => void;
+
   // Catalog Generation Experience (Lovable style)
   isGeneratingCatalog: boolean;
   generationStage: number;
@@ -463,6 +473,101 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   exportModalTab: 'pdf',
   openExportModal: (tab = 'pdf') => set({ isExportModalOpen: true, exportModalTab: tab }),
   closeExportModal: () => set({ isExportModalOpen: false }),
+
+  // Product Drawer & Inventory Repository
+  isProductDrawerOpen: false,
+  unassignedProducts: [
+    {
+      id: 'prod-unassigned-1',
+      category: 'COURO LEGITIMO',
+      index: '08',
+      name: 'Porta-Cartoes Verona',
+      sku: 'ART-008',
+      price: 'R$ 490',
+      description: 'Couro vegetal encerado com bordas polidas artesanalmente a quente.',
+      image: '/aurea/images/det-costura.jpg',
+      tag: 'Disponivel',
+    },
+    {
+      id: 'prod-unassigned-2',
+      category: 'MARROQUINARIA',
+      index: '09',
+      name: 'Bolsa Tote Amalfi',
+      sku: 'ART-009',
+      price: 'R$ 3.800',
+      description: 'Espaco generoso com forro em camurca natural e ferragens em latao escovado.',
+      image: '/aurea/images/det-atelier.jpg',
+      tag: 'Edicao Limitada',
+    },
+    {
+      id: 'prod-unassigned-3',
+      category: 'SEDA & CASHMERE',
+      index: '10',
+      name: 'Lenco de Bolso Lucca',
+      sku: 'ART-010',
+      price: 'R$ 320',
+      description: 'Twill de seda pura com bainha enrolada a mao em padrao geometrico discreto.',
+      image: '/aurea/images/det-tecido.jpg',
+      tag: 'Seda Pura',
+    },
+  ],
+  openProductDrawer: () => set({ isProductDrawerOpen: true }),
+  closeProductDrawer: () => set({ isProductDrawerOpen: false }),
+  toggleProductDrawer: () => set((s) => ({ isProductDrawerOpen: !s.isProductDrawerOpen })),
+  addProductToRepository: (productData) => {
+    const newProduct: ProductItem = {
+      ...productData,
+      id: `prod-custom-${Date.now()}`,
+    };
+    set((s) => ({
+      unassignedProducts: [newProduct, ...s.unassignedProducts],
+    }));
+    toast.success(`Produto "${newProduct.name}" adicionado ao acervo!`);
+    return newProduct;
+  },
+  deleteProductFromRepository: (productId) => {
+    set((s) => ({
+      unassignedProducts: s.unassignedProducts.filter((p) => p.id !== productId),
+    }));
+    toast.info('Produto removido do acervo.');
+  },
+  assignProductToSpread: (product, targetPageNumber, slotIndex = 0) => {
+    get().pushHistorySnapshot();
+    const state = get();
+    const updatedPages = state.pages.map((page) => {
+      if (page.pageNumber !== targetPageNumber) return page;
+
+      let newProducts = [...(page.products || [])];
+      if (page.type === 'hero' || page.type === 'single') {
+        newProducts = [product];
+      } else if (page.type === 'duo') {
+        if (slotIndex === 1) {
+          newProducts[1] = product;
+          if (!newProducts[0]) newProducts[0] = product;
+        } else {
+          newProducts[0] = product;
+        }
+      } else {
+        newProducts = [product];
+      }
+
+      return {
+        ...page,
+        products: newProducts,
+      };
+    });
+
+    const updatedUnassigned = state.unassignedProducts.filter((p) => p.id !== product.id);
+
+    set({
+      pages: updatedPages,
+      unassignedProducts: updatedUnassigned,
+      saveStatus: 'unsaved',
+    });
+
+    get().debouncedSaveCurrentSpread();
+    toast.success(`Produto "${product.name}" alocado na Pagina ${String(targetPageNumber).padStart(2, '0')}!`);
+  },
 
   isGeneratingCatalog: false,
   generationStage: 1,
@@ -1126,14 +1231,23 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           ),
         };
       }),
+      unassignedProducts: s.unassignedProducts.map((prod) =>
+        prod.id === productId ? { ...prod, ...updates } : prod
+      ),
       saveStatus: 'unsaved',
     }));
     get().debouncedSaveCurrentSpread();
   },
 
   removeProductBackground: async (pageNumber, productId) => {
-    const page = get().pages.find((p) => p.pageNumber === pageNumber);
-    const prod = page?.products?.find((p) => p.id === productId);
+    let prod: ProductItem | undefined;
+    if (pageNumber) {
+      const page = get().pages.find((p) => p.pageNumber === pageNumber);
+      prod = page?.products?.find((p) => p.id === productId);
+    }
+    if (!prod) {
+      prod = get().unassignedProducts.find((p) => p.id === productId);
+    }
     if (!prod || !prod.image) {
       toast.error('Produto nao possui imagem para remocao de fundo.');
       return;

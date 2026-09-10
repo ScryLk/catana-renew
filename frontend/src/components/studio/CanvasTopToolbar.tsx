@@ -19,6 +19,7 @@ import {
   Cloud,
   CloudOff,
   Sparkles,
+  Package,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
 import { Tooltip } from '../ui/Tooltip';
@@ -46,10 +47,17 @@ export const CanvasTopToolbar: React.FC = () => {
     isCoPilotOpen,
     toggleCoPilot,
     openExportModal,
+    pages,
+    unassignedProducts,
+    isProductDrawerOpen,
+    toggleProductDrawer,
   } = useStudioStore();
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(catalogTitle);
+
+  const totalProductsCount =
+    pages.flatMap((p) => p.products || []).length + (unassignedProducts?.length || 0);
 
   const isDark = theme === 'dark';
 
@@ -400,6 +408,40 @@ export const CanvasTopToolbar: React.FC = () => {
             {activePalette.locked && (
               <Lock className="size-2.5 text-amber-400 shrink-0" />
             )}
+          </button>
+        </Tooltip>
+
+        {/* Product Drawer Toggle Button */}
+        <Tooltip text="Gaveta de Produtos & Acervo (P)" shortcut="P" position="bottom">
+          <button
+            type="button"
+            onClick={toggleProductDrawer}
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition-all cursor-pointer ${
+              isProductDrawerOpen
+                ? isDark
+                  ? 'bg-zinc-200 text-zinc-950 border-white font-bold'
+                  : 'bg-zinc-900 text-white border-zinc-900 font-bold'
+                : isDark
+                ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white'
+                : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300 text-zinc-700 hover:text-zinc-950'
+            }`}
+            aria-label="Gaveta de produtos"
+          >
+            <Package className="size-3.5 shrink-0" />
+            <span className="text-[11px] font-medium hidden sm:inline">Produtos</span>
+            <span
+              className={`text-[9px] font-mono px-1 rounded ${
+                isProductDrawerOpen
+                  ? isDark
+                    ? 'bg-zinc-900 text-zinc-200'
+                    : 'bg-white text-zinc-900'
+                  : isDark
+                  ? 'bg-zinc-800 text-zinc-300'
+                  : 'bg-zinc-200 text-zinc-700'
+              }`}
+            >
+              {totalProductsCount}
+            </span>
           </button>
         </Tooltip>
 

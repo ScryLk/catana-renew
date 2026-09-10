@@ -9,6 +9,7 @@ import { CatalogGenerationExperience } from '../components/studio/CatalogGenerat
 import { KatanaSplashScreen } from '../components/studio/KatanaSplashScreen';
 import { AccountSettingsModal } from '../components/studio/AccountSettingsModal';
 import { ExportCatalogModal } from '../components/studio/ExportCatalogModal';
+import { ProductDrawer } from '../components/studio/ProductDrawer';
 import { AuthModal } from '../components/auth/AuthModal';
 import { useStudioStore } from '../store/studioStore';
 import { useAuthStore, isAutoLoginSettled } from '../store/authStore';
@@ -61,6 +62,7 @@ export const KatanaStudio: React.FC = () => {
     theme,
     isAccountSettingsOpen,
     closeAccountSettings,
+    toggleProductDrawer,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -82,11 +84,14 @@ export const KatanaStudio: React.FC = () => {
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'j' || e.key === 'J')) {
         e.preventDefault();
         toggleCoPilot();
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        toggleProductDrawer();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleStudioSidebar, toggleCoPilot]);
+  }, [toggleStudioSidebar, toggleCoPilot, toggleProductDrawer]);
 
   return (
     <div className="h-screen w-screen flex bg-[#09090b] text-zinc-100 overflow-hidden font-sans antialiased relative">
@@ -160,6 +165,9 @@ export const KatanaStudio: React.FC = () => {
 
       {/* Modal de Exportação Editorial e Distribuição Multiformato */}
       <ExportCatalogModal />
+
+      {/* Gaveta de Produtos & Acervo Editorial */}
+      <ProductDrawer />
 
       {/* Modal de Autenticacao In-Context (Light/Dark Mode) */}
       <AuthModal
