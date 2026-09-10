@@ -164,7 +164,7 @@ class GeminiAIProvider:
 
     def __init__(self, api_key: Optional[str] = None, default_model: Optional[str] = None):
         self.api_key = api_key or getattr(settings, "GEMINI_API_KEY", "") or os.environ.get("GEMINI_API_KEY", "")
-        self.default_model = default_model or getattr(settings, "AI_DEFAULT_MODEL", "gemini-2.0-flash")
+        self.default_model = default_model or getattr(settings, "AI_DEFAULT_MODEL", "gemini-2.5-flash")
         self.mock_provider = MockGeminiProvider()
         self.client = None
 
