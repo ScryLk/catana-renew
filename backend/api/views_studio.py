@@ -742,3 +742,26 @@ class StudioMediaRemoveBackgroundView(APIView):
             return Response({"error": f"Falha ao remover fundo: {str(exc)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class StudioCatalogGenerateView(APIView):
+    """
+    Gera um catalogo editorial completo e autentico a partir do prompt via Google Gemini.
+    POST /api/v2/studio/catalogs/generate/
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        from api.ai.catalog_builder import generate_catalog_from_gemini
+
+        prompt = request.data.get("prompt", "").strip()
+        if not prompt:
+            return Response({"error": "O campo prompt e obrigatorio."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            result = generate_catalog_from_gemini(prompt)
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as err:
+            logger.error(f"[StudioCatalogGenerate] Falha ao gerar catalogo: {err}")
+            return Response({"error": "Falha na sintese generativa do catalogo."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+

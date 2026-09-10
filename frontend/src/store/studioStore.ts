@@ -268,7 +268,8 @@ export interface StudioState {
     text: string;
   }>;
   generationTargetCatalog: GeneratedCatalogResult | null;
-  triggerCatalogGeneration: (prompt: string, attachments?: ChatAttachment[]) => void;
+  lastGenerationPrompt?: string;
+  triggerCatalogGeneration: (prompt: string, attachments?: ChatAttachment[]) => void | Promise<void>;
   finishCatalogGeneration: () => void;
   cancelCatalogGeneration: () => void;
 
@@ -574,129 +575,195 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   generationProgress: 0,
   generationLogs: [],
   generationTargetCatalog: null,
+  lastGenerationPrompt: undefined,
 
-  triggerCatalogGeneration: (prompt: string, attachments?: ChatAttachment[]) => {
-    const generated = generateCatalogFromPrompt(prompt, attachments);
+  triggerCatalogGeneration: async (prompt: string, attachments?: ChatAttachment[]) => {
     const nowTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const shortPrompt = prompt.length > 55 ? `${prompt.slice(0, 52)}...` : prompt;
 
     set({
       isGeneratingCatalog: true,
       generationStage: 1,
-      generationProgress: 15,
-      generationTargetCatalog: generated,
+      generationProgress: 18,
+      generationTargetCatalog: null,
+      lastGenerationPrompt: prompt,
       generationLogs: [
         {
-          id: `log-1`,
+          id: `log-${Date.now()}-1`,
           time: nowTime(),
           roleId: 'orchestrator',
           roleName: 'Orquestrador',
-          text: `Iniciando síntese generativa para "${generated.title}". Categoria identificada: ${generated.category}.`,
+          text: `Iniciando sintese generativa via Google Gemini para: "${shortPrompt}".`,
         },
       ],
     });
 
-    // Stage 2: Conselho Editorial
-    setTimeout(() => {
+    const timer2 = setTimeout(() => {
       if (!get().isGeneratingCatalog) return;
       set((s) => ({
         generationStage: 2,
-        generationProgress: 36,
+        generationProgress: 42,
         generationLogs: [
           ...s.generationLogs,
           {
-            id: `log-2`,
+            id: `log-${Date.now()}-2`,
             time: nowTime(),
             roleId: 'director',
             roleName: 'Editor-Chefe',
-            text: `Conselho Editorial ativado. Alocados 5 agentes especialistas para direção de arte, redação e diagramação.`,
+            text: 'Conselho Editorial ativado. Gemini sintetizando conceito de marca, manifesto e mix de produtos.',
           },
         ],
       }));
-    }, 700);
+    }, 800);
 
-    // Stage 3: Sistema Cromático & Tipografia
-    setTimeout(() => {
+    const timer3 = setTimeout(() => {
       if (!get().isGeneratingCatalog) return;
       set((s) => ({
         generationStage: 3,
-        generationProgress: 62,
+        generationProgress: 68,
         generationLogs: [
           ...s.generationLogs,
           {
-            id: `log-3`,
+            id: `log-${Date.now()}-3`,
             time: nowTime(),
             roleId: 'art_director',
             roleName: 'Diretor de Arte',
-            text: `Paleta "${generated.palette.name}" aplicada. Contraste certificado sob WCAG AAA (${generated.palette.contrastRatio || '9.2:1'}).`,
+            text: 'Calculando harmonia cromatica, contraste certificado WCAG AAA e tipografia editorial.',
           },
         ],
       }));
-    }, 1400);
+    }, 1800);
 
-    // Stage 4: Diagramação de Spreads & Grid A4
-    setTimeout(() => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/v2/studio/catalogs/generate/`,
+        { prompt },
+        { timeout: 45000 }
+      );
+
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+
       if (!get().isGeneratingCatalog) return;
+
+      const generated: GeneratedCatalogResult = response.data;
+      if (!generated || !generated.pages || generated.pages.length === 0) {
+        throw new Error('Retorno do Gemini sem paginas validas');
+      }
+
+      generated.initialPrompt = prompt;
+
       set((s) => ({
         generationStage: 4,
-        generationProgress: 84,
+        generationProgress: 88,
+        generationTargetCatalog: generated,
         generationLogs: [
           ...s.generationLogs,
           {
-            id: `log-4`,
+            id: `log-${Date.now()}-4`,
             time: nowTime(),
             roleId: 'grid_architect',
             roleName: 'Diagramador A4',
-            text: `Estruturadas ${generated.totalPages} páginas editoriais com margens de 96px e proporção áurea.`,
+            text: `Estruturadas ${generated.totalPages} paginas editoriais para "${generated.title}" (${generated.category}).`,
           },
           {
-            id: `log-5`,
+            id: `log-${Date.now()}-5`,
             time: nowTime(),
             roleId: 'copywriter',
             roleName: 'Copywriter',
-            text: `Manifesto de marca e chamadas comerciais de produtos redigidos com vocabulário de posicionamento.`,
+            text: `Manifesto exclusivo e titulos comerciais gerados pela IA sob a paleta "${generated.palette.name}".`,
           },
         ],
       }));
-    }, 2200);
 
-    // Stage 5: Renderização Vetorial & Auditoria
-    setTimeout(() => {
+      // Stage 5: Finalizacao e Auditoria
+      setTimeout(() => {
+        if (!get().isGeneratingCatalog) return;
+        set((s) => ({
+          generationStage: 5,
+          generationProgress: 98,
+          generationLogs: [
+            ...s.generationLogs,
+            {
+              id: `log-${Date.now()}-6`,
+              time: nowTime(),
+              roleId: 'branding_auditor',
+              roleName: 'Auditor de Branding',
+              text: 'Homologacao editorial concluida. Compilando pranchetas de alta fidelidade para o Katana Studio.',
+            },
+          ],
+        }));
+
+        setTimeout(() => {
+          if (!get().isGeneratingCatalog) return;
+          get().finishCatalogGeneration();
+        }, 600);
+      }, 700);
+
+    } catch (err) {
+      console.warn('[triggerCatalogGeneration] Falha ao conectar ao Gemini, acionando sintese de contingencia local:', err);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+
       if (!get().isGeneratingCatalog) return;
+
+      const fallback = generateCatalogFromPrompt(prompt, attachments);
+      fallback.initialPrompt = prompt;
+
       set((s) => ({
-        generationStage: 5,
-        generationProgress: 97,
+        generationStage: 4,
+        generationProgress: 88,
+        generationTargetCatalog: fallback,
         generationLogs: [
           ...s.generationLogs,
           {
-            id: `log-6`,
+            id: `log-${Date.now()}-fallback`,
             time: nowTime(),
-            roleId: 'branding_auditor',
-            roleName: 'Auditor de Branding',
-            text: `Homologação concluída com sucesso. Compilando pranchetas de alta fidelidade para o Katana Studio.`,
+            roleId: 'orchestrator',
+            roleName: 'Orquestrador',
+            text: `Modo de contingencia acionado. Sintese local aplicada para "${fallback.title}".`,
           },
         ],
       }));
-    }, 3000);
 
-    // Auto-finish after 3600ms
-    setTimeout(() => {
-      if (!get().isGeneratingCatalog) return;
-      get().finishCatalogGeneration();
-    }, 3600);
+      setTimeout(() => {
+        if (!get().isGeneratingCatalog) return;
+        set((s) => ({
+          generationStage: 5,
+          generationProgress: 98,
+          generationLogs: [
+            ...s.generationLogs,
+            {
+              id: `log-${Date.now()}-finish`,
+              time: nowTime(),
+              roleId: 'branding_auditor',
+              roleName: 'Auditor de Branding',
+              text: 'Compilando pranchetas de contingencia para o Katana Studio.',
+            },
+          ],
+        }));
+
+        setTimeout(() => {
+          if (!get().isGeneratingCatalog) return;
+          get().finishCatalogGeneration();
+        }, 600);
+      }, 700);
+    }
   },
 
   finishCatalogGeneration: () => {
-    const target = get().generationTargetCatalog;
+    let target = get().generationTargetCatalog;
     if (!target) {
-      set({ isGeneratingCatalog: false });
-      return;
+      const fallbackPrompt = get().lastGenerationPrompt || 'Catalogo Editorial';
+      target = generateCatalogFromPrompt(fallbackPrompt);
+      set({ generationTargetCatalog: target });
     }
 
     const initialMessages: ChatMessage[] = [
       {
         id: 'msg-1',
         role: 'user',
-        content: target.initialPrompt || `Criar catálogo ${target.title}`,
+        content: target.initialPrompt || `Criar catalogo ${target.title}`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
       {
@@ -749,6 +816,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       generationStage: 1,
       generationLogs: [],
       generationTargetCatalog: null,
+      lastGenerationPrompt: undefined,
     });
   },
 
