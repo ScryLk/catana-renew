@@ -136,94 +136,128 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
         </div>
       )}
 
-      {page.type === 'hero' && page.products?.[0] && (
+      {page.type === 'hero' && (
         <div className="h-full flex flex-col justify-between pt-2">
-          <div className="w-full h-18 bg-stone-100 overflow-hidden rounded-xs">
-            <img
-              src={page.products[0].image}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="pt-1">
-            <span
-              className="text-[6px] text-[#1A1817] font-medium block truncate"
-              style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-            >
-              {page.products[0].name}
-            </span>
-            <span className="text-[5px] font-mono text-[#1A1817] font-semibold block">
-              {page.products[0].price}
-            </span>
-          </div>
+          {page.products?.[0] ? (
+            <>
+              <div className="w-full h-18 bg-stone-100 overflow-hidden rounded-xs">
+                <img
+                  src={page.products[0].image}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="pt-1">
+                <span
+                  className="text-[6px] text-[#1A1817] font-medium block truncate"
+                  style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                >
+                  {page.products[0].name}
+                </span>
+                <span className="text-[5px] font-mono text-[#1A1817] font-semibold block">
+                  {page.products[0].price}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center border border-dashed border-zinc-400/50 rounded-xs p-1 text-center bg-black/5">
+              <span className="text-[9px] text-zinc-400 font-light">+</span>
+              <span className="text-[4px] font-mono uppercase text-zinc-500 mt-0.5">Slot Hero</span>
+            </div>
+          )}
         </div>
       )}
 
-      {page.type === 'duo' && page.products && (
+      {page.type === 'duo' && (
         <div className="h-full flex flex-col justify-between pt-2">
           <div className="grid grid-cols-2 gap-1 h-20 items-center">
-            {page.products.slice(0, 2).map((prod) => (
-              <div key={prod.id} className="flex flex-col gap-0.5">
-                <div className="w-full h-10 bg-stone-100 overflow-hidden rounded-xs">
-                  <img src={prod.image} alt="" className="w-full h-full object-cover" />
+            {[0, 1].map((idx) => {
+              const prod = page.products?.[idx];
+              return prod ? (
+                <div key={prod.id || idx} className="flex flex-col gap-0.5">
+                  <div className="w-full h-10 bg-stone-100 overflow-hidden rounded-xs">
+                    <img src={prod.image} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <span className="text-[4px] text-[#1A1817] font-semibold truncate block">
+                    {prod.name}
+                  </span>
+                  <span className="text-[4px] font-mono text-stone-700 block">
+                    {prod.price}
+                  </span>
                 </div>
-                <span className="text-[4px] text-[#1A1817] font-semibold truncate block">
-                  {prod.name}
-                </span>
-                <span className="text-[4px] font-mono text-stone-700 block">
-                  {prod.price}
-                </span>
-              </div>
-            ))}
+              ) : (
+                <div key={idx} className="h-14 border border-dashed border-zinc-400/50 rounded-xs flex flex-col items-center justify-center bg-black/5">
+                  <span className="text-[8px] text-zinc-400 font-light">+</span>
+                  <span className="text-[3px] font-mono text-zinc-500">Slot {idx + 1}</span>
+                </div>
+              );
+            })}
           </div>
           <div className="text-center pb-0.5">
-            <span className="text-[5px] font-mono text-stone-500">{page.folio}</span>
+            <span className="text-[5px] font-mono text-stone-500">{page.folio || `PÁG. ${page.pageNumber}`}</span>
           </div>
         </div>
       )}
 
-      {page.type === 'single' && page.products?.[0] && (
+      {page.type === 'single' && (
         <div className="h-full flex flex-col items-center justify-between pt-2 text-center">
-          <div className="w-14 h-16 bg-stone-100 overflow-hidden rounded-xs">
-            <img
-              src={page.products[0].image}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="pt-0.5">
-            <span
-              className="text-[6px] text-[#1A1817] font-medium block truncate"
-              style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-            >
-              {page.products[0].name}
-            </span>
-            <span className="text-[5px] font-mono text-[#1A1817] font-semibold block">
-              {page.products[0].price}
-            </span>
-          </div>
+          {page.products?.[0] ? (
+            <>
+              <div className="w-14 h-16 bg-stone-100 overflow-hidden rounded-xs">
+                <img
+                  src={page.products[0].image}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="pt-0.5">
+                <span
+                  className="text-[6px] text-[#1A1817] font-medium block truncate"
+                  style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                >
+                  {page.products[0].name}
+                </span>
+                <span className="text-[5px] font-mono text-[#1A1817] font-semibold block">
+                  {page.products[0].price}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="w-16 h-20 border border-dashed border-zinc-400/50 rounded-xs flex flex-col items-center justify-center bg-black/5 mt-2">
+              <span className="text-[9px] text-zinc-400 font-light">+</span>
+              <span className="text-[4px] font-mono uppercase text-zinc-500 mt-0.5">Slot Single</span>
+            </div>
+          )}
         </div>
       )}
 
-      {page.type === 'grid_4' && page.products && (
+      {page.type === 'grid_4' && (
         <div className="h-full flex flex-col justify-between pt-2">
           <div className="grid grid-cols-2 gap-0.5 items-center">
-            {page.products.slice(0, 4).map((prod) => (
-              <div key={prod.id} className="flex flex-col gap-0.2">
-                <div className="w-full h-7 bg-stone-100 overflow-hidden rounded-xs">
-                  <img src={prod.image} alt="" className="w-full h-full object-cover" />
+            {[0, 1, 2, 3].map((idx) => {
+              const prod = page.products?.[idx];
+              return prod ? (
+                <div key={prod.id || idx} className="flex flex-col gap-0.2">
+                  <div className="w-full h-7 bg-stone-100 overflow-hidden rounded-xs">
+                    <img src={prod.image} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <span className="text-[3px] text-[#1A1817] font-semibold truncate block">
+                    {prod.name}
+                  </span>
+                  <span className="text-[3px] font-mono text-stone-700 block">
+                    {prod.price}
+                  </span>
                 </div>
-                <span className="text-[3px] text-[#1A1817] font-semibold truncate block">
-                  {prod.name}
-                </span>
-                <span className="text-[3px] font-mono text-stone-700 block">
-                  {prod.price}
-                </span>
-              </div>
-            ))}
+              ) : (
+                <div key={idx} className="h-9 border border-dashed border-zinc-400/50 rounded-xs flex flex-col items-center justify-center bg-black/5">
+                  <span className="text-[7px] text-zinc-400 font-light">+</span>
+                  <span className="text-[3px] font-mono text-zinc-500">{idx + 1}</span>
+                </div>
+              );
+            })}
           </div>
           <div className="text-center pb-0.5">
-            <span className="text-[5px] font-mono text-stone-500">{page.folio}</span>
+            <span className="text-[5px] font-mono text-stone-500">{page.folio || `PÁG. ${page.pageNumber}`}</span>
           </div>
         </div>
       )}

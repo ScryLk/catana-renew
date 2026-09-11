@@ -7,6 +7,8 @@ import {
   DollarSign,
   ChevronDown,
   ArrowLeftRight,
+  Plus,
+  Package,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
 import { CatalogPageData } from '../../data/aureaCatalog.mock';
@@ -29,6 +31,7 @@ export const SpreadViewport: React.FC = () => {
     setSpreadPage,
     swapSpreadPages,
     activePalette,
+    openProductDrawer,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -142,13 +145,13 @@ export const SpreadViewport: React.FC = () => {
   const [openDropdown, setOpenDropdown] = useState<'left' | 'right' | null>(null);
 
   const getPageTitleOrLabel = (page: CatalogPageData): string => {
-    if (page.type === 'cover') return 'Capa · Coleção Inverno 2026';
-    if (page.type === 'manifesto') return 'Manifesto do Atelier';
+    if (page.type === 'cover') return 'Capa · Coleção 2026';
+    if (page.type === 'manifesto') return 'Manifesto Editorial';
     if (page.type === 'divider') return `Divisória · ${page.title || page.label}`;
-    if (page.type === 'hero') return `Destaque · ${page.products?.[0]?.name || page.label}`;
-    if (page.type === 'duo') return `Duo · ${page.products?.map((p) => p.name).join(' & ')}`;
-    if (page.type === 'single') return `Single · ${page.products?.[0]?.name || page.label}`;
-    if (page.type === 'grid_4') return `Grade Comercial · ${page.products?.length || 4} itens`;
+    if (page.type === 'hero') return `Destaque · ${page.products?.[0]?.name || 'Slot Disponível'}`;
+    if (page.type === 'duo') return `Duo · ${page.products?.length ? page.products.map((p) => p.name).join(' & ') : 'Slots Disponíveis'}`;
+    if (page.type === 'single') return `Single · ${page.products?.[0]?.name || 'Slot Disponível'}`;
+    if (page.type === 'grid_4') return `Grade Comercial · ${page.products?.length || 0}/4 itens`;
     if (page.type === 'backcover') return 'Contracapa · Atelier';
     return `Página ${page.pageNumber}`;
   };
@@ -416,7 +419,72 @@ export const SpreadViewport: React.FC = () => {
       // ---------------- PÁGINA 04 & 07: HERO PRODUCT ----------------
       case 'hero': {
         const prod = page.products?.[0];
-        if (!prod) return null;
+        if (!prod) {
+          return (
+            <div className="h-full flex flex-col justify-between py-9 px-9 select-none">
+              {/* Wireframe Hero Dropzone / Slot */}
+              <div
+                onClick={() => openProductDrawer()}
+                className="w-full h-[360px] rounded-sm border-2 border-dashed border-zinc-400/40 dark:border-zinc-700/80 bg-zinc-500/5 hover:bg-amber-500/5 hover:border-amber-600/70 transition-all cursor-pointer flex flex-col items-center justify-center p-6 text-center group"
+              >
+                <div className="size-14 rounded-full bg-zinc-200/50 dark:bg-zinc-800/60 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:border-amber-600/50 transition-all shadow-xs">
+                  <Plus className="size-6 text-zinc-500 dark:text-zinc-400 group-hover:text-amber-600 transition-colors" />
+                </div>
+                <span className="text-[11px] font-mono tracking-widest uppercase font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  LÂMINA HERO · SLOT DESTAQUE
+                </span>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs mb-3 font-light leading-relaxed">
+                  Espaço reservado para o produto principal. Clique para selecionar do acervo ou arraste da planilha.
+                </p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openProductDrawer();
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-xs font-medium shadow-sm hover:bg-zinc-800 dark:hover:bg-white transition-colors cursor-pointer"
+                >
+                  <Package className="size-3.5" />
+                  + Inserir Produto do Acervo
+                </button>
+              </div>
+
+              {/* Product Placeholder Copy */}
+              <div className="p-3 rounded-lg border border-dashed border-zinc-300/60 dark:border-zinc-800/80 bg-zinc-500/5">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[9px] tracking-[0.3em] font-semibold uppercase" style={{ color: accent }}>
+                    SLOT 01 · {page.label || 'DESTAQUE EXCLUSIVO'}
+                  </span>
+                  <span className="text-[9px] font-mono text-stone-400">SKU-PENDENTE</span>
+                </div>
+                <div className="w-10 h-[1px] mb-2.5" style={{ backgroundColor: accent }} />
+                <div className="flex items-baseline justify-between gap-4 mb-2">
+                  <h3
+                    className="text-2xl text-[#1A1817] dark:text-zinc-200 font-medium italic opacity-70"
+                    style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                  >
+                    Título do Produto em Destaque
+                  </h3>
+                  <span className="text-sm font-sans tracking-wider text-stone-400 font-semibold tabular-nums">
+                    R$ 0,00
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-[1.65] font-light">
+                  Aguardando vinculação do produto. As especificações técnicas, selo editorial e precificação serão renderizadas aqui automaticamente.
+                </p>
+              </div>
+
+              {/* Folio Footer */}
+              <div className="flex flex-col items-center">
+                <div className="w-6 h-[1px] mb-2" style={{ backgroundColor: accent }} />
+                <span className="text-[9px] tracking-[0.3em] text-[#1A1817]/70 font-mono">
+                  {page.folio || `PÁG. ${String(page.pageNumber).padStart(2, '0')}`}
+                </span>
+              </div>
+            </div>
+          );
+        }
+
         const isSelected = selectedElementId === prod.id;
 
         return (
@@ -489,39 +557,33 @@ export const SpreadViewport: React.FC = () => {
       // ---------------- PÁGINA 05 & 08: DUO PRODUCTS ----------------
       case 'duo': {
         const [prodA, prodB] = page.products || [];
-        if (!prodA || !prodB) return null;
         const isMirrored = page.mirrored;
 
-        return (
-          <div className="h-full flex flex-col justify-between py-9 px-8 select-none">
-            {/* 2-Column Asymmetric Grid */}
-            <div className="grid grid-cols-2 gap-5 items-start">
-              {/* Column 1 (Starts top if not mirrored, offset down if mirrored) */}
-              <div
-                className={`flex flex-col gap-2.5 transition-transform ${
-                  isMirrored ? 'translate-y-10' : ''
-                }`}
-              >
+        const renderDuoSlot = (prod: any, slotIdx: number, offsetClass: string) => {
+          if (prod) {
+            const isSelected = selectedElementId === prod.id;
+            return (
+              <div className={`flex flex-col gap-2.5 transition-transform ${offsetClass}`}>
                 <div
                   className={`w-full h-44 bg-stone-100 overflow-hidden rounded-sm transition-all cursor-pointer group ${
-                    selectedElementId === prodA.id ? 'ring-2 ring-amber-600' : 'hover:opacity-95'
+                    isSelected ? 'ring-2 ring-amber-600' : 'hover:opacity-95'
                   }`}
-                  onClick={(e) => handleSelect(prodA.id, e, prodA.name, prodA.price)}
+                  onClick={(e) => handleSelect(prod.id, e, prod.name, prod.price)}
                 >
                   <img
-                    src={prodA.image}
-                    alt={prodA.name}
+                    src={prod.image}
+                    alt={prod.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 </div>
                 <div
                   className={`p-1.5 rounded transition-all cursor-pointer ${
-                    selectedElementId === prodA.id ? 'ring-2 ring-amber-600/80 bg-black/5' : 'hover:bg-black/5'
+                    isSelected ? 'ring-2 ring-amber-600/80 bg-black/5' : 'hover:bg-black/5'
                   }`}
-                  onClick={(e) => handleSelect(prodA.id, e, prodA.name, prodA.price)}
+                  onClick={(e) => handleSelect(prod.id, e, prod.name, prod.price)}
                 >
                   <span className="text-[8px] tracking-[0.25em] uppercase font-semibold block mb-1" style={{ color: accent }}>
-                    {prodA.category} · {prodA.index}
+                    {prod.category} · {prod.index}
                   </span>
                   <div className="w-8 h-[1px] mb-1.5" style={{ backgroundColor: accent }} />
                   <div className="flex items-baseline justify-between mb-1">
@@ -529,68 +591,68 @@ export const SpreadViewport: React.FC = () => {
                       className="text-base text-[#1A1817] font-medium"
                       style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
                     >
-                      {prodA.name}
+                      {prod.name}
                     </h4>
                   </div>
                   <div className="text-xs font-semibold text-[#1A1817] tabular-nums mb-1">
-                    {prodA.price}
+                    {prod.price}
                   </div>
                   <p className="text-[10px] text-stone-600 leading-snug line-clamp-2">
-                    {prodA.description}
+                    {prod.description}
                   </p>
                 </div>
               </div>
+            );
+          }
 
-              {/* Column 2 (Offset down if not mirrored, starts top if mirrored) */}
+          // Empty Slot Wireframe
+          return (
+            <div className={`flex flex-col gap-2.5 transition-transform ${offsetClass}`}>
               <div
-                className={`flex flex-col gap-2.5 transition-transform ${
-                  !isMirrored ? 'translate-y-12' : ''
-                }`}
+                onClick={() => openProductDrawer()}
+                className="w-full h-44 rounded-sm border-2 border-dashed border-zinc-400/40 dark:border-zinc-700/80 bg-zinc-500/5 hover:bg-amber-500/5 hover:border-amber-600/70 transition-all cursor-pointer flex flex-col items-center justify-center p-3 text-center group"
               >
-                <div
-                  className={`w-full h-44 bg-stone-100 overflow-hidden rounded-sm transition-all cursor-pointer group ${
-                    selectedElementId === prodB.id ? 'ring-2 ring-amber-600' : 'hover:opacity-95'
-                  }`}
-                  onClick={(e) => handleSelect(prodB.id, e, prodB.name, prodB.price)}
-                >
-                  <img
-                    src={prodB.image}
-                    alt={prodB.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
+                <div className="size-9 rounded-full bg-zinc-200/50 dark:bg-zinc-800/60 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center mb-1.5 group-hover:scale-110 group-hover:border-amber-600/50 transition-all">
+                  <Plus className="size-4 text-zinc-500 group-hover:text-amber-600" />
                 </div>
-                <div
-                  className={`p-1.5 rounded transition-all cursor-pointer ${
-                    selectedElementId === prodB.id ? 'ring-2 ring-amber-600/80 bg-black/5' : 'hover:bg-black/5'
-                  }`}
-                  onClick={(e) => handleSelect(prodB.id, e, prodB.name, prodB.price)}
-                >
-                  <span className="text-[8px] tracking-[0.25em] uppercase font-semibold block mb-1" style={{ color: accent }}>
-                    {prodB.category} · {prodB.index}
-                  </span>
-                  <div className="flex items-baseline justify-between mb-1">
-                    <h4
-                      className="text-base text-[#1A1817] font-medium"
-                      style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                    >
-                      {prodB.name}
-                    </h4>
-                  </div>
-                  <div className="text-xs font-semibold text-[#1A1817] tabular-nums mb-1">
-                    {prodB.price}
-                  </div>
-                  <p className="text-[10px] text-stone-600 leading-snug line-clamp-2">
-                    {prodB.description}
-                  </p>
-                </div>
+                <span className="text-[9px] font-mono tracking-wider uppercase font-semibold text-zinc-700 dark:text-zinc-300">
+                  SLOT {slotIdx + 1} · DUO
+                </span>
+                <span className="text-[9px] text-zinc-400 mt-0.5">Clique para alocar</span>
               </div>
+              <div className="p-1.5 rounded border border-dashed border-zinc-300/50 dark:border-zinc-800/80 bg-zinc-500/5">
+                <span className="text-[8px] tracking-[0.25em] uppercase font-semibold block mb-0.5 text-stone-400">
+                  SLOT LIVRE · {slotIdx === 0 ? 'ITEM A' : 'ITEM B'}
+                </span>
+                <div className="w-8 h-[1px] mb-1 opacity-40" style={{ backgroundColor: accent }} />
+                <h4
+                  className="text-sm text-stone-400 font-medium italic mb-0.5"
+                  style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                >
+                  Produto Par {slotIdx + 1}
+                </h4>
+                <div className="text-[10px] text-stone-400 font-mono mb-0.5">R$ 0,00</div>
+                <p className="text-[9px] text-stone-400/80 leading-tight">
+                  Aguardando item da coleção.
+                </p>
+              </div>
+            </div>
+          );
+        };
+
+        return (
+          <div className="h-full flex flex-col justify-between py-9 px-8 select-none">
+            {/* 2-Column Asymmetric Grid */}
+            <div className="grid grid-cols-2 gap-5 items-start">
+              {renderDuoSlot(prodA, 0, isMirrored ? 'translate-y-10' : '')}
+              {renderDuoSlot(prodB, 1, !isMirrored ? 'translate-y-12' : '')}
             </div>
 
             {/* Folio Footer */}
             <div className="flex flex-col items-center mt-4">
               <div className="w-6 h-[1px] mb-2" style={{ backgroundColor: accent }} />
               <span className="text-[9px] tracking-[0.3em] text-[#1A1817]/70 font-mono">
-                {page.folio}
+                {page.folio || `PÁG. ${String(page.pageNumber).padStart(2, '0')}`}
               </span>
             </div>
           </div>
@@ -600,7 +662,67 @@ export const SpreadViewport: React.FC = () => {
       // ---------------- PÁGINA 09: SINGLE FECHAMENTO ----------------
       case 'single': {
         const prod = page.products?.[0];
-        if (!prod) return null;
+        if (!prod) {
+          return (
+            <div className="h-full flex flex-col justify-between py-10 px-10 select-none">
+              <div className="flex flex-col items-center text-center mt-4">
+                <div
+                  onClick={() => openProductDrawer()}
+                  className="w-64 h-72 rounded-sm border-2 border-dashed border-zinc-400/40 dark:border-zinc-700/80 bg-zinc-500/5 hover:bg-amber-500/5 hover:border-amber-600/70 transition-all cursor-pointer flex flex-col items-center justify-center p-5 text-center group mb-6"
+                >
+                  <div className="size-12 rounded-full bg-zinc-200/50 dark:bg-zinc-800/60 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center mb-2.5 group-hover:scale-110 group-hover:border-amber-600/50 transition-all shadow-xs">
+                    <Plus className="size-5 text-zinc-500 group-hover:text-amber-600 transition-colors" />
+                  </div>
+                  <span className="text-[10px] font-mono tracking-widest uppercase font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                    LÂMINA SINGLE · FECHAMENTO
+                  </span>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-[200px] mb-2 font-light leading-snug">
+                    Slot reservado para peça singular de fechamento editorial.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openProductDrawer();
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-[11px] font-medium hover:bg-zinc-800 dark:hover:bg-white transition-colors cursor-pointer"
+                  >
+                    <Package className="size-3" />
+                    + Inserir Produto
+                  </button>
+                </div>
+
+                <div className="p-3 rounded-lg border border-dashed border-zinc-300/60 dark:border-zinc-800/80 bg-zinc-500/5 max-w-[320px]">
+                  <span className="text-[9px] tracking-[0.3em] font-semibold uppercase block mb-1 text-stone-400">
+                    SLOT 01 · {page.label || 'EDIÇÃO LIMITADA'}
+                  </span>
+                  <div className="w-8 h-[1px] mx-auto mb-2 opacity-40" style={{ backgroundColor: accent }} />
+                  <h3
+                    className="text-2xl text-[#1A1817] dark:text-zinc-200 font-medium italic opacity-70 mb-1"
+                    style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                  >
+                    Produto de Fechamento
+                  </h3>
+                  <div className="text-sm font-semibold text-stone-400 tabular-nums mb-2">
+                    R$ 0,00
+                  </div>
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed font-light">
+                    Espaço editorial pronto para receber a imagem de alta resolução e ficha de catálogo.
+                  </p>
+                </div>
+              </div>
+
+              {/* Folio Footer */}
+              <div className="flex flex-col items-center">
+                <div className="w-6 h-[1px] mb-2" style={{ backgroundColor: accent }} />
+                <span className="text-[9px] tracking-[0.3em] text-[#1A1817]/70 font-mono">
+                  {page.folio || `PÁG. ${String(page.pageNumber).padStart(2, '0')}`}
+                </span>
+              </div>
+            </div>
+          );
+        }
+
         const isSelected = selectedElementId === prod.id;
 
         return (
@@ -666,55 +788,88 @@ export const SpreadViewport: React.FC = () => {
                 {page.label || 'MATRIZ COMERCIAL · 4 PRODUTOS'}
               </span>
               <span className="text-[9px] font-mono text-stone-400">
-                {gridProducts.length} ITENS
+                {gridProducts.length}/4 ITENS ALOCADOS
               </span>
             </div>
 
-            {/* 2x2 Grid */}
+            {/* 2x2 Grid with Wireframe Fallbacks for Unfilled Slots */}
             <div className="grid grid-cols-2 gap-4 flex-1 items-stretch">
-              {gridProducts.slice(0, 4).map((prod) => {
-                const isSelected = selectedElementId === prod.id;
+              {[0, 1, 2, 3].map((slotIdx) => {
+                const prod = gridProducts[slotIdx];
+                if (prod) {
+                  const isSelected = selectedElementId === prod.id;
+                  return (
+                    <div
+                      key={prod.id || `grid-prod-${slotIdx}`}
+                      className={`flex flex-col justify-between p-2.5 rounded-sm border transition-all cursor-pointer bg-white/40 dark:bg-black/10 ${
+                        isSelected
+                          ? 'ring-2 ring-amber-600 border-amber-600/80 bg-black/5'
+                          : 'border-stone-200/80 dark:border-zinc-800/80 hover:border-stone-400'
+                      }`}
+                      onClick={(e) => handleSelect(prod.id, e, prod.name, prod.price)}
+                    >
+                      {/* Thumbnail Image */}
+                      <div className="w-full h-28 bg-stone-100 dark:bg-zinc-800/50 overflow-hidden rounded-xs relative mb-2">
+                        <img
+                          src={prod.image}
+                          alt={prod.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        {prod.tag && (
+                          <div className="absolute top-1.5 left-1.5 bg-[#1A1817] text-[#F5F1EA] text-[7px] font-mono tracking-wider px-1.5 py-0.2 uppercase">
+                            {prod.tag}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Metadata */}
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-baseline justify-between gap-1">
+                          <span className="text-[7px] font-mono text-stone-400">{prod.sku}</span>
+                          <span className="text-[10px] font-semibold text-[#1A1817] dark:text-zinc-100 tabular-nums">
+                            {prod.price}
+                          </span>
+                        </div>
+                        <h4
+                          className="text-xs text-[#1A1817] dark:text-zinc-100 font-medium truncate"
+                          style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                        >
+                          {prod.name}
+                        </h4>
+                        <p className="text-[9px] text-stone-600 dark:text-zinc-400 line-clamp-1 font-light">
+                          {prod.description}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Empty Wireframe Slot in Grid
                 return (
                   <div
-                    key={prod.id}
-                    className={`flex flex-col justify-between p-2.5 rounded-sm border transition-all cursor-pointer bg-white/40 dark:bg-black/10 ${
-                      isSelected
-                        ? 'ring-2 ring-amber-600 border-amber-600/80 bg-black/5'
-                        : 'border-stone-200/80 dark:border-zinc-800/80 hover:border-stone-400'
-                    }`}
-                    onClick={(e) => handleSelect(prod.id, e, prod.name, prod.price)}
+                    key={`empty-grid-slot-${slotIdx}`}
+                    onClick={() => openProductDrawer()}
+                    className="flex flex-col justify-between p-3 rounded-sm border-2 border-dashed border-zinc-400/40 dark:border-zinc-700/80 bg-zinc-500/5 hover:bg-amber-500/5 hover:border-amber-600/70 transition-all cursor-pointer group"
                   >
-                    {/* Thumbnail Image */}
-                    <div className="w-full h-28 bg-stone-100 dark:bg-zinc-800/50 overflow-hidden rounded-xs relative mb-2">
-                      <img
-                        src={prod.image}
-                        alt={prod.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      {prod.tag && (
-                        <div className="absolute top-1.5 left-1.5 bg-[#1A1817] text-[#F5F1EA] text-[7px] font-mono tracking-wider px-1.5 py-0.2 uppercase">
-                          {prod.tag}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Metadata */}
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-baseline justify-between gap-1">
-                        <span className="text-[7px] font-mono text-stone-400">{prod.sku}</span>
-                        <span className="text-[10px] font-semibold text-[#1A1817] dark:text-zinc-100 tabular-nums">
-                          {prod.price}
-                        </span>
+                    <div className="w-full h-24 rounded-xs flex flex-col items-center justify-center bg-zinc-200/30 dark:bg-zinc-800/30 border border-zinc-300/40 dark:border-zinc-700/40 mb-2">
+                      <div className="size-8 rounded-full bg-zinc-200/60 dark:bg-zinc-800/70 flex items-center justify-center mb-1 group-hover:scale-110 group-hover:text-amber-600 transition-all">
+                        <Plus className="size-4 text-zinc-500 group-hover:text-amber-600" />
                       </div>
-                      <h4
-                        className="text-xs text-[#1A1817] dark:text-zinc-100 font-medium truncate"
+                      <span className="text-[8px] font-mono uppercase text-zinc-500 dark:text-zinc-400">
+                        Slot {slotIdx + 1}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-[7px] font-mono text-stone-400">SLOT-{slotIdx + 1}</span>
+                        <span className="text-[9px] font-mono text-stone-400">Vazio</span>
+                      </div>
+                      <span
+                        className="text-xs text-stone-400 font-medium italic truncate"
                         style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
                       >
-                        {prod.name}
-                      </h4>
-                      <p className="text-[9px] text-stone-600 dark:text-zinc-400 line-clamp-1 font-light">
-                        {prod.description}
-                      </p>
+                        Aguardando Produto
+                      </span>
                     </div>
                   </div>
                 );

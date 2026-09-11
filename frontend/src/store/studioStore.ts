@@ -576,6 +576,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         } else {
           newProducts[0] = product;
         }
+      } else if (page.type === 'grid_4') {
+        newProducts[slotIndex] = product;
       } else {
         newProducts = [product];
       }

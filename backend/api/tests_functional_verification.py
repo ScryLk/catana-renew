@@ -489,13 +489,19 @@ class SystemDesignAndFunctionalVerificationTests(TestCase):
         """
         from api.ai.catalog_builder import generate_catalog_from_gemini
 
-        # 1. Teste de 0 produtos: estrutura conceitual de 6 paginas
+        # 1. Teste de 0 produtos: estrutura conceitual de 6 paginas com slots vazios (Caminho A)
         cat_0 = generate_catalog_from_gemini("Colecao Lookbook de Moda e Acessorios")
         self.assertEqual(cat_0["totalPages"], 6)
         types_0 = [p["type"] for p in cat_0["pages"]]
         self.assertEqual(types_0, ["cover", "manifesto", "hero", "duo", "single", "backcover"])
         self.assertIn("rag_metadata", cat_0)
         self.assertGreaterEqual(cat_0["rag_metadata"]["tokens_saved_pct"], 80)
+
+        # Caminho A: Garante que nao foram gerados produtos ficticios
+        for p in cat_0["pages"]:
+            if p["type"] in ["hero", "duo", "single", "grid_4"]:
+                self.assertEqual(len(p["products"]), 0, f"Pagina {p['id']} nao deve conter produtos ficticios")
+                self.assertGreater(p.get("slotCapacity", 0), 0)
 
         # 2. Teste de 8 produtos reais: estrutura dinamica com grid_4
         sample_prods = [

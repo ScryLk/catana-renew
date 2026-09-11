@@ -512,6 +512,35 @@ def run_verification():
         "duration_ms": dur_ms
     })
 
+    # -------------------------------------------------------------
+    # TESTE 19: Caminho A - Wireframes Elegantes Sem Produtos Falsos
+    # -------------------------------------------------------------
+    t0 = time.time()
+    cat_wireframes = generate_catalog_from_gemini("Colecao Minimalista de Alta Confeitaria")
+    dur_ms = int((time.time() - t0) * 1000)
+
+    product_pages = [p for p in cat_wireframes.get("pages", []) if p.get("type") in ["hero", "duo", "single", "grid_4"]]
+    all_empty_products = all(len(p.get("products", [])) == 0 for p in product_pages)
+    has_slot_capacity = all(p.get("slotCapacity", 0) > 0 for p in product_pages)
+
+    raw_wf_json = json.dumps(cat_wireframes, ensure_ascii=False)
+    wf_zero_emojis = len(EMOJI_PATTERN.findall(raw_wf_json)) == 0
+
+    passed_19 = (
+        len(product_pages) >= 3 and
+        all_empty_products and
+        has_slot_capacity and
+        wf_zero_emojis
+    )
+    results.append({
+        "module": "Caminho A",
+        "feature": "Slots Wireframe Sem Fakes",
+        "expected": "0 produtos falsos, slots vazios e capacidades validas",
+        "obtained": f"{len(product_pages)} laminas com slots interativos vazios (0 fakes)",
+        "passed": passed_19,
+        "duration_ms": dur_ms
+    })
+
     total_time = round(time.time() - total_start, 2)
 
     # -------------------------------------------------------------

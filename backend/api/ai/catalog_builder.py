@@ -116,6 +116,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON valido (sem tags markdown, apenas o JSON p
     }
   ]
 }
+Caso nao haja produtos reais no briefing, retorne 'product_copies' obrigatoriamente como um array vazio [].
 """
 SYSTEM_CATALOG_WITH_PRODUCTS_PROMPT = SYSTEM_CREATIVE_SYNTHESIS_PROMPT
 SYSTEM_CATALOG_PROMPT = SYSTEM_CREATIVE_SYNTHESIS_PROMPT
@@ -178,7 +179,9 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
                 user_contents = (
                     f"Briefing do Catalogo: {prompt}\n"
                     f"Segmento Identificado: {detected_industry}\n\n"
-                    "Crie a identidade da colecao, paleta cromatica, manifesto e 4 produtos representativos com descricoes."
+                    "INSTRUCAO: Crie a identidade da colecao (titulo, categoria, summary, reasoning), paleta cromatica refinada e manifesto da marca.\n"
+                    "IMPORTANTE: Nao ha produtos cadastrados ainda. O catalogo sera diagramado com wireframes de slots vazios para inclusao posterior pelo usuario. "
+                    "Retorne 'product_copies' obrigatoriamente como um array vazio []."
                 )
 
             config = types.GenerateContentConfig(
@@ -282,6 +285,7 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
                 "MATRIZ COMERCIAL" if p_type == "grid_4" else "EDICAO LIMITADA"
             )
             page_obj["folio"] = f"{page_num:02d} · {catalog_category.upper()}"
+            page_obj["slotCapacity"] = plan.get("capacity", 1)
 
             # Monta a lista de produtos da lamina
             page_products = []
@@ -309,24 +313,9 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
                         "tag": p_copy.get("tag") or prod_item.get("tag") or ("Destaque" if p_idx == 0 else "Disponivel"),
                     })
             else:
-                # Se nao ha produtos reais, gera itens conceituais aderentes ao nicho
-                stock_prods = stock["products"]
-                capacity = plan.get("capacity", 1)
-                for c_idx in range(capacity):
-                    idx_str = f"{len(page_products) + 1:02d}"
-                    p_copy = product_copies.get(idx_str, {})
-                    page_products.append({
-                        "id": f"prod-{catalog_id}-{page_num}-{c_idx}",
-                        "name": p_copy.get("name") or f"Item {catalog_category} {c_idx + 1}",
-                        "category": catalog_category,
-                        "index": idx_str,
-                        "sku": f"ART-{page_num}{c_idx+1:02d}",
-                        "price": f"R$ {(c_idx + 1) * 85 + 40},00",
-                        "description": p_copy.get("description") or "Desenvolvido com materiais de alta nobreza e acabamento minucioso para maxima durabilidade.",
-                        "image": stock_prods[prod_img_idx % len(stock_prods)],
-                        "tag": p_copy.get("tag") or "Linha Exclusiva",
-                    })
-                    prod_img_idx += 1
+                # Caminho A: Wireframes e slots interativos vazios.
+                # Nao inventa produtos ficticios nem consome tokens adicionais.
+                page_products = []
 
             page_obj["products"] = page_products
 
@@ -375,7 +364,11 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
                 "roleId": "commercial",
                 "roleName": "Diretor Comercial",
                 "badge": "Comercial",
-                "action": "Preservou 100% dos precos, codigos SKU e dados tecnicos fornecidos.",
+                "action": (
+                    f"Alocou {len(clean_products)} produtos com precificacao e SKUs validados."
+                    if clean_products else
+                    "Preparou pranchetas com wireframes de diagramacao aguardando alocacao de produtos pelo usuario."
+                ),
             },
         ],
     }

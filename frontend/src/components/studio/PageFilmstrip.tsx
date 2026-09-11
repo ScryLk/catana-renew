@@ -40,9 +40,10 @@ export const PageFilmstrip: React.FC = () => {
     if (page.type === 'cover') return 'Capa · Coleção 2026';
     if (page.type === 'manifesto') return 'Manifesto';
     if (page.type === 'divider') return `Divisória · ${page.title || page.label}`;
-    if (page.type === 'hero') return `Destaque · ${page.products?.[0]?.name || page.label}`;
-    if (page.type === 'duo') return `Duo · ${page.products?.map((p) => p.name).join(' & ')}`;
-    if (page.type === 'single') return `Single · ${page.products?.[0]?.name || page.label}`;
+    if (page.type === 'hero') return `Destaque · ${page.products?.[0]?.name || 'Slot Disponível'}`;
+    if (page.type === 'duo') return `Duo · ${page.products?.length ? page.products.map((p) => p.name).join(' & ') : 'Slots Disponíveis'}`;
+    if (page.type === 'single') return `Single · ${page.products?.[0]?.name || 'Slot Disponível'}`;
+    if (page.type === 'grid_4') return `Grade · ${page.products?.length || 0}/4 itens`;
     if (page.type === 'backcover') return 'Contracapa';
     return `Página ${pageNumber}`;
   };
