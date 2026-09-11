@@ -7,6 +7,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 
+from django.contrib.auth import get_user_model
+from api.models import UserCustomAgent
 from api.ai.agents.registry import get_agent, list_agents, _AGENTS
 from api.ai.provider import get_ai_provider
 
@@ -210,20 +212,177 @@ AGENT_PROFILES = {
     }
 }
 
+class StudioUsersListView(APIView):
+    """
+    Lista usuarios do estudio e a contagem de agentes personalizados de cada um.
+    GET /api/v2/studio/system-design/users/
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        User = get_user_model()
+        users_qs = User.objects.all().order_by('id')
+        user_list = []
+        for u in users_qs:
+            custom_count = u.custom_agents.count()
+            active_count = u.custom_agents.filter(is_active=True).count()
+            user_list.append({
+                "id": u.id,
+                "username": u.username,
+                "email": u.email,
+                "name": u.get_full_name() or u.username,
+                "role": getattr(u, 'role', 'editor'),
+                "custom_agents_count": custom_count,
+                "active_custom_agents_count": active_count,
+            })
+        return Response({"users": user_list}, status=status.HTTP_200_OK)
+
+
 class StudioSystemDesignView(APIView):
     """
     Especificacao viva da arquitetura do Katana Studio 2.0 e perfil dos Agentes.
+    Suporta filtragem por usuario via ?user_id=<id>
     GET /api/v2/studio/system-design/
     """
     permission_classes = [AllowAny]
 
     def get(self, request):
+        user_id = request.query_params.get("user_id")
+
+        # Agentes canonicos do sistema
+        system_agents = []
+        for a in AGENT_PROFILES.values():
+            agent_dict = dict(a)
+            agent_dict["is_custom"] = False
+            agent_dict["is_active"] = True
+            agent_dict["owner_user"] = "system"
+            system_agents.append(agent_dict)
+
+        # Agentes personalizados de usuario
+        custom_agents = []
+        qs = UserCustomAgent.objects.select_related('user')
+        if user_id and user_id != 'all':
+            qs = qs.filter(user_id=user_id)
+
+        for ca in qs:
+            custom_agents.append({
+                "id": ca.id,
+                "role": ca.role,
+                "name": ca.name,
+                "title": ca.title,
+                "department": ca.department,
+                "mission": ca.mission,
+                "decision_scope": ca.decision_scope,
+                "scope_constraints": ca.scope_constraints,
+                "evaluation_keywords": ca.evaluation_keywords,
+                "sample_prompts": ca.sample_prompts,
+                "system_prompt": ca.system_prompt,
+                "is_custom": True,
+                "is_active": ca.is_active,
+                "owner_user": ca.user.username,
+                "user_id": ca.user.id,
+            })
+
+        all_agents = system_agents + custom_agents
+
         return Response({
             "system_design": SYSTEM_DESIGN_SPEC,
-            "agents": list(AGENT_PROFILES.values()),
-            "total_agents": len(AGENT_PROFILES),
+            "agents": all_agents,
+            "total_agents": len(all_agents),
+            "system_agents_count": len(system_agents),
+            "custom_agents_count": len(custom_agents),
+            "selected_user_id": user_id or "all",
             "engine": "Google Gemini 2.5 Flash Enterprise",
         }, status=status.HTTP_200_OK)
+
+
+class StudioCustomAgentCreateDeleteView(APIView):
+    """
+    Criacao e remocao de agentes personalizados por usuario.
+    POST /api/v2/studio/system-design/custom-agents/
+    DELETE /api/v2/studio/system-design/custom-agents/<id>/
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        User = get_user_model()
+        user_id = request.data.get("user_id")
+        if user_id and str(user_id) != "all":
+            user = User.objects.filter(id=user_id).first()
+        else:
+            user = request.user if request.user.is_authenticated else User.objects.first()
+
+        if not user:
+            return Response({"error": "Usuario nao encontrado no sistema."}, status=status.HTTP_400_BAD_REQUEST)
+
+        name = request.data.get("name", "").strip()
+        role = request.data.get("role", "").strip().lower().replace(" ", "_")
+        title = request.data.get("title", "").strip()
+        department = request.data.get("department", "").strip()
+        mission = request.data.get("mission", "").strip()
+        decision_scope = request.data.get("decision_scope", "").strip()
+        scope_constraints = request.data.get("scope_constraints", "").strip()
+        system_prompt = request.data.get("system_prompt", "").strip()
+        evaluation_keywords = request.data.get("evaluation_keywords", [])
+        sample_prompts = request.data.get("sample_prompts", [])
+        is_active = request.data.get("is_active", True)
+
+        if not name or not role or not mission:
+            return Response(
+                {"error": "Os campos 'name', 'role' e 'mission' sao obrigatorios."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not system_prompt:
+            system_prompt = (
+                f"Voce e o {name} ({title}) do Katana Studio no departamento de {department}.\n"
+                f"Sua missao e: {mission}\n"
+                f"Seu escopo de decisao: {decision_scope}\n"
+                f"Linhas vermelhas: {scope_constraints}\n"
+                "Regra inegociavel: ZERO EMOJIS em qualquer resposta."
+            )
+
+        custom_agent, created = UserCustomAgent.objects.update_or_create(
+            user=user,
+            role=role,
+            defaults={
+                "name": name,
+                "title": title or name,
+                "department": department or "Especialidades",
+                "mission": mission,
+                "decision_scope": decision_scope,
+                "scope_constraints": scope_constraints,
+                "system_prompt": system_prompt,
+                "evaluation_keywords": evaluation_keywords if isinstance(evaluation_keywords, list) else [k.strip() for k in str(evaluation_keywords).split(",") if k.strip()],
+                "sample_prompts": sample_prompts if isinstance(sample_prompts, list) else [p.strip() for p in str(sample_prompts).split("\n") if p.strip()],
+                "is_active": is_active,
+            }
+        )
+
+        return Response({
+            "success": True,
+            "agent_id": custom_agent.id,
+            "created": created,
+            "agent": {
+                "id": custom_agent.id,
+                "role": custom_agent.role,
+                "name": custom_agent.name,
+                "title": custom_agent.title,
+                "department": custom_agent.department,
+                "mission": custom_agent.mission,
+                "is_custom": True,
+                "is_active": custom_agent.is_active,
+                "owner_user": user.username,
+            }
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    def delete(self, request, pk=None):
+        try:
+            agent = UserCustomAgent.objects.get(id=pk)
+            agent.delete()
+            return Response({"success": True, "message": "Agente removido com sucesso."}, status=status.HTTP_200_OK)
+        except UserCustomAgent.DoesNotExist:
+            return Response({"error": "Agente personalizado nao encontrado."}, status=status.HTTP_404_NOT_FOUND)
 
 
 class StudioAgentTestView(APIView):
@@ -239,6 +398,7 @@ class StudioAgentTestView(APIView):
         agent_role = request.data.get("agent_role", "orchestrator").strip().lower()
         user_prompt = request.data.get("prompt", "").strip()
         context = request.data.get("context", {})
+        user_id = request.data.get("user_id")
 
         if not user_prompt:
             return Response(
@@ -246,11 +406,72 @@ class StudioAgentTestView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        agent_obj = get_agent(agent_role)
-        profile = AGENT_PROFILES.get(agent_role, AGENT_PROFILES["orchestrator"])
+        is_custom = False
+        custom_contingency = ""
 
-        system_prompt = agent_obj.get_system_prompt(context)
-        final_user_prompt = agent_obj.build_user_prompt(user_prompt, catalog_context=context)
+        if agent_role in AGENT_PROFILES:
+            agent_obj = get_agent(agent_role)
+            profile = dict(AGENT_PROFILES[agent_role])
+            profile["is_custom"] = False
+            profile["owner_user"] = "system"
+            system_prompt = agent_obj.get_system_prompt(context)
+            final_user_prompt = agent_obj.build_user_prompt(user_prompt, catalog_context=context)
+        else:
+            # Busca agente personalizado do usuario
+            ca_qs = UserCustomAgent.objects.filter(role=agent_role)
+            if user_id and str(user_id) != "all":
+                ca_match = ca_qs.filter(user_id=user_id).first()
+            else:
+                ca_match = ca_qs.first()
+
+            if ca_match:
+                is_custom = True
+                profile = {
+                    "id": ca_match.id,
+                    "role": ca_match.role,
+                    "name": ca_match.name,
+                    "title": ca_match.title,
+                    "department": ca_match.department,
+                    "mission": ca_match.mission,
+                    "decision_scope": ca_match.decision_scope,
+                    "scope_constraints": ca_match.scope_constraints,
+                    "evaluation_keywords": ca_match.evaluation_keywords or [],
+                    "sample_prompts": ca_match.sample_prompts or [],
+                    "is_custom": True,
+                    "is_active": ca_match.is_active,
+                    "owner_user": ca_match.user.username,
+                    "user_id": ca_match.user.id,
+                }
+                system_prompt = ca_match.system_prompt or (
+                    f"Voce e o {ca_match.name} ({ca_match.title}) do Katana Studio no departamento de {ca_match.department}.\n"
+                    f"Sua missao e: {ca_match.mission}\n"
+                    f"Seu escopo de decisao: {ca_match.decision_scope}\n"
+                    f"Linhas vermelhas: {ca_match.scope_constraints}\n"
+                    "Regra inegociavel: ZERO EMOJIS em qualquer resposta."
+                )
+                context_str = json.dumps(context, ensure_ascii=False) if context else "{}"
+                final_user_prompt = (
+                    f"[ESPECIALISTA: {ca_match.name} - {ca_match.title}]\n"
+                    f"[DEPARTAMENTO: {ca_match.department}]\n"
+                    f"[MISSAO: {ca_match.mission}]\n"
+                    f"[CONTEXTO CATALOGO: {context_str}]\n\n"
+                    f"SOLICITACAO DO USUARIO:\n{user_prompt}\n\n"
+                    "Responda estritamente sob a perspectiva do seu cargo e especialidade, fornecendo recomendacoes praticas e tecnicas. Nao use emojis."
+                )
+                custom_contingency = (
+                    f"Como {profile['name']} ({profile['title']}) do departamento de {profile['department']}, "
+                    f"analisei a solicitacao '{user_prompt[:80]}'. "
+                    f"Em consonancia com a missao de {profile['mission']}, "
+                    f"estabeleco as diretrizes tecnicas cabiveis ao escopo de {profile.get('decision_scope', 'especialidade')} "
+                    f"com absoluto rigor aos padroes editoriais do Katana Studio."
+                )
+            else:
+                agent_obj = get_agent("orchestrator")
+                profile = dict(AGENT_PROFILES["orchestrator"])
+                profile["is_custom"] = False
+                profile["owner_user"] = "system"
+                system_prompt = agent_obj.get_system_prompt(context)
+                final_user_prompt = agent_obj.build_user_prompt(user_prompt, catalog_context=context)
 
         provider = get_ai_provider()
         start_time = time.time()
@@ -302,10 +523,10 @@ class StudioAgentTestView(APIView):
                 }
                 response_text = contingency_responses.get(
                     agent_role,
-                    f"Parecer executivo do cargo '{profile['name']}' ({profile['title']}): homologado com base nas diretrizes do Katana Studio."
+                    custom_contingency if is_custom else f"Parecer executivo do cargo '{profile['name']}' ({profile['title']}): homologado com base nas diretrizes do Katana Studio."
                 )
         else:
-            response_text = f"[Modo de Contingencia Local]: Agente '{profile['name']}' ({profile['title']}) homologado com base nas diretrizes do Katana Studio."
+            response_text = custom_contingency if is_custom else f"[Modo de Contingencia Local]: Agente '{profile['name']}' ({profile['title']}) homologado com base nas diretrizes do Katana Studio."
 
         duration_ms = int((time.time() - start_time) * 1000)
 
@@ -320,11 +541,14 @@ class StudioAgentTestView(APIView):
 
         return Response({
             "agent": {
+                "id": profile.get("id"),
                 "role": profile["role"],
                 "name": profile["name"],
                 "title": profile["title"],
                 "department": profile["department"],
                 "mission": profile["mission"],
+                "is_custom": profile.get("is_custom", False),
+                "owner_user": profile.get("owner_user", "system"),
             },
             "system_prompt_used": system_prompt,
             "user_prompt_sent": final_user_prompt,

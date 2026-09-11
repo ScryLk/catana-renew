@@ -51,6 +51,8 @@ from .views_transparency import (
 from .views_system_design import (
     StudioSystemDesignView,
     StudioAgentTestView,
+    StudioUsersListView,
+    StudioCustomAgentCreateDeleteView,
 )
 
 router = DefaultRouter()
@@ -151,6 +153,9 @@ urlpatterns = [
     path('v2/studio/billing/cancel/', StudioCancelSubscriptionView.as_view(), name='studio_billing_cancel'),
     path('v2/studio/transparency/export-data/', StudioDataExportView.as_view(), name='studio_data_export'),
     path('v2/studio/system-design/', StudioSystemDesignView.as_view(), name='studio_system_design'),
+    path('v2/studio/system-design/users/', StudioUsersListView.as_view(), name='studio_system_design_users'),
+    path('v2/studio/system-design/custom-agents/', StudioCustomAgentCreateDeleteView.as_view(), name='studio_system_design_custom_agents'),
+    path('v2/studio/system-design/custom-agents/<int:pk>/', StudioCustomAgentCreateDeleteView.as_view(), name='studio_system_design_custom_agent_detail'),
     path('v2/studio/system-design/test-agent/', StudioAgentTestView.as_view(), name='studio_agent_test'),
 
     path('schema/', SpectacularAPIView.as_view(), name='schema'),

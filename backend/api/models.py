@@ -786,3 +786,32 @@ class CatalogTemplate(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.category})"
+
+
+class UserCustomAgent(models.Model):
+    """
+    Agente especialista personalizado criado por um usuario para seu workspace
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='custom_agents')
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, null=True, blank=True, related_name='custom_agents')
+    role = models.SlugField(max_length=100)
+    name = models.CharField(max_length=150)
+    title = models.CharField(max_length=200)
+    department = models.CharField(max_length=150)
+    mission = models.TextField()
+    decision_scope = models.TextField(blank=True, default='')
+    scope_constraints = models.TextField(blank=True, default='')
+    system_prompt = models.TextField(blank=True, default='')
+    evaluation_keywords = models.JSONField(default=list, blank=True)
+    sample_prompts = models.JSONField(default=list, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'user_custom_agents'
+        unique_together = ('user', 'role')
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.role}) - {self.user.username}"

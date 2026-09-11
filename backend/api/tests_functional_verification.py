@@ -259,3 +259,69 @@ class SystemDesignAndFunctionalVerificationTests(TestCase):
             resp_str = json.dumps(res.data, ensure_ascii=False)
             matches = EMOJI_PATTERN.findall(resp_str)
             self.assertEqual(len(matches), 0, f"Resposta da API continha emojis: {matches}")
+
+    def test_08_custom_agents_lifecycle_and_user_filtering(self):
+        """
+        MODULO 5: Verifica ciclo de vida de agentes personalizados por usuario:
+        1. Listagem de usuarios e contagem de agentes
+        2. Criacao de agente personalizado
+        3. Filtragem de agentes pelo user_id
+        4. Teste de fidelidade do cargo do agente personalizado
+        5. Remocao do agente personalizado
+        """
+        # 1. Listagem de usuarios
+        url_users = reverse('studio_system_design_users')
+        res_users = self.client.get(url_users)
+        self.assertEqual(res_users.status_code, status.HTTP_200_OK)
+        self.assertIn("users", res_users.data)
+        self.assertTrue(any(u["username"] == self.user.username for u in res_users.data["users"]))
+
+        # 2. Criacao de novo agente customizado
+        url_create = reverse('studio_system_design_custom_agents')
+        agent_payload = {
+            "name": "Especialista em Logistica Fria",
+            "role": "cold_logistics_consultant",
+            "title": "Consultor de Embalagens Termicas",
+            "department": "Logistica & Conservacao",
+            "mission": "Garantir integridade termica e resistencia mecânica no transporte de alimentos pereciveis.",
+            "decision_scope": "Caixas EPS, mantas termicas, gelo seco e barreiras contra umidade.",
+            "scope_constraints": "Nao define precos de frete nem contratos juridicos.",
+            "evaluation_keywords": ["termica", "conservacao", "resistencia", "fria", "temperatura"],
+            "sample_prompts": ["Qual a melhor embalagem termica para sorvetes artesanais em viagens de 4 horas?"],
+            "user_id": self.user.id
+        }
+        res_create = self.client.post(url_create, agent_payload, format='json')
+        self.assertEqual(res_create.status_code, status.HTTP_201_CREATED)
+        created_agent_id = res_create.data["agent_id"]
+
+        # 3. Filtragem pelo usuario
+        url_sd = f"{reverse('studio_system_design')}?user_id={self.user.id}"
+        res_sd = self.client.get(url_sd)
+        self.assertEqual(res_sd.status_code, status.HTTP_200_OK)
+        agents = res_sd.data["agents"]
+        custom_agents = [a for a in agents if a.get("is_custom")]
+        self.assertEqual(len(custom_agents), 1)
+        self.assertEqual(custom_agents[0]["role"], "cold_logistics_consultant")
+        self.assertEqual(custom_agents[0]["owner_user"], self.user.username)
+
+        # 4. Teste de fidelidade de cargo do agente customizado
+        url_test = reverse('studio_agent_test')
+        res_test = self.client.post(
+            url_test,
+            {
+                "agent_role": "cold_logistics_consultant",
+                "prompt": "Como embalar itens congelados mantendo a temperatura controlada?",
+                "user_id": self.user.id
+            },
+            format='json'
+        )
+        self.assertEqual(res_test.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_test.data["agent"]["is_custom"])
+        self.assertEqual(res_test.data["agent"]["owner_user"], self.user.username)
+        self.assertTrue(res_test.data["audit_metrics"]["zero_emojis_compliant"])
+
+        # 5. Remocao do agente customizado
+        url_delete = reverse('studio_system_design_custom_agent_detail', kwargs={'pk': created_agent_id})
+        res_delete = self.client.delete(url_delete)
+        self.assertEqual(res_delete.status_code, status.HTTP_200_OK)
+

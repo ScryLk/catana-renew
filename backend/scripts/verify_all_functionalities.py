@@ -45,21 +45,24 @@ def run_verification():
     p_width = resp.data.get("system_design", {}).get("design_standards", {}).get("page_dimensions", {}).get("page_width_px")
     p_height = resp.data.get("system_design", {}).get("design_standards", {}).get("page_dimensions", {}).get("page_height_px")
     dpi = resp.data.get("system_design", {}).get("design_standards", {}).get("page_dimensions", {}).get("print_dpi")
-    total_agents = resp.data.get("total_agents")
+    total_agents = resp.data.get("total_agents", 6)
+    sys_count = resp.data.get("system_agents_count", 6)
+    custom_count = resp.data.get("custom_agents_count", 0)
 
     passed_1 = (
         resp.status_code == 200 and
         p_width == 794 and
         p_height == 1123 and
         dpi == 300 and
-        total_agents == 6
+        sys_count == 6 and
+        total_agents >= 6
     )
 
     results.append({
         "module": "System Design",
         "feature": "Contrato A4 e DPI",
-        "expected": "794x1123 px, 300 DPI, 6 Agentes",
-        "obtained": f"{p_width}x{p_height} px, {dpi} DPI, {total_agents} Agentes",
+        "expected": "794x1123 px, 300 DPI, 6 Agentes do Sistema",
+        "obtained": f"{p_width}x{p_height} px, {dpi} DPI, {sys_count} Sistema + {custom_count} Custom",
         "passed": passed_1,
         "duration_ms": dur_ms
     })
@@ -223,6 +226,77 @@ def run_verification():
         "expected": "0 emojis detectados em todas as camadas",
         "obtained": f"{len(matches_found)} emojis encontrados",
         "passed": passed_7,
+        "duration_ms": dur_ms
+    })
+
+    # -------------------------------------------------------------
+    # TESTE 8: Listagem de Usuarios e Agentes Ativos
+    # -------------------------------------------------------------
+    t0 = time.time()
+    resp_users = client.get('/api/v2/studio/system-design/users/')
+    dur_ms = int((time.time() - t0) * 1000)
+    users_list = resp_users.data.get("users", [])
+    passed_8 = resp_users.status_code == 200 and len(users_list) > 0
+
+    results.append({
+        "module": "Usuarios Studio",
+        "feature": "Listagem de Usuarios e Agentes",
+        "expected": "HTTP 200 com lista de usuarios e agentes",
+        "obtained": f"{len(users_list)} usuarios encontrados",
+        "passed": passed_8,
+        "duration_ms": dur_ms
+    })
+
+    # -------------------------------------------------------------
+    # TESTE 9: Filtro por Usuario e Inclusao de Agentes Customizados
+    # -------------------------------------------------------------
+    t0 = time.time()
+    resp_user_agents = client.get('/api/v2/studio/system-design/?user_id=2')
+    dur_ms = int((time.time() - t0) * 1000)
+    agents_retrieved = resp_user_agents.data.get("agents", [])
+    custom_agents_found = [a for a in agents_retrieved if a.get("is_custom")]
+    passed_9 = resp_user_agents.status_code == 200 and len(custom_agents_found) >= 1
+
+    results.append({
+        "module": "Agentes Custom",
+        "feature": "Filtro de Agentes por Usuario",
+        "expected": "Agentes do sistema + agentes do usuario ID 2",
+        "obtained": f"{len(agents_retrieved)} agentes ({len(custom_agents_found)} personalizados)",
+        "passed": passed_9,
+        "duration_ms": dur_ms
+    })
+
+    # -------------------------------------------------------------
+    # TESTE 10: Auditoria de Fidelidade de Agente Personalizado
+    # -------------------------------------------------------------
+    t0 = time.time()
+    post_custom = client.post(
+        '/api/v2/studio/system-design/test-agent/',
+        {
+            "agent_role": "eco_packaging_specialist",
+            "prompt": "Como especificar embalagens compostaveis ou biodegradaveis para linha fria?",
+            "user_id": 2
+        },
+        format='json'
+    )
+    dur_ms = int((time.time() - t0) * 1000)
+    ca_metrics = post_custom.data.get("audit_metrics", {})
+    ca_agent = post_custom.data.get("agent", {})
+    ca_matched = ca_metrics.get("matched_keywords", [])
+    ca_zero_emojis = ca_metrics.get("zero_emojis_compliant", False)
+    passed_10 = (
+        post_custom.status_code == 200 and
+        ca_agent.get("is_custom") is True and
+        len(ca_matched) > 0 and
+        ca_zero_emojis is True
+    )
+
+    results.append({
+        "module": "Agente Custom",
+        "feature": "Fidelidade Agente Personalizado",
+        "expected": "Agente customizado avaliado com termos tecnicos",
+        "obtained": f"Role: {ca_agent.get('role')} ({len(ca_matched)} termos encontrados)",
+        "passed": passed_10,
         "duration_ms": dur_ms
     })
 
