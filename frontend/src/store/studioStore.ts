@@ -186,6 +186,13 @@ export interface ChatThread {
   createdAt: string;
 }
 
+export interface ActiveTargetSlot {
+  pageNumber: number;
+  slotIndex: number;
+  slotLabel?: string;
+  pageType?: string;
+}
+
 export interface StudioState {
   // Session & Workspace Mode
   hasStartedSession: boolean;
@@ -248,9 +255,11 @@ export interface StudioState {
 
   // Product Drawer & Inventory Repository
   isProductDrawerOpen: boolean;
+  activeTargetSlot: ActiveTargetSlot | null;
   unassignedProducts: ProductItem[];
-  openProductDrawer: () => void;
+  openProductDrawer: (targetSlot?: ActiveTargetSlot | null) => void;
   closeProductDrawer: () => void;
+  setActiveTargetSlot: (targetSlot: ActiveTargetSlot | null) => void;
   toggleProductDrawer: () => void;
   addProductToRepository: (product: Omit<ProductItem, 'id'>) => ProductItem;
   deleteProductFromRepository: (productId: string) => void;
@@ -540,9 +549,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       tag: 'Seda Pura',
     },
   ],
-  openProductDrawer: () => set({ isProductDrawerOpen: true }),
-  closeProductDrawer: () => set({ isProductDrawerOpen: false }),
-  toggleProductDrawer: () => set((s) => ({ isProductDrawerOpen: !s.isProductDrawerOpen })),
+  activeTargetSlot: null,
+  openProductDrawer: (targetSlot) => set({ isProductDrawerOpen: true, activeTargetSlot: targetSlot ?? null }),
+  closeProductDrawer: () => set({ isProductDrawerOpen: false, activeTargetSlot: null }),
+  setActiveTargetSlot: (activeTargetSlot) => set({ activeTargetSlot }),
+  toggleProductDrawer: () => set((s) => ({ isProductDrawerOpen: !s.isProductDrawerOpen, activeTargetSlot: s.isProductDrawerOpen ? null : s.activeTargetSlot })),
   addProductToRepository: (productData) => {
     const newProduct: ProductItem = {
       ...productData,
@@ -570,12 +581,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       if (page.type === 'hero' || page.type === 'single') {
         newProducts = [product];
       } else if (page.type === 'duo') {
-        if (slotIndex === 1) {
-          newProducts[1] = product;
-          if (!newProducts[0]) newProducts[0] = product;
-        } else {
-          newProducts[0] = product;
-        }
+        newProducts[slotIndex] = product;
       } else if (page.type === 'grid_4') {
         newProducts[slotIndex] = product;
       } else {
@@ -594,10 +600,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       pages: updatedPages,
       unassignedProducts: updatedUnassigned,
       saveStatus: 'unsaved',
+      activeTargetSlot: null,
     });
 
     get().debouncedSaveCurrentSpread();
-    toast.success(`Produto "${product.name}" alocado na Pagina ${String(targetPageNumber).padStart(2, '0')}!`);
+    toast.success(`Produto "${product.name}" alocado na Página ${String(targetPageNumber).padStart(2, '0')} (Slot ${slotIndex + 1})!`);
   },
 
   isExcelImportModalOpen: false,

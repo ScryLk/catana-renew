@@ -424,25 +424,57 @@ export const SpreadViewport: React.FC = () => {
             <div className="h-full flex flex-col justify-between py-9 px-9 select-none">
               {/* Wireframe Hero Dropzone / Slot */}
               <div
-                onClick={() => openProductDrawer()}
-                className="w-full h-[360px] rounded-sm border-2 border-dashed border-zinc-400/40 dark:border-zinc-700/80 bg-zinc-500/5 hover:bg-amber-500/5 hover:border-amber-600/70 transition-all cursor-pointer flex flex-col items-center justify-center p-6 text-center group"
+                onClick={() =>
+                  openProductDrawer({
+                    pageNumber: page.pageNumber,
+                    slotIndex: 0,
+                    slotLabel: 'Slot 01 · Destaque Hero',
+                    pageType: page.type,
+                  })
+                }
+                className="w-full h-[360px] rounded-sm border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center p-6 text-center group"
+                style={{
+                  borderColor: isDark ? 'rgba(63, 63, 70, 0.8)' : `${accent}70`,
+                  backgroundColor: isDark ? 'rgba(24, 24, 27, 0.4)' : 'rgba(255, 255, 255, 0.65)',
+                }}
               >
-                <div className="size-14 rounded-full bg-zinc-200/50 dark:bg-zinc-800/60 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:border-amber-600/50 transition-all shadow-xs">
-                  <Plus className="size-6 text-zinc-500 dark:text-zinc-400 group-hover:text-amber-600 transition-colors" />
+                <div
+                  className="size-14 rounded-full border flex items-center justify-center mb-3 group-hover:scale-110 transition-all shadow-xs"
+                  style={{
+                    backgroundColor: isDark ? 'rgba(39, 39, 42, 0.7)' : '#FFFFFF',
+                    borderColor: isDark ? '#3f3f46' : `${accent}50`,
+                  }}
+                >
+                  <Plus className="size-6 text-stone-600 dark:text-zinc-400 group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors" />
                 </div>
-                <span className="text-[11px] font-mono tracking-widest uppercase font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                <span
+                  className="text-[11px] font-mono tracking-widest uppercase font-semibold mb-1"
+                  style={{ color: isDark ? '#d4d4d8' : '#292524' }}
+                >
                   LÂMINA HERO · SLOT DESTAQUE
                 </span>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs mb-3 font-light leading-relaxed">
+                <p
+                  className="text-xs max-w-xs mb-3 font-light leading-relaxed"
+                  style={{ color: isDark ? '#a1a1aa' : '#57534e' }}
+                >
                   Espaço reservado para o produto principal. Clique para selecionar do acervo ou arraste da planilha.
                 </p>
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    openProductDrawer();
+                    openProductDrawer({
+                      pageNumber: page.pageNumber,
+                      slotIndex: 0,
+                      slotLabel: 'Slot 01 · Destaque Hero',
+                      pageType: page.type,
+                    });
                   }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-xs font-medium shadow-sm hover:bg-zinc-800 dark:hover:bg-white transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium shadow-sm transition-colors cursor-pointer"
+                  style={{
+                    backgroundColor: isDark ? '#f4f4f5' : '#1c1917',
+                    color: isDark ? '#18181b' : '#fafaf9',
+                  }}
                 >
                   <Package className="size-3.5" />
                   + Inserir Produto do Acervo
@@ -450,7 +482,13 @@ export const SpreadViewport: React.FC = () => {
               </div>
 
               {/* Product Placeholder Copy */}
-              <div className="p-3 rounded-lg border border-dashed border-zinc-300/60 dark:border-zinc-800/80 bg-zinc-500/5">
+              <div
+                className="p-3 rounded-lg border border-dashed"
+                style={{
+                  borderColor: isDark ? 'rgba(63, 63, 70, 0.6)' : `${accent}40`,
+                  backgroundColor: isDark ? 'rgba(24, 24, 27, 0.3)' : 'rgba(255, 255, 255, 0.5)',
+                }}
+              >
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[9px] tracking-[0.3em] font-semibold uppercase" style={{ color: accent }}>
                     SLOT 01 · {page.label || 'DESTAQUE EXCLUSIVO'}
@@ -609,18 +647,44 @@ export const SpreadViewport: React.FC = () => {
           return (
             <div className={`flex flex-col gap-2.5 transition-transform ${offsetClass}`}>
               <div
-                onClick={() => openProductDrawer()}
-                className="w-full h-44 rounded-sm border-2 border-dashed border-zinc-400/40 dark:border-zinc-700/80 bg-zinc-500/5 hover:bg-amber-500/5 hover:border-amber-600/70 transition-all cursor-pointer flex flex-col items-center justify-center p-3 text-center group"
+                onClick={() =>
+                  openProductDrawer({
+                    pageNumber: page.pageNumber,
+                    slotIndex: slotIdx,
+                    slotLabel: `Slot 0${slotIdx + 1} · Duo ${slotIdx === 0 ? 'Item A' : 'Item B'}`,
+                    pageType: page.type,
+                  })
+                }
+                className="w-full h-44 rounded-sm border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center p-3 text-center group"
+                style={{
+                  borderColor: isDark ? 'rgba(63, 63, 70, 0.8)' : `${accent}70`,
+                  backgroundColor: isDark ? 'rgba(24, 24, 27, 0.4)' : 'rgba(255, 255, 255, 0.65)',
+                }}
               >
-                <div className="size-9 rounded-full bg-zinc-200/50 dark:bg-zinc-800/60 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center mb-1.5 group-hover:scale-110 group-hover:border-amber-600/50 transition-all">
-                  <Plus className="size-4 text-zinc-500 group-hover:text-amber-600" />
+                <div
+                  className="size-9 rounded-full border flex items-center justify-center mb-1.5 group-hover:scale-110 transition-all shadow-2xs"
+                  style={{
+                    backgroundColor: isDark ? 'rgba(39, 39, 42, 0.7)' : '#FFFFFF',
+                    borderColor: isDark ? '#3f3f46' : `${accent}50`,
+                  }}
+                >
+                  <Plus className="size-4 text-stone-600 dark:text-zinc-400 group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors" />
                 </div>
-                <span className="text-[9px] font-mono tracking-wider uppercase font-semibold text-zinc-700 dark:text-zinc-300">
+                <span
+                  className="text-[9px] font-mono tracking-wider uppercase font-semibold"
+                  style={{ color: isDark ? '#d4d4d8' : '#292524' }}
+                >
                   SLOT {slotIdx + 1} · DUO
                 </span>
-                <span className="text-[9px] text-zinc-400 mt-0.5">Clique para alocar</span>
+                <span className="text-[9px] text-stone-500 dark:text-zinc-400 mt-0.5">Clique para alocar</span>
               </div>
-              <div className="p-1.5 rounded border border-dashed border-zinc-300/50 dark:border-zinc-800/80 bg-zinc-500/5">
+              <div
+                className="p-1.5 rounded border border-dashed"
+                style={{
+                  borderColor: isDark ? 'rgba(63, 63, 70, 0.6)' : `${accent}40`,
+                  backgroundColor: isDark ? 'rgba(24, 24, 27, 0.3)' : 'rgba(255, 255, 255, 0.5)',
+                }}
+              >
                 <span className="text-[8px] tracking-[0.25em] uppercase font-semibold block mb-0.5 text-stone-400">
                   SLOT LIVRE · {slotIdx === 0 ? 'ITEM A' : 'ITEM B'}
                 </span>
@@ -667,32 +731,70 @@ export const SpreadViewport: React.FC = () => {
             <div className="h-full flex flex-col justify-between py-10 px-10 select-none">
               <div className="flex flex-col items-center text-center mt-4">
                 <div
-                  onClick={() => openProductDrawer()}
-                  className="w-64 h-72 rounded-sm border-2 border-dashed border-zinc-400/40 dark:border-zinc-700/80 bg-zinc-500/5 hover:bg-amber-500/5 hover:border-amber-600/70 transition-all cursor-pointer flex flex-col items-center justify-center p-5 text-center group mb-6"
+                  onClick={() =>
+                    openProductDrawer({
+                      pageNumber: page.pageNumber,
+                      slotIndex: 0,
+                      slotLabel: 'Slot 01 · Fechamento Editorial',
+                      pageType: page.type,
+                    })
+                  }
+                  className="w-64 h-72 rounded-sm border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center p-5 text-center group mb-6"
+                  style={{
+                    borderColor: isDark ? 'rgba(63, 63, 70, 0.8)' : `${accent}70`,
+                    backgroundColor: isDark ? 'rgba(24, 24, 27, 0.4)' : 'rgba(255, 255, 255, 0.65)',
+                  }}
                 >
-                  <div className="size-12 rounded-full bg-zinc-200/50 dark:bg-zinc-800/60 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center mb-2.5 group-hover:scale-110 group-hover:border-amber-600/50 transition-all shadow-xs">
-                    <Plus className="size-5 text-zinc-500 group-hover:text-amber-600 transition-colors" />
+                  <div
+                    className="size-12 rounded-full border flex items-center justify-center mb-2.5 group-hover:scale-110 transition-all shadow-xs"
+                    style={{
+                      backgroundColor: isDark ? 'rgba(39, 39, 42, 0.7)' : '#FFFFFF',
+                      borderColor: isDark ? '#3f3f46' : `${accent}50`,
+                    }}
+                  >
+                    <Plus className="size-5 text-stone-600 dark:text-zinc-400 group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors" />
                   </div>
-                  <span className="text-[10px] font-mono tracking-widest uppercase font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  <span
+                    className="text-[10px] font-mono tracking-widest uppercase font-semibold mb-1"
+                    style={{ color: isDark ? '#d4d4d8' : '#292524' }}
+                  >
                     LÂMINA SINGLE · FECHAMENTO
                   </span>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-[200px] mb-2 font-light leading-snug">
+                  <p
+                    className="text-[11px] max-w-[200px] mb-2 font-light leading-snug"
+                    style={{ color: isDark ? '#a1a1aa' : '#57534e' }}
+                  >
                     Slot reservado para peça singular de fechamento editorial.
                   </p>
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      openProductDrawer();
+                      openProductDrawer({
+                        pageNumber: page.pageNumber,
+                        slotIndex: 0,
+                        slotLabel: 'Slot 01 · Fechamento Editorial',
+                        pageType: page.type,
+                      });
                     }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-[11px] font-medium hover:bg-zinc-800 dark:hover:bg-white transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer shadow-xs"
+                    style={{
+                      backgroundColor: isDark ? '#f4f4f5' : '#1c1917',
+                      color: isDark ? '#18181b' : '#fafaf9',
+                    }}
                   >
                     <Package className="size-3" />
                     + Inserir Produto
                   </button>
                 </div>
 
-                <div className="p-3 rounded-lg border border-dashed border-zinc-300/60 dark:border-zinc-800/80 bg-zinc-500/5 max-w-[320px]">
+                <div
+                  className="p-3 rounded-lg border border-dashed max-w-[320px]"
+                  style={{
+                    borderColor: isDark ? 'rgba(63, 63, 70, 0.6)' : `${accent}40`,
+                    backgroundColor: isDark ? 'rgba(24, 24, 27, 0.3)' : 'rgba(255, 255, 255, 0.5)',
+                  }}
+                >
                   <span className="text-[9px] tracking-[0.3em] font-semibold uppercase block mb-1 text-stone-400">
                     SLOT 01 · {page.label || 'EDIÇÃO LIMITADA'}
                   </span>
@@ -848,14 +950,37 @@ export const SpreadViewport: React.FC = () => {
                 return (
                   <div
                     key={`empty-grid-slot-${slotIdx}`}
-                    onClick={() => openProductDrawer()}
-                    className="flex flex-col justify-between p-3 rounded-sm border-2 border-dashed border-zinc-400/40 dark:border-zinc-700/80 bg-zinc-500/5 hover:bg-amber-500/5 hover:border-amber-600/70 transition-all cursor-pointer group"
+                    onClick={() =>
+                      openProductDrawer({
+                        pageNumber: page.pageNumber,
+                        slotIndex: slotIdx,
+                        slotLabel: `Slot 0${slotIdx + 1} · Grade Comercial`,
+                        pageType: page.type,
+                      })
+                    }
+                    className="flex flex-col justify-between p-3 rounded-sm border-2 border-dashed transition-all cursor-pointer group"
+                    style={{
+                      borderColor: isDark ? 'rgba(63, 63, 70, 0.8)' : `${accent}70`,
+                      backgroundColor: isDark ? 'rgba(24, 24, 27, 0.4)' : 'rgba(255, 255, 255, 0.65)',
+                    }}
                   >
-                    <div className="w-full h-24 rounded-xs flex flex-col items-center justify-center bg-zinc-200/30 dark:bg-zinc-800/30 border border-zinc-300/40 dark:border-zinc-700/40 mb-2">
-                      <div className="size-8 rounded-full bg-zinc-200/60 dark:bg-zinc-800/70 flex items-center justify-center mb-1 group-hover:scale-110 group-hover:text-amber-600 transition-all">
-                        <Plus className="size-4 text-zinc-500 group-hover:text-amber-600" />
+                    <div
+                      className="w-full h-24 rounded-xs flex flex-col items-center justify-center border mb-2"
+                      style={{
+                        backgroundColor: isDark ? 'rgba(39, 39, 42, 0.3)' : '#FFFFFF',
+                        borderColor: isDark ? '#3f3f46' : `${accent}40`,
+                      }}
+                    >
+                      <div
+                        className="size-8 rounded-full border flex items-center justify-center mb-1 group-hover:scale-110 transition-all shadow-2xs"
+                        style={{
+                          backgroundColor: isDark ? 'rgba(39, 39, 42, 0.7)' : '#FFFFFF',
+                          borderColor: isDark ? '#3f3f46' : `${accent}50`,
+                        }}
+                      >
+                        <Plus className="size-4 text-stone-600 dark:text-zinc-400 group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors" />
                       </div>
-                      <span className="text-[8px] font-mono uppercase text-zinc-500 dark:text-zinc-400">
+                      <span className="text-[8px] font-mono uppercase text-stone-500 dark:text-zinc-400">
                         Slot {slotIdx + 1}
                       </span>
                     </div>
@@ -949,10 +1074,10 @@ export const SpreadViewport: React.FC = () => {
         setOpenDropdown(null);
       }}
       className={`flex-1 overflow-auto custom-scrollbar relative select-none transition-colors ${
-        isDark ? 'bg-[#0a0a0c]' : 'bg-[#e5e7eb]'
+        isDark ? 'bg-[#0a0a0c]' : 'bg-[#F4F0E8]'
       }`}
       style={{
-        backgroundImage: `radial-gradient(${isDark ? '#1f1f26' : '#cbd5e1'} 1px, transparent 1px)`,
+        backgroundImage: `radial-gradient(${isDark ? '#1f1f26' : '#DDD6C9'} 1px, transparent 1px)`,
         backgroundSize: '24px 24px',
       }}
     >
@@ -1034,7 +1159,7 @@ export const SpreadViewport: React.FC = () => {
               className={`w-[490px] h-[693px] rounded-sm relative transition-all border overflow-hidden ${
                 isDark
                   ? 'shadow-[0_16px_50px_rgba(0,0,0,0.65)] border-zinc-700/60'
-                  : 'shadow-[0_12px_36px_rgba(0,0,0,0.12)] border-stone-300/80'
+                  : 'shadow-[0_20px_50px_rgba(40,30,20,0.08),0_4px_12px_rgba(0,0,0,0.04)] border-stone-300/60'
               }`}
               style={{
                 backgroundColor: leftPage.backgroundColor,
@@ -1130,7 +1255,7 @@ export const SpreadViewport: React.FC = () => {
               className={`w-[490px] h-[693px] rounded-sm relative transition-all border overflow-hidden ${
                 isDark
                   ? 'shadow-[0_16px_50px_rgba(0,0,0,0.65)] border-zinc-700/60'
-                  : 'shadow-[0_12px_36px_rgba(0,0,0,0.12)] border-stone-300/80'
+                  : 'shadow-[0_20px_50px_rgba(40,30,20,0.08),0_4px_12px_rgba(0,0,0,0.04)] border-stone-300/60'
               }`}
               style={{
                 backgroundColor: rightPage.backgroundColor,

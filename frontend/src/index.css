@@ -43,49 +43,49 @@
 
 @layer base {
   :root {
-    /* Catana Dark Theme */
-    --background: 0 0% 8%; /* Fundo escuro #141414 */
-    --foreground: 0 0% 95%; /* Texto claro */
-    --card: 0 0% 12%; /* Cards cinza escuro #1F1F1F */
-    --card-foreground: 0 0% 95%;
-    --popover: 0 0% 12%;
-    --popover-foreground: 0 0% 95%;
-    --primary: 0 0% 18%; /* Cinza escuro da logo Catana #2D2D2D */
-    --primary-foreground: 0 0% 95%;
-    --secondary: 0 5% 25%; /* Cinza escuro */
-    --secondary-foreground: 0 0% 95%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 5% 60%;
-    --accent: 0 0% 18%; /* Cinza escuro da logo Catana */
-    --accent-foreground: 0 0% 95%;
+    /* Katana Editorial Light Theme */
+    --background: 40 20% 97%; /* Fundo quente marfim / papel #F8F6F1 */
+    --foreground: 20 10% 12%; /* Texto profundo editorial #1A1817 */
+    --card: 0 0% 100%;
+    --card-foreground: 20 10% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 10% 12%;
+    --primary: 20 10% 15%; /* Off-black nobre #211E1C */
+    --primary-foreground: 40 20% 97%;
+    --secondary: 35 15% 92%; /* Neutro acolhedor #EBE7DE */
+    --secondary-foreground: 20 10% 15%;
+    --muted: 35 15% 94%; /* Respiro suave #F0ECE4 */
+    --muted-foreground: 20 5% 45%; /* Cinza quente #736E65 */
+    --accent: 38 40% 50%; /* Ouro editorial #B08D57 */
+    --accent-foreground: 20 10% 12%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 20%; /* Bordas escuras */
-    --input: 0 0% 18%;
-    --ring: 0 0% 18%;
+    --border: 35 15% 88%; /* Borda suave nobre #E4E0D6 */
+    --input: 35 15% 88%;
+    --ring: 38 40% 50%;
     --radius: 0.75rem;
   }
 
   .dark {
     --background: 0 0% 5%; /* #0D0D0D */
     --foreground: 0 0% 95%;
-    --card: 0 0% 25%; /* #404040 */
+    --card: 0 0% 12%; /* #1F1F1F */
     --card-foreground: 0 0% 95%;
     --popover: 0 0% 10%;
     --popover-foreground: 0 0% 95%;
-    --primary: 0 0% 18%; /* Cinza escuro da logo Catana #2D2D2D */
+    --primary: 0 0% 18%; /* #2D2D2D */
     --primary-foreground: 0 0% 95%;
     --secondary: 0 2% 54%; /* #89888C */
     --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 25%;
+    --muted: 0 0% 18%;
     --muted-foreground: 0 2% 54%;
-    --accent: 0 0% 18%;
+    --accent: 38 40% 50%; /* #B08D57 */
     --accent-foreground: 0 0% 95%;
     --destructive: 0 72.2% 50.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 25%;
-    --input: 0 0% 25%;
-    --ring: 0 0% 18%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 38 40% 50%;
   }
 }
 
