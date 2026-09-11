@@ -309,6 +309,16 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
                 raw_text = raw_text[:-3]
 
             data = json.loads(raw_text.strip())
+            if isinstance(data, list):
+                data = {
+                    "pages": data,
+                    "title": f"Coleção {products[0].get('category', 'Editorial') if has_real_products else 'Editorial'}",
+                    "category": products[0].get('category', 'Geral') if has_real_products else "Geral",
+                    "summary": "Catálogo editorial estruturado pelo Google Gemini com análise semântica de produtos.",
+                    "reasoning": "Harmonia entre identidade de produto, utilidade e tipografia refinada.",
+                    "palette": {}
+                }
+
             stock = resolve_images_for_prompt(prompt if not has_real_products else f"{prompt} {products[0].get('name', '')} {products[0].get('category', '')}")
 
             pages = data.get("pages", [])
@@ -324,6 +334,13 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
                         user_prods_by_name[name_key] = p
 
             for p_idx, page in enumerate(pages):
+                if "page_number" in page and "pageNumber" not in page:
+                    page["pageNumber"] = page["page_number"]
+
+                if "product" in page and isinstance(page["product"], dict):
+                    if "products" not in page or not page["products"]:
+                        page["products"] = [page["product"]]
+
                 page["id"] = f"{catalog_id}-p{page.get('pageNumber', p_idx + 1)}"
 
                 if page.get("type") == "divider":
