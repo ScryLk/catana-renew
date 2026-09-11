@@ -148,6 +148,7 @@ export const SpreadViewport: React.FC = () => {
     if (page.type === 'hero') return `Destaque · ${page.products?.[0]?.name || page.label}`;
     if (page.type === 'duo') return `Duo · ${page.products?.map((p) => p.name).join(' & ')}`;
     if (page.type === 'single') return `Single · ${page.products?.[0]?.name || page.label}`;
+    if (page.type === 'grid_4') return `Grade Comercial · ${page.products?.length || 4} itens`;
     if (page.type === 'backcover') return 'Contracapa · Atelier';
     return `Página ${page.pageNumber}`;
   };
@@ -648,6 +649,83 @@ export const SpreadViewport: React.FC = () => {
               <div className="w-6 h-[1px] mb-2" style={{ backgroundColor: accent }} />
               <span className="text-[9px] tracking-[0.3em] text-[#1A1817]/70 font-mono">
                 {page.folio}
+              </span>
+            </div>
+          </div>
+        );
+      }
+
+      // ---------------- PÁGINA GRID 4: MATRIZ COMERCIAL 2x2 ----------------
+      case 'grid_4': {
+        const gridProducts = page.products || [];
+        return (
+          <div className="h-full flex flex-col justify-between py-8 px-8 select-none">
+            {/* Header / Section Label */}
+            <div className="flex items-center justify-between mb-4 border-b pb-2 border-stone-200 dark:border-zinc-800">
+              <span className="text-[10px] tracking-[0.3em] font-semibold uppercase" style={{ color: accent }}>
+                {page.label || 'MATRIZ COMERCIAL · 4 PRODUTOS'}
+              </span>
+              <span className="text-[9px] font-mono text-stone-400">
+                {gridProducts.length} ITENS
+              </span>
+            </div>
+
+            {/* 2x2 Grid */}
+            <div className="grid grid-cols-2 gap-4 flex-1 items-stretch">
+              {gridProducts.slice(0, 4).map((prod) => {
+                const isSelected = selectedElementId === prod.id;
+                return (
+                  <div
+                    key={prod.id}
+                    className={`flex flex-col justify-between p-2.5 rounded-sm border transition-all cursor-pointer bg-white/40 dark:bg-black/10 ${
+                      isSelected
+                        ? 'ring-2 ring-amber-600 border-amber-600/80 bg-black/5'
+                        : 'border-stone-200/80 dark:border-zinc-800/80 hover:border-stone-400'
+                    }`}
+                    onClick={(e) => handleSelect(prod.id, e, prod.name, prod.price)}
+                  >
+                    {/* Thumbnail Image */}
+                    <div className="w-full h-28 bg-stone-100 dark:bg-zinc-800/50 overflow-hidden rounded-xs relative mb-2">
+                      <img
+                        src={prod.image}
+                        alt={prod.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      {prod.tag && (
+                        <div className="absolute top-1.5 left-1.5 bg-[#1A1817] text-[#F5F1EA] text-[7px] font-mono tracking-wider px-1.5 py-0.2 uppercase">
+                          {prod.tag}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Metadata */}
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-baseline justify-between gap-1">
+                        <span className="text-[7px] font-mono text-stone-400">{prod.sku}</span>
+                        <span className="text-[10px] font-semibold text-[#1A1817] dark:text-zinc-100 tabular-nums">
+                          {prod.price}
+                        </span>
+                      </div>
+                      <h4
+                        className="text-xs text-[#1A1817] dark:text-zinc-100 font-medium truncate"
+                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                      >
+                        {prod.name}
+                      </h4>
+                      <p className="text-[9px] text-stone-600 dark:text-zinc-400 line-clamp-1 font-light">
+                        {prod.description}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Folio Footer */}
+            <div className="flex flex-col items-center mt-3">
+              <div className="w-6 h-[1px] mb-1.5" style={{ backgroundColor: accent }} />
+              <span className="text-[9px] tracking-[0.3em] text-[#1A1817]/70 font-mono">
+                {page.folio || `PAG. ${String(page.pageNumber).padStart(2, '0')}`}
               </span>
             </div>
           </div>

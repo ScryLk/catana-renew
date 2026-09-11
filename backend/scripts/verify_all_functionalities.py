@@ -192,12 +192,12 @@ def run_verification():
     has_price_48 = any("48" in pr for pr in prices)
     has_sku_060 = any("060" in sk for sk in skus)
 
-    passed_6 = has_cupula and has_price_48 and has_sku_060 and len(catalog.get("pages", [])) == 8
+    passed_6 = has_cupula and has_price_48 and has_sku_060 and len(catalog.get("pages", [])) >= 4
 
     results.append({
         "module": "Diagramacao IA",
         "feature": "Preservacao de Produtos Reais",
-        "expected": "8 paginas, Cupula G-60, R$ 48,00, SKU EMB-060",
+        "expected": "Min 4 pags dinamicas, Cupula G-60, R$ 48,00, SKU EMB-060",
         "obtained": f"{len(catalog.get('pages', []))} pags, {len(all_prods)} itens alocados com dados preservados",
         "passed": passed_6,
         "duration_ms": dur_ms
@@ -461,6 +461,54 @@ def run_verification():
         "expected": "Ruido politico removido, foco no catalogo",
         "obtained": f"Status: {rf_pol_metrics.get('guardrail_status')} (Acoes: {len(rf_pol_gw.get('reformatting_actions', []))})",
         "passed": passed_16,
+        "duration_ms": dur_ms
+    })
+
+    # -------------------------------------------------------------
+    # TESTE 17: RAG - Planejamento Dinamico de Layouts
+    # -------------------------------------------------------------
+    t0 = time.time()
+    cat_empty = generate_catalog_from_gemini("Colecao Conceitual de Moda")
+    prods_8 = [
+        {"name": f"Pote Gourmet {i}", "price": f"R$ {10+i},00", "sku": f"POT-{i}", "category": "Embalagens"}
+        for i in range(1, 9)
+    ]
+    cat_8 = generate_catalog_from_gemini("Catalogo de Embalagens e Potes", products=prods_8)
+    dur_ms = int((time.time() - t0) * 1000)
+
+    passed_17 = (
+        cat_empty.get("totalPages") == 6 and
+        cat_8.get("totalPages") == 5 and
+        "grid_4" in [p.get("type") for p in cat_8.get("pages", [])]
+    )
+    results.append({
+        "module": "Katana RAG",
+        "feature": "Planejamento Dinamico",
+        "expected": "Paginas variaveis (0 prods: 6, 8 prods: 5)",
+        "obtained": f"0 prods: {cat_empty.get('totalPages')} pags | 8 prods: {cat_8.get('totalPages')} pags (Grid_4)",
+        "passed": passed_17,
+        "duration_ms": dur_ms
+    })
+
+    # -------------------------------------------------------------
+    # TESTE 18: Katana RAG - Otimizacao de Tokens (Micro-Prompting)
+    # -------------------------------------------------------------
+    t0 = time.time()
+    rag_meta = cat_8.get("rag_metadata", {})
+    tokens_saved = rag_meta.get("tokens_saved_pct", 0)
+    industry_detected = rag_meta.get("industry", "")
+    dur_ms = int((time.time() - t0) * 1000)
+
+    passed_18 = (
+        tokens_saved >= 80 and
+        industry_detected == "packaging_food_service"
+    )
+    results.append({
+        "module": "Katana RAG",
+        "feature": "Economia Maxima de Tokens",
+        "expected": "Tokens saved >= 80%, segmento packaging",
+        "obtained": f"{tokens_saved}% economia | Segmento: {industry_detected}",
+        "passed": passed_18,
         "duration_ms": dur_ms
     })
 

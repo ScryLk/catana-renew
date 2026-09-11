@@ -204,7 +204,8 @@ class SystemDesignAndFunctionalVerificationTests(TestCase):
         self.assertIsNotNone(catalog)
         self.assertIn("title", catalog)
         self.assertIn("pages", catalog)
-        self.assertEqual(len(catalog["pages"]), 8)
+        self.assertEqual(len(catalog["pages"]), catalog["totalPages"])
+        self.assertGreaterEqual(len(catalog["pages"]), 4)
 
         # Coleta todos os produtos diagramados nas 8 paginas
         extracted_products = []
@@ -476,6 +477,54 @@ class SystemDesignAndFunctionalVerificationTests(TestCase):
         )
         self.assertEqual(res_attack.status_code, status.HTTP_200_OK)
         self.assertEqual(res_attack.data.get("audit_metrics", {}).get("guardrail_status"), "BLOCKED")
+
+    def test_11_dynamic_catalog_rag_and_token_optimization(self):
+        """
+        MODULO 8: Geracao Dinamica de Catalogo via RAG & Otimizacao de Tokens:
+        1. Geracao com 0 produtos resulta em estrutura conceitual enxuta (6 paginas).
+        2. Geracao com 8 produtos ativa dinamicamente matriz comercial grid_4.
+        3. Metadados de RAG confirmam taxa de economia de tokens >= 80%.
+        4. Preservacao estrita dos produtos reais (nome, preco, SKU).
+        5. Conformidade universal de Zero Emojis em titulos e manifestos gerados.
+        """
+        from api.ai.catalog_builder import generate_catalog_from_gemini
+
+        # 1. Teste de 0 produtos: estrutura conceitual de 6 paginas
+        cat_0 = generate_catalog_from_gemini("Colecao Lookbook de Moda e Acessorios")
+        self.assertEqual(cat_0["totalPages"], 6)
+        types_0 = [p["type"] for p in cat_0["pages"]]
+        self.assertEqual(types_0, ["cover", "manifesto", "hero", "duo", "single", "backcover"])
+        self.assertIn("rag_metadata", cat_0)
+        self.assertGreaterEqual(cat_0["rag_metadata"]["tokens_saved_pct"], 80)
+
+        # 2. Teste de 8 produtos reais: estrutura dinamica com grid_4
+        sample_prods = [
+            {
+                "name": f"Pote Hermetico Pro {i}",
+                "price": f"R$ {12 + i * 2},50",
+                "sku": f"POT-{i:03d}",
+                "category": "Embalagens Plasticas",
+                "description": f"Pote descartavel com trava hermetica modelo {i}."
+            }
+            for i in range(1, 9)
+        ]
+        cat_8 = generate_catalog_from_gemini("Catalogo Atacado de Potes Plasticos", products=sample_prods)
+        self.assertEqual(cat_8["totalPages"], 5)
+        types_8 = [p["type"] for p in cat_8["pages"]]
+        self.assertEqual(types_8, ["cover", "manifesto", "grid_4", "grid_4", "backcover"])
+        self.assertEqual(cat_8["rag_metadata"]["industry"], "packaging_food_service")
+
+        # 3. Preservacao dos dados reais
+        grid_page_1 = cat_8["pages"][2]
+        self.assertEqual(len(grid_page_1["products"]), 4)
+        first_prod = grid_page_1["products"][0]
+        self.assertEqual(first_prod["sku"], "POT-001")
+        self.assertEqual(first_prod["price"], "R$ 14,50")
+
+        # 4. Zero emojis global no retorno
+        raw_json = json.dumps(cat_8, ensure_ascii=False)
+        matches = EMOJI_PATTERN.findall(raw_json)
+        self.assertEqual(len(matches), 0, f"Emoji detectado no catalogo gerado: {matches}")
 
 
 

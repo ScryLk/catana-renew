@@ -205,6 +205,29 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
         </div>
       )}
 
+      {page.type === 'grid_4' && page.products && (
+        <div className="h-full flex flex-col justify-between pt-2">
+          <div className="grid grid-cols-2 gap-0.5 items-center">
+            {page.products.slice(0, 4).map((prod) => (
+              <div key={prod.id} className="flex flex-col gap-0.2">
+                <div className="w-full h-7 bg-stone-100 overflow-hidden rounded-xs">
+                  <img src={prod.image} alt="" className="w-full h-full object-cover" />
+                </div>
+                <span className="text-[3px] text-[#1A1817] font-semibold truncate block">
+                  {prod.name}
+                </span>
+                <span className="text-[3px] font-mono text-stone-700 block">
+                  {prod.price}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="text-center pb-0.5">
+            <span className="text-[5px] font-mono text-stone-500">{page.folio}</span>
+          </div>
+        </div>
+      )}
+
       {page.type === 'backcover' && (
         <div className="h-full flex flex-col items-center justify-center text-center gap-1 pt-3">
           <div

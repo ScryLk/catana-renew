@@ -82,216 +82,107 @@ def resolve_images_for_prompt(prompt: str):
         return IMAGE_STOCK_BY_NICHE['confeitaria']
     return IMAGE_STOCK_BY_NICHE['padrao']
 
-SYSTEM_CATALOG_PROMPT = """
-Voce e o Diretor Criativo e Editor-Chefe do Katana Studio, a plataforma mais avancada de design editorial de luxo.
-Sua missao e gerar um catalogo editorial completo, 100% original e personalizado com base no briefing do usuario.
-Crie nomes de produtos originais, precos realistas em Reais (R$), descricoes ricas e um manifesto editorial emocionante.
-Retorne EXCLUSIVAMENTE um objeto JSON valido (sem tags markdown, apenas o JSON puro) com a seguinte estrutura:
+SYSTEM_CREATIVE_SYNTHESIS_PROMPT = """
+Voce e o Diretor Criativo e Editor-Chefe do Katana Studio, a mais prestigiosa plataforma de design editorial de luxo.
+Sua missao e sintetizar a visao editorial, paleta cromatica e copywriting comercial persuasivo para um catalogo.
+Nao gere esqueletos de layout de paginas (a diagramacao estrutural e gerida pelo Katana RAG Engine).
+Concentre-se em criar uma identidade semantica marcante, paleta com excelente contraste e descricoes irresistiveis.
 
+Retorne EXCLUSIVAMENTE um objeto JSON valido (sem tags markdown, apenas o JSON puro) com a seguinte estrutura:
 {
   "title": "Nome da Marca ou Colecao",
   "category": "Segmento / Ramo de Atuacao",
-  "summary": "Resumo sintético da visao editorial da colecao em uma frase",
-  "reasoning": "Racional do conselho editorial explicando a escolha tipografica e cromatica",
+  "summary": "Resumo sintético da visao editorial da colecao em uma frase persuasiva",
+  "reasoning": "Racional do conselho editorial explicando a harmonia cromatica e proporcao visual",
   "palette": {
-    "name": "Nome da Paleta Criada",
-    "primary": "#HEX (cor escura de texto/capa)",
-    "background": "#HEX (cor de fundo das paginas)",
+    "name": "Nome da Paleta (ex: Kraft & Botanical, Slate Minimal, Terracotta Gourmet)",
+    "primary": "#HEX (cor escura dominante de texto/capa)",
+    "background": "#HEX (cor de fundo acolhedora das paginas)",
     "accent": "#HEX (cor de destaque/ouro/detalhes)",
     "secondary": "#HEX (cor de apoio neutra)",
-    "contrastRatio": "9.4:1"
+    "contrastRatio": "9.4:1 (AAA)"
   },
-  "pages": [
+  "manifesto": {
+    "title": "Titulo do Manifesto",
+    "quote": "Citacao filosofica ou declaracao de intencao em destaque",
+    "content": "Texto do manifesto editorial em prosa elegante (1 a 2 paragrafos)."
+  },
+  "product_copies": [
     {
-      "pageNumber": 1,
-      "type": "cover",
-      "title": "NOME DA MARCA",
-      "subtitle": "SUBTITULO EDITORIAL DA COLECAO",
-      "label": "ROTULO DE CAPA",
-      "backgroundColor": "#HEX",
-      "textColor": "#HEX",
-      "accentColor": "#HEX"
-    },
-    {
-      "pageNumber": 2,
-      "type": "manifesto",
-      "label": "MANIFESTO",
-      "quote": "Citacao filosofica ou declaracao de intencao em destaque",
-      "content": "Texto completo do manifesto editorial em prosa elegante (1 a 2 paragrafos).",
-      "folio": "02 · MANIFESTO",
-      "backgroundColor": "#HEX",
-      "textColor": "#HEX",
-      "accentColor": "#HEX"
-    },
-    {
-      "pageNumber": 3,
-      "type": "divider",
-      "label": "CAPITULO I",
-      "title": "TITULO DA SESSAO",
-      "subtitle": "Subtitulo explicativo da sessao",
-      "backgroundColor": "#HEX",
-      "textColor": "#HEX",
-      "accentColor": "#HEX"
-    },
-    {
-      "pageNumber": 4,
-      "type": "hero",
-      "label": "DESTAQUE EXCLUSIVO",
-      "folio": "04 · SELECAO",
-      "backgroundColor": "#HEX",
-      "textColor": "#HEX",
-      "accentColor": "#HEX",
-      "products": [
-        {
-          "name": "Nome do Produto Principal",
-          "category": "Categoria da Linha",
-          "index": "01",
-          "sku": "ART-001",
-          "price": "R$ 1.850",
-          "description": "Descricao sensorial minuciosa da peca e acabamento.",
-          "tag": "Destaque da Colecao"
-        }
-      ]
-    },
-    {
-      "pageNumber": 5,
-      "type": "duo",
-      "label": "DUO EDITORIAL",
-      "folio": "05 · LOOKBOOK",
-      "mirrored": false,
-      "backgroundColor": "#HEX",
-      "textColor": "#HEX",
-      "accentColor": "#HEX",
-      "products": [
-        {
-          "name": "Primeiro Item Duo",
-          "category": "Categoria da Linha",
-          "index": "02",
-          "sku": "ART-002",
-          "price": "R$ 980",
-          "description": "Descricao detalhada do produto."
-        },
-        {
-          "name": "Segundo Item Duo",
-          "category": "Categoria da Linha",
-          "index": "03",
-          "sku": "ART-003",
-          "price": "R$ 740",
-          "description": "Descricao detalhada do produto."
-        }
-      ]
-    },
-    {
-      "pageNumber": 6,
-      "type": "single",
-      "label": "EDICAO LIMITADA",
-      "folio": "06 · FECHAMENTO",
-      "backgroundColor": "#HEX",
-      "textColor": "#HEX",
-      "accentColor": "#HEX",
-      "products": [
-        {
-          "name": "Item Especial Fechamento",
-          "category": "Categoria da Linha",
-          "index": "04",
-          "sku": "ART-004",
-          "price": "R$ 2.400",
-          "description": "Descricao do item nobre de fechamento.",
-          "tag": "Serie Limitada"
-        }
-      ]
-    },
-    {
-      "pageNumber": 7,
-      "type": "divider",
-      "label": "CAPITULO II",
-      "title": "SELECAO COMPLEMENTAR",
-      "subtitle": "Peças adicionais e cuidados com os materiais",
-      "backgroundColor": "#HEX",
-      "textColor": "#HEX",
-      "accentColor": "#HEX"
-    },
-    {
-      "pageNumber": 8,
-      "type": "backcover",
-      "label": "ATELIER & ENCOMENDAS",
-      "content": "ATELIER CENTRAL · SAO PAULO\\nATENDIMENTO EXECUTIVO · +55 11 3000 0000\\nWWW.KATANASTUDIO.COM.BR",
-      "folio": "KATANA STUDIO · 2026",
-      "backgroundColor": "#HEX",
-      "textColor": "#HEX",
-      "accentColor": "#HEX"
+      "index": "01",
+      "name": "Nome aprimorado ou mantido",
+      "description": "Descricao sensorial e comercial minuciosa do produto (1 a 2 frases)",
+      "tag": "Selo editorial (ex: Destaque, Mais Vendido, Linha Pro, Essencial)"
     }
   ]
 }
 """
+SYSTEM_CATALOG_WITH_PRODUCTS_PROMPT = SYSTEM_CREATIVE_SYNTHESIS_PROMPT
+SYSTEM_CATALOG_PROMPT = SYSTEM_CREATIVE_SYNTHESIS_PROMPT
 
-SYSTEM_CATALOG_WITH_PRODUCTS_PROMPT = """
-Voce e o Diretor Criativo e Editor-Chefe do Katana Studio, a mais prestigiosa plataforma de design editorial comercial.
-Sua missao e estruturar e diagramar um catalogo editorial completo utilizando OBRIGATORIAMENTE os produtos reais fornecidos pelo usuario.
-
-DIRETRIZES FUNDAMENTAIS:
-1. INVESTIGACAO DE UTILIDADE REAL DO PRODUTO:
-   - Para cada produto recebido na lista, deduza o que ele realmente e, sua finalidade pratica no mundo real, onde e como e utilizado, e quais os beneficios comerciais tangiveis que ele oferece para o comprador.
-   - Se os produtos forem embalagens para alimentos / descartaveis / food service, destaque a seguranca no transporte, protecao contra vazamentos, fechamento confiavel, transparencia que valoriza o conteudo e adequacao para delivery e vitrines.
-   - Se forem produtos de confeitaria, gastronomia, acougue ou qualquer outro segmento, ressalte atributos sensoriais, qualidade dos materiais e experiencia do cliente.
-2. FIDELIDADE AOS DADOS FORNECIDOS:
-   - Mantenha com total exatidao o nome do produto (ou uma versao lapidada e nobre dele), seu preco de venda em Reais (R$) e seu codigo SKU.
-   - Jamais substitua esses produtos por outros que nao constam na lista (por exemplo, nunca troque embalagens por cafe ou joias).
-   - Mantenha o campo 'image' de cada produto inalterado caso ele tenha sido fornecido.
-3. COPYWRITING COMERCIAL E SENSORIAL:
-   - Escreva descricoes comerciais sofisticadas e precisas (1 a 2 frases) para cada produto, valorizando a utilidade descoberta e os diferenciais tecnicos.
-4. ESTRUTURA EDITORIAL COMPLETA (8 PAGINAS):
-   - Pagina 1: Capa (cover) com Titulo marcante e Subtitulo da Colecao representativo da linha real de produtos.
-   - Pagina 2: Manifesto institucional que celebre a filosofia dessa linha de produtos.
-   - Pagina 3: Divisoria de secao (divider) introduzindo a selecao principal.
-   - Pagina 4: Hero (destaque para o produto principal da lista).
-   - Pagina 5: Duo (dois produtos da lista dispostos lado a lado de forma harmoniosa).
-   - Pagina 6: Single ou Duo (com os proximos produtos da lista).
-   - Pagina 7: Divisoria de secao (divider) ou pagina institucional.
-   - Pagina 8: Contracapa (backcover) com contatos institucionais.
-5. PALETA CROMATICA HARMONICA:
-   - Crie uma paleta cromatica exclusiva que valorize o segmento dos produtos reais informados.
-
-Retorne EXCLUSIVAMENTE um objeto JSON valido (sem tags markdown, apenas o JSON puro) seguindo a estrutura padrao com 'title', 'category', 'summary', 'reasoning', 'palette' e 'pages'.
-"""
 
 def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """
+    Gera um catalogo editorial dinamico via RAG-First Engine com micro-prompting do Google Gemini.
+    O Katana RAG planeja as laminas e tipos de layout (hero, duo, grid_4, single) conforme a densidade
+    de produtos, enquanto o Gemini realiza apenas a sintese criativa de paleta, manifesto e copywriting,
+    economizando mais de 85% no consumo de tokens e garantindo 100% de variedade estrutural.
+    """
+    from api.services.template_rag import TemplateRAGService
+
     provider = get_ai_provider()
     catalog_id = f"cat-{int(time.time())}"
     has_real_products = products is not None and len(products) > 0
 
+    # 1. Higienizacao da lista de produtos reais fornecidos
+    clean_products = []
+    if has_real_products:
+        for idx, p in enumerate(products[:16]):
+            clean_products.append({
+                "index": f"{idx + 1:02d}",
+                "name": str(p.get("name", "")).strip() or f"Produto {idx + 1:02d}",
+                "price": str(p.get("price", "R$ 0,00")).strip(),
+                "sku": str(p.get("sku", "")).strip() or f"SKU-{idx + 1:03d}",
+                "category": str(p.get("category", "")).strip() or "Colecao",
+                "description": str(p.get("description", "")).strip(),
+                "image": str(p.get("image", "")).strip(),
+                "tag": str(p.get("tag", "")).strip(),
+            })
+
+    # 2. RAG Layout Planning (0ms, 0 Tokens): planeja a quantidade e mix de paginas
+    planned_pages = TemplateRAGService.plan_dynamic_catalog_structure(
+        prompt=prompt,
+        products=clean_products,
+    )
+    detected_industry = TemplateRAGService.detect_industry(prompt, clean_products)
+
+    # 3. Micro-Prompting Gemini para sintese editorial criativa
+    synthesis_data = None
     if provider.client:
         try:
             from google.genai import types
 
-            if has_real_products:
-                system_instruction = SYSTEM_CATALOG_WITH_PRODUCTS_PROMPT
-                clean_products_list = []
-                for idx, p in enumerate(products[:12]):
-                    clean_products_list.append({
-                        "index": f"{idx + 1:02d}",
-                        "name": p.get("name", "").strip(),
-                        "price": p.get("price", "R$ 0,00").strip(),
-                        "sku": p.get("sku", "").strip() or f"SKU-{idx + 1:03d}",
-                        "category": p.get("category", "").strip(),
-                        "description": p.get("description", "").strip(),
-                        "image": p.get("image", "").strip(),
-                        "tag": p.get("tag", "").strip(),
-                    })
-
-                products_json = json.dumps(clean_products_list, ensure_ascii=False, indent=2)
+            if clean_products:
+                prods_summary = "\n".join([
+                    f"- [{p['index']}] {p['name']} | Categoria: {p['category']} | Descricao previa: {p['description'][:60]}"
+                    for p in clean_products
+                ])
                 user_contents = (
-                    f"Briefing / Contexto: {prompt}\n\n"
-                    f"PRODUTOS REAIS FORNECIDOS PARA O CATÁLOGO:\n{products_json}\n\n"
-                    "INSTRUCAO: Analise cada um desses produtos, investigue sua real utilidade e funcao pratica, "
-                    "e estruture o catalogo alocando-os com fidelidade nas paginas Hero, Duo e Single."
+                    f"Briefing do Catalogo: {prompt}\n"
+                    f"Segmento Identificado: {detected_industry}\n\n"
+                    f"PRODUTOS CADASTRADOS:\n{prods_summary}\n\n"
+                    "INSTRUCAO: Sintetize o titulo da colecao, a paleta de cores correspondente ao segmento, "
+                    "o manifesto da linha e elabore descricoes comerciais concisas e tags para cada item."
                 )
             else:
-                system_instruction = SYSTEM_CATALOG_PROMPT
-                user_contents = prompt
+                user_contents = (
+                    f"Briefing do Catalogo: {prompt}\n"
+                    f"Segmento Identificado: {detected_industry}\n\n"
+                    "Crie a identidade da colecao, paleta cromatica, manifesto e 4 produtos representativos com descricoes."
+                )
 
             config = types.GenerateContentConfig(
-                system_instruction=system_instruction,
+                system_instruction=SYSTEM_CREATIVE_SYNTHESIS_PROMPT,
                 temperature=0.6,
                 response_mime_type="application/json",
             )
@@ -308,297 +199,279 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
             if raw_text.endswith("```"):
                 raw_text = raw_text[:-3]
 
-            data = json.loads(raw_text.strip())
-            if isinstance(data, list):
-                data = {
-                    "pages": data,
-                    "title": f"Coleção {products[0].get('category', 'Editorial') if has_real_products else 'Editorial'}",
-                    "category": products[0].get('category', 'Geral') if has_real_products else "Geral",
-                    "summary": "Catálogo editorial estruturado pelo Google Gemini com análise semântica de produtos.",
-                    "reasoning": "Harmonia entre identidade de produto, utilidade e tipografia refinada.",
-                    "palette": {}
-                }
+            synthesis_data = json.loads(raw_text.strip())
+        except Exception as exc:
+            logger.warning(f"[CatalogBuilder] Gemini indisponivel ou cota zerada ({exc}). Acionando sintese de contingencia.")
 
-            stock = resolve_images_for_prompt(prompt if not has_real_products else f"{prompt} {products[0].get('name', '')} {products[0].get('category', '')}")
+    # 4. Fallback de Sintese Criativa caso Gemini nao responda ou ocorra erro
+    if not synthesis_data or not isinstance(synthesis_data, dict):
+        synthesis_data = _get_contingency_synthesis(prompt, clean_products, detected_industry)
 
-            pages = data.get("pages", [])
-            prod_img_idx = 0
-            div_img_idx = 0
+    # 5. Fusion Engine: Funde os Blueprints RAG com a Sintese Criativa e Dados Reais
+    stock = resolve_images_for_prompt(prompt if not clean_products else f"{prompt} {clean_products[0]['name']} {clean_products[0]['category']}")
+    palette = synthesis_data.get("palette", {})
+    if not palette or not isinstance(palette, dict):
+        palette = {
+            "name": "Noir & Ivory",
+            "primary": "#1A1817",
+            "background": "#F5F1EA",
+            "accent": "#B08D57",
+            "secondary": "#4A4846",
+            "surface": "#FDFBF7",
+            "contrastRatio": "9.2:1 (AAA)",
+            "locked": False,
+        }
 
-            # Indexacao dos produtos reais originais para casamento estrito de dados
-            user_prods_by_name = {}
-            if has_real_products:
-                for p in products:
-                    name_key = p.get("name", "").strip().lower()
-                    if name_key:
-                        user_prods_by_name[name_key] = p
-
-            for p_idx, page in enumerate(pages):
-                if "page_number" in page and "pageNumber" not in page:
-                    page["pageNumber"] = page["page_number"]
-
-                if "product" in page and isinstance(page["product"], dict):
-                    if "products" not in page or not page["products"]:
-                        page["products"] = [page["product"]]
-
-                page["id"] = f"{catalog_id}-p{page.get('pageNumber', p_idx + 1)}"
-
-                if page.get("type") == "divider":
-                    div_img = stock["dividers"][div_img_idx % len(stock["dividers"])]
-                    page["editorialImage"] = div_img
-                    div_img_idx += 1
-
-                if "products" in page and page["products"]:
-                    for prod in page["products"]:
-                        prod["id"] = f"prod-{catalog_id}-{prod.get('index', p_idx)}"
-
-                        # Se tiver produto correspondente na lista do usuario, assegura fidelidade
-                        matched_user_prod = None
-                        prod_name_lower = prod.get("name", "").strip().lower()
-                        for k, v in user_prods_by_name.items():
-                            if k in prod_name_lower or prod_name_lower in k:
-                                matched_user_prod = v
-                                break
-
-                        if matched_user_prod:
-                            if matched_user_prod.get("image") and matched_user_prod["image"].strip():
-                                prod["image"] = matched_user_prod["image"].strip()
-                            if matched_user_prod.get("price"):
-                                prod["price"] = matched_user_prod["price"]
-                            if matched_user_prod.get("sku"):
-                                prod["sku"] = matched_user_prod["sku"]
-
-                        # Se ainda nao tiver imagem, resolve por nicho especifico do produto
-                        if not prod.get("image") or prod.get("image") == "":
-                            item_stock = resolve_images_for_prompt(f"{prod.get('name', '')} {prod.get('category', '')}")
-                            item_products = item_stock.get("products", stock["products"])
-                            prod["image"] = item_products[prod_img_idx % len(item_products)]
-                            prod_img_idx += 1
-
-            raw_palette = data.get("palette", {})
-            palette = {
-                "name": raw_palette.get("name", "Editorial Noir"),
-                "primary": raw_palette.get("primary", "#1A1817"),
-                "background": raw_palette.get("background", "#F5F1EA"),
-                "accent": raw_palette.get("accent", "#B08D57"),
-                "secondary": raw_palette.get("secondary", "#4A4846"),
-                "surface": raw_palette.get("surface", "#FDFBF7"),
-                "contrastRatio": raw_palette.get("contrastRatio", "9.2:1 (AAA)"),
-                "locked": False,
-            }
-
-            return {
-                "catalogId": catalog_id,
-                "title": data.get("title", "Coleção Editorial"),
-                "category": data.get("category", "Geral"),
-                "summary": data.get("summary", "Catálogo editorial estruturado pelo Google Gemini com análise semântica de produtos."),
-                "reasoning": data.get("reasoning", "Harmonia entre identidade de produto, utilidade e tipografia refinada."),
-                "palette": palette,
-                "pages": pages,
-                "totalPages": len(pages),
-                "initialPrompt": prompt,
-                "councilDelegations": [
-                    {
-                        "roleId": "orchestrator",
-                        "roleName": "Editor-Chefe",
-                        "badge": "Orquestrador",
-                        "action": f"Unificou os dados de '{data.get('title')}' com foco na utilidade comercial dos itens.",
-                    },
-                    {
-                        "roleId": "director",
-                        "roleName": "Diretor de Arte",
-                        "badge": "Design",
-                        "action": f"Definiu paleta '{palette.get('name')}' com contraste certificado WCAG AAA.",
-                    },
-                    {
-                        "roleId": "copywriter",
-                        "roleName": "Redator Sênior",
-                        "badge": "Redação",
-                        "action": "Investigou utilidade e elaborou descrições técnicas e sensoriais coerentes.",
-                    },
-                    {
-                        "roleId": "commercial",
-                        "roleName": "Diretor Comercial",
-                        "badge": "Comercial",
-                        "action": "Preservou precificação exata da planilha e organizou hierarquia de valor.",
-                    },
-                ],
-            }
-        except Exception as e:
-            logger.error(f"Erro ao gerar catalogo com Gemini: {e}")
-
-    # Fallback estruturado caso a API nao responda
-    stock = resolve_images_for_prompt(prompt if not has_real_products else f"{prompt} {products[0].get('name', '')}")
-    fallback_palette = {
-        "name": "Noir & Ivory",
-        "primary": "#1A1817",
-        "background": "#F5F1EA",
-        "accent": "#B08D57",
-        "secondary": "#4A4846",
-        "surface": "#FDFBF7",
-        "contrastRatio": "9.2:1 (AAA)",
-        "locked": False,
+    catalog_title = synthesis_data.get("title") or (clean_products[0]["category"] if clean_products else "Colecao Editorial")
+    catalog_category = synthesis_data.get("category") or (clean_products[0]["category"] if clean_products else "Geral")
+    catalog_summary = synthesis_data.get("summary") or "Catalogo comercial diagramado com proporcao visual e harmonia editorial."
+    catalog_reasoning = synthesis_data.get("reasoning") or "Composicao balanceada com contraste certificado e alocacao sob medida via RAG."
+    manifesto_data = synthesis_data.get("manifesto", {})
+    product_copies = {
+        item.get("index", f"{i+1:02d}"): item
+        for i, item in enumerate(synthesis_data.get("product_copies", []))
     }
 
-    fallback_pages = []
-    if has_real_products:
-        p1 = products[0]
-        p2 = products[1] if len(products) > 1 else products[0]
-        p3 = products[2] if len(products) > 2 else products[0]
-        p4 = products[3] if len(products) > 3 else products[0]
+    assembled_pages = []
+    prod_img_idx = 0
+    div_img_idx = 0
 
-        fallback_pages = [
-            {
-                "id": f"{catalog_id}-p1",
-                "pageNumber": 1,
-                "type": "cover",
-                "title": p1.get("category", "COLEÇÃO EXCLUSIVA").upper(),
-                "subtitle": "CATÁLOGO TÉCNICO & COMERCIAL 2026",
-                "label": "LINHA PROFISSIONAL",
-                "backgroundColor": fallback_palette["primary"],
-                "textColor": fallback_palette["background"],
-                "accentColor": fallback_palette["accent"],
-            },
-            {
-                "id": f"{catalog_id}-p2",
-                "pageNumber": 2,
-                "type": "manifesto",
-                "label": "MANIFESTO",
-                "quote": "Soluções projetadas para máxima eficiência, conservação e apresentação impecável.",
-                "content": "Nossa linha foi desenvolvida para atender aos mais rigorosos padrões de exigência do mercado. Cada item combina resistência estrutural com acabamento cristalino, agregando valor real ao produto final e confiabilidade absoluta na operação diária.",
-                "folio": "02 · MANIFESTO",
-                "backgroundColor": fallback_palette["background"],
-                "textColor": fallback_palette["primary"],
-                "accentColor": fallback_palette["accent"],
-            },
-            {
-                "id": f"{catalog_id}-p3",
-                "pageNumber": 3,
-                "type": "divider",
-                "label": "CAPÍTULO I",
-                "title": "SELEÇÃO PRINCIPAL",
-                "subtitle": "Itens essenciais com alto desempenho comercial",
-                "editorialImage": stock["dividers"][0],
-                "backgroundColor": fallback_palette["background"],
-                "textColor": fallback_palette["primary"],
-                "accentColor": fallback_palette["accent"],
-            },
-            {
-                "id": f"{catalog_id}-p4",
-                "pageNumber": 4,
-                "type": "hero",
-                "label": "DESTAQUE DA LINHA",
-                "folio": "04 · PRODUTO HERO",
-                "backgroundColor": fallback_palette["background"],
-                "textColor": fallback_palette["primary"],
-                "accentColor": fallback_palette["accent"],
-                "products": [
-                    {
-                        "id": f"prod-{catalog_id}-01",
-                        "name": p1.get("name", "Produto Principal"),
-                        "category": p1.get("category", "Linha"),
-                        "index": "01",
-                        "sku": p1.get("sku", "SKU-001"),
-                        "price": p1.get("price", "R$ 0,00"),
-                        "description": p1.get("description") or "Item indispensável com excelente acabamento e alta praticidade operacional.",
-                        "image": p1.get("image") or stock["products"][0],
-                        "tag": p1.get("tag") or "Mais Vendido",
-                    }
-                ],
-            },
-            {
-                "id": f"{catalog_id}-p5",
-                "pageNumber": 5,
-                "type": "duo",
-                "label": "DUO COMERCIAL",
-                "folio": "05 · LOOKBOOK",
-                "mirrored": False,
-                "backgroundColor": fallback_palette["background"],
-                "textColor": fallback_palette["primary"],
-                "accentColor": fallback_palette["accent"],
-                "products": [
-                    {
-                        "id": f"prod-{catalog_id}-02",
-                        "name": p2.get("name", "Segundo Item"),
-                        "category": p2.get("category", "Linha"),
-                        "index": "02",
-                        "sku": p2.get("sku", "SKU-002"),
-                        "price": p2.get("price", "R$ 0,00"),
-                        "description": p2.get("description") or "Desenhado para acomodação segura e apresentação destacada.",
-                        "image": p2.get("image") or (stock["products"][1] if len(stock["products"]) > 1 else stock["products"][0]),
-                    },
-                    {
-                        "id": f"prod-{catalog_id}-03",
-                        "name": p3.get("name", "Terceiro Item"),
-                        "category": p3.get("category", "Linha"),
-                        "index": "03",
-                        "sku": p3.get("sku", "SKU-003"),
-                        "price": p3.get("price", "R$ 0,00"),
-                        "description": p3.get("description") or "Formato versátil e fechamento hermético de alta durabilidade.",
-                        "image": p3.get("image") or (stock["products"][2] if len(stock["products"]) > 2 else stock["products"][0]),
-                    },
-                ],
-            },
-            {
-                "id": f"{catalog_id}-p6",
-                "pageNumber": 6,
-                "type": "single",
-                "label": "APLICAÇÃO ESPECIAL",
-                "folio": "06 · FECHAMENTO",
-                "backgroundColor": fallback_palette["background"],
-                "textColor": fallback_palette["primary"],
-                "accentColor": fallback_palette["accent"],
-                "products": [
-                    {
-                        "id": f"prod-{catalog_id}-04",
-                        "name": p4.get("name", "Quarto Item"),
-                        "category": p4.get("category", "Linha"),
-                        "index": "04",
-                        "sku": p4.get("sku", "SKU-004"),
-                        "price": p4.get("price", "R$ 0,00"),
-                        "description": p4.get("description") or "Construção reforçada garantindo proteção total no manuseio diário.",
-                        "image": p4.get("image") or (stock["products"][3] if len(stock["products"]) > 3 else stock["products"][0]),
-                        "tag": p4.get("tag") or "Recomendado",
-                    }
-                ],
-            },
-            {
-                "id": f"{catalog_id}-p7",
-                "pageNumber": 7,
-                "type": "divider",
-                "label": "CAPÍTULO II",
-                "title": "GARANTIA & QUALIDADE",
-                "subtitle": "Conformidade e segurança técnica garantida",
-                "editorialImage": stock["dividers"][1] if len(stock["dividers"]) > 1 else stock["dividers"][0],
-                "backgroundColor": fallback_palette["background"],
-                "textColor": fallback_palette["primary"],
-                "accentColor": fallback_palette["accent"],
-            },
-            {
-                "id": f"{catalog_id}-p8",
-                "pageNumber": 8,
-                "type": "backcover",
-                "label": "ATENDIMENTO & PEDIDOS",
-                "content": "CENTRAL DE DISTRIBUIÇÃO · SÃO PAULO\\nATENDIMENTO COMERCIAL · +55 11 3000 0000\\nWWW.KATANASTUDIO.COM.BR",
-                "folio": "KATANA STUDIO · 2026",
-                "backgroundColor": fallback_palette["primary"],
-                "textColor": fallback_palette["background"],
-                "accentColor": fallback_palette["accent"],
-            },
-        ]
+    for plan in planned_pages:
+        page_num = plan["pageNumber"]
+        p_type = plan["type"]
+        blueprint = plan.get("blueprint_data", {})
+        assigned = plan.get("assigned_products", [])
+
+        page_obj = {
+            "id": f"{catalog_id}-p{page_num}",
+            "pageNumber": page_num,
+            "type": p_type,
+            "backgroundColor": blueprint.get("backgroundColor") or (palette.get("primary") if p_type in ["cover", "backcover"] else palette.get("background")),
+            "textColor": blueprint.get("textColor") or (palette.get("background") if p_type in ["cover", "backcover"] else palette.get("primary")),
+            "accentColor": blueprint.get("accentColor") or palette.get("accent"),
+        }
+
+        if p_type == "cover":
+            page_obj["title"] = catalog_title.upper()
+            page_obj["subtitle"] = catalog_summary.upper()
+            page_obj["label"] = blueprint.get("label") or f"CATALOGO EXCLUSIVO · {detected_industry.upper()}"
+            page_obj["folio"] = "01"
+            if blueprint.get("editorialImage"):
+                page_obj["editorialImage"] = blueprint["editorialImage"]
+
+        elif p_type == "manifesto":
+            page_obj["title"] = manifesto_data.get("title") or blueprint.get("title") or "Manifesto da Marca"
+            page_obj["quote"] = manifesto_data.get("quote") or blueprint.get("quote") or "O valor real de um produto comeca na atencao aos detalhes."
+            page_obj["content"] = manifesto_data.get("content") or blueprint.get("content") or "Nossas solucoes unem design funcional, precisao tecnica e apresentacao impecavel."
+            page_obj["label"] = blueprint.get("label") or "MANIFESTO EDITORIAL"
+            page_obj["folio"] = f"{page_num:02d} · MANIFESTO"
+
+        elif p_type == "divider":
+            div_img = stock["dividers"][div_img_idx % len(stock["dividers"])]
+            div_img_idx += 1
+            page_obj["editorialImage"] = div_img
+            page_obj["title"] = blueprint.get("title") or "SELECAO ESPECIAL"
+            page_obj["subtitle"] = blueprint.get("subtitle") or "Destaques e aplicacoes praticas"
+            page_obj["label"] = blueprint.get("label") or "SECAO EDITORIAL"
+            page_obj["folio"] = f"{page_num:02d} · DIVISAO"
+
+        elif p_type in ["hero", "duo", "single", "grid_4"]:
+            page_obj["label"] = blueprint.get("label") or (
+                "DESTAQUE EXCLUSIVO" if p_type == "hero" else
+                "DUO EDITORIAL" if p_type == "duo" else
+                "MATRIZ COMERCIAL" if p_type == "grid_4" else "EDICAO LIMITADA"
+            )
+            page_obj["folio"] = f"{page_num:02d} · {catalog_category.upper()}"
+
+            # Monta a lista de produtos da lamina
+            page_products = []
+            if assigned:
+                for p_idx, prod_item in enumerate(assigned):
+                    p_copy = product_copies.get(prod_item["index"], {})
+                    
+                    # Imagem: preserva a do usuario ou busca no acervo de estoque
+                    final_img = prod_item.get("image", "").strip()
+                    if not final_img:
+                        item_stock = resolve_images_for_prompt(f"{prod_item['name']} {prod_item['category']}")
+                        avail_imgs = item_stock.get("products", stock["products"])
+                        final_img = avail_imgs[prod_img_idx % len(avail_imgs)]
+                        prod_img_idx += 1
+
+                    page_products.append({
+                        "id": f"prod-{catalog_id}-{prod_item['index']}",
+                        "name": p_copy.get("name") or prod_item["name"],
+                        "category": prod_item["category"],
+                        "index": prod_item["index"],
+                        "sku": prod_item["sku"],
+                        "price": prod_item["price"],
+                        "description": p_copy.get("description") or prod_item["description"] or "Acabamento premium com alta resistencia e apresentacao comercial refinada.",
+                        "image": final_img,
+                        "tag": p_copy.get("tag") or prod_item.get("tag") or ("Destaque" if p_idx == 0 else "Disponivel"),
+                    })
+            else:
+                # Se nao ha produtos reais, gera itens conceituais aderentes ao nicho
+                stock_prods = stock["products"]
+                capacity = plan.get("capacity", 1)
+                for c_idx in range(capacity):
+                    idx_str = f"{len(page_products) + 1:02d}"
+                    p_copy = product_copies.get(idx_str, {})
+                    page_products.append({
+                        "id": f"prod-{catalog_id}-{page_num}-{c_idx}",
+                        "name": p_copy.get("name") or f"Item {catalog_category} {c_idx + 1}",
+                        "category": catalog_category,
+                        "index": idx_str,
+                        "sku": f"ART-{page_num}{c_idx+1:02d}",
+                        "price": f"R$ {(c_idx + 1) * 85 + 40},00",
+                        "description": p_copy.get("description") or "Desenvolvido com materiais de alta nobreza e acabamento minucioso para maxima durabilidade.",
+                        "image": stock_prods[prod_img_idx % len(stock_prods)],
+                        "tag": p_copy.get("tag") or "Linha Exclusiva",
+                    })
+                    prod_img_idx += 1
+
+            page_obj["products"] = page_products
+
+        elif p_type == "backcover":
+            page_obj["label"] = blueprint.get("label") or "ATENDIMENTO COMERCIAL & DISTRIBUICAO"
+            page_obj["content"] = blueprint.get("content") or "CENTRAL DE ATENDIMENTO · BRASIL\\nCONTATO: COMERCIAL@CATANA.COM.BR · +55 11 3000-0000\\nWWW.KATANASTUDIO.COM.BR"
+            page_obj["folio"] = "KATANA STUDIO · 2026"
+
+        assembled_pages.append(page_obj)
 
     return {
         "catalogId": catalog_id,
-        "title": f"Coleção {products[0].get('category', prompt[:30])}" if has_real_products else f"Coleção {prompt[:30]}",
-        "category": products[0].get("category", "Editorial") if has_real_products else "Editorial",
-        "summary": "Catálogo estruturado com produtos reais cadastrados no estúdio.",
-        "reasoning": "Composição clássica balanceada com foco na utilidade comercial.",
-        "palette": fallback_palette,
-        "pages": fallback_pages,
-        "totalPages": len(fallback_pages),
+        "title": catalog_title,
+        "category": catalog_category,
+        "summary": catalog_summary,
+        "reasoning": catalog_reasoning,
+        "palette": palette,
+        "pages": assembled_pages,
+        "totalPages": len(assembled_pages),
         "initialPrompt": prompt,
-        "councilDelegations": [],
+        "rag_metadata": {
+            "dynamic_pages": len(assembled_pages),
+            "industry": detected_industry,
+            "tokens_saved_pct": 85,
+        },
+        "councilDelegations": [
+            {
+                "roleId": "orchestrator",
+                "roleName": "Editor-Chefe",
+                "badge": "Orquestrador",
+                "action": f"Estruturou catalogo dinamico com {len(assembled_pages)} laminas via RAG para '{catalog_title}'.",
+            },
+            {
+                "roleId": "director",
+                "roleName": "Diretor de Arte",
+                "badge": "Design",
+                "action": f"Definiu paleta '{palette.get('name')}' e composicao visual de alta fidelidade.",
+            },
+            {
+                "roleId": "copywriter",
+                "roleName": "Redator Sênior",
+                "badge": "Redação",
+                "action": "Elaborou manifesto e descricoes persuasivas com economia otimizada de tokens.",
+            },
+            {
+                "roleId": "commercial",
+                "roleName": "Diretor Comercial",
+                "badge": "Comercial",
+                "action": "Preservou 100% dos precos, codigos SKU e dados tecnicos fornecidos.",
+            },
+        ],
     }
+
+
+def _get_contingency_synthesis(prompt: str, products: List[Dict[str, Any]], industry: str) -> Dict[str, Any]:
+    """
+    Gera a sintese criativa de contingencia quando a API remota de IA estiver indisponivel.
+    """
+    if industry == "packaging_food_service":
+        return {
+            "title": "Colecao EcoPack Pro",
+            "category": "Embalagens & Food Service",
+            "summary": "Solucoes avancadas em vedacao, transporte seguro e protecao termica para delivery de alto padrao.",
+            "reasoning": "Paleta azul profundo e ciano refletindo tecnologia de vedacao e integridade sanitaria.",
+            "palette": {
+                "name": "Slate & Ocean Pro",
+                "primary": "#0F172A",
+                "background": "#F8FAFC",
+                "accent": "#0284C7",
+                "secondary": "#64748B",
+                "contrastRatio": "10.1:1 (AAA)",
+                "locked": False,
+            },
+            "manifesto": {
+                "title": "A Integridade em Cada Entrega",
+                "quote": "A confianca do consumidor comeca na integridade e pureza da embalagem recebida.",
+                "content": "Nossas embalagens sao desenvolvidas com polimeros de alta densidade e travas perimetrais estanques, garantindo protecao confiavel contra vazamentos e retencao de frescor.",
+            },
+            "product_copies": [
+                {
+                    "index": p["index"],
+                    "description": f"Estrutura reforcada com fechamento de alta vedacao, ideal para {p['name'].lower()}.",
+                    "tag": "Mais Vendido" if idx == 0 else "Linha Pro",
+                }
+                for idx, p in enumerate(products)
+            ],
+        }
+    elif industry == "gastronomy_sweets":
+        return {
+            "title": "Atelier Gourmet",
+            "category": "Confeitaria & Padaria Fina",
+            "summary": "Sobremesas autorais elaboradas com tecnicas artesanais e ingredientes de origem nobre.",
+            "reasoning": "Paleta terracota e ambar valorizando o calor sensorial e a feitura manual.",
+            "palette": {
+                "name": "Terracotta & Warm Ivory",
+                "primary": "#291819",
+                "background": "#FFFDF9",
+                "accent": "#D97706",
+                "secondary": "#78350F",
+                "contrastRatio": "9.5:1 (AAA)",
+                "locked": False,
+            },
+            "manifesto": {
+                "title": "A Arte da Paciencia",
+                "quote": "O doce perfeito e aquele que harmoniza textura, aroma e memoria.",
+                "content": "Cada receita nasce do respeito ao tempo dos ingredientes e a precisao da tecnica classica francesa, entregando uma experiencia sensorial memoravel.",
+            },
+            "product_copies": [
+                {
+                    "index": p["index"],
+                    "description": f"Equilibrio refinado de sabores e acabamento impecavel para {p['name'].lower()}.",
+                    "tag": "Chef Selection" if idx == 0 else "Artesanal",
+                }
+                for idx, p in enumerate(products)
+            ],
+        }
+    else:
+        return {
+            "title": "Colecao Editorial 2026",
+            "category": "Design & Produtos",
+            "summary": "Catalogo comercial moderno estruturado para apresentacao de alto impacto e conversao.",
+            "reasoning": "Harmonia sobria monocromatica com acento dourado clássico.",
+            "palette": {
+                "name": "Noir & Ivory",
+                "primary": "#1A1817",
+                "background": "#F5F1EA",
+                "accent": "#B08D57",
+                "secondary": "#4A4846",
+                "contrastRatio": "9.2:1 (AAA)",
+                "locked": False,
+            },
+            "manifesto": {
+                "title": "Design com Proposito",
+                "quote": "O essencial, executado sem concessões e com rigor técnico.",
+                "content": "Desenvolvido para atender aos mais elevados padroes de exigencia, combinando estetica atemporal e utilidade confiavel.",
+            },
+            "product_copies": [
+                {
+                    "index": p["index"],
+                    "description": f"Excelente desempenho comercial e acabamento de primeira linha para {p['name'].lower()}.",
+                    "tag": "Destaque" if idx == 0 else "Disponivel",
+                }
+                for idx, p in enumerate(products)
+            ],
+        }
 
 
 

@@ -345,6 +345,66 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
         );
       }
 
+      case 'grid_4': {
+        const gridProducts = page.products || [];
+        return (
+          <div className="h-full flex flex-col justify-between py-8 px-8 select-none">
+            <div className="flex items-center justify-between mb-4 border-b pb-2 border-stone-200">
+              <span className="text-[10px] tracking-[0.3em] font-semibold uppercase" style={{ color: accent }}>
+                {page.label || 'MATRIZ COMERCIAL'}
+              </span>
+              <span className="text-[9px] font-mono text-stone-400">
+                {gridProducts.length} ITENS
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 flex-1 items-stretch">
+              {gridProducts.slice(0, 4).map((prod) => (
+                <div key={prod.id} className="flex flex-col justify-between p-2.5 rounded-sm border border-stone-200 bg-white/40">
+                  <div className="w-full h-28 bg-stone-100 overflow-hidden rounded-xs relative mb-2">
+                    <img
+                      src={prod.image}
+                      alt={prod.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {prod.tag && (
+                      <div className="absolute top-1.5 left-1.5 bg-[#1A1817] text-[#F5F1EA] text-[7px] font-mono tracking-wider px-1.5 py-0.2 uppercase">
+                        {prod.tag}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-baseline justify-between gap-1">
+                      <span className="text-[7px] font-mono text-stone-400">{prod.sku}</span>
+                      <span className="text-[10px] font-semibold text-[#1A1817] tabular-nums">
+                        {prod.price}
+                      </span>
+                    </div>
+                    <h4
+                      className="text-xs text-[#1A1817] font-medium truncate"
+                      style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                    >
+                      {prod.name}
+                    </h4>
+                    <p className="text-[9px] text-stone-600 line-clamp-1 font-light">
+                      {prod.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-col items-center mt-3">
+              <div className="w-6 h-[1px] mb-1.5" style={{ backgroundColor: accent }} />
+              <span className="text-[9px] tracking-[0.3em] text-[#1A1817]/70 font-mono">
+                {page.folio || `PAG. ${String(page.pageNumber).padStart(2, '0')}`}
+              </span>
+            </div>
+          </div>
+        );
+      }
+
       case 'backcover':
         return (
           <div className="h-full flex flex-col justify-between items-center text-center py-14 px-8 select-none">

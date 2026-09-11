@@ -28,6 +28,7 @@ export type PageLayoutType =
   | 'hero'
   | 'duo'
   | 'single'
+  | 'grid_4'
   | 'backcover';
 
 export interface CatalogPageData {

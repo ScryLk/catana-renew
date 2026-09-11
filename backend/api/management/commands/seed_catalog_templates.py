@@ -267,6 +267,156 @@ CANONICAL_TEMPLATES = [
             "content": "atendimento@catana.com.br | +55 11 3290-8800 | Sao Paulo, Brasil",
         },
     },
+    {
+        "slug": "cover-commercial-packaging",
+        "title": "Capa Comercial Embalagens & Food Service",
+        "category": "cover",
+        "industry": "packaging_food_service",
+        "style_preset": "commercial_bold",
+        "product_capacity": 0,
+        "description": "Capa comercial corporativa com tipografia sem serifa de alto impacto para distribuidores de embalagens, descartaveis e food service.",
+        "editorial_reasoning": (
+            "Impacto visual imediato e sobriedade tecnica. Transmite confianca, hermeticidade e pontualidade operacional."
+        ),
+        "blueprint_data": {
+            "type": "cover",
+            "backgroundColor": "#0F172A",
+            "textColor": "#F8FAFC",
+            "accentColor": "#38BDF8",
+            "title": "ECOPACK INDUSTRIAL",
+            "subtitle": "Solucoes Avancadas em Embalagens, Vedacao & Food Service",
+            "label": "LINHA PROFISSIONAL 2026",
+            "folio": "01",
+        },
+    },
+    {
+        "slug": "cover-gourmet-artisan",
+        "title": "Capa Gastronomica Gourmet & Confeitaria",
+        "category": "cover",
+        "industry": "gastronomy_sweets",
+        "style_preset": "terracotta_warm",
+        "product_capacity": 0,
+        "description": "Capa refinada para doces finos, confeitaria artesanal, padaria e cafe com paleta acolhedora e tipografia elegante.",
+        "editorial_reasoning": (
+            "Apelo sensorial e calor acolhedor. Conecta o leitor ao aroma e ao carater feito a mao da producao artesanal."
+        ),
+        "blueprint_data": {
+            "type": "cover",
+            "backgroundColor": "#291819",
+            "textColor": "#FFF7ED",
+            "accentColor": "#D97706",
+            "title": "ATELIER GOURMET",
+            "subtitle": "Patisserie & Sobremesas Artesanais",
+            "label": "CARDAPIO & ENCOMENDAS EXCLUSIVAS",
+            "folio": "01",
+        },
+    },
+    {
+        "slug": "cover-tech-modern",
+        "title": "Capa Tech & Hardware Minimalista",
+        "category": "cover",
+        "industry": "tech_hardware",
+        "style_preset": "tech_slate",
+        "product_capacity": 0,
+        "description": "Capa futurista e limpa para produtos de tecnologia, perifericos, hardware e automacao comercial.",
+        "editorial_reasoning": (
+            "Composicao precisa com linhas geometricas que comunicam performance, robustez e avanco tecnologico."
+        ),
+        "blueprint_data": {
+            "type": "cover",
+            "backgroundColor": "#090D16",
+            "textColor": "#F1F5F9",
+            "accentColor": "#6366F1",
+            "title": "TECHGEAR LAB",
+            "subtitle": "Equipamentos, Perifericos & Performance",
+            "label": "CATALOGO TECNICO 2026",
+            "folio": "01",
+        },
+    },
+    {
+        "slug": "manifesto-commercial-efficiency",
+        "title": "Manifesto Comercial de Eficiencia & Vedacao",
+        "category": "manifesto",
+        "industry": "packaging_food_service",
+        "style_preset": "commercial_bold",
+        "product_capacity": 0,
+        "description": "Manifesto objetivo destacando criterios de higiene, preservacao termica, praticidade e normas sanitarias.",
+        "editorial_reasoning": (
+            "Foco no valor operacional B2B. Assegura ao comprador a tranquilidade de uma entrega sem avarias."
+        ),
+        "blueprint_data": {
+            "type": "manifesto",
+            "backgroundColor": "#F8FAFC",
+            "textColor": "#0F172A",
+            "accentColor": "#0284C7",
+            "title": "Padrao Tecnico & Integridade",
+            "quote": "A confianca do seu cliente comeca na integridade da embalagem entregue a sua porta.",
+            "content": "Nossas linhas sao produzidas sob rigorosos controles de pureza e resistencia estrutural. Cada pote, tampa e copo foi dimensionado para fechamento hermetico confiavel, empilhamento seguro e valorizacao visual do produto final.",
+            "label": "MANIFESTO DE QUALIDADE",
+        },
+    },
+    {
+        "slug": "grid-4-packaging-matrix",
+        "title": "Grade Comercial Embalagens 2x2",
+        "category": "grid_4",
+        "industry": "packaging_food_service",
+        "style_preset": "commercial_bold",
+        "product_capacity": 4,
+        "description": "Matriz 2x2 com 4 produtos de embalagens com foco em volume, capacidade e aplicacoes praticas.",
+        "editorial_reasoning": (
+            "Alta legibilidade para compras corporativas com dados tecnicos e precificacao clara em lote ou unidade."
+        ),
+        "blueprint_data": {
+            "type": "grid_4",
+            "backgroundColor": "#F8FAFC",
+            "textColor": "#0F172A",
+            "accentColor": "#0284C7",
+            "title": "Linha Food Service & Delivery",
+            "label": "MATRIZ DE PRODUTOS",
+        },
+    },
+    {
+        "slug": "grid-4-gourmet-sweets",
+        "title": "Grade Gourmet Confeitaria 2x2",
+        "category": "grid_4",
+        "industry": "gastronomy_sweets",
+        "style_preset": "terracotta_warm",
+        "product_capacity": 4,
+        "description": "Matriz 2x2 com 4 sobremesas individuais, peso liquido, ingredientes nobres e valor unitario.",
+        "editorial_reasoning": (
+            "Exibicao apetecivel com espaco generoso para fotografia gastronômica e detalhes de confeitaria fina."
+        ),
+        "blueprint_data": {
+            "type": "grid_4",
+            "backgroundColor": "#FFFDF9",
+            "textColor": "#291819",
+            "accentColor": "#D97706",
+            "title": "Selecao de Potes & Doces Gourmet",
+            "label": "CARDAPIO DA ESTACAO",
+        },
+    },
+    {
+        "slug": "backcover-commercial-qr",
+        "title": "Contracapa Comercial & Pedidos Atacado",
+        "category": "backcover",
+        "industry": "packaging_food_service",
+        "style_preset": "commercial_bold",
+        "product_capacity": 0,
+        "description": "Contracapa comercial com tabela de contatos, departamento de vendas B2B e atendimento ao cliente.",
+        "editorial_reasoning": (
+            "Canalizacao rapida do fechamento comercial com instrucoes claras de televendas e representantes."
+        ),
+        "blueprint_data": {
+            "type": "backcover",
+            "backgroundColor": "#0F172A",
+            "textColor": "#F8FAFC",
+            "accentColor": "#38BDF8",
+            "title": "Central de Atendimento & Pedidos B2B",
+            "subtitle": "Consulte condicoes especiais para atacado, distribuicao e contratos programados.",
+            "label": "CANAL DIRETO COMERCIAL",
+            "content": "vendas@ecopack.com.br | +55 11 4004-9000 | televendas@ecopack.com.br\\nSao Paulo · Rio de Janeiro · Curitiba · Belo Horizonte",
+        },
+    },
 ]
 
 

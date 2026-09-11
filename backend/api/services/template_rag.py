@@ -240,3 +240,117 @@ class TemplateRAGService:
         if matches:
             return cls.format_template_for_prompt(matches[0])
         return None
+
+    @classmethod
+    def detect_industry(cls, prompt: str, products: Optional[List[Dict[str, Any]]] = None) -> str:
+        """
+        Detecta o segmento industrial/comercial a partir do prompt e dos produtos.
+        """
+        text_corpus = prompt.lower()
+        if products:
+            for p in products[:6]:
+                text_corpus += " " + (p.get("name", "") + " " + p.get("category", "") + " " + p.get("description", "")).lower()
+
+        if any(k in text_corpus for k in ["embalag", "descartav", "pote", "marmita", "food service", "vedacao", "vedação", "pet redondo", "sacola", "copo", "delivery"]):
+            return "packaging_food_service"
+        if any(k in text_corpus for k in ["doce", "confeit", "bolo", "patisserie", "sobremesa", "chocolate", "brigadeiro", "festa", "torta", "padaria", "cafe"]):
+            return "gastronomy_sweets"
+        if any(k in text_corpus for k in ["carne", "acougue", "açougue", "churrasco", "corte", "angus", "bovino", "costela", "frango"]):
+            return "butcher_meat"
+        if any(k in text_corpus for k in ["tech", "tecnolog", "hardware", "setup", "computad", "software", "periferic", "eletron"]):
+            return "tech_hardware"
+        if any(k in text_corpus for k in ["joia", "joalher", "luxo", "ouro", "prata", "couro", "bolsa", "moda", "lookbook", "alfaiat"]):
+            return "luxury_fashion"
+        if any(k in text_corpus for k in ["valvula", "industrial", "b2b", "tubo", "usinagem", "ferramenta", "maquina"]):
+            return "industrial_b2b"
+        return "general_retail"
+
+    @classmethod
+    def plan_dynamic_catalog_structure(
+        cls,
+        prompt: str,
+        products: Optional[List[Dict[str, Any]]] = None,
+        organization_id: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Calcula dinamicamente a estrutura de paginas do catalogo com base no volume
+        e natureza dos produtos, recuperando via RAG os templates mais aderentes.
+        """
+        industry = cls.detect_industry(prompt, products)
+        n_prods = len(products) if products else 0
+
+        # Define a sequencia dinamica de laminas (page_type, capacity)
+        page_specs = []
+
+        # 1. Capa sempre presente
+        page_specs.append({"type": "cover", "capacity": 0})
+
+        # 2. Abertura: Manifesto ou Divisor
+        page_specs.append({"type": "manifesto", "capacity": 0})
+
+        # 3. Laminas de produtos planejadas conforme volume real
+        if n_prods == 0:
+            # Sem produtos: estrutura conceitual equilibrada de 6 paginas
+            page_specs.append({"type": "hero", "capacity": 1})
+            page_specs.append({"type": "duo", "capacity": 2})
+            page_specs.append({"type": "single", "capacity": 1})
+        elif n_prods == 1:
+            page_specs.append({"type": "hero", "capacity": 1})
+        elif n_prods == 2:
+            page_specs.append({"type": "duo", "capacity": 2})
+        elif n_prods in [3, 4]:
+            page_specs.append({"type": "hero", "capacity": 1})
+            page_specs.append({"type": "duo", "capacity": 2})
+            if n_prods == 4:
+                page_specs.append({"type": "single", "capacity": 1})
+        elif n_prods in [5, 6]:
+            page_specs.append({"type": "grid_4", "capacity": 4})
+            page_specs.append({"type": "duo", "capacity": 2})
+        elif n_prods in [7, 8]:
+            page_specs.append({"type": "grid_4", "capacity": 4})
+            page_specs.append({"type": "grid_4", "capacity": 4})
+        else:
+            # n_prods >= 9
+            page_specs.append({"type": "grid_4", "capacity": 4})
+            page_specs.append({"type": "divider", "capacity": 0})
+            page_specs.append({"type": "grid_4", "capacity": 4})
+            if n_prods >= 10:
+                page_specs.append({"type": "duo", "capacity": 2})
+
+        # 4. Contracapa sempre presente
+        page_specs.append({"type": "backcover", "capacity": 0})
+
+        # Recupera os melhores blueprints via RAG para cada lamina planejada
+        planned_pages = []
+        prod_pointer = 0
+
+        for p_idx, spec in enumerate(page_specs):
+            p_type = spec["type"]
+            cap = spec["capacity"]
+
+            # Busca no RAG o template mais relevante para o tipo e industria
+            matches = cls.search_templates(
+                query=f"{prompt} {p_type} {industry}",
+                category=p_type,
+                industry=industry,
+                limit=1,
+                organization_id=organization_id,
+            )
+
+            matched_tpl = matches[0] if matches else None
+            assigned_prods = []
+            if cap > 0 and products:
+                assigned_prods = products[prod_pointer : prod_pointer + cap]
+                prod_pointer += len(assigned_prods)
+
+            planned_pages.append({
+                "pageNumber": p_idx + 1,
+                "type": p_type,
+                "capacity": cap,
+                "template_slug": matched_tpl.slug if matched_tpl else f"generic-{p_type}",
+                "template_title": matched_tpl.title if matched_tpl else f"Lamina {p_type.capitalize()}",
+                "blueprint_data": matched_tpl.blueprint_data if matched_tpl else {},
+                "assigned_products": assigned_prods,
+            })
+
+        return planned_pages
