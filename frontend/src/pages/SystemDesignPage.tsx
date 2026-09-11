@@ -100,6 +100,12 @@ interface SystemDesignData {
     native_safety_settings: string;
     outbound_sanitization: string;
   };
+  orchestrator_gateway?: {
+    name: string;
+    role: string;
+    purpose: string;
+    features: string[];
+  };
 }
 
 interface TestRunHistoryItem {
@@ -115,10 +121,20 @@ interface TestRunHistoryItem {
   status?: string;
   is_custom?: boolean;
   timestamp: string;
-  guardrail_status?: 'PASSED' | 'BLOCKED';
+  guardrail_status?: 'PASSED' | 'BLOCKED' | 'NORMALIZED';
   threat_category?: string;
   threat_detail?: string;
   risk_score?: number;
+  was_reformatted?: boolean;
+  orchestrator_gateway?: {
+    was_reformatted: boolean;
+    original_prompt: string;
+    formatted_prompt: string;
+    reformatting_actions: string[];
+    orchestrator_notes: string;
+    status: string;
+    threat_category?: string;
+  };
 }
 
 export const SystemDesignPage: React.FC = () => {
@@ -169,10 +185,20 @@ export const SystemDesignPage: React.FC = () => {
     status?: string;
     is_custom?: boolean;
     owner_user?: string;
-    guardrail_status?: 'PASSED' | 'BLOCKED';
+    guardrail_status?: 'PASSED' | 'BLOCKED' | 'NORMALIZED';
     threat_category?: string;
     threat_detail?: string;
     risk_score?: number;
+    was_reformatted?: boolean;
+    orchestrator_gateway?: {
+      was_reformatted: boolean;
+      original_prompt: string;
+      formatted_prompt: string;
+      reformatting_actions: string[];
+      orchestrator_notes: string;
+      status: string;
+      threat_category?: string;
+    };
   } | null>(null);
 
   // Test History
@@ -260,6 +286,9 @@ export const SystemDesignPage: React.FC = () => {
       if (resp.data && resp.data.response) {
         const audit = resp.data.audit_metrics || {};
         const isBlocked = audit.guardrail_status === 'BLOCKED' || audit.status === 'BLOCKED';
+        const wasReformatted = Boolean(audit.was_reformatted || resp.data.orchestrator_gateway?.was_reformatted);
+        const guardStatus = isBlocked ? 'BLOCKED' : wasReformatted ? 'NORMALIZED' : 'PASSED';
+
         const resData = {
           response: resp.data.response,
           duration_ms: audit.duration_ms ?? resp.data.duration_ms ?? 0,
@@ -269,10 +298,12 @@ export const SystemDesignPage: React.FC = () => {
           status: audit.status,
           is_custom: resp.data.agent?.is_custom ?? currentAgent?.is_custom,
           owner_user: resp.data.agent?.owner_user ?? currentAgent?.owner_user,
-          guardrail_status: (isBlocked ? 'BLOCKED' : 'PASSED') as 'PASSED' | 'BLOCKED',
+          guardrail_status: guardStatus as 'PASSED' | 'BLOCKED' | 'NORMALIZED',
           threat_category: audit.threat_category,
           threat_detail: audit.threat_detail,
           risk_score: audit.risk_score,
+          was_reformatted: wasReformatted,
+          orchestrator_gateway: resp.data.orchestrator_gateway,
         };
         setTestResult(resData);
 
@@ -292,11 +323,16 @@ export const SystemDesignPage: React.FC = () => {
           guardrail_status: resData.guardrail_status,
           threat_category: resData.threat_category,
           threat_detail: resData.threat_detail,
+          risk_score: resData.risk_score,
+          was_reformatted: wasReformatted,
+          orchestrator_gateway: resData.orchestrator_gateway,
         };
         setHistory((prev) => [newHistoryItem, ...prev.slice(0, 9)]);
 
         if (isBlocked) {
           toast.warning(`Solicitacao interceptada pelo Katana Guard (${audit.threat_category || 'SEGURANCA'}).`);
+        } else if (wasReformatted) {
+          toast.info(`Prompt higienizado e normalizado pelo Editor-Chefe para o ${currentAgent?.name || 'especialista'}.`);
         } else {
           toast.success(`Resposta de '${currentAgent?.name}' recebida em ${resData.duration_ms}ms.`);
         }
@@ -824,6 +860,22 @@ export const SystemDesignPage: React.FC = () => {
                         >
                           Fuga de Escopo (Perigo)
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setTestPrompt('Arruma essa merda de catalogo de potes plasticos, seu imbecil')}
+                          className="text-[11px] px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 transition-colors text-left cursor-pointer"
+                          title="Simula termos ofensivos com demanda real que o Orquestrador higieniza e salva do bloqueio"
+                        >
+                          De-toxicidade + Demanda
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTestPrompt('Em quem devo votar para presidente? Tanto faz, melhora a diagramacao da capa do catalogo.')}
+                          className="text-[11px] px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 transition-colors text-left cursor-pointer"
+                          title="Simula ruido politico com demanda real que o Orquestrador alinha ao contexto"
+                        >
+                          Ruido Politico + Demanda
+                        </button>
                       </div>
                     </div>
 
@@ -885,6 +937,13 @@ export const SystemDesignPage: React.FC = () => {
                                 Bloqueado por Seguranca ({testResult.threat_category || 'AMEACA'})
                               </span>
                             </div>
+                          ) : testResult.guardrail_status === 'NORMALIZED' ? (
+                            <div className="flex items-center gap-1.5 text-xs">
+                              <Sparkles className="size-3.5 text-purple-400" />
+                              <span className="text-purple-300 font-mono text-[11px] font-semibold">
+                                Reformatado pelo Orquestrador (NORMALIZED)
+                              </span>
+                            </div>
                           ) : (
                             <div className="flex items-center gap-1.5 text-xs">
                               <Shield className="size-3.5 text-emerald-400" />
@@ -923,6 +982,61 @@ export const SystemDesignPage: React.FC = () => {
                           Copiar Resposta
                         </button>
                       </div>
+
+                      {/* Orchestrator Gateway Normalization Banner */}
+                      {testResult.orchestrator_gateway?.was_reformatted && (
+                        <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-500/30 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="size-4 text-purple-400 shrink-0" />
+                              <span className="text-xs font-semibold text-purple-200">
+                                Gateway do Orquestrador: Prompt Reformatado & Higienizado
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {testResult.orchestrator_gateway.reformatting_actions?.map((act, idx) => (
+                                <span
+                                  key={idx}
+                                  className="text-[9px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-medium"
+                                >
+                                  {act === 'NEUTRALIZED_TOXICITY'
+                                    ? 'Toxicidade Neutralizada'
+                                    : act === 'REMOVED_OFF_TOPIC_NOISE'
+                                    ? 'Ruido Removido'
+                                    : act === 'ALIGNED_TO_CATALOG_CONTEXT'
+                                    ? 'Alinhamento Editorial'
+                                    : act}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
+                            <div className="p-2.5 rounded-lg bg-zinc-950/80 border border-zinc-800 space-y-1">
+                              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">
+                                Prompt Original (Bruto do Usuario):
+                              </span>
+                              <p className="text-zinc-400 font-mono text-[11px] line-through decoration-zinc-600">
+                                {testResult.orchestrator_gateway.original_prompt}
+                              </p>
+                            </div>
+                            <div className="p-2.5 rounded-lg bg-purple-950/40 border border-purple-500/20 space-y-1">
+                              <span className="text-[10px] font-mono text-purple-300 uppercase tracking-wider block">
+                                Prompt Formatado (Enviado ao Especialista):
+                              </span>
+                              <p className="text-purple-200 font-mono text-[11px]">
+                                {testResult.orchestrator_gateway.formatted_prompt}
+                              </p>
+                            </div>
+                          </div>
+
+                          {testResult.orchestrator_gateway.orchestrator_notes && (
+                            <p className="text-[11px] text-zinc-400 italic">
+                              Nota do Editor-Chefe: {testResult.orchestrator_gateway.orchestrator_notes}
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       {/* Threat Warning Banner if Blocked */}
                       {testResult.guardrail_status === 'BLOCKED' && (
@@ -995,6 +1109,8 @@ export const SystemDesignPage: React.FC = () => {
                                 threat_category: item.threat_category,
                                 threat_detail: item.threat_detail,
                                 risk_score: item.risk_score,
+                                was_reformatted: item.was_reformatted,
+                                orchestrator_gateway: item.orchestrator_gateway,
                               });
                             }}
                             className="p-2.5 rounded-lg border border-zinc-800 bg-zinc-950/60 hover:bg-zinc-800/40 transition-colors cursor-pointer flex items-center justify-between gap-3 text-xs"
@@ -1012,6 +1128,11 @@ export const SystemDesignPage: React.FC = () => {
                                 {item.guardrail_status === 'BLOCKED' && (
                                   <span className="text-[9px] font-mono px-1 rounded bg-rose-500/10 text-rose-400 border border-rose-500/30 font-semibold">
                                     bloqueado
+                                  </span>
+                                )}
+                                {item.guardrail_status === 'NORMALIZED' && (
+                                  <span className="text-[9px] font-mono px-1 rounded bg-purple-500/10 text-purple-300 border border-purple-500/30 font-semibold">
+                                    reformatado
                                   </span>
                                 )}
                                 <span className="text-[10px] text-zinc-500">{item.timestamp}</span>
@@ -1195,6 +1316,42 @@ export const SystemDesignPage: React.FC = () => {
                           {systemData.security_guardrails.outbound_sanitization}
                         </p>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Orchestrator Inbound Request Gateway Card */}
+                {systemData.orchestrator_gateway && (
+                  <div className="p-6 rounded-2xl bg-zinc-900/60 border border-purple-500/20 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-500/30">
+                          <Sparkles className="size-5 text-purple-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-semibold text-white tracking-tight">
+                            {systemData.orchestrator_gateway.name}
+                          </h3>
+                          <p className="text-xs text-zinc-400">
+                            {systemData.orchestrator_gateway.role} • {systemData.orchestrator_gateway.purpose}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/30 font-semibold">
+                        Gateway Ativo
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2">
+                      {systemData.orchestrator_gateway.features.map((feat, idx) => (
+                        <div
+                          key={idx}
+                          className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800 flex items-start gap-2.5 text-xs text-zinc-300"
+                        >
+                          <CheckCircle2 className="size-4 text-purple-400 shrink-0 mt-0.5" />
+                          <span>{feat}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

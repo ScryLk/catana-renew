@@ -455,8 +455,21 @@ class StudioChatStreamView(APIView):
             metadata = {}
 
             try:
+                # Gateway do Orquestrador (Editor-Chefe): Inspecao e Normalizacao de Prompt
+                from api.ai.agents.orchestrator import OrchestratorAgent
+                orchestrator_agent = get_agent("orchestrator")
+                clean_message = message
+                if isinstance(orchestrator_agent, OrchestratorAgent):
+                    gw_res = orchestrator_agent.format_and_guard_request(message, target_role=agent.role)
+                    if not gw_res.get("is_safe") or gw_res.get("status") == "BLOCKED":
+                        refusal = gw_res.get("refusal_response") or "Solicitacao bloqueada pelo Katana Guard."
+                        yield f"data: {json.dumps({'event': 'token', 'text': refusal})}\n\n"
+                        yield f"data: {json.dumps({'event': 'done', 'usage': final_usage, 'metadata': {'guardrail': 'BLOCKED'}})}\n\n"
+                        return
+                    clean_message = gw_res.get("formatted_prompt", message)
+
                 stream_generator = agent.process_stream(
-                    user_message=message,
+                    user_message=clean_message,
                     catalog_context=catalog_context,
                     attachments=attachments_info,
                     history=history,

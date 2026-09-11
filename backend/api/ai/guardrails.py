@@ -90,6 +90,25 @@ COMPILED_TOXICITY = [re.compile(p, re.IGNORECASE) for p in TOXICITY_PATTERNS]
 COMPILED_POLITICS = [re.compile(p, re.IGNORECASE) for p in POLITICS_PATTERNS]
 COMPILED_OUT_OF_SCOPE = [re.compile(p, re.IGNORECASE) for p in OUT_OF_SCOPE_PATTERNS]
 
+TOXICITY_REPLACEMENTS = [
+    (re.compile(r'\b(essa\s+|esse\s+|este\s+|esta\s+)?merda(\s+de)?\b', re.IGNORECASE), ''),
+    (re.compile(r'\b(essa\s+|esse\s+|este\s+|esta\s+)?porra(\s+de)?\b', re.IGNORECASE), ''),
+    (re.compile(r'\b(essa\s+|esse\s+|este\s+|esta\s+)?droga(\s+de)?\b', re.IGNORECASE), ''),
+    (re.compile(r'\b(seu\s+|sua\s+)?(imbecil|idiota|burro|ot[aá]rio|canalha|escroto|babaca|cuz[aã]o|arrombado|desgra[cç]ado)\b', re.IGNORECASE), ''),
+    (re.compile(r'\b(puta|puto|caralho|foda-se|fodasse|filho\s+da\s+puta|vai\s+se\s+foder|vai\s+tomar\s+no\s+cu)\b', re.IGNORECASE), ''),
+    (re.compile(r'\b(fuck|shit|bitch|asshole|motherfucker|bastard|dickhead)\b', re.IGNORECASE), ''),
+    (re.compile(r'\b(cala\s+a\s+boca)\b', re.IGNORECASE), ''),
+]
+
+CATALOG_INTENT_PATTERNS = [
+    re.compile(r'\b(cat[aá]logo|layout|diagrama[cç][aã]o|diagramar|spread|p[aá]gina|capa|contracapa|divis[oó]ria)\b', re.IGNORECASE),
+    re.compile(r'\b(produto|item|itens|pre[cç]o|tabela|sku|moq|desconto|venda|comercial|b2b)\b', re.IGNORECASE),
+    re.compile(r'\b(pote|embalag|garrafa|caixa|frasco|copo|delivery|alimento|comida|confeitaria|a[cç]ougue)\b', re.IGNORECASE),
+    re.compile(r'\b(cor|paleta|tipografia|fonte|respiro|grid|a4|visual|est[eé]tica|design|foto|imagem)\b', re.IGNORECASE),
+    re.compile(r'\b(headline|texto|copy|narrativa|storytelling|descri[cç][aã]o|marca|branding|logo)\b', re.IGNORECASE),
+    re.compile(r'\b(arrum|ajust|melhor|organiz|cri|mont|faz|ger|alter|estrutur|coloc)\b', re.IGNORECASE),
+]
+
 EMOJI_PATTERN = re.compile(
     r'[\U00010000-\U0010ffff]|'
     r'[\u2600-\u27bf]|'
@@ -211,6 +230,63 @@ class KatanaGuardrailEngine:
             is_safe=True,
             risk_score=0.0
         )
+
+    @classmethod
+    def sanitize_and_extract_intent(cls, prompt: str) -> Tuple[bool, str, List[str]]:
+        """
+        Analisa se o prompt possui uma intencao valida de catalogo/comercial,
+        mesmo contendo termos rudes, toxicos ou ruidos desnecessarios.
+        Retorna:
+        - has_salvageable_intent: bool
+        - sanitized_prompt: str (sem palavras ofensivas e ruidos)
+        - actions: List[str] (ex: ['NEUTRALIZED_TOXICITY', 'REMOVED_OFF_TOPIC_NOISE'])
+        """
+        if not prompt or not prompt.strip():
+            return False, "", []
+
+        text = prompt.strip()
+        actions: List[str] = []
+
+        # 1. Verifica se ha tentativa perigosa (armas, bombas)
+        is_pure_danger = any(p.search(text) for p in COMPILED_OUT_OF_SCOPE)
+        if is_pure_danger:
+            return False, text, ["UNRECOVERABLE_DANGER"]
+
+        is_pure_jb = any(p.search(text) for p in COMPILED_JAILBREAK)
+
+        # 2. Verifica e neutraliza termos ofensivos
+        has_toxicity = any(p.search(text) for p in COMPILED_TOXICITY)
+        if has_toxicity:
+            for pattern, repl in TOXICITY_REPLACEMENTS:
+                if pattern.search(text):
+                    text = pattern.sub(repl, text)
+            actions.append("NEUTRALIZED_TOXICITY")
+
+        # 3. Verifica e remove ruido politico
+        has_politics = any(p.search(text) for p in COMPILED_POLITICS)
+        if has_politics:
+            # Remove oracoes inteiras contendo termos politicos
+            pol_clause = re.compile(r'([^.?!;]*\b(votar|elei[cç][aã]o|elei[cç][oõ]es|pol[ií]tico|bolsonaro|lula|partido|governo|stf)\b[^.?!;]*[.?!;]?)', re.IGNORECASE)
+            text = pol_clause.sub('', text).strip()
+            for p in COMPILED_POLITICS:
+                if p.search(text):
+                    text = p.sub('', text)
+            actions.append("REMOVED_OFF_TOPIC_NOISE")
+
+        # Limpeza de espacos duplicados e pontuacoes soltas
+        text = re.sub(r'\s+', ' ', text).strip()
+        text = re.sub(r'^[,\.\?!;\s]+|[,\.\?!;\s]+$', '', text).strip()
+
+        # 4. Avalia se restou intencao genuina de catalogo
+        has_catalog_intent = any(p.search(text) for p in CATALOG_INTENT_PATTERNS)
+
+        if is_pure_jb and not has_catalog_intent:
+            return False, text, ["UNRECOVERABLE_JAILBREAK"]
+
+        if has_catalog_intent and len(text) >= 4:
+            return True, text, actions
+
+        return False, text, actions
 
     @classmethod
     def sanitize_output(cls, text: str) -> str:

@@ -97,6 +97,17 @@ SYSTEM_DESIGN_SPEC = {
         ],
         "native_safety_settings": "Google Gemini BLOCK_LOW_AND_ABOVE para odio, assedio, sexualidade e conteudo perigoso.",
         "outbound_sanitization": "Remocao estrita de emojis, mascaramento de caminhos de servidor e protecao de chaves."
+    },
+    "orchestrator_gateway": {
+        "name": "Orchestrator Inbound Request Gateway",
+        "role": "Editor-Chefe / Agente Superior",
+        "purpose": "Intercepta requisicoes na frente dos especialistas, higieniza termos de baixo calao, remove ruidos e formata o briefing tecnico.",
+        "features": [
+            "De-toxicidade ativa com preservacao da intencao comercial",
+            "Remocao de ruidos politicos e conversacionais",
+            "Formatacao em diretrizes tecnicas executivas para o especialista competente",
+            "Bloqueio estrito de ataques deliberados e irrecuperaveis"
+        ]
     }
 }
 
@@ -418,10 +429,31 @@ class StudioAgentTestView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Inspecao do Katana Guardrail Engine (Prompt Protection)
-        from api.ai.guardrails import KatanaGuardrailEngine
-        guard_result = KatanaGuardrailEngine.inspect_prompt(user_prompt, agent_role=agent_role)
-        if not guard_result.is_safe:
+        # 1. Gateway do Orquestrador: Inspecao e Reformatacao Cognitiva
+        from api.ai.agents.orchestrator import OrchestratorAgent
+        orchestrator_obj = get_agent("orchestrator")
+        if isinstance(orchestrator_obj, OrchestratorAgent):
+            gw_result = orchestrator_obj.format_and_guard_request(user_prompt, target_role=agent_role, context=context)
+        else:
+            from api.ai.guardrails import KatanaGuardrailEngine
+            gr = KatanaGuardrailEngine.inspect_prompt(user_prompt, agent_role=agent_role)
+            gw_result = {
+                "is_safe": gr.is_safe,
+                "status": "PASSED" if gr.is_safe else "BLOCKED",
+                "original_prompt": user_prompt,
+                "formatted_prompt": user_prompt,
+                "was_reformatted": False,
+                "reformatting_actions": [],
+                "orchestrator_notes": "",
+                "target_role": agent_role,
+                "refusal_response": gr.refusal_response,
+                "threat_category": gr.threat_category,
+                "threat_detail": gr.threat_detail,
+                "risk_score": gr.risk_score,
+            }
+
+        # Se for ameaca irrecuperavel (jailbreak puro, armas, etc.), bloqueia
+        if not gw_result.get("is_safe") or gw_result.get("status") == "BLOCKED":
             return Response({
                 "agent": {
                     "role": agent_role,
@@ -434,7 +466,15 @@ class StudioAgentTestView(APIView):
                 },
                 "system_prompt_used": "[RESTRITO: Diretiva de Seguranca do Katana Guard]",
                 "user_prompt_sent": user_prompt,
-                "response": guard_result.refusal_response,
+                "response": gw_result.get("refusal_response") or "Solicitacao bloqueada pelo Katana Guard.",
+                "orchestrator_gateway": {
+                    "was_reformatted": False,
+                    "original_prompt": user_prompt,
+                    "formatted_prompt": user_prompt,
+                    "reformatting_actions": gw_result.get("reformatting_actions", []),
+                    "orchestrator_notes": gw_result.get("orchestrator_notes", "Bloqueado por violacao de seguranca."),
+                    "status": "BLOCKED",
+                },
                 "audit_metrics": {
                     "model": "katana-guard-engine",
                     "duration_ms": 1,
@@ -445,12 +485,13 @@ class StudioAgentTestView(APIView):
                     "zero_emojis_compliant": True,
                     "status": "BLOCKED",
                     "guardrail_status": "BLOCKED",
-                    "threat_category": guard_result.threat_category,
-                    "threat_detail": guard_result.threat_detail,
-                    "risk_score": guard_result.risk_score,
+                    "threat_category": gw_result.get("threat_category"),
+                    "threat_detail": gw_result.get("threat_detail"),
+                    "risk_score": gw_result.get("risk_score", 1.0),
                 }
             }, status=status.HTTP_200_OK)
 
+        effective_user_prompt = gw_result.get("formatted_prompt", user_prompt)
         is_custom = False
         custom_contingency = ""
 
@@ -460,7 +501,7 @@ class StudioAgentTestView(APIView):
             profile["is_custom"] = False
             profile["owner_user"] = "system"
             system_prompt = agent_obj.get_system_prompt(context)
-            final_user_prompt = agent_obj.build_user_prompt(user_prompt, catalog_context=context)
+            final_user_prompt = agent_obj.build_user_prompt(effective_user_prompt, catalog_context=context)
         else:
             # Busca agente personalizado do usuario
             ca_qs = UserCustomAgent.objects.filter(role=agent_role)
@@ -500,12 +541,12 @@ class StudioAgentTestView(APIView):
                     f"[DEPARTAMENTO: {ca_match.department}]\n"
                     f"[MISSAO: {ca_match.mission}]\n"
                     f"[CONTEXTO CATALOGO: {context_str}]\n\n"
-                    f"SOLICITACAO DO USUARIO:\n{user_prompt}\n\n"
+                    f"SOLICITACAO DO USUARIO:\n{effective_user_prompt}\n\n"
                     "Responda estritamente sob a perspectiva do seu cargo e especialidade, fornecendo recomendacoes praticas e tecnicas. Nao use emojis."
                 )
                 custom_contingency = (
                     f"Como {profile['name']} ({profile['title']}) do departamento de {profile['department']}, "
-                    f"analisei a solicitacao '{user_prompt[:80]}'. "
+                    f"analisei a solicitacao '{effective_user_prompt[:80]}'. "
                     f"Em consonancia com a missao de {profile['mission']}, "
                     f"estabeleco as diretrizes tecnicas cabiveis ao escopo de {profile.get('decision_scope', 'especialidade')} "
                     f"com absoluto rigor aos padroes editoriais do Katana Studio."
@@ -516,7 +557,7 @@ class StudioAgentTestView(APIView):
                 profile["is_custom"] = False
                 profile["owner_user"] = "system"
                 system_prompt = agent_obj.get_system_prompt(context)
-                final_user_prompt = agent_obj.build_user_prompt(user_prompt, catalog_context=context)
+                final_user_prompt = agent_obj.build_user_prompt(effective_user_prompt, catalog_context=context)
 
         provider = get_ai_provider()
         start_time = time.time()
@@ -550,16 +591,16 @@ class StudioAgentTestView(APIView):
                         "eliminando clichês e construindo apelo de alto valor comercial e impacto visual."
                     ),
                     "commercial": (
-                        "Como Estrategista Comercial, analiso a viabilidade de precificação em Reais (R$), estrutura de atacado e varejo "
-                        "e agrupamento por categorias complementares. A hierarquia comercial destaca as condições de fornecimento B2B, margem e giro rápido."
+                        "Como Estrategista Comercial do Katana Studio, organizo a grade com estrutura de precificação por volume, quantidades mínimas (MOQ) "
+                        "e condições especiais para compras no atacado B2B. Cada item recebe especificação clara de margem, código SKU e política de faturamento."
                     ),
                     "branding": (
-                        "Como Auditor de Branding e Acessibilidade, valido a conformidade estrita com o padrão WCAG AAA (contraste mínimo de 7:1) "
-                        "e consistência da paleta de cores. Asseguro integridade estética editorial e conformidade absoluta com a regra de Zero Emojis."
+                        "Como Auditor de Branding e Diretrizes Visuais, asseguro conformidade estética rigorosa, aplicação precisa do logotipo com área "
+                        "de respiro inviolável, paleta cromática contrastada e tipografia padronizada que preservam a autoridade visual da marca."
                     ),
                     "orchestrator": (
-                        "Como Orquestrador do Katana Studio, coordeno o fluxo de execução entre os 6 estágios do pipeline, "
-                        "despachando as tarefas da ingestão de dados até a síntese final de homologação do conselho."
+                        "Como Editor-Chefe, orquestro a visão integrada desta edição: definindo o fluxo narrativo entre capa, manifesto conceitual, "
+                        "lâminas heroicas e tabelas de fechamento comercial, delegando a cada especialista sua atuação máxima."
                     ),
                     "council": (
                         "O Conselho Editorial Deliberativo emite parecer homologatório favorável. A integração entre direção de arte, "
@@ -568,23 +609,34 @@ class StudioAgentTestView(APIView):
                 }
                 response_text = contingency_responses.get(
                     agent_role,
-                    custom_contingency if is_custom else f"Parecer executivo do cargo '{profile['name']}' ({profile['title']}): homologado com base nas diretrizes do Katana Studio."
+                    custom_contingency or "Análise técnica realizada com base nas diretrizes editoriais do Catana Studio."
                 )
         else:
-            response_text = custom_contingency if is_custom else f"[Modo de Contingencia Local]: Agente '{profile['name']}' ({profile['title']}) homologado com base nas diretrizes do Katana Studio."
+            response_text = (
+                f"Parecer técnico formulado para a função {profile['name']}: "
+                f"demanda atendida com estrito cumprimento das diretrizes de {profile['department']}."
+            )
 
-        # Sanitizacao final do Katana Guardrail Engine
+        # Sanitizacao Katana Guard na saida
+        from api.ai.guardrails import KatanaGuardrailEngine
         response_text = KatanaGuardrailEngine.sanitize_output(response_text)
-        duration_ms = int((time.time() - start_time) * 1000)
 
-        # Analise de fidelidade ao cargo
-        resp_lower = response_text.lower()
+        duration_ms = max(1, int((time.time() - start_time) * 1000))
+
+        # Analise de fidelidade ao papel
         expected_keywords = profile.get("evaluation_keywords", [])
-        matched_keywords = [kw for kw in expected_keywords if kw in resp_lower]
+        matched_keywords = []
+        resp_lower = response_text.lower()
+        for kw in expected_keywords:
+            if kw.lower() in resp_lower:
+                matched_keywords.append(kw)
+
         fidelity_percentage = round((len(matched_keywords) / max(1, len(expected_keywords))) * 100, 1)
 
         has_json_patch = "```json:patch" in response_text
         has_emojis = any(ord(char) > 0x10000 for char in response_text)
+
+        was_reformatted = gw_result.get("was_reformatted", False)
 
         return Response({
             "agent": {
@@ -598,8 +650,18 @@ class StudioAgentTestView(APIView):
                 "owner_user": profile.get("owner_user", "system"),
             },
             "system_prompt_used": system_prompt,
-            "user_prompt_sent": final_user_prompt,
+            "user_prompt_sent": user_prompt,
+            "formatted_prompt_sent": effective_user_prompt,
             "response": response_text,
+            "orchestrator_gateway": {
+                "was_reformatted": was_reformatted,
+                "original_prompt": user_prompt,
+                "formatted_prompt": effective_user_prompt,
+                "reformatting_actions": gw_result.get("reformatting_actions", []),
+                "orchestrator_notes": gw_result.get("orchestrator_notes", ""),
+                "status": gw_result.get("status", "PASSED"),
+                "threat_category": gw_result.get("threat_category"),
+            },
             "audit_metrics": {
                 "model": model_name,
                 "duration_ms": duration_ms,
@@ -609,9 +671,10 @@ class StudioAgentTestView(APIView):
                 "has_json_patch": has_json_patch,
                 "zero_emojis_compliant": not has_emojis,
                 "status": "APPROVED" if fidelity_percentage >= 25 else "NEEDS_REVIEW",
-                "guardrail_status": "PASSED",
-                "threat_category": None,
-                "threat_detail": None,
+                "guardrail_status": "NORMALIZED" if was_reformatted else "PASSED",
+                "was_reformatted": was_reformatted,
+                "threat_category": gw_result.get("threat_category"),
+                "threat_detail": gw_result.get("threat_detail"),
                 "risk_score": 0.0,
             }
         }, status=status.HTTP_200_OK)

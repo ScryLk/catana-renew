@@ -400,6 +400,70 @@ def run_verification():
         "duration_ms": dur_ms
     })
 
+    # -------------------------------------------------------------
+    # TESTE 15: Orquestrador - Reformatacao de Prompt & De-toxicidade
+    # -------------------------------------------------------------
+    t0 = time.time()
+    post_reformat = client.post(
+        '/api/v2/studio/system-design/test-agent/',
+        {
+            "agent_role": "director",
+            "prompt": "Arruma essa merda de catalogo de potes plasticos, seu imbecil"
+        },
+        format='json'
+    )
+    dur_ms = int((time.time() - t0) * 1000)
+    rf_gw = post_reformat.data.get("orchestrator_gateway", {})
+    rf_metrics = post_reformat.data.get("audit_metrics", {})
+    formatted_prompt = post_reformat.data.get("formatted_prompt_sent", "")
+    passed_15 = (
+        post_reformat.status_code == 200 and
+        rf_gw.get("was_reformatted") is True and
+        rf_metrics.get("guardrail_status") == "NORMALIZED" and
+        "merda" not in formatted_prompt.lower() and
+        "imbecil" not in formatted_prompt.lower()
+    )
+    results.append({
+        "module": "Orquestrador",
+        "feature": "Reformatacao & De-toxicidade",
+        "expected": "Prompt higienizado e normalizado sem bloqueio",
+        "obtained": f"Status: {rf_metrics.get('guardrail_status')} (Acoes: {len(rf_gw.get('reformatting_actions', []))})",
+        "passed": passed_15,
+        "duration_ms": dur_ms
+    })
+
+    # -------------------------------------------------------------
+    # TESTE 16: Orquestrador - Remocao de Ruido Politico & Alinhamento
+    # -------------------------------------------------------------
+    t0 = time.time()
+    post_pol_reformat = client.post(
+        '/api/v2/studio/system-design/test-agent/',
+        {
+            "agent_role": "director",
+            "prompt": "Em quem devo votar para presidente? Tanto faz, melhora a diagramacao da capa do catalogo."
+        },
+        format='json'
+    )
+    dur_ms = int((time.time() - t0) * 1000)
+    rf_pol_gw = post_pol_reformat.data.get("orchestrator_gateway", {})
+    rf_pol_metrics = post_pol_reformat.data.get("audit_metrics", {})
+    pol_formatted_prompt = post_pol_reformat.data.get("formatted_prompt_sent", "")
+    passed_16 = (
+        post_pol_reformat.status_code == 200 and
+        rf_pol_gw.get("was_reformatted") is True and
+        rf_pol_metrics.get("guardrail_status") == "NORMALIZED" and
+        "votar" not in pol_formatted_prompt.lower() and
+        "presidente" not in pol_formatted_prompt.lower()
+    )
+    results.append({
+        "module": "Orquestrador",
+        "feature": "Alinhamento de Contexto",
+        "expected": "Ruido politico removido, foco no catalogo",
+        "obtained": f"Status: {rf_pol_metrics.get('guardrail_status')} (Acoes: {len(rf_pol_gw.get('reformatting_actions', []))})",
+        "passed": passed_16,
+        "duration_ms": dur_ms
+    })
+
     total_time = round(time.time() - total_start, 2)
 
     # -------------------------------------------------------------
