@@ -85,6 +85,18 @@ SYSTEM_DESIGN_SPEC = {
         "name": "JSON Delta Patch Protocol",
         "format": "```json:patch ... ```",
         "purpose": "Permite que qualquer agente proponha alteracoes pontuais cirurgicas no spread visivel sem corromper ou reescrever dados estaveis do catalogo."
+    },
+    "security_guardrails": {
+        "engine": "Katana Guardrail Engine v1.0",
+        "architecture": "Defense-in-Depth (4 Camadas de Protecao)",
+        "inbound_scanners": [
+            {"category": "JAILBREAK", "description": "Bloqueio de manipulacao de instrucoes, modo DAN, vazamento de prompt e comandos destrutivos."},
+            {"category": "TOXICITY", "description": "Filtro de ofensas, termos de baixo calao, assedio e linguagem hostil em PT-BR e EN."},
+            {"category": "POLITICS", "description": "Neutralidade institucional estrita contra debates partidarios, candidatos ou pautas eleitorais."},
+            {"category": "OUT_OF_SCOPE", "description": "Confinamento estrito ao dominio de catalogos, produtos, precificacao B2B e diagramacao."}
+        ],
+        "native_safety_settings": "Google Gemini BLOCK_LOW_AND_ABOVE para odio, assedio, sexualidade e conteudo perigoso.",
+        "outbound_sanitization": "Remocao estrita de emojis, mascaramento de caminhos de servidor e protecao de chaves."
     }
 }
 
@@ -406,6 +418,39 @@ class StudioAgentTestView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Inspecao do Katana Guardrail Engine (Prompt Protection)
+        from api.ai.guardrails import KatanaGuardrailEngine
+        guard_result = KatanaGuardrailEngine.inspect_prompt(user_prompt, agent_role=agent_role)
+        if not guard_result.is_safe:
+            return Response({
+                "agent": {
+                    "role": agent_role,
+                    "name": AGENT_PROFILES.get(agent_role, {}).get("name", agent_role),
+                    "title": AGENT_PROFILES.get(agent_role, {}).get("title", "Especialista"),
+                    "department": AGENT_PROFILES.get(agent_role, {}).get("department", "Editorial"),
+                    "mission": AGENT_PROFILES.get(agent_role, {}).get("mission", "Conformidade editorial"),
+                    "is_custom": False,
+                    "owner_user": "system",
+                },
+                "system_prompt_used": "[RESTRITO: Diretiva de Seguranca do Katana Guard]",
+                "user_prompt_sent": user_prompt,
+                "response": guard_result.refusal_response,
+                "audit_metrics": {
+                    "model": "katana-guard-engine",
+                    "duration_ms": 1,
+                    "fidelity_percentage": 100.0,
+                    "matched_keywords": [],
+                    "expected_keywords": [],
+                    "has_json_patch": False,
+                    "zero_emojis_compliant": True,
+                    "status": "BLOCKED",
+                    "guardrail_status": "BLOCKED",
+                    "threat_category": guard_result.threat_category,
+                    "threat_detail": guard_result.threat_detail,
+                    "risk_score": guard_result.risk_score,
+                }
+            }, status=status.HTTP_200_OK)
+
         is_custom = False
         custom_contingency = ""
 
@@ -528,6 +573,8 @@ class StudioAgentTestView(APIView):
         else:
             response_text = custom_contingency if is_custom else f"[Modo de Contingencia Local]: Agente '{profile['name']}' ({profile['title']}) homologado com base nas diretrizes do Katana Studio."
 
+        # Sanitizacao final do Katana Guardrail Engine
+        response_text = KatanaGuardrailEngine.sanitize_output(response_text)
         duration_ms = int((time.time() - start_time) * 1000)
 
         # Analise de fidelidade ao cargo
@@ -561,6 +608,10 @@ class StudioAgentTestView(APIView):
                 "expected_keywords": expected_keywords,
                 "has_json_patch": has_json_patch,
                 "zero_emojis_compliant": not has_emojis,
-                "status": "APPROVED" if fidelity_percentage >= 25 else "NEEDS_REVIEW"
+                "status": "APPROVED" if fidelity_percentage >= 25 else "NEEDS_REVIEW",
+                "guardrail_status": "PASSED",
+                "threat_category": None,
+                "threat_detail": None,
+                "risk_score": 0.0,
             }
         }, status=status.HTTP_200_OK)

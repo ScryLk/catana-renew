@@ -196,6 +196,33 @@ class GeminiAIProvider:
         Executa a chamada streaming. Se o cliente real estiver disponivel, consome do Gemini;
         caso contrario, entrega a resposta estruturada do MockGeminiProvider.
         """
+        # Verificacao de Seguranca e Protecao de Prompts (Katana Guard)
+        from api.ai.guardrails import KatanaGuardrailEngine
+        guard_result = KatanaGuardrailEngine.inspect_prompt(prompt, agent_role=agent_role)
+        if not guard_result.is_safe:
+            logger.warning(
+                f"[GeminiAIProvider] Prompt bloqueado por seguranca ({guard_result.threat_category}): "
+                f"{guard_result.threat_detail}"
+            )
+            refusal_text = guard_result.refusal_response or (
+                "Esta solicitacao viola as diretrizes de seguranca e conformidade do Katana Studio. "
+                "Por favor, formule uma demanda voltada ao catalogo de produtos."
+            )
+            yield AIResponseChunk(text=refusal_text, done=False)
+            yield AIResponseChunk(
+                text="",
+                done=True,
+                usage={"prompt_tokens": 10, "completion_tokens": len(refusal_text.split()), "total_tokens": 20},
+                metadata={
+                    "provider": "katana-guard",
+                    "guardrail_status": "BLOCKED",
+                    "threat_category": guard_result.threat_category,
+                    "threat_detail": guard_result.threat_detail,
+                    "risk_score": guard_result.risk_score,
+                }
+            )
+            return
+
         if self.is_mock:
             yield from self.mock_provider.generate_stream(
                 prompt=prompt,
@@ -243,9 +270,29 @@ class GeminiAIProvider:
                 )
             )
 
+            safety_settings = [
+                types.SafetySetting(
+                    category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                    threshold=types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+                ),
+                types.SafetySetting(
+                    category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                    threshold=types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+                ),
+                types.SafetySetting(
+                    category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                    threshold=types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+                ),
+                types.SafetySetting(
+                    category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                    threshold=types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+                ),
+            ]
+
             config = types.GenerateContentConfig(
                 system_instruction=system_instruction or "Voce e um assistente profissional do Catana Studio especializado na criacao e edicao de catalogos de produtos.",
                 temperature=0.7,
+                safety_settings=safety_settings,
             )
 
             response_stream = self.client.models.generate_content_stream(
@@ -259,7 +306,9 @@ class GeminiAIProvider:
 
             for chunk in response_stream:
                 if chunk.text:
-                    yield AIResponseChunk(text=chunk.text, done=False)
+                    clean_chunk = KatanaGuardrailEngine.sanitize_output(chunk.text)
+                    if clean_chunk:
+                        yield AIResponseChunk(text=clean_chunk, done=False)
                 
                 # Se metadados de tokens estiverem disponiveis no chunk
                 if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:

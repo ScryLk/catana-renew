@@ -2,6 +2,7 @@ import json
 from typing import Iterator, Dict, Any, Optional, List
 from api.ai.provider import get_ai_provider, AIResponseChunk
 from api.services.template_rag import TemplateRAGService
+from api.ai.guardrails import KatanaGuardrailEngine
 
 class BaseAgent:
     """
@@ -17,7 +18,7 @@ class BaseAgent:
         """
         Retorna o prompt de sistema personalizado para este agente.
         """
-        return (
+        base_prompt = (
             "Voce e um agente de inteligencia artificial especializado do Catana Studio 2.0. "
             "Seu foco e auxiliar na criacao, refinamento e producao de catalogos comerciais e editoriais de alto padrao.\n\n"
             "Diretrizes Gerais:\n"
@@ -37,6 +38,7 @@ class BaseAgent:
             "   ```\n"
             "4. Regra Estrita: Nao utilize nenhum emoji em suas respostas sob qualquer hipotese."
         )
+        return f"{base_prompt}{KatanaGuardrailEngine.UNIVERSAL_SYSTEM_GUARDRAIL_DIRECTIVE}"
 
     def build_user_prompt(
         self,
