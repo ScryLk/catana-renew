@@ -117,7 +117,7 @@ export const SystemDesignPage: React.FC = () => {
       const resp = await axios.get(`${API_BASE_URL}/api/v2/studio/system-design/`);
       if (resp.data) {
         setSystemData(resp.data.system_design);
-        setAgentsList(resp.data.registered_agents || []);
+        setAgentsList(resp.data.agents || resp.data.registered_agents || []);
       }
     } catch {
       toast.error('Nao foi possivel carregar as especificacoes de System Design.');
