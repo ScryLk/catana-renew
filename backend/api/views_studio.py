@@ -305,11 +305,11 @@ class StudioThreadMessagesView(APIView):
 def extract_patch_from_text(text: str) -> Optional[Dict[str, Any]]:
     """
     Extrai bloco estruturado de JSON Patch emitido pelo modelo.
-    Suporta formatacao ```json:patch ... ``` ou ```json ... ``` contendo a chave updates.
+    Suporta formatacao ```json:patch ... ``` ou ```json ... ``` contendo a chave 'actions' ou 'updates'.
     """
     if not text:
         return None
-    pattern = r"```(?:json:patch|json)?\s*(\{[\s\S]*?\"updates\"[\s\S]*?\})\s*```"
+    pattern = r"```(?:json:patch|json)?\s*(\{[\s\S]*?(?:\"updates\"|\"actions\")[\s\S]*?\})\s*```"
     match = re.search(pattern, text)
     if match:
         try:

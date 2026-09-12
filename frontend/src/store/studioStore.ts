@@ -397,8 +397,14 @@ export interface StudioState {
   // JSON Patch mutation
   applySpreadPatch: (patch: {
     spread_index?: number;
-    updates: Array<{ target: string; field: string; value: any }>;
+    updates?: Array<{ target: string; field: string; value: any }>;
+    actions?: Array<{
+      type: string;
+      [key: string]: any;
+    }>;
     summary?: string;
+    reasoning?: string;
+    delegations?: ChatDelegation[];
   }) => void;
 
   // Real Agent Streaming & Command Execution
@@ -1634,68 +1640,401 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
 
   applySpreadPatch: (patch) => {
-    if (!patch || !Array.isArray(patch.updates)) return;
+    if (!patch) return;
+    const hasUpdates = Array.isArray(patch.updates) && patch.updates.length > 0;
+    const hasActions = Array.isArray(patch.actions) && patch.actions.length > 0;
+    if (!hasUpdates && !hasActions && typeof patch.spread_index !== 'number') return;
 
     const state = get();
     state.pushHistorySnapshot();
 
     const [leftPageNum, rightPageNum] = state.currentSpread;
 
-    set((s) => {
-      let updatedPages = [...s.pages];
+    // 1. Processar Acoes Operacionais do Conselho Editorial
+    if (hasActions && patch.actions) {
+      for (const action of patch.actions) {
+        if (!action || !action.type) continue;
 
-      for (const update of patch.updates) {
-        const { target, field, value } = update;
+        switch (action.type) {
+          case 'remove_product': {
+            const targetPage = typeof action.page === 'number' ? action.page : undefined;
+            const prodId = action.product_id || action.productId;
+            const slotIdx = typeof action.slot_index === 'number' ? action.slot_index : undefined;
 
-        if (target === 'left_page' || target === 'left') {
-          updatedPages = updatedPages.map((p) =>
-            p.pageNumber === leftPageNum ? { ...p, [field]: value } : p
-          );
-        } else if (target === 'right_page' || target === 'right') {
-          updatedPages = updatedPages.map((p) =>
-            p.pageNumber === rightPageNum ? { ...p, [field]: value } : p
-          );
-        } else if (typeof target === 'string' && target.startsWith('page:')) {
-          const targetPageNum = parseInt(target.replace('page:', ''), 10);
-          updatedPages = updatedPages.map((p) =>
-            p.pageNumber === targetPageNum ? { ...p, [field]: value } : p
-          );
-        } else {
-          // target e um produto ou elemento especifico
-          updatedPages = updatedPages.map((page) => {
-            if (!page.products) return page;
-            const hasProduct = page.products.some((prod) => prod.id === target);
-            if (!hasProduct) return page;
+            if (prodId) {
+              const currentPages = get().pages;
+              const containingPage = targetPage
+                ? currentPages.find((p) => p.pageNumber === targetPage)
+                : currentPages.find((p) => p.products?.some((pr) => pr.id === prodId));
+              const pageNum = containingPage ? containingPage.pageNumber : leftPageNum;
+              get().removeProductFromSpread(pageNum, slotIdx, prodId);
+            } else if (typeof targetPage === 'number') {
+              get().removeProductFromSpread(targetPage, slotIdx);
+            } else {
+              const [lNum, rNum] = get().currentSpread;
+              const curLeft = get().pages.find((p) => p.pageNumber === lNum);
+              const curRight = get().pages.find((p) => p.pageNumber === rNum);
+              if (curLeft?.products?.length) {
+                get().removeProductFromSpread(lNum, slotIdx);
+              } else if (curRight?.products?.length) {
+                get().removeProductFromSpread(rNum, slotIdx);
+              }
+            }
+            break;
+          }
 
-            return {
-              ...page,
-              products: page.products.map((prod) =>
-                prod.id === target ? { ...prod, [field]: value } : prod
-              ),
-            };
-          });
+          case 'assign_product': {
+            const prodId = action.product_id || action.productId;
+            const allProducts = [
+              ...get().unassignedProducts,
+              ...get().pages.flatMap((p) => p.products || []),
+            ];
+            const foundProd = allProducts.find(
+              (p) =>
+                p.id === prodId ||
+                (p.name && prodId && p.name.toLowerCase() === String(prodId).toLowerCase())
+            );
+            if (foundProd) {
+              const targetPage = typeof action.page === 'number' ? action.page : leftPageNum;
+              const slotIdx = typeof action.slot_index === 'number' ? action.slot_index : 0;
+              get().assignProductToSpread(foundProd, targetPage, slotIdx);
+            }
+            break;
+          }
+
+          case 'swap_product': {
+            const curId = action.current_product_id || action.currentProductId;
+            const newId = action.new_product_id || action.newProductId;
+            const allProds = [
+              ...get().unassignedProducts,
+              ...get().pages.flatMap((p) => p.products || []),
+            ];
+            const newProd = allProds.find(
+              (p) =>
+                p.id === newId ||
+                (p.name && newId && p.name.toLowerCase() === String(newId).toLowerCase())
+            );
+            if (newProd) {
+              let targetPage = typeof action.page === 'number' ? action.page : undefined;
+              let slotIdx = 0;
+              if (curId) {
+                const foundPage = get().pages.find((p) => p.products?.some((pr) => pr.id === curId));
+                if (foundPage) {
+                  targetPage = foundPage.pageNumber;
+                  const curIdx = foundPage.products?.findIndex((pr) => pr.id === curId) ?? 0;
+                  if (curIdx >= 0) slotIdx = curIdx;
+                }
+              }
+              const finalPage = targetPage || leftPageNum;
+              if (curId) {
+                get().removeProductFromSpread(finalPage, undefined, curId);
+              }
+              get().assignProductToSpread(newProd, finalPage, slotIdx);
+            }
+            break;
+          }
+
+          case 'create_product': {
+            const name = action.title || action.name || 'Novo Produto';
+            const created = get().addProductToRepository({
+              name,
+              sku: action.sku || `SKU-${Date.now().toString().slice(-4)}`,
+              price: action.price || 'R$ 0,00',
+              category: action.category || 'Coleção',
+              description: action.description || 'Item de alta precisão e acabamento manual.',
+              index: action.index || '01',
+              image:
+                action.image ||
+                'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000&auto=format&fit=crop',
+            });
+            if (typeof action.page === 'number') {
+              get().assignProductToSpread(created, action.page, action.slot_index ?? 0);
+            }
+            break;
+          }
+
+          case 'change_layout': {
+            const targetPage = typeof action.page === 'number' ? action.page : leftPageNum;
+            const rawLayout = String(action.layout || action.type || 'hero').toLowerCase();
+            let mappedType: CatalogPageData['type'] = 'hero';
+            if (rawLayout.includes('duo')) mappedType = 'duo';
+            else if (
+              rawLayout.includes('grid') ||
+              rawLayout.includes('grade') ||
+              rawLayout.includes('quad')
+            )
+              mappedType = 'grid_4';
+            else if (rawLayout.includes('single')) mappedType = 'single';
+            else if (rawLayout.includes('divis') || rawLayout.includes('divider'))
+              mappedType = 'divider';
+            else if (rawLayout.includes('manifesto')) mappedType = 'manifesto';
+            else if (rawLayout.includes('capa') || rawLayout.includes('cover'))
+              mappedType = 'cover';
+            else mappedType = 'hero';
+
+            get().updatePage(targetPage, { type: mappedType });
+            break;
+          }
+
+          case 'update_text': {
+            const targetPage = typeof action.page === 'number' ? action.page : leftPageNum;
+            const field = action.field || 'title';
+            const val = action.value;
+            if (field && val !== undefined) {
+              get().updatePage(targetPage, { [field]: val });
+            }
+            break;
+          }
+
+          case 'adjust_pricing': {
+            const mode =
+              action.mode ||
+              (action.percentage ? (action.percentage < 0 ? 'decrease' : 'increase') : 'set');
+            const pct = typeof action.percentage === 'number' ? action.percentage : 0;
+            const targetVal = typeof action.value === 'number' ? action.value : 0;
+            const targetPageNum = typeof action.page === 'number' ? action.page : undefined;
+
+            get().pushHistorySnapshot();
+            set((s) => {
+              const updateProdPrice = (prod: ProductItem) => {
+                const currentNumeric =
+                  parseFloat(prod.price.replace(/[^\d.,]/g, '').replace(',', '.')) || 100;
+                let newNumeric = currentNumeric;
+                if (mode === 'set' && targetVal > 0) {
+                  newNumeric = targetVal;
+                } else if (mode === 'decrease') {
+                  newNumeric = currentNumeric * (1 - Math.abs(pct) / 100);
+                } else {
+                  newNumeric = currentNumeric * (1 + Math.abs(pct) / 100);
+                }
+                const formatted = `R$ ${newNumeric.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}`;
+                return { ...prod, price: formatted };
+              };
+
+              const updatedPages = s.pages.map((p) => {
+                if (targetPageNum && p.pageNumber !== targetPageNum) return p;
+                if (!p.products || p.products.length === 0) return p;
+                return { ...p, products: p.products.map(updateProdPrice) };
+              });
+
+              const updatedUnassigned = targetPageNum
+                ? s.unassignedProducts
+                : s.unassignedProducts.map(updateProdPrice);
+
+              return {
+                pages: updatedPages,
+                unassignedProducts: updatedUnassigned,
+                saveStatus: 'unsaved',
+              };
+            });
+            break;
+          }
+
+          case 'generate_skus': {
+            const prefix = action.prefix || 'CAT';
+            let counter = typeof action.start_number === 'number' ? action.start_number : 100;
+            const targetPageNum = typeof action.page === 'number' ? action.page : undefined;
+
+            get().pushHistorySnapshot();
+            set((s) => {
+              const updatedPages = s.pages.map((p) => {
+                if (targetPageNum && p.pageNumber !== targetPageNum) return p;
+                if (!p.products) return p;
+                return {
+                  ...p,
+                  products: p.products.map((prod) => ({
+                    ...prod,
+                    sku: `${prefix}-${String(counter++).padStart(3, '0')}`,
+                  })),
+                };
+              });
+
+              let updatedUnassigned = s.unassignedProducts;
+              if (!targetPageNum) {
+                updatedUnassigned = s.unassignedProducts.map((prod) => ({
+                  ...prod,
+                  sku: `${prefix}-${String(counter++).padStart(3, '0')}`,
+                }));
+              }
+
+              return {
+                pages: updatedPages,
+                unassignedProducts: updatedUnassigned,
+                saveStatus: 'unsaved',
+              };
+            });
+            break;
+          }
+
+          case 'set_palette': {
+            const palId = (
+              action.palette_id ||
+              action.paletteId ||
+              action.name ||
+              ''
+            ).toLowerCase();
+            let chosen = STUDIO_PALETTE_PRESETS[0];
+            if (
+              palId.includes('argent') ||
+              palId.includes('prata') ||
+              palId.includes('silver') ||
+              palId.includes('atelier')
+            ) {
+              chosen = STUDIO_PALETTE_PRESETS[1];
+            } else if (
+              palId.includes('bronze') ||
+              palId.includes('charcoal') ||
+              palId.includes('acervo')
+            ) {
+              chosen = STUDIO_PALETTE_PRESETS[2];
+            } else if (
+              palId.includes('terracotta') ||
+              palId.includes('terracota') ||
+              palId.includes('sable') ||
+              palId.includes('edition')
+            ) {
+              chosen = STUDIO_PALETTE_PRESETS[3];
+            } else if (
+              palId.includes('slate') ||
+              palId.includes('minimaliste') ||
+              palId.includes('cinza') ||
+              palId.includes('light')
+            ) {
+              chosen = STUDIO_PALETTE_PRESETS[4];
+            } else if (
+              palId.includes('emerald') ||
+              palId.includes('esmeralda') ||
+              palId.includes('champagne')
+            ) {
+              chosen = STUDIO_PALETTE_PRESETS[5] || STUDIO_PALETTE_PRESETS[0];
+            } else if (
+              palId.includes('noir') ||
+              palId.includes('luxe') ||
+              palId.includes('gold') ||
+              palId.includes('ouro') ||
+              palId.includes('dark')
+            ) {
+              chosen = STUDIO_PALETTE_PRESETS[0];
+            }
+            get().setActivePalette({ ...chosen, locked: get().activePalette.locked }, true);
+            break;
+          }
+
+          case 'brand_lock': {
+            get().setPaletteLocked(action.locked !== false);
+            break;
+          }
+
+          case 'remove_background': {
+            const prodId = action.product_id || action.productId;
+            const targetPage = typeof action.page === 'number' ? action.page : leftPageNum;
+            if (prodId) {
+              get().removeProductBackground(targetPage, prodId);
+            }
+            break;
+          }
+
+          case 'generate_photo': {
+            const prodId = action.product_id || action.productId;
+            const allProds = [
+              ...get().unassignedProducts,
+              ...get().pages.flatMap((p) => p.products || []),
+            ];
+            const targetProd = allProds.find(
+              (p) =>
+                p.id === prodId ||
+                (p.name && prodId && p.name.toLowerCase().includes(prodId.toLowerCase()))
+            );
+            if (targetProd) {
+              get().generateAIProductImage(
+                targetProd.id,
+                targetProd.name,
+                targetProd.category || 'Editorial',
+                action.prompt ||
+                  'Fotografia de estudio profissional em alta resolucao com iluminacao suave'
+              );
+            }
+            break;
+          }
+
+          case 'navigate': {
+            if (typeof action.spread_index === 'number') {
+              get().goToSpread(action.spread_index);
+            } else if (typeof action.page === 'number') {
+              get().goToSpread(Math.floor((action.page - 1) / 2));
+            }
+            break;
+          }
+
+          default:
+            console.warn('[applySpreadPatch] Acao nao reconhecida:', action.type);
+            break;
         }
       }
+    }
 
-      // Devolve produtos removidos ao acervo
-      const currentProducts = s.pages.flatMap((p) => p.products || []);
-      const newProductIds = new Set(updatedPages.flatMap((p) => p.products || []).map((p) => p.id));
-      const removedProducts = currentProducts.filter((p) => !newProductIds.has(p.id));
+    // 2. Processar Updates de Campos Especificos (Legado & Direct Field Updates)
+    if (hasUpdates && patch.updates) {
+      set((s) => {
+        let updatedPages = [...s.pages];
 
-      const updatedUnassigned = [...s.unassignedProducts];
-      for (const item of removedProducts) {
-        if (!updatedUnassigned.some((p) => p.id === item.id)) {
-          updatedUnassigned.unshift({ ...item, tag: item.tag || 'Disponível' });
+        for (const update of patch.updates!) {
+          const { target, field, value } = update;
+
+          if (target === 'left_page' || target === 'left') {
+            updatedPages = updatedPages.map((p) =>
+              p.pageNumber === leftPageNum ? { ...p, [field]: value } : p
+            );
+          } else if (target === 'right_page' || target === 'right') {
+            updatedPages = updatedPages.map((p) =>
+              p.pageNumber === rightPageNum ? { ...p, [field]: value } : p
+            );
+          } else if (typeof target === 'string' && target.startsWith('page:')) {
+            const targetPageNum = parseInt(target.replace('page:', ''), 10);
+            updatedPages = updatedPages.map((p) =>
+              p.pageNumber === targetPageNum ? { ...p, [field]: value } : p
+            );
+          } else {
+            updatedPages = updatedPages.map((page) => {
+              if (!page.products) return page;
+              const hasProduct = page.products.some((prod) => prod.id === target);
+              if (!hasProduct) return page;
+
+              return {
+                ...page,
+                products: page.products.map((prod) =>
+                  prod.id === target ? { ...prod, [field]: value } : prod
+                ),
+              };
+            });
+          }
         }
-      }
 
-      return {
-        pages: updatedPages,
-        unassignedProducts: updatedUnassigned,
-        saveStatus: 'unsaved',
-      };
-    });
+        const currentProducts = s.pages.flatMap((p) => p.products || []);
+        const newProductIds = new Set(
+          updatedPages.flatMap((p) => p.products || []).map((p) => p.id)
+        );
+        const removedProducts = currentProducts.filter((p) => !newProductIds.has(p.id));
 
+        const updatedUnassigned = [...s.unassignedProducts];
+        for (const item of removedProducts) {
+          if (!updatedUnassigned.some((p) => p.id === item.id)) {
+            updatedUnassigned.unshift({ ...item, tag: item.tag || 'Disponível' });
+          }
+        }
+
+        return {
+          pages: updatedPages,
+          unassignedProducts: updatedUnassigned,
+          saveStatus: 'unsaved',
+        };
+      });
+    }
+
+    // 3. Navegacao por Indice de Lamina
     if (typeof patch.spread_index === 'number' && patch.spread_index >= 0) {
       get().goToSpread(patch.spread_index);
     }
@@ -1833,9 +2172,34 @@ export const useStudioStore = create<StudioState>((set, get) => ({
               }));
             }
 
+            const syncMessageMetadata = (patchObj: any) => {
+              if (!patchObj) return;
+              if (patchObj.delegations || patchObj.reasoning) {
+                set((s) => ({
+                  threads: s.threads.map((t) =>
+                    t.id === s.activeThreadId
+                      ? {
+                          ...t,
+                          messages: t.messages.map((m) =>
+                            m.id === assistantMsgId
+                              ? {
+                                  ...m,
+                                  reasoning: patchObj.reasoning || m.reasoning,
+                                  delegations: patchObj.delegations || m.delegations,
+                                }
+                              : m
+                          ),
+                        }
+                      : t
+                  ),
+                }));
+              }
+            };
+
             if (data.event === 'patch' && data.patch && !appliedPatch) {
               appliedPatch = data.patch;
               get().applySpreadPatch(data.patch);
+              syncMessageMetadata(data.patch);
               toast.success(data.patch.summary || 'Alteracoes aplicadas ao spread!');
             }
 
@@ -1843,6 +2207,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
               if (data.patch && !appliedPatch) {
                 appliedPatch = data.patch;
                 get().applySpreadPatch(data.patch);
+                syncMessageMetadata(data.patch);
                 toast.success(data.patch.summary || 'Alteracoes aplicadas ao spread!');
               }
             }
@@ -1854,11 +2219,32 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
       // Se nao veio evento de patch explicito mas o texto acumulado tem json:patch
       if (!appliedPatch && accumulatedContent.includes('json:patch')) {
-        const match = accumulatedContent.match(/```(?:json:patch|json)?\s*(\{[\s\S]*?"updates"[\s\S]*?\})\s*```/);
+        const match = accumulatedContent.match(/```(?:json:patch|json)?\s*(\{[\s\S]*?(?:"updates"|"actions")[\s\S]*?\})\s*```/);
         if (match) {
           try {
             const parsed = JSON.parse(match[1]);
+            appliedPatch = parsed;
             get().applySpreadPatch(parsed);
+            if (parsed.delegations || parsed.reasoning) {
+              set((s) => ({
+                threads: s.threads.map((t) =>
+                  t.id === s.activeThreadId
+                    ? {
+                        ...t,
+                        messages: t.messages.map((m) =>
+                          m.id === assistantMsgId
+                            ? {
+                                ...m,
+                                reasoning: parsed.reasoning || m.reasoning,
+                                delegations: parsed.delegations || m.delegations,
+                              }
+                            : m
+                        ),
+                      }
+                    : t
+                ),
+              }));
+            }
             toast.success(parsed.summary || 'Alteracoes aplicadas ao spread!');
           } catch {}
         }
@@ -2693,6 +3079,248 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         reasoning: 'Racional [Redator Publicitário]: Refinamento de texto com vocabulário alinhado ao posicionamento da coleção.',
       });
       return;
+    }
+
+    // ==========================================
+    // 5.1 INTENT: REAJUSTE DE PREÇOS EM MASSA / PERCENTUAL
+    // ==========================================
+    const pctPriceMatch = command.match(
+      /(?:reajuste|reajustar|aumente|aumentar|reduza|reduzir|eleve|elevar|suba|subir|desconto|abaixe|abaixar)\s+(?:os\s+)?pre[cç]os\s+(?:em\s+)?([+-]?\d+(?:[.,]\d+)?)\s*%/i
+    ) || command.match(/\/reajustar-precos\s*([+-]?\d+)?/i);
+
+    if (pctPriceMatch) {
+      const rawPct = pctPriceMatch[1] ? parseFloat(pctPriceMatch[1].replace(',', '.')) : 10;
+      const isReduction = lower.includes('reduz') || lower.includes('desconto') || lower.includes('abaix') || rawPct < 0;
+      const pct = Math.abs(rawPct);
+
+      state.applySpreadPatch({
+        actions: [
+          {
+            type: 'adjust_pricing',
+            percentage: isReduction ? -pct : pct,
+            mode: isReduction ? 'decrease' : 'increase',
+          },
+        ],
+        summary: `Preços reajustados em ${isReduction ? '-' : '+'}${pct}% em todo o catálogo.`,
+      });
+
+      set({ agentStatus: 'idle' });
+      state.addMessage({
+        role: 'assistant',
+        content: `Reajuste de **${isReduction ? '-' : '+'}${pct}%** aplicado com sucesso a todas as referências do catálogo e acervo comercial.`,
+        reasoning: isOrchestrator
+          ? 'Racional do Editor-Chefe [Rebalanceamento Financeiro B2B]: Markups e tabelas de atacado recalculados em consonância com as diretrizes comerciais e alinhamento numérico preservado.'
+          : `Racional [${currentRole.name}]: Tabela de preços atualizada com precisão centesimal sob as diretrizes do cargo.`,
+        delegations: isOrchestrator
+          ? [
+              {
+                roleId: 'commercial',
+                roleName: 'Tabela Comercial / B2B',
+                badge: 'Comercial',
+                action: `Recalculou a margem de atacado aplicando ${isReduction ? '-' : '+'}${pct}% em todos os SKUs cadastrados.`,
+              },
+              {
+                roleId: 'director',
+                roleName: 'Diretor de Arte',
+                badge: 'Design',
+                action: 'Garantiu a sustentação da tipografia numérica tabular e o respiro mínimo de 96px nos módulos de preço.',
+              },
+              {
+                roleId: 'branding',
+                roleName: 'Auditor de Branding',
+                badge: 'Auditoria',
+                action: 'Validou o contraste tipográfico dos novos valores sob as regras WCAG AA.',
+              },
+            ]
+          : undefined,
+      });
+      return;
+    }
+
+    // ==========================================
+    // 5.2 INTENT: GERAÇÃO SEQUENCIAL DE SKUS
+    // ==========================================
+    const skuGenMatch = command.match(
+      /(?:gere|gerar|crie|criar|padronize|padronizar|sequenciar|organize)\s+(?:os\s+)?skus?(?:\s+para\s+todos)?/i
+    ) || command.match(/\/gerar-skus/i);
+
+    if (skuGenMatch) {
+      state.applySpreadPatch({
+        actions: [
+          {
+            type: 'generate_skus',
+            prefix: 'CAT',
+            start_number: 101,
+          },
+        ],
+        summary: 'Códigos SKU sequenciais padronizados em todo o catálogo.',
+      });
+
+      set({ agentStatus: 'idle' });
+      state.addMessage({
+        role: 'assistant',
+        content: 'Todos os produtos do catálogo e acervo receberam códigos SKU padronizados sequencialmente (ex: `CAT-101`, `CAT-102`, `CAT-103`).',
+        reasoning: isOrchestrator
+          ? 'Racional do Editor-Chefe [Padronização Logística]: Normalização de catálogo B2B para integração com ERP e exportação de fichas técnicas.'
+          : `Racional [${currentRole.name}]: Nomenclatura SKU padronizada conforme as regras comerciais vigentes.`,
+        delegations: isOrchestrator
+          ? [
+              {
+                roleId: 'commercial',
+                roleName: 'Tabela Comercial / B2B',
+                badge: 'Comercial',
+                action: 'Gerou matriz de códigos SKU sequenciais com prefixo institucional CAT.',
+              },
+              {
+                roleId: 'branding',
+                roleName: 'Auditor de Branding',
+                badge: 'Auditoria',
+                action: 'Homologou o formato de identificação técnica nos fólios e legendas.',
+              },
+            ]
+          : undefined,
+      });
+      return;
+    }
+
+    // ==========================================
+    // 5.3 INTENT: GERAÇÃO DE FOTO DE ESTÚDIO COM IA
+    // ==========================================
+    const photoGenMatch = command.match(
+      /(?:gere|gerar|crie|criar)\s+foto(?:grafia)?\s+(?:com\s+ia\s+)?(?:para|do|da)?\s*(.+)/i
+    );
+
+    if (photoGenMatch && !lower.includes('layout') && !lower.includes('paleta') && !lower.includes('sku')) {
+      const prodQuery = photoGenMatch[1].trim();
+      const allProducts = [
+        ...state.unassignedProducts,
+        ...state.pages.flatMap((p) => p.products || []),
+      ];
+      const targetProd = allProducts.find(
+        (p) =>
+          p.name.toLowerCase().includes(prodQuery.toLowerCase()) ||
+          prodQuery.toLowerCase().includes(p.name.toLowerCase()) ||
+          (p.sku && p.sku.toLowerCase().includes(prodQuery.toLowerCase()))
+      ) || allProducts[0];
+
+      if (targetProd) {
+        state.generateAIProductImage(
+          targetProd.id,
+          targetProd.name,
+          targetProd.category || 'Editorial',
+          'Fotografia de estúdio profissional em alta resolução com iluminação suave sobre fundo neutro'
+        );
+
+        set({ agentStatus: 'idle' });
+        state.addMessage({
+          role: 'assistant',
+          content: `Iniciei a geração fotográfica com IA para o produto **"${targetProd.name}"**. Assim que concluída, a imagem de estúdio em alta resolução será atualizada na prancheta.`,
+          reasoning: isOrchestrator
+            ? `Racional do Editor-Chefe [Fotografia IA]: Síntese visual de estúdio disparada para "${targetProd.name}", mantendo o padrão fotográfico de alta joalheria.`
+            : `Racional [${currentRole.name}]: Disparo de geração visual em conformidade com o briefing do catálogo.`,
+          delegations: isOrchestrator
+            ? [
+                {
+                  roleId: 'director',
+                  roleName: 'Diretor de Arte',
+                  badge: 'Design',
+                  action: `Parametrizou o prompt fotográfico para iluminação zenital suave e textura fidedigna de "${targetProd.name}".`,
+                },
+                {
+                  roleId: 'branding',
+                  roleName: 'Auditor de Branding',
+                  badge: 'Auditoria',
+                  action: 'Supervisiona a conformidade de paleta e ausência de ruídos ou aberrações de renderização.',
+                },
+              ]
+            : undefined,
+        });
+        return;
+      }
+    }
+
+    // ==========================================
+    // 5.4 INTENT: REMOÇÃO DE FUNDO DE IMAGEM
+    // ==========================================
+    const bgRemovalMatch = command.match(
+      /(?:remova|remover|retire|retirar|isole|isolar|fundo\s+transparente)\s+(?:o\s+)?fundo\s+(?:da\s+imagem|da\s+foto|do\s+produto)?\s*(?:de|do|da)?\s*(.+)?/i
+    );
+
+    if (bgRemovalMatch) {
+      const prodQuery = (bgRemovalMatch[1] || '').trim();
+      const allProducts = [
+        ...state.unassignedProducts,
+        ...state.pages.flatMap((p) => p.products || []),
+      ];
+      let targetProd: ProductItem | undefined;
+      let targetPageNum: number | undefined;
+
+      if (prodQuery) {
+        for (const p of state.pages) {
+          const match = p.products?.find(
+            (pr) =>
+              pr.name.toLowerCase().includes(prodQuery.toLowerCase()) ||
+              prodQuery.toLowerCase().includes(pr.name.toLowerCase()) ||
+              (pr.sku && pr.sku.toLowerCase().includes(prodQuery.toLowerCase()))
+          );
+          if (match) {
+            targetProd = match;
+            targetPageNum = p.pageNumber;
+            break;
+          }
+        }
+        if (!targetProd) {
+          targetProd = state.unassignedProducts.find(
+            (pr) =>
+              pr.name.toLowerCase().includes(prodQuery.toLowerCase()) ||
+              prodQuery.toLowerCase().includes(pr.name.toLowerCase())
+          );
+        }
+      }
+
+      if (!targetProd) {
+        const [lNum, rNum] = state.currentSpread;
+        const curLeft = state.pages.find((p) => p.pageNumber === lNum);
+        const curRight = state.pages.find((p) => p.pageNumber === rNum);
+        if (curLeft?.products?.[0]) {
+          targetProd = curLeft.products[0];
+          targetPageNum = lNum;
+        } else if (curRight?.products?.[0]) {
+          targetProd = curRight.products[0];
+          targetPageNum = rNum;
+        } else {
+          targetProd = allProducts[0];
+        }
+      }
+
+      if (targetProd) {
+        state.removeProductBackground(targetPageNum || state.currentSpread[0], targetProd.id);
+        set({ agentStatus: 'idle' });
+        state.addMessage({
+          role: 'assistant',
+          content: `Solicitei o isolamento de silhueta e remoção de fundo com IA para **"${targetProd.name}"**. O elemento transparente será aplicado diretamente ao layout editorial.`,
+          reasoning: isOrchestrator
+            ? `Racional do Editor-Chefe [Tratamento de Imagem]: Recorte alpha disparado para "${targetProd.name}" para sobreposição perfeita no layout.`
+            : `Racional [${currentRole.name}]: Isolamento de fundo executado para atender às diretrizes visuais.`,
+          delegations: isOrchestrator
+            ? [
+                {
+                  roleId: 'director',
+                  roleName: 'Diretor de Arte',
+                  badge: 'Design',
+                  action: `Aplicou máscara alpha de alta precisão ao produto "${targetProd.name}".`,
+                },
+                {
+                  roleId: 'branding',
+                  roleName: 'Auditor de Branding',
+                  badge: 'Auditoria',
+                  action: 'Validou o recorte vetorial sem halos ou franjas de cor residual.',
+                },
+              ]
+            : undefined,
+        });
+        return;
+      }
     }
 
     // 6. Mudança de Preço

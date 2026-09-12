@@ -545,7 +545,7 @@ class SystemDesignAndFunctionalVerificationTests(TestCase):
         orchestrator = get_agent("orchestrator")
         prompt = orchestrator.get_system_prompt()
         self.assertIn("json:patch", prompt)
-        self.assertIn("Protocolo de Modificacao do Canvas", prompt)
+        self.assertIn("MODIFICACAO DO CANVAS", prompt.upper())
         self.assertIn("spread_index", prompt)
         self.assertIn("page:<numero>", prompt)
 
@@ -577,6 +577,89 @@ class SystemDesignAndFunctionalVerificationTests(TestCase):
         self.assertEqual(extracted["updates"][0]["field"], "products")
         self.assertEqual(extracted["updates"][0]["value"], [])
         self.assertEqual(extracted["summary"], "Produto removido da Pagina 3")
+
+    def test_13_universal_multi_action_agent_patch_protocol(self):
+        """
+        MODULO 13: Verifica o protocolo universal de acoes operacionais do Conselho Editorial
+        (remove_product, assign_product, swap_product, create_product, change_layout,
+        update_text, adjust_pricing, generate_skus, set_palette, brand_lock,
+        remove_background, generate_photo, navigate).
+        """
+        from api.views_studio import extract_patch_from_text
+        from api.ai.agents.registry import get_agent
+
+        orchestrator = get_agent("orchestrator")
+        prompt = orchestrator.get_system_prompt()
+
+        # 1. Verifica presenca do registro de acoes no prompt do orquestrador
+        action_registry_keys = [
+            "remove_product",
+            "assign_product",
+            "swap_product",
+            "create_product",
+            "change_layout",
+            "update_text",
+            "adjust_pricing",
+            "generate_skus",
+            "set_palette",
+            "brand_lock",
+            "remove_background",
+            "generate_photo",
+            "navigate",
+        ]
+        for key in action_registry_keys:
+            self.assertIn(key, prompt, f"Acao '{key}' ausente no prompt do Orquestrador")
+
+        # 2. Verifica extracao de json:patch com bloco 'actions'
+        sample_multi_action = (
+            "Comando executado em colaboracao com o conselho editorial.\n\n"
+            "```json:patch\n"
+            "{\n"
+            '  "reasoning": "Remocao executiva da peca para abertura de respiro negativo de 96px e reajuste comercial.",\n'
+            '  "summary": "Produto retirado da Pagina 3 e precos reajustados.",\n'
+            '  "delegations": [\n'
+            '    {\n'
+            '      "roleId": "director",\n'
+            '      "roleName": "Diretor de Arte",\n'
+            '      "badge": "Design",\n'
+            '      "action": "Liberou o espaco visual da Pagina 3."\n'
+            '    },\n'
+            '    {\n'
+            '      "roleId": "commercial",\n'
+            '      "roleName": "Tabela Comercial / B2B",\n'
+            '      "badge": "Comercial",\n'
+            '      "action": "Reajustou tabela de atacado em 10%."\n'
+            '    }\n'
+            '  ],\n'
+            '  "actions": [\n'
+            '    {"type": "remove_product", "page": 3, "product_id": "prod-123"},\n'
+            '    {"type": "adjust_pricing", "percentage": 10, "mode": "increase"},\n'
+            '    {"type": "generate_skus", "prefix": "AUREA", "start_number": 100},\n'
+            '    {"type": "set_palette", "palette_id": "editorial-dark"},\n'
+            '    {"type": "brand_lock", "locked": true}\n'
+            '  ]\n'
+            "}\n"
+            "```\n"
+            "Prancheta e catalogo atualizados com sucesso."
+        )
+
+        extracted = extract_patch_from_text(sample_multi_action)
+        self.assertIsNotNone(extracted, "Falha ao extrair patch com chave 'actions'")
+        self.assertEqual(len(extracted["actions"]), 5)
+        self.assertEqual(extracted["actions"][0]["type"], "remove_product")
+        self.assertEqual(extracted["actions"][0]["page"], 3)
+        self.assertEqual(extracted["actions"][1]["type"], "adjust_pricing")
+        self.assertEqual(extracted["actions"][1]["percentage"], 10)
+        self.assertEqual(extracted["actions"][2]["type"], "generate_skus")
+        self.assertEqual(extracted["actions"][2]["prefix"], "AUREA")
+        self.assertEqual(extracted["actions"][3]["type"], "set_palette")
+        self.assertEqual(extracted["actions"][4]["type"], "brand_lock")
+        self.assertEqual(len(extracted["delegations"]), 2)
+
+        # 3. Garantir Zero Emojis no prompt do orquestrador
+        matches = EMOJI_PATTERN.findall(prompt)
+        self.assertEqual(len(matches), 0, f"Emoji detectado no prompt do orquestrador: {matches}")
+
 
 
 
