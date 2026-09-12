@@ -21,6 +21,13 @@ import { useStudioStore } from '../../store/studioStore';
 import { StudioPalette, STUDIO_PALETTE_PRESETS } from '../../data/aureaCatalog.mock';
 import { extractColorsFromImage } from '../../utils/colorExtractor';
 import { parseBrandMarkdown, generateBrandTemplateMarkdown } from '../../utils/brandMarkdownParser';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const SEGMENTS = [
   'Moda & Luxo',
@@ -426,21 +433,38 @@ export const BrandModal: React.FC = () => {
               <label className="block font-medium mb-1 text-zinc-300 text-[11px]">
                 Segmento de Atuação
               </label>
-              <select
-                value={segment}
-                onChange={(e) => setSegment(e.target.value)}
-                className={`w-full px-3 py-1.5 rounded-lg text-xs outline-none border transition-all cursor-pointer ${
-                  isDark
-                    ? 'bg-zinc-900/60 border-zinc-800 text-zinc-100 focus:border-zinc-600 focus:bg-zinc-900'
-                    : 'bg-white border-zinc-300 text-zinc-900 focus:border-zinc-400'
-                }`}
-              >
-                {SEGMENTS.map((seg) => (
-                  <option key={seg} value={seg} className={isDark ? 'bg-zinc-900 text-zinc-100' : 'bg-white text-zinc-900'}>
-                    {seg}
-                  </option>
-                ))}
-              </select>
+              <Select value={segment} onValueChange={(val) => setSegment(val)}>
+                <SelectTrigger
+                  className={`w-full h-[30px] px-3 py-1 rounded-lg text-xs border transition-all cursor-pointer ${
+                    isDark
+                      ? 'bg-zinc-900/60 border-zinc-800 text-zinc-100 hover:border-zinc-700 hover:bg-zinc-900 focus:border-zinc-600'
+                      : 'bg-white border-zinc-300 text-zinc-900 hover:border-zinc-400 focus:border-zinc-400'
+                  }`}
+                >
+                  <SelectValue placeholder="Selecione o segmento" />
+                </SelectTrigger>
+                <SelectContent
+                  className={`rounded-xl border shadow-2xl p-1.5 z-[70] backdrop-blur-md min-w-[var(--radix-select-trigger-width)] ${
+                    isDark
+                      ? 'bg-[#141418]/95 border-zinc-800 text-zinc-100 shadow-black/80'
+                      : 'bg-white/95 border-zinc-200 text-zinc-900 shadow-zinc-300/50'
+                  }`}
+                >
+                  {SEGMENTS.map((seg) => (
+                    <SelectItem
+                      key={seg}
+                      value={seg}
+                      className={`text-xs rounded-lg py-2 pl-8 pr-3 cursor-pointer transition-colors ${
+                        isDark
+                          ? 'hover:bg-zinc-800/80 focus:bg-zinc-800 focus:text-white text-zinc-200'
+                          : 'hover:bg-zinc-100 focus:bg-zinc-100 focus:text-zinc-950 text-zinc-800'
+                      }`}
+                    >
+                      {seg}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
