@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Plus, History, ChevronDown, Check, Trash2, Settings2, Users, Scale, Palette, Lock, Unlock, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
+import { Sparkles, Plus, History, ChevronDown, Check, Trash2, Settings2, Users, Scale, Palette, Lock, Unlock, PanelLeftOpen, PanelLeftClose, ListOrdered } from 'lucide-react';
 import { ExecutionPlanCard } from './ExecutionPlanCard';
 import { AgentChatStream } from './AgentChatStream';
 import { AgentInputBar } from './AgentInputBar';
@@ -32,6 +32,9 @@ export const AgentCoPilot: React.FC = () => {
     isStudioSidebarOpen,
     toggleStudioSidebar,
     toggleCoPilot,
+    executionPlan,
+    isPlanHidden,
+    setPlanHidden,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -243,6 +246,27 @@ export const AgentCoPilot: React.FC = () => {
               <Users className="size-3.5" />
             </button>
           </Tooltip>
+
+          {/* Reexibir Plano de Execução quando oculto */}
+          {executionPlan.length > 0 && isPlanHidden && (
+            <Tooltip text="Reexibir Plano de Execução" position="bottom">
+              <button
+                type="button"
+                onClick={() => {
+                  setPlanHidden(false);
+                  toast.success('Plano de execução reexibido');
+                }}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  isDark
+                    ? 'hover:text-white hover:bg-zinc-800 text-[#B08D57]'
+                    : 'hover:text-zinc-950 hover:bg-zinc-100 text-[#B08D57]'
+                }`}
+                aria-label="Reexibir Plano de Execução"
+              >
+                <ListOrdered className="size-3.5" />
+              </button>
+            </Tooltip>
+          )}
 
           <Tooltip text="Nova conversa (adicionar aba)" position="bottom">
             <button

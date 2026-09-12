@@ -333,6 +333,10 @@ export interface StudioState {
   executionPlan: ExecutionStep[];
   isPlanCollapsed: boolean;
   togglePlanCollapse: () => void;
+  setPlanCollapsed: (collapsed: boolean) => void;
+  isPlanHidden: boolean;
+  setPlanHidden: (hidden: boolean) => void;
+  togglePlanHidden: () => void;
   setStepStatus: (stepId: string, status: StepStatus) => void;
   setExecutionPlan: (steps: ExecutionStep[]) => void;
 
@@ -994,6 +998,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         { id: 'step-3', label: `Diagramação de ${target.totalPages} páginas no padrão A4`, status: 'completed', roleBadge: 'Diagramação' },
         { id: 'step-4', label: 'Auditoria editorial e conformidade de leitura WCAG AAA', status: 'completed', roleBadge: 'Auditoria' },
       ],
+      isPlanCollapsed: true,
+      isPlanHidden: false,
     });
     toast.success(`Catálogo "${target.title}" gerado com sucesso!`);
   },
@@ -1340,8 +1346,12 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
 
   executionPlan: [],
-  isPlanCollapsed: false,
+  isPlanCollapsed: true,
   togglePlanCollapse: () => set((s) => ({ isPlanCollapsed: !s.isPlanCollapsed })),
+  setPlanCollapsed: (collapsed) => set({ isPlanCollapsed: collapsed }),
+  isPlanHidden: false,
+  setPlanHidden: (hidden) => set({ isPlanHidden: hidden }),
+  togglePlanHidden: () => set((s) => ({ isPlanHidden: !s.isPlanHidden })),
   setStepStatus: (stepId, status) =>
     set((s) => ({
       executionPlan: s.executionPlan.map((step) =>
