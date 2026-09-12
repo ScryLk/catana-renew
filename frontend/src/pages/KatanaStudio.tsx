@@ -13,6 +13,7 @@ import { ProductDrawer } from '../components/studio/ProductDrawer';
 import { StudioExcelImportModal } from '../components/studio/StudioExcelImportModal';
 import { StudioSystemDesignModal } from '../components/studio/StudioSystemDesignModal';
 import { NewCatalogModal } from '../components/studio/NewCatalogModal';
+import { BrandModal } from '../components/studio/BrandModal';
 import { AuthModal } from '../components/auth/AuthModal';
 import { useStudioStore } from '../store/studioStore';
 import { useAuthStore, isAutoLoginSettled } from '../store/authStore';
@@ -162,6 +163,9 @@ export const KatanaStudio: React.FC = () => {
 
       {/* Modal de Criação de Novo Catálogo */}
       <NewCatalogModal />
+
+      {/* Modal de Gerenciamento de Marca & Brand Kit */}
+      <BrandModal />
 
       {/* Modal de Configuracoes da Conta */}
       <AccountSettingsModal

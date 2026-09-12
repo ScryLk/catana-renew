@@ -196,6 +196,146 @@ export interface ActiveTargetSlot {
   pageType?: string;
 }
 
+export interface RecentCatalogItem {
+  id: string;
+  title: string;
+  totalPages: number;
+  category: string;
+  updatedAt: string;
+}
+
+export interface Brand {
+  id: string;
+  name: string;
+  segment?: string;
+  logoUrl?: string;
+  paletteName?: string;
+  commercialContact?: {
+    whatsapp?: string;
+    email?: string;
+    website?: string;
+    instagram?: string;
+  };
+  catalogs: RecentCatalogItem[];
+  createdAt: string;
+}
+
+export const INITIAL_BRANDS: Brand[] = [
+  {
+    id: 'brand-maison',
+    name: 'Maison Éthérée',
+    segment: 'Moda & Luxo',
+    paletteName: 'Luxe · Noir & Or',
+    commercialContact: {
+      whatsapp: '+55 11 99882-1100',
+      email: 'contato@maisonetheree.com',
+      website: 'www.maisonetheree.com',
+      instagram: '@maisonetheree',
+    },
+    catalogs: [
+      {
+        id: 'lookbook-editorial-2026',
+        title: 'Coleção Inverno 2026',
+        totalPages: 6,
+        category: 'Moda & Estilo',
+        updatedAt: '2m',
+      },
+      {
+        id: 'capsula-linho-2026',
+        title: 'Lookbook Cápsula de Seda',
+        totalPages: 4,
+        category: 'Alta Moda',
+        updatedAt: '3d',
+      },
+    ],
+    createdAt: '2026-09-01',
+  },
+  {
+    id: 'brand-atelier',
+    name: 'Atelier Sucré',
+    segment: 'Gastronomia',
+    paletteName: 'Édition · Terracotta & Sable',
+    commercialContact: {
+      whatsapp: '+55 11 97721-3400',
+      email: 'encomendas@ateliersucre.com',
+      website: 'www.ateliersucre.com',
+    },
+    catalogs: [
+      {
+        id: 'confeitaria-artesanal',
+        title: 'Confeitaria & Pâtisserie',
+        totalPages: 8,
+        category: 'Gastronomia',
+        updatedAt: '1d',
+      },
+    ],
+    createdAt: '2026-09-03',
+  },
+  {
+    id: 'brand-nexus',
+    name: 'Nexus Core',
+    segment: 'Tecnologia B2B',
+    paletteName: 'Atelier · Noir & Argent 925',
+    commercialContact: {
+      whatsapp: '+55 11 91234-5678',
+      email: 'b2b@nexuscore.tech',
+      website: 'www.nexuscore.tech',
+    },
+    catalogs: [
+      {
+        id: 'techgear-2026',
+        title: 'Setup & Hardware B2B',
+        totalPages: 6,
+        category: 'Tecnologia',
+        updatedAt: '5d',
+      },
+    ],
+    createdAt: '2026-09-05',
+  },
+  {
+    id: 'brand-cristallo',
+    name: 'Cristallo',
+    segment: 'Alta Joalheria',
+    paletteName: 'Luxe · Noir & Or',
+    commercialContact: {
+      whatsapp: '+55 11 96543-2100',
+      email: 'vip@cristallojoias.com.br',
+      website: 'www.cristallojoias.com.br',
+    },
+    catalogs: [
+      {
+        id: 'cristallo-joias',
+        title: 'Joalheria & Gemas Raras',
+        totalPages: 5,
+        category: 'Alta Joalheria',
+        updatedAt: '12d',
+      },
+    ],
+    createdAt: '2026-09-08',
+  },
+];
+
+export const getStoredBrands = (): Brand[] => {
+  try {
+    const saved = localStorage.getItem('katana_studio_brands');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {
+    // fallback
+  }
+  return INITIAL_BRANDS;
+};
+
+export const saveStoredBrands = (brands: Brand[]) => {
+  try {
+    localStorage.setItem('katana_studio_brands', JSON.stringify(brands));
+  } catch {
+    // ignore
+  }
+};
+
 export interface StudioState {
   // Session & Workspace Mode
   hasStartedSession: boolean;
@@ -249,6 +389,18 @@ export interface StudioState {
   setActiveCatalogId: (id: string | null) => void;
   setHasStartedSession: (started: boolean) => void;
   loadExistingCatalog: (catalogId: string) => void;
+
+  // Brands / Marcas Management (Antigravity Projects style)
+  brands: Brand[];
+  activeBrandId: string | null;
+  setActiveBrandId: (id: string | null) => void;
+  addBrand: (data: Omit<Brand, 'id' | 'createdAt' | 'catalogs'>) => Brand;
+  updateBrand: (id: string, updates: Partial<Brand>) => void;
+  deleteBrand: (id: string) => void;
+  isBrandModalOpen: boolean;
+  brandModalEditingId: string | null;
+  openBrandModal: (brandId?: string) => void;
+  closeBrandModal: () => void;
 
   // New Catalog Creation Modal
   isNewCatalogModalOpen: boolean;
@@ -528,6 +680,52 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setActiveCatalogId: (id) => set({ activeCatalogId: id }),
   setHasStartedSession: (started) => set({ hasStartedSession: started }),
 
+  // Brands / Marcas Management (Antigravity Projects style)
+  brands: getStoredBrands(),
+  activeBrandId: 'brand-maison',
+  setActiveBrandId: (id) => set({ activeBrandId: id }),
+  addBrand: (data) => {
+    const newBrand: Brand = {
+      ...data,
+      id: `brand-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      catalogs: [],
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [newBrand, ...get().brands];
+    saveStoredBrands(updated);
+    set({
+      brands: updated,
+      activeBrandId: newBrand.id,
+      isBrandModalOpen: false,
+      brandModalEditingId: null,
+    });
+    toast.success(`Marca "${newBrand.name}" cadastrada com sucesso!`);
+    return newBrand;
+  },
+  updateBrand: (id, updates) => {
+    const updated = get().brands.map((b) => (b.id === id ? { ...b, ...updates } : b));
+    saveStoredBrands(updated);
+    set({
+      brands: updated,
+      isBrandModalOpen: false,
+      brandModalEditingId: null,
+    });
+    toast.success('Marca atualizada com sucesso!');
+  },
+  deleteBrand: (id) => {
+    const remaining = get().brands.filter((b) => b.id !== id);
+    saveStoredBrands(remaining);
+    set((s) => ({
+      brands: remaining,
+      activeBrandId: s.activeBrandId === id ? (remaining[0]?.id || null) : s.activeBrandId,
+    }));
+    toast.success('Marca removida.');
+  },
+  isBrandModalOpen: false,
+  brandModalEditingId: null,
+  openBrandModal: (brandId) => set({ isBrandModalOpen: true, brandModalEditingId: brandId || null }),
+  closeBrandModal: () => set({ isBrandModalOpen: false, brandModalEditingId: null }),
+
   // New Catalog Creation Modal
   isNewCatalogModalOpen: false,
   setIsNewCatalogModalOpen: (open) => set({ isNewCatalogModalOpen: open }),
@@ -621,6 +819,30 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       selectedElementId: null,
       isNewCatalogModalOpen: false,
     });
+
+    const activeBrandId = get().activeBrandId;
+    if (activeBrandId) {
+      const updatedBrands = get().brands.map((b) => {
+        if (b.id === activeBrandId) {
+          return {
+            ...b,
+            catalogs: [
+              {
+                id: catalogId,
+                title: catalogTitle,
+                totalPages: pagesCount,
+                category: b.segment || 'Editorial',
+                updatedAt: 'Agora',
+              },
+              ...b.catalogs,
+            ],
+          };
+        }
+        return b;
+      });
+      saveStoredBrands(updatedBrands);
+      set({ brands: updatedBrands });
+    }
 
     toast.success(`Catálogo "${catalogTitle}" pronto para edição!`);
   },

@@ -4,7 +4,6 @@ import {
   Plus,
   PanelLeftClose,
   Search,
-  BookOpen,
   Sun,
   Moon,
   Settings,
@@ -13,49 +12,14 @@ import {
   ChevronUp,
   Sparkles,
   Cpu,
+  Folder,
+  FolderPlus,
+  ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
-import { useStudioStore } from '../../store/studioStore';
+import { useStudioStore, Brand } from '../../store/studioStore';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
-
-export interface RecentCatalogItem {
-  id: string;
-  title: string;
-  totalPages: number;
-  category: string;
-  updatedAt: string;
-}
-
-const RECENT_CATALOGS: RecentCatalogItem[] = [
-  {
-    id: 'lookbook-editorial-2026',
-    title: 'Maison Éthérée — Coleção Inverno',
-    totalPages: 6,
-    category: 'Moda & Estilo',
-    updatedAt: 'Hoje',
-  },
-  {
-    id: 'confeitaria-artesanal',
-    title: 'Atelier Sucré — Confeitaria & Pâtisserie',
-    totalPages: 8,
-    category: 'Gastronomia',
-    updatedAt: 'Ontem',
-  },
-  {
-    id: 'techgear-2026',
-    title: 'Nexus Core — Setup & Hardware B2B',
-    totalPages: 6,
-    category: 'Tecnologia',
-    updatedAt: '3 dias atrás',
-  },
-  {
-    id: 'cristallo-joias',
-    title: 'Cristallo — Joalheria & Gemas',
-    totalPages: 5,
-    category: 'Alta Joalheria',
-    updatedAt: 'Semana passada',
-  },
-];
 
 export const StudioSidebar: React.FC = () => {
   const navigate = useNavigate();
@@ -83,10 +47,22 @@ export const StudioSidebar: React.FC = () => {
     theme,
     toggleTheme,
     openAccountSettings,
+    brands,
+    activeBrandId,
+    setActiveBrandId,
+    openBrandModal,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandedBrands, setExpandedBrands] = useState<Record<string, boolean>>({});
+
+  const toggleBrandExpanded = (brandId: string) => {
+    setExpandedBrands((prev) => ({
+      ...prev,
+      [brandId]: prev[brandId] === undefined ? false : !prev[brandId],
+    }));
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -132,15 +108,25 @@ export const StudioSidebar: React.FC = () => {
     setIsProfileMenuOpen(false);
   };
 
-  const filteredCatalogs = useMemo(() => {
+  const filteredBrands = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return RECENT_CATALOGS;
-    return RECENT_CATALOGS.filter(
-      (c) =>
-        c.title.toLowerCase().includes(q) ||
-        c.category.toLowerCase().includes(q)
-    );
-  }, [searchQuery]);
+    if (!q) return brands;
+    return brands
+      .map((b) => {
+        const brandMatches =
+          b.name.toLowerCase().includes(q) ||
+          (b.segment && b.segment.toLowerCase().includes(q));
+        const matchingCatalogs = b.catalogs.filter(
+          (c) =>
+            c.title.toLowerCase().includes(q) ||
+            c.category.toLowerCase().includes(q)
+        );
+        if (brandMatches) return b;
+        if (matchingCatalogs.length > 0) return { ...b, catalogs: matchingCatalogs };
+        return null;
+      })
+      .filter((b): b is Brand => b !== null);
+  }, [brands, searchQuery]);
 
   const handleSelectCatalog = (catalogId: string) => {
     loadExistingCatalog(catalogId);
@@ -235,7 +221,7 @@ export const StudioSidebar: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar catálogo..."
+            placeholder="Buscar marca ou catálogo..."
             className={`w-full pl-7 pr-2.5 py-1.5 rounded-lg text-xs outline-none border transition-all ${
               isDark
                 ? 'bg-zinc-900/50 border-zinc-800/80 text-zinc-200 placeholder:text-zinc-500 focus:border-zinc-600 focus:bg-zinc-900'
@@ -245,61 +231,120 @@ export const StudioSidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* Recent Catalogs List */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-2 py-2 space-y-1">
-        <div className="px-2 py-1 flex items-center justify-between text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-semibold">
-          <span>Catálogos Recentes</span>
-          <span>{filteredCatalogs.length}</span>
+      {/* Marcas & Projetos (Antigravity Projects style) */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-2 py-2 space-y-2">
+        {/* Section Header */}
+        <div className="px-2 py-1 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-semibold">
+              Marcas
+            </span>
+            <span className="text-[10px] font-mono text-zinc-500">
+              {brands.length}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => openBrandModal()}
+            className={`p-1 rounded-md transition-colors cursor-pointer ${
+              isDark
+                ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100'
+                : 'hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900'
+            }`}
+            title="Nova Marca / Empresa"
+            aria-label="Nova Marca"
+          >
+            <FolderPlus className="size-3.5" />
+          </button>
         </div>
 
-        {filteredCatalogs.map((catalog) => {
-          const isActive = hasStartedSession && activeCatalogId === catalog.id;
+        {/* Brands Tree List */}
+        <div className="space-y-1.5">
+          {filteredBrands.map((brand) => {
+            const isBrandActive = activeBrandId === brand.id;
+            const isExpanded = expandedBrands[brand.id] ?? true;
 
-          return (
-            <button
-              key={catalog.id}
-              type="button"
-              onClick={() => handleSelectCatalog(catalog.id)}
-              className={`w-full text-left p-2 rounded-xl transition-all flex items-start justify-between gap-2 group cursor-pointer border ${
-                isActive
-                  ? isDark
-                    ? 'bg-zinc-800/80 border-zinc-700 text-white font-medium shadow-2xs'
-                    : 'bg-white border-zinc-300 text-zinc-950 font-medium shadow-2xs'
-                  : isDark
-                  ? 'border-transparent hover:bg-zinc-900/70 hover:border-zinc-800/60 text-zinc-300 hover:text-white'
-                  : 'border-transparent hover:bg-zinc-200/60 hover:border-zinc-300/60 text-zinc-700 hover:text-zinc-950'
-              }`}
-            >
-              <div className="flex items-start gap-2 min-w-0 flex-1">
-                <BookOpen
-                  className={`size-3.5 shrink-0 mt-0.5 ${
-                    isActive
+            return (
+              <div key={brand.id} className="space-y-0.5">
+                {/* Brand Folder Row */}
+                <div
+                  onClick={() => {
+                    setActiveBrandId(brand.id);
+                    toggleBrandExpanded(brand.id);
+                  }}
+                  className={`group flex items-center justify-between px-2 py-1.5 rounded-xl text-xs transition-all cursor-pointer select-none border ${
+                    isBrandActive
                       ? isDark
-                        ? 'text-white'
-                        : 'text-zinc-900'
-                      : 'text-zinc-500 group-hover:text-zinc-300'
+                        ? 'bg-zinc-900/90 border-zinc-800 text-zinc-200 font-medium'
+                        : 'bg-zinc-200/60 border-zinc-300 text-zinc-900 font-medium'
+                      : isDark
+                      ? 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
+                      : 'border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
                   }`}
-                />
-                <div className="truncate flex-1">
-                  <div className="text-xs truncate font-medium">{catalog.title}</div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 mt-0.5">
-                    <span>{catalog.totalPages} págs</span>
-                    <span>·</span>
-                    <span className="truncate">{catalog.category}</span>
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Folder className={`size-3.5 shrink-0 ${isBrandActive ? 'text-[#B08D57]' : 'text-zinc-500'}`} />
+                    <span className="truncate font-medium">{brand.name}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openBrandModal(brand.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-700/40 text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer"
+                      title={`Editar Brand Kit: ${brand.name}`}
+                    >
+                      <Settings className="size-3" />
+                    </button>
+                    {isExpanded ? (
+                      <ChevronDown className="size-3 text-zinc-500" />
+                    ) : (
+                      <ChevronRight className="size-3 text-zinc-500" />
+                    )}
                   </div>
                 </div>
-              </div>
 
-              {isActive ? (
-                <span className="size-1.5 rounded-full bg-emerald-400 shrink-0 mt-1.5 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
-              ) : (
-                <span className="text-[10px] text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
-                  Abrir
-                </span>
-              )}
-            </button>
-          );
-        })}
+                {/* Brand Catalogs (Indented) */}
+                {isExpanded && brand.catalogs && brand.catalogs.length > 0 && (
+                  <div className="pl-2.5 space-y-0.5 border-l border-zinc-800/50 ml-3.5 mt-0.5">
+                    {brand.catalogs.map((catalog) => {
+                      const isCatalogActive = hasStartedSession && activeCatalogId === catalog.id;
+
+                      return (
+                        <button
+                          key={catalog.id}
+                          type="button"
+                          onClick={() => {
+                            setActiveBrandId(brand.id);
+                            handleSelectCatalog(catalog.id);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                            isCatalogActive
+                              ? isDark
+                                ? 'bg-zinc-800 text-white font-medium shadow-xs ring-1 ring-zinc-700'
+                                : 'bg-zinc-900 text-white font-medium shadow-xs'
+                              : isDark
+                              ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
+                              : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50'
+                          }`}
+                        >
+                          <span className="truncate min-w-0 flex-1">{catalog.title}</span>
+                          <span className={`text-[10px] font-mono shrink-0 ${isCatalogActive ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                            {catalog.updatedAt}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
 
