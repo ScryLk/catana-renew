@@ -373,7 +373,7 @@ export const SpreadViewport: React.FC = () => {
                   className="text-3xl sm:text-[34px] leading-[1.25] text-[#1A1817] font-normal whitespace-pre-line"
                   style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
                 >
-                  {page.quote || 'O essencial,\nexecutado sem pressa.'}
+                  {page.quote || page.title || 'O essencial,\nexecutado sem pressa.'}
                 </h2>
               </div>
 

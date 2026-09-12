@@ -2054,10 +2054,37 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         const targetStr = String(rawAction.target || '');
         const params = rawAction.params || {};
 
-        let targetPage = typeof rawAction.page === 'number' ? rawAction.page : undefined;
-        if (targetPage === undefined && targetStr.startsWith('page:')) {
-          const parsed = parseInt(targetStr.replace('page:', ''), 10);
-          if (!isNaN(parsed)) targetPage = parsed;
+        let targetPage =
+          typeof rawAction.page === 'number'
+            ? rawAction.page
+            : typeof params.page === 'number'
+            ? params.page
+            : typeof params.pageNumber === 'number'
+            ? params.pageNumber
+            : undefined;
+
+        if (targetPage === undefined) {
+          const m = targetStr.match(/(?:page|p[aá]gina)?[\s\-_:]*(\d+)/i);
+          if (m && m[1]) {
+            targetPage = parseInt(m[1], 10);
+          } else {
+            const wordMap: Record<string, number> = {
+              um: 1, uma: 1, primeira: 1, primeiro: 1,
+              dois: 2, duas: 2, segunda: 2, segundo: 2,
+              tres: 3, três: 3, terceira: 3, terceiro: 3,
+              quatro: 4, quarta: 4, quarto: 4,
+              cinco: 5, quinta: 5, quinto: 5,
+              seis: 6, sexta: 6, sexto: 6,
+              sete: 7, setima: 7, sétima: 7,
+              oito: 8, oitava: 8, oitavo: 8,
+            };
+            for (const [w, n] of Object.entries(wordMap)) {
+              if (new RegExp(`\\b${w}\\b`, 'i').test(targetStr)) {
+                targetPage = n;
+                break;
+              }
+            }
+          }
         }
 
         const prodId =
@@ -2199,10 +2226,60 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
           case 'update_text': {
             const finalPage = typeof targetPage === 'number' ? targetPage : leftPageNum;
-            const field = rawAction.field || params.field || 'title';
-            const val = rawAction.value !== undefined ? rawAction.value : params.value;
-            if (field && val !== undefined) {
-              get().updatePage(finalPage, { [field]: val });
+            const targetPageObj = get().pages.find((p) => p.pageNumber === finalPage);
+            const isManifesto = targetPageObj?.type === 'manifesto';
+            const isCover = targetPageObj?.type === 'cover';
+            const isDivider = targetPageObj?.type === 'divider';
+
+            const updatesToApply: Partial<CatalogPageData> = {};
+
+            if (params.quote !== undefined) updatesToApply.quote = String(params.quote);
+            if (rawAction.quote !== undefined) updatesToApply.quote = String(rawAction.quote);
+
+            if (params.content !== undefined) updatesToApply.content = String(params.content);
+            if (params.body !== undefined) updatesToApply.content = String(params.body);
+            if (params.copy !== undefined) updatesToApply.content = String(params.copy);
+            if (rawAction.content !== undefined) updatesToApply.content = String(rawAction.content);
+
+            if (params.title !== undefined) updatesToApply.title = String(params.title);
+            if (params.headline !== undefined) updatesToApply.title = String(params.headline);
+            if (rawAction.title !== undefined) updatesToApply.title = String(rawAction.title);
+
+            if (params.subtitle !== undefined) updatesToApply.subtitle = String(params.subtitle);
+            if (rawAction.subtitle !== undefined) updatesToApply.subtitle = String(rawAction.subtitle);
+
+            if (params.label !== undefined) updatesToApply.label = String(params.label);
+            if (rawAction.label !== undefined) updatesToApply.label = String(rawAction.label);
+
+            const explicitField = rawAction.field || params.field;
+            const explicitVal = rawAction.value !== undefined ? rawAction.value : params.value;
+            if (explicitField && explicitVal !== undefined) {
+              updatesToApply[explicitField as keyof CatalogPageData] = explicitVal;
+            }
+
+            const genericText = rawAction.text ?? params.text ?? (explicitField ? undefined : explicitVal);
+            if (genericText !== undefined && Object.keys(updatesToApply).length === 0) {
+              const strVal = String(genericText).trim();
+              if (isManifesto) {
+                if (strVal.length < 140) {
+                  updatesToApply.quote = strVal;
+                  updatesToApply.title = strVal;
+                } else {
+                  updatesToApply.content = strVal;
+                }
+              } else if (isCover || isDivider) {
+                updatesToApply.title = strVal;
+              } else {
+                updatesToApply.title = strVal;
+              }
+            }
+
+            if (isManifesto && updatesToApply.title && !updatesToApply.quote) {
+              updatesToApply.quote = updatesToApply.title;
+            }
+
+            if (Object.keys(updatesToApply).length > 0) {
+              get().updatePage(finalPage, updatesToApply);
             }
             break;
           }
@@ -3653,29 +3730,83 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
 
     // ==========================================
-    // 5. INTENT: EDIÇÃO DE TÍTULO / SUBTÍTULO / CLAIM DE PÁGINA ESPECÍFICA
+    // 5. INTENT: EDIÇÃO DE TÍTULO / TEXTO / MANIFESTO / SUBTÍTULO
     // ==========================================
+    const pageWordToNumber: Record<string, number> = {
+      um: 1, uma: 1, primeira: 1, primeiro: 1,
+      dois: 2, duas: 2, segunda: 2, segundo: 2,
+      tres: 3, três: 3, terceira: 3, terceiro: 3,
+      quatro: 4, quarta: 4, quarto: 4,
+      cinco: 5, quinta: 5, quinto: 5,
+      seis: 6, sexta: 6, sexto: 6,
+      sete: 7, setima: 7, sétima: 7,
+      oito: 8, oitava: 8, oitavo: 8,
+    };
+
     const pageTextMatch = command.match(
-      /(?:mude|altere|troque|coloque)\s+(?:o\s+)?(t[ií]tulo|subt[ií]tulo|claim|legenda|label)\s+da\s+p[aá]gina\s+(\d+)\s+para\s+["'“]?(.+?)["'”]?$/i
+      /(?:mude|altere|troque|coloque|ajuste|atualize|editar|edite|trocar|mudar)\s+(?:o\s+)?(texto|t[ií]tulo|subt[ií]tulo|claim|legenda|label|frase|headline|conte[uú]do)\s+(?:da\s+)?(?:p[aá]gina|p[aá]g\.?|page)\s+(\d+|um|uma|primeira|primeiro|dois|duas|segunda|segundo|tr[eê]s|terceira|terceiro|quatro|quarta|quarto|cinco|quinta|quinto|seis|sexta|sexto|sete|s[eé]tima|s[eé]timo|oito|oitava|oitavo)\s+(?:para:?|por:?|como:?)\s*["'“]?(.+?)["'”]?$/i
     );
+
     if (pageTextMatch) {
       const fieldType = pageTextMatch[1].toLowerCase();
-      const pageNum = parseInt(pageTextMatch[2], 10);
-      const newText = pageTextMatch[3].trim().replace(/^["']|["']$/g, '');
+      const rawPage = pageTextMatch[2].toLowerCase();
+      const pageNum = isNaN(parseInt(rawPage, 10)) ? (pageWordToNumber[rawPage] || 1) : parseInt(rawPage, 10);
+      const newText = pageTextMatch[3].trim().replace(/^["':]|["']$/g, '').trim();
 
-      const fieldKey = fieldType.includes('sub') ? 'subtitle' : fieldType.includes('claim') ? 'quote' : 'title';
-      state.updatePage(pageNum, { [fieldKey]: newText });
+      const targetPageObj = state.pages.find((p) => p.pageNumber === pageNum);
+      const isManifesto = targetPageObj?.type === 'manifesto';
+
+      const updates: Partial<CatalogPageData> = {};
+      if (fieldType.includes('sub')) {
+        updates.subtitle = newText;
+      } else if (fieldType.includes('claim')) {
+        updates.quote = newText;
+      } else if (fieldType.includes('label') || fieldType.includes('legenda')) {
+        updates.label = newText;
+      } else if (fieldType.includes('conte') && newText.length > 140) {
+        updates.content = newText;
+      } else if (isManifesto) {
+        // No manifesto, o texto principal e o quote (serifado)
+        updates.quote = newText;
+        updates.title = newText;
+      } else {
+        updates.title = newText;
+      }
+
+      state.updatePage(pageNum, updates);
       set({ agentStatus: 'idle' });
       get().goToSpread(Math.floor((pageNum - 1) / 2));
-      toast.success(`${fieldType} da Página ${pageNum} atualizado!`, {
-        description: `Texto revisado com tom de voz da coleção e tipografia Cormorant.`,
+      toast.success(`Texto da Página ${pageNum} atualizado!`, {
+        description: `"${newText}" diagramado com proporções e tipografia editorial.`,
       });
 
       state.addMessage({
         role: 'assistant',
-        content: `O ${fieldType} da **Página ${String(pageNum).padStart(2, '0')}** foi atualizado para **"${newText}"**.`,
-        reasoning: 'Racional [Redator Publicitário]: Refinamento de texto com vocabulário alinhado ao posicionamento da coleção.',
-        actions: [`${fieldType} da Página ${String(pageNum).padStart(2, '0')} atualizado para "${newText}"`],
+        content: `Texto da **Página ${String(pageNum).padStart(2, '0')}** atualizado para **"${newText}"**.`,
+        reasoning: 'Racional [Redator Publicitário]: Ajuste textual aplicado diretamente na lâmina com refinamento de tom de voz.',
+        actions: [`Texto da Página ${String(pageNum).padStart(2, '0')} atualizado para "${newText}"`],
+        delegations: isOrchestrator
+          ? [
+              {
+                roleId: 'copywriter',
+                roleName: 'Redator Publicitário',
+                badge: 'Redação',
+                action: `Redigiu a nova frase editorial: "${newText}".`,
+              },
+              {
+                roleId: 'director',
+                roleName: 'Diretor de Arte',
+                badge: 'Design',
+                action: `Adequou a escala tipográfica e respiros na Página ${String(pageNum).padStart(2, '0')}.`,
+              },
+              {
+                roleId: 'branding',
+                roleName: 'Auditor de Branding',
+                badge: 'Auditoria',
+                action: 'Validou contraste e harmonia com a identidade visual.',
+              },
+            ]
+          : undefined,
       });
       return;
     }

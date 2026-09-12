@@ -11,7 +11,6 @@ import {
   ArrowRight,
   ThumbsUp,
   ThumbsDown,
-  ChevronDown,
 } from 'lucide-react';
 import { useStudioStore, type ChatMessage, type ChatDelegation } from '../../store/studioStore';
 import { toast } from 'sonner';
@@ -709,47 +708,48 @@ export const AgentChatStream: React.FC = () => {
                 {/* Barra Inferior: Detalhes / Parecer dos Agentes e Feedback Like/Dislike */}
                 <div className="mt-2.5 pt-2 border-t border-inherit/40 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    {parsed.delegations.length > 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => toggleOpinions(msg.id)}
-                        className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
-                          expandedOpinions[msg.id]
-                            ? isDark
-                              ? 'bg-[#181614] border-[#B08D57]/50 text-[#B08D57]'
-                              : 'bg-[#FDFBF7] border-[#B08D57]/60 text-[#8C6D3B]'
-                            : isDark
-                              ? 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
-                              : 'bg-zinc-100/80 border-zinc-200 hover:border-zinc-300 text-zinc-600 hover:text-zinc-900'
-                        }`}
-                      >
-                        <Users className="size-3 text-[#B08D57]" />
-                        <span>
-                          {expandedOpinions[msg.id]
-                            ? 'Ocultar parecer dos agentes'
-                            : `Parecer dos agentes (${parsed.delegations.length})`}
-                        </span>
-                        <ChevronDown
-                          className={`size-3 transition-transform duration-200 ${
-                            expandedOpinions[msg.id] ? 'rotate-180 text-[#B08D57]' : ''
+                    {parsed.delegations.length > 0 && (
+                      <div className="relative group inline-flex">
+                        <button
+                          type="button"
+                          onClick={() => toggleOpinions(msg.id)}
+                          title="Parecer dos agentes"
+                          aria-label="Parecer dos agentes"
+                          className={`size-6 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
+                            expandedOpinions[msg.id]
+                              ? isDark
+                                ? 'bg-[#B08D57]/25 border-[#B08D57] text-[#B08D57]'
+                                : 'bg-[#B08D57]/20 border-[#B08D57] text-[#8C6D3B]'
+                              : isDark
+                                ? 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                                : 'bg-white border-zinc-200 text-zinc-500 hover:text-zinc-800 hover:border-zinc-300 shadow-2xs'
                           }`}
-                        />
-                      </button>
-                    ) : (
-                      <span className={`text-[10px] tabular-nums ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                        Katana Studio · {msg.timestamp}
-                      </span>
+                        >
+                          <Users className="size-3 text-[#B08D57]" />
+                        </button>
+                        <div
+                          role="tooltip"
+                          className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-0.5 rounded text-[10px] font-medium shadow-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 whitespace-nowrap z-50 border ${
+                            isDark
+                              ? 'bg-zinc-900 text-zinc-200 border-zinc-700'
+                              : 'bg-white text-zinc-800 border-zinc-300'
+                          }`}
+                        >
+                          Parecer dos agentes
+                          <div
+                            className={`absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent ${
+                              isDark ? 'border-t-zinc-900' : 'border-t-white'
+                            }`}
+                          />
+                        </div>
+                      </div>
                     )}
+                    <span className={`text-[10px] tabular-nums ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                      Katana Studio · {msg.timestamp}
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    {parsed.delegations.length > 0 && (
-                      <span className={`text-[10px] tabular-nums hidden sm:inline ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                        Katana Studio · {msg.timestamp}
-                      </span>
-                    )}
-
-                    <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
                         onClick={() => handleFeedback(msg.id, 'like')}
@@ -784,7 +784,6 @@ export const AgentChatStream: React.FC = () => {
                       </button>
                     </div>
                   </div>
-                </div>
 
                 {/* Detalhes / Pareceres Expandidos dos Agentes Especialistas */}
                 {expandedOpinions[msg.id] && parsed.delegations.length > 0 && (

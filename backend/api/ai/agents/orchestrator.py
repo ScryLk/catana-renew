@@ -63,7 +63,7 @@ class OrchestratorAgent(BaseAgent):
             "- Mudar layout: action 'change_layout', target 'page:5', params {'type': 'grid_4' | 'hero' | 'duo' | 'manifesto' | 'divider'}\n"
             "- Reajustar precos: action 'adjust_pricing', target 'global', params {'mode': 'percentage', 'amount': 15}\n"
             "- Gerar SKUs: action 'generate_skus', target 'catalog:products', params {'prefix': 'ART-', 'format': '000'}\n"
-            "- Editar texto: action 'update_text', target 'page:3', params {'title': '...', 'quote': '...'}\n"
+            "- Editar texto: action 'update_text', target 'page:2', params {'quote': '...', 'title': '...', 'content': '...'}\n"
             "- Remover fundo: action 'remove_background', target 'page:4', params {'slotIndex': 0}\n"
             "- Paleta e Trava: action 'set_palette' com 'brand_lock', params {'paletteName': 'Slate & Noir Minimaliste', 'locked': true}"
         )
