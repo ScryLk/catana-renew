@@ -175,12 +175,21 @@ class OrchestratorAgent(BaseAgent):
         # Remove pontuacoes desnecessarias, saudações e frases de preenchimento
         t = re.sub(r'^(por favor|pfv|ei|ola|olá|me ajuda a|ajuda a|quero que você|preciso que você|tanto faz[,\.\s]*|deixa disso[,\.\s]*)\s*', '', text, flags=re.IGNORECASE).strip()
 
-        # Substitui verbos informais de comando
+        # Substitui verbos informais de comando e dialetos regionais
+        t = re.sub(r'^(tira|tirar|arranca|arrancar|apaga|apagar|limpa|limpar)\s+', 'Remover da prancheta ', t, flags=re.IGNORECASE)
+        t = re.sub(r'^(bota|botar|taca|tacar|mete|meter|poe|põe|coloca|colocar)\s+', 'Organizar na prancheta ', t, flags=re.IGNORECASE)
+        t = re.sub(r'^(enxuga|enxugar|poda|podar|diminui|diminuir)\s+', 'Sintetizar e resumir ', t, flags=re.IGNORECASE)
         t = re.sub(r'^arrum(ar|a|e)\s+', 'Revisar e aprimorar ', t, flags=re.IGNORECASE)
         t = re.sub(r'^melhor(ar|a|e)\s+', 'Otimizar e refinar ', t, flags=re.IGNORECASE)
         t = re.sub(r'^faz(er)?\s+', 'Estruturar e desenvolver ', t, flags=re.IGNORECASE)
-        t = re.sub(r'^coloc(ar|a|e)\s+', 'Organizar no spread ', t, flags=re.IGNORECASE)
         t = re.sub(r'^mont(ar|a|e)\s+', 'Compor a diagramacao de ', t, flags=re.IGNORECASE)
+
+        # Normalizacao de termos coloquiais frequentes
+        t = re.sub(r'\b(folha|folhinha|l[aâ]mina|prancha|prancheta)\b', 'pagina', t, flags=re.IGNORECASE)
+        t = re.sub(r'\b(pagna|pagnia|pajina)\b', 'pagina', t, flags=re.IGNORECASE)
+        t = re.sub(r'\b(preso|precos)\b', 'preco', t, flags=re.IGNORECASE)
+        t = re.sub(r'\b(pintura|tinta)\b', 'paleta', t, flags=re.IGNORECASE)
+        t = re.sub(r'\b(conto|pau)\b', 'reais', t, flags=re.IGNORECASE)
 
         if not t:
             t = "Estruturar proposta de composicao editorial para os produtos informados"

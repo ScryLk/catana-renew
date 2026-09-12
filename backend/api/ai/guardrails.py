@@ -101,12 +101,12 @@ TOXICITY_REPLACEMENTS = [
 ]
 
 CATALOG_INTENT_PATTERNS = [
-    re.compile(r'\b(cat[aá]logo|layout|diagrama[cç][aã]o|diagramar|spread|p[aá]gina|capa|contracapa|divis[oó]ria)\b', re.IGNORECASE),
-    re.compile(r'\b(produto|item|itens|pre[cç]o|tabela|sku|moq|desconto|venda|comercial|b2b)\b', re.IGNORECASE),
-    re.compile(r'\b(pote|embalag|garrafa|caixa|frasco|copo|delivery|alimento|comida|confeitaria|a[cç]ougue)\b', re.IGNORECASE),
-    re.compile(r'\b(cor|paleta|tipografia|fonte|respiro|grid|a4|visual|est[eé]tica|design|foto|imagem)\b', re.IGNORECASE),
-    re.compile(r'\b(headline|texto|copy|narrativa|storytelling|descri[cç][aã]o|marca|branding|logo)\b', re.IGNORECASE),
-    re.compile(r'\b(arrum|ajust|melhor|organiz|cri|mont|faz|ger|alter|estrutur|coloc)\b', re.IGNORECASE),
+    re.compile(r'\b(cat[aá]logo|layout|laiout|layot|diagrama[cç][aã]o|diagramar|spread|p[aá]gina|pagna|pagnia|p[aá]g|folha|folhinha|l[aâ]mina|prancha|prancheta|capa|contracapa|divis[oó]ria)\b', re.IGNORECASE),
+    re.compile(r'\b(produto|poduto|prroduto|item|itens|pre[cç]o|preso|tabela|sku|moq|desconto|disconto|venda|comercial|b2b|grana|custo)\b', re.IGNORECASE),
+    re.compile(r'\b(pote|embalag|garrafa|caixa|frasco|copo|delivery|alimento|comida|confeitaria|a[cç]ougue|bolsa|joia|anel|relogio|carteira)\b', re.IGNORECASE),
+    re.compile(r'\b(cor|cores|paleta|palheta|pintura|tom|tipografia|fonte|respiro|grid|a4|visual|est[eé]tica|design|foto|imagem|ouro|prata|bronze)\b', re.IGNORECASE),
+    re.compile(r'\b(headline|texto|copy|narrativa|storytelling|descri[cç][aã]o|marca|branding|logo|manifesto|claim)\b', re.IGNORECASE),
+    re.compile(r'\b(arrum|ajust|melhor|organiz|cri|mont|faz|ger|alter|estrutur|coloc|bota|taca|mete|tira|arranca|limp|enxug|poda|sob|baix|rezum|resum|sintetiz|cadastr|aloc)\b', re.IGNORECASE),
 ]
 
 EMOJI_PATTERN = re.compile(

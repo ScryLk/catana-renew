@@ -10,6 +10,13 @@ import {
   PageLayoutType,
 } from '../data/aureaCatalog.mock';
 import { generateCatalogFromPrompt, GeneratedCatalogResult } from '../utils/catalogGenerator';
+import {
+  preprocessUserCommand,
+  parseSpelledNumber,
+  normalizeLayoutType,
+  isFuzzyMatch,
+  removeAccents,
+} from '../utils/textNormalizer';
 
 export const API_BASE_URL = (import.meta.env && import.meta.env.VITE_API_BASE_URL) || 'http://localhost:8000';
 let saveTimeout: any = null;
@@ -3212,7 +3219,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
 
   executeCopilotCommand: (command, attachments) => {
-    const lower = command.toLowerCase();
+    const preprocessed = preprocessUserCommand(command);
+    const lower = preprocessed.normalized;
     const state = get();
     const currentRole =
       state.roles.find((r) => r.id === state.activeRoleId) ||
@@ -3583,7 +3591,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       return;
     }
 
-    if (lower.startsWith('/revisao-geral') || lower.includes('revisão geral')) {
+    if (lower.startsWith('/revisao-geral') || lower.includes('revisao geral') || lower.includes('revisao total') || lower.includes('auditoria completa')) {
       set({ agentStatus: 'idle' });
       state.addMessage({
         role: 'assistant',
@@ -3602,14 +3610,23 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // ==========================================
     // 1. INTENT: REMOÇÃO DE PRODUTO
     // ==========================================
-    const isRemoveIntent = /(?:retire|remover|remova|tire|tirar|apague|apagar|deletar|excluir|limpar|desalocar|remover-produto)/i.test(lower);
+    const isRemoveIntent = /(?:retire|remover|remova|tire|tirar|apague|apagar|deletar|excluir|limpar|desalocar|remover-produto|arranca|arrancar|some|sumir)/i.test(lower);
     if (isRemoveIntent) {
-      const pageMatch = command.match(/(?:p[aá]gina|p[aá]g\.?|page)\s*(\d+)/i);
+      const pageMatch =
+        lower.match(/(?:pagina|pag)\s*(\d+|um|uma|primeira|primeiro|dois|duas|segunda|segundo|tres|terceira|terceiro|quatro|quarta|quarto|cinco|quinta|quinto|seis|meia|sexta|sexto|sete|setima|setimo|oito|oitava|oitavo)/i) ||
+        command.match(/(?:p[aá]gina|p[aá]g\.?|page|folha|l[aâ]mina)\s*(\d+|um|uma|primeira|dois|duas|segunda|tr[eê]s|quatro|cinco|seis|meia|sete|oito)/i);
       const slotMatch = command.match(/(?:slot|posi[cç][aã]o|posicao)\s*(\d+)/i);
       const slotIdx = slotMatch ? parseInt(slotMatch[1], 10) - 1 : undefined;
 
       // 1.1 Remover todos os produtos do catálogo
-      if (lower.includes('todos os produtos') || lower.includes('todo o catálogo') || lower.includes('todos produtos') || lower.includes('limpar catalogo') || lower.includes('limpar catálogo')) {
+      if (
+        lower.includes('todos os produtos') ||
+        lower.includes('todo o catalogo') ||
+        lower.includes('todos produtos') ||
+        lower.includes('limpar catalogo') ||
+        lower.includes('zerar catalogo') ||
+        lower.includes('limpar tudo')
+      ) {
         let totalRemoved = 0;
         const allRemoved: ProductItem[] = [];
         const newPages = state.pages.map((page) => {
@@ -3675,7 +3692,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
       // 1.2 Remoção com página explicitamente indicada (ex: "retire o produto alocado na pagina 3")
       if (pageMatch) {
-        const targetPageNum = parseInt(pageMatch[1], 10);
+        const targetPageNum = parseSpelledNumber(pageMatch[1]) || parseInt(pageMatch[1], 10);
         const targetPage = state.pages.find((p) => p.pageNumber === targetPageNum);
 
         if (!targetPage) {
@@ -3803,7 +3820,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       for (const p of state.pages) {
         if (!p.products) continue;
         for (const prod of p.products) {
-          if (lower.includes(prod.name.toLowerCase()) || (prod.sku && lower.includes(prod.sku.toLowerCase()))) {
+          const prodClean = removeAccents(prod.name.toLowerCase());
+          const skuClean = prod.sku ? prod.sku.toLowerCase() : '';
+          if (
+            lower.includes(prodClean) ||
+            (skuClean && lower.includes(skuClean)) ||
+            isFuzzyMatch(lower, prodClean)
+          ) {
             matchedPageNum = p.pageNumber;
             matchedProdId = prod.id;
             matchedProdName = prod.name;
@@ -3878,12 +3901,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // ==========================================
     // 2. INTENT: ALOCAÇÃO DE PRODUTO
     // ==========================================
-    const isAssignIntent = /(?:aloque|alocar|insira|inserir|coloque|colocar|adicione|adicionar)\s+(?:o\s+produto\s+)?(.+?)\s+na\s+p[aá]gina\s+(\d+)/i;
-    const assignMatch = command.match(isAssignIntent);
+    const isAssignIntent = /(?:aloque|alocar|insira|inserir|coloque|colocar|adicione|adicionar|bote|botar|taque|tacar|mete|meter|põe|poe)\s+(?:o\s+produto\s+)?(.+?)\s+na\s+(?:p[aá]gina|pagina)\s+(\d+|um|uma|primeira|dois|duas|segunda|tr[eê]s|tres|terceira|quatro|quarta|cinco|quinta|seis|meia|sete|setima|oito|oitava)/i;
+    const assignMatch = lower.match(isAssignIntent) || command.match(isAssignIntent);
     if (assignMatch) {
       const prodQuery = assignMatch[1].trim().toLowerCase();
-      const targetPageNum = parseInt(assignMatch[2], 10);
-      const slotMatch = command.match(/(?:slot|posi[cç][aã]o|posicao)\s*(\d+)/i);
+      const prodQueryClean = removeAccents(prodQuery);
+      const targetPageNum = parseSpelledNumber(assignMatch[2]) || parseInt(assignMatch[2], 10);
+      const slotMatch = command.match(/(?:slot|posi[cç][aã]o|posicao)\s*(\d+)/i) || lower.match(/(?:slot|posicao)\s*(\d+)/i);
       const slotIdx = slotMatch ? parseInt(slotMatch[1], 10) - 1 : 0;
 
       const allAvailable = [
@@ -3891,12 +3915,16 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         ...state.pages.flatMap((p) => p.products || []),
       ];
 
-      const foundProduct = allAvailable.find(
-        (p) =>
-          p.name.toLowerCase().includes(prodQuery) ||
-          prodQuery.includes(p.name.toLowerCase()) ||
-          (p.sku && p.sku.toLowerCase().includes(prodQuery))
-      ) || allAvailable[0];
+      const foundProduct = allAvailable.find((p) => {
+        const pNameClean = removeAccents(p.name.toLowerCase());
+        const pSkuClean = p.sku ? p.sku.toLowerCase() : '';
+        return (
+          pNameClean.includes(prodQueryClean) ||
+          prodQueryClean.includes(pNameClean) ||
+          (pSkuClean && pSkuClean.includes(prodQueryClean)) ||
+          isFuzzyMatch(prodQueryClean, pNameClean)
+        );
+      }) || allAvailable[0];
 
       if (foundProduct) {
         state.assignProductToSpread(foundProduct, targetPageNum, slotIdx);
@@ -3946,16 +3974,20 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // ==========================================
     // 2.1 INTENT: CADASTRO / CRIAÇÃO DE NOVO PRODUTO
     // ==========================================
-    const createProductMatch = command.match(
-      /(?:cadastre|cadastrar|crie|criar|adicione|adicionar)\s+(?:um\s+|novo\s+)?produto\s+["'“]?([^"'\n,]+?)["'”]?\s*(?:com\s+pre[cç]o\s+|com\s+valor\s+|custando\s+|por\s+)?(r?\$?\s*[\d.,]+)?(?:\s+na\s+p[aá]gina\s+(\d+))?$/i
-    );
+    const createProductMatch =
+      lower.match(
+        /(?:cadastre|cadastrar|crie|criar|adicione|adicionar)\s+(?:um\s+|novo\s+)?produto\s+["'“]?([^"'\n,]+?)["'”]?\s*(?:com\s+preco\s+|com\s+valor\s+|custando\s+|por\s+)?(r?\$?\s*[\d.,]+)?(?:\s+na\s+pagina\s+(\d+|um|uma|primeira|dois|duas|segunda|tres|terceira|quatro|quarta|cinco|quinta|seis|meia|sete|oito))?$/i
+      ) ||
+      command.match(
+        /(?:cadastre|cadastrar|crie|criar|adicione|adicionar)\s+(?:um\s+|novo\s+)?produto\s+["'“]?([^"'\n,]+?)["'”]?\s*(?:com\s+pre[cç]o\s+|com\s+valor\s+|custando\s+|por\s+)?(r?\$?\s*[\d.,]+)?(?:\s+na\s+p[aá]gina\s+(\d+))?$/i
+      );
 
     if (createProductMatch && !assignMatch) {
       const prodName = createProductMatch[1].trim();
       const rawPrice = createProductMatch[2] ? createProductMatch[2].trim() : 'R$ 890,00';
       const formattedPrice = rawPrice.startsWith('R$') ? rawPrice : `R$ ${rawPrice.replace(/[^\d.,]/g, '')}`;
       const pageNumStr = createProductMatch[3];
-      const targetPageNum = pageNumStr ? parseInt(pageNumStr, 10) : undefined;
+      const targetPageNum = pageNumStr ? (parseSpelledNumber(pageNumStr) || parseInt(pageNumStr, 10)) : undefined;
 
       const createdProduct = state.addProductToRepository({
         name: prodName,
@@ -4007,21 +4039,16 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // ==========================================
     // 3. INTENT: TROCA DE LAYOUT DA PÁGINA
     // ==========================================
-    const layoutMatch = command.match(
-      /(?:mude|altere|troque|transforme|converter|converta)\s+(?:a\s+)?p[aá]gina\s+(\d+)\s+para\s+(hero|duo|single|grade comercial|grade|grid_4|grid|manifesto|divis[oó]ria|divisoria|divider|capa|cover)/i
-    );
+    const layoutMatch =
+      lower.match(
+        /(?:mude|altere|troque|transforme|converter|converta)\s+(?:a\s+)?pagina\s+(\d+|um|uma|primeira|dois|duas|segunda|tres|terceira|quatro|quarta|cinco|quinta|seis|meia|sete|setima|oito|oitava)\s+para\s+(hero|duo|single|grade comercial|grade|grid_4|grid|manifesto|divisoria|divider|capa|cover)/i
+      ) ||
+      command.match(
+        /(?:mude|altere|troque|transforme|converter|converta)\s+(?:a\s+)?p[aá]gina\s+(\d+|um|uma|primeira|dois|duas|segunda|tr[eê]s|terceira|quatro|quarta|cinco|quinta|seis|meia|sete|setima|oito|oitava)\s+para\s+(hero|duo|single|grade comercial|grade|grid_4|grid|manifesto|divis[oó]ria|divisoria|divider|capa|cover)/i
+      );
     if (layoutMatch) {
-      const pageNum = parseInt(layoutMatch[1], 10);
-      const rawType = layoutMatch[2].toLowerCase();
-      let newType: CatalogPageData['type'] = 'hero';
-
-      if (rawType.includes('duo')) newType = 'duo';
-      else if (rawType.includes('grid') || rawType.includes('grade')) newType = 'grid_4';
-      else if (rawType.includes('single')) newType = 'single';
-      else if (rawType.includes('divis') || rawType.includes('divider')) newType = 'divider';
-      else if (rawType.includes('manifesto')) newType = 'manifesto';
-      else if (rawType.includes('capa') || rawType.includes('cover')) newType = 'cover';
-      else newType = 'hero';
+      const pageNum = parseSpelledNumber(layoutMatch[1]) || parseInt(layoutMatch[1], 10) || 1;
+      const newType = normalizeLayoutType(layoutMatch[2]);
 
       state.updatePage(pageNum, { type: newType });
       set({ agentStatus: 'idle' });
@@ -4058,24 +4085,17 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // ==========================================
     // 3.1 INTENT: REMOÇÃO DE PÁGINA DO CATÁLOGO
     // ==========================================
-    const pageWordMapForRemoval: Record<string, number> = {
-      um: 1, uma: 1, primeira: 1, primeiro: 1,
-      dois: 2, duas: 2, segunda: 2, segundo: 2,
-      tres: 3, três: 3, terceira: 3, terceiro: 3,
-      quatro: 4, quarta: 4, quarto: 4,
-      cinco: 5, quinta: 5, quinto: 5,
-      seis: 6, sexta: 6, sexto: 6,
-      sete: 7, setima: 7, sétima: 7,
-      oito: 8, oitava: 8, oitavo: 8,
-    };
-
-    const removePageMatch = command.match(
-      /(?:retire|retirar|remova|remover|apague|apagar|exclua|excluir|delete|deletar|elimine|eliminar)\s+(?:a\s+)?(?:p[aá]gina|p[aá]g\.?|page)?\s*(\d+|um|uma|primeira|primeiro|dois|duas|segunda|segundo|tr[eê]s|terceira|terceiro|quatro|quarta|quarto|cinco|quinta|quinto|seis|sexta|sexto|sete|s[eé]tima|s[eé]timo|oito|oitava|oitavo)\s*(?:p[aá]gina)?/i
-    );
+    const removePageMatch =
+      lower.match(
+        /(?:retire|retirar|remova|remover|apague|apagar|exclua|excluir|delete|deletar|elimine|eliminar)\s+(?:a\s+)?(?:pagina)?\s*(\d+|um|uma|primeira|primeiro|dois|duas|segunda|segundo|tres|terceira|terceiro|quatro|quarta|quarto|cinco|quinta|quinto|seis|meia|sexta|sexto|sete|setima|setimo|oito|oitava|oitavo)\s*(?:pagina)?/i
+      ) ||
+      command.match(
+        /(?:retire|retirar|remova|remover|apague|apagar|exclua|excluir|delete|deletar|elimine|eliminar)\s+(?:a\s+)?(?:p[aá]gina|p[aá]g\.?|page)?\s*(\d+|um|uma|primeira|primeiro|dois|duas|segunda|segundo|tr[eê]s|terceira|terceiro|quatro|quarta|quarto|cinco|quinta|quinto|seis|meia|sexta|sexto|sete|s[eé]tima|s[eé]timo|oito|oitava|oitavo)\s*(?:p[aá]gina)?/i
+      );
 
     if (removePageMatch) {
       const rawPage = removePageMatch[1].toLowerCase();
-      const pageNum = isNaN(parseInt(rawPage, 10)) ? (pageWordMapForRemoval[rawPage] || 1) : parseInt(rawPage, 10);
+      const pageNum = parseSpelledNumber(rawPage) || (isNaN(parseInt(rawPage, 10)) ? 1 : parseInt(rawPage, 10));
 
       state.removePage(pageNum);
       set({ agentStatus: 'idle' });
@@ -4108,25 +4128,20 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // ==========================================
     // 3.2 INTENT: ADIÇÃO DE PÁGINA AO CATÁLOGO
     // ==========================================
-    const addPageMatch = command.match(
-      /(?:adicione|adicionar|crie|criar|insira|inserir|acrescente|acrescentar)\s+(?:uma\s+|nova\s+)?(?:p[aá]gina|p[aá]g\.?|page|l[aâ]mina)(?:\s+(hero|duo|single|grade comercial|grade|grid_4|grid|manifesto|divis[oó]ria|divisoria|divider|capa|cover))?(?:\s+(?:ap[oó]s|depois\s+da)\s+p[aá]gina\s+(\d+|um|uma|primeira|dois|duas|segunda|tr[eê]s|terceira|quatro|quarta|cinco|quinta))?/i
-    ) || command.match(/\/novo-spread/i);
+    const addPageMatch =
+      lower.match(
+        /(?:adicione|adicionar|crie|criar|insira|inserir|acrescente|acrescentar)\s+(?:uma\s+|nova\s+)?(?:pagina|lamina)(?:\s+(hero|duo|single|grade comercial|grade|grid_4|grid|manifesto|divisoria|divider|capa|cover))?(?:\s+(?:apos|depois\s+da)\s+pagina\s+(\d+|um|uma|primeira|dois|duas|segunda|tres|terceira|quatro|quarta|cinco|quinta|seis|meia))?/i
+      ) ||
+      command.match(
+        /(?:adicione|adicionar|crie|criar|insira|inserir|acrescente|acrescentar)\s+(?:uma\s+|nova\s+)?(?:p[aá]gina|p[aá]g\.?|page|l[aâ]mina)(?:\s+(hero|duo|single|grade comercial|grade|grid_4|grid|manifesto|divis[oó]ria|divisoria|divider|capa|cover))?(?:\s+(?:ap[oó]s|depois\s+da)\s+p[aá]gina\s+(\d+|um|uma|primeira|dois|duas|segunda|tr[eê]s|terceira|quatro|quarta|cinco|quinta))?/i
+      ) ||
+      command.match(/\/novo-spread/i);
 
     if (addPageMatch) {
       const rawLayout = (addPageMatch[1] || 'hero').toLowerCase();
-      let newType: CatalogPageData['type'] = 'hero';
-      if (rawLayout.includes('duo')) newType = 'duo';
-      else if (rawLayout.includes('grid') || rawLayout.includes('grade')) newType = 'grid_4';
-      else if (rawLayout.includes('single')) newType = 'single';
-      else if (rawLayout.includes('divis') || rawLayout.includes('divider')) newType = 'divider';
-      else if (rawLayout.includes('manifesto')) newType = 'manifesto';
-      else if (rawLayout.includes('capa') || rawLayout.includes('cover')) newType = 'cover';
-      else newType = 'hero';
-
+      const newType = normalizeLayoutType(rawLayout);
       const rawAfter = (addPageMatch[2] || '').toLowerCase();
-      const afterNum = rawAfter
-        ? (isNaN(parseInt(rawAfter, 10)) ? (pageWordMapForRemoval[rawAfter] || undefined) : parseInt(rawAfter, 10))
-        : undefined;
+      const afterNum = rawAfter ? (parseSpelledNumber(rawAfter) || parseInt(rawAfter, 10)) : undefined;
 
       state.addPage({ type: newType, afterPage: afterNum });
       set({ agentStatus: 'idle' });
@@ -4165,51 +4180,59 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // ==========================================
     // 4. INTENT: NAVEGAÇÃO DE PÁGINAS
     // ==========================================
-    const navMatch = command.match(
-      /(?:v[aá]|navegue|navegar|ir|mostrar|mostre|abra|abrir|exibir|exiba)\s+(?:para\s+a\s+|o\s+|a\s+)?(?:p[aá]gina|p[aá]g\.?|page)\s*(\d+)/i
-    );
+    const navMatch =
+      lower.match(
+        /(?:va|vai|navegue|navegar|ir|mostrar|mostre|abra|abrir|exibir|exiba)\s+(?:para\s+a\s+|para\s+|pra\s+a\s+|pra\s+|o\s+|a\s+)?(?:pagina)\s*(\d+|um|uma|primeira|dois|duas|segunda|tres|quatro|cinco|seis|meia|sete|oito|nove|dez)/i
+      ) ||
+      command.match(
+        /(?:v[aá]|navegue|navegar|ir|mostrar|mostre|abra|abrir|exibir|exiba)\s+(?:para\s+a\s+|para\s+|pra\s+a\s+|pra\s+|o\s+|a\s+)?(?:p[aá]gina|p[aá]g\.?|page|folha|l[aâ]mina)\s*(\d+|um|uma|primeira|dois|duas|segunda|tr[eê]s|quatro|cinco|seis|meia|sete|oito|nove|dez)/i
+      );
     if (navMatch) {
-      const pageNum = parseInt(navMatch[1], 10);
-      if (pageNum >= 1 && pageNum <= state.totalPages) {
-        const spreadIdx = Math.floor((pageNum - 1) / 2);
+      const targetPageNum = parseSpelledNumber(navMatch[1]) || parseInt(navMatch[1], 10);
+      if (targetPageNum && targetPageNum >= 1 && targetPageNum <= state.totalPages) {
+        const spreadIdx = Math.floor((targetPageNum - 1) / 2);
         state.goToSpread(spreadIdx);
         set({ agentStatus: 'idle' });
-        toast.info(`Navegando para a Página ${String(pageNum).padStart(2, '0')}`, {
+        toast.info(`Navegando para a Página ${String(targetPageNum).padStart(2, '0')}`, {
           description: `Lâmina ${spreadIdx + 1} de ${Math.ceil(state.totalPages / 2)} centralizada no canvas.`,
         });
 
         state.addMessage({
           role: 'assistant',
-          content: `Navegando para a **Página ${String(pageNum).padStart(2, '0')}** (Lâmina ${spreadIdx + 1} de ${Math.ceil(state.totalPages / 2)}).`,
+          content: `Navegando para a **Página ${String(targetPageNum).padStart(2, '0')}** (Lâmina ${spreadIdx + 1} de ${Math.ceil(state.totalPages / 2)}).`,
           reasoning: 'Racional [Navegação]: Prancheta centralizada na lâmina solicitada.',
-          actions: [`Navegação para a Página ${String(pageNum).padStart(2, '0')} (Lâmina ${spreadIdx + 1})`],
+          actions: [`Navegação para a Página ${String(targetPageNum).padStart(2, '0')} (Lâmina ${spreadIdx + 1})`],
         });
         return;
       }
     }
 
-    const pageWordToNumber: Record<string, number> = {
-      um: 1, uma: 1, primeira: 1, primeiro: 1,
-      dois: 2, duas: 2, segunda: 2, segundo: 2,
-      tres: 3, três: 3, terceira: 3, terceiro: 3,
-      quatro: 4, quarta: 4, quarto: 4,
-      cinco: 5, quinta: 5, quinto: 5,
-      seis: 6, sexta: 6, sexto: 6,
-      sete: 7, setima: 7, sétima: 7,
-      oito: 8, oitava: 8, oitavo: 8,
-    };
-
     // ==========================================
     // 4.9 INTENT: RESUMO / SÍNTESE DE CONTEÚDO EDITORIAL
     // ==========================================
-    const summarizeMatch = command.match(
-      /(?:resuma|resumir|sintetize|sintetizar|encurte|encurtar|condense|condensar)\s+(?:o\s+)?(?:texto|conte[uú]do|copy|narrativa|frase)?\s*(?:da\s+)?(?:p[aá]gina|p[aá]g\.?|page)?\s*(\d+|um|uma|primeira|dois|duas|segunda|tr[eê]s|terceira|quatro|quarta|cinco|quinta|seis|sexta|sete|s[eé]tima|oito|oitava)?/i
-    ) || command.match(/\/sintese-b2b/i);
+    const summarizeMatch =
+      lower.match(
+        /(?:resuma|resumir|sintetize|sintetizar|encurte|encurtar|condense|condensar|enxugar|enxuga|podar|poda|simplificar|simplifique)\s+(?:o\s+)?(?:texto|conteudo|copy|narrativa|frase)?\s*(?:da\s+)?(?:pagina)?\s*(\d+|um|uma|primeira|dois|duas|segunda|tres|terceira|quatro|quarta|cinco|quinta|seis|meia|sexta|sete|setima|oito|oitava)?/i
+      ) ||
+      command.match(
+        /(?:resuma|resumir|sintetize|sintetizar|encurte|encurtar|condense|condensar|enxugar|enxuga|podar|poda|simplificar|simplifique)\s+(?:o\s+)?(?:texto|conte[uú]do|copy|narrativa|frase)?\s*(?:da\s+)?(?:p[aá]gina|p[aá]g\.?|page|folha|l[aâ]mina)?\s*(\d+|um|uma|primeira|dois|duas|segunda|tr[eê]s|terceira|quatro|quarta|cinco|quinta|seis|meia|sexta|sete|s[eé]tima|oito|oitava)?/i
+      ) ||
+      command.match(/\/sintese-b2b/i);
 
-    if (summarizeMatch && (lower.includes('resum') || lower.includes('sintet') || lower.includes('encurt') || lower.includes('condens') || lower.includes('sintese-b2b'))) {
-      const rawP = (summarizeMatch[1] || '').toLowerCase();
+    const isSummarizeTrigger =
+      Boolean(summarizeMatch) ||
+      lower.includes('resum') ||
+      lower.includes('sintet') ||
+      lower.includes('encurt') ||
+      lower.includes('condens') ||
+      lower.includes('enxug') ||
+      lower.includes('poda') ||
+      lower.includes('sintese-b2b');
+
+    if (isSummarizeTrigger && !lower.includes('reajuste') && !lower.includes('layout')) {
+      const rawP = summarizeMatch ? (summarizeMatch[1] || '').toLowerCase() : '';
       const targetPageNum = rawP
-        ? (isNaN(parseInt(rawP, 10)) ? (pageWordToNumber[rawP] || state.currentSpread[0]) : parseInt(rawP, 10))
+        ? (parseSpelledNumber(rawP) || parseInt(rawP, 10) || state.currentSpread[0])
         : state.currentSpread[0];
 
       state.summarizePageContent(targetPageNum);
@@ -4250,15 +4273,26 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // ==========================================
     // 5. INTENT: EDIÇÃO DE TÍTULO / TEXTO / MANIFESTO / SUBTÍTULO
     // ==========================================
-    const pageTextMatch = command.match(
-      /(?:mude|altere|troque|coloque|ajuste|atualize|editar|edite|trocar|mudar)\s+(?:o\s+)?(texto|t[ií]tulo|subt[ií]tulo|claim|legenda|label|frase|headline|conte[uú]do)\s+(?:da\s+)?(?:p[aá]gina|p[aá]g\.?|page)\s+(\d+|um|uma|primeira|primeiro|dois|duas|segunda|segundo|tr[eê]s|terceira|terceiro|quatro|quarta|quarto|cinco|quinta|quinto|seis|sexta|sexto|sete|s[eé]tima|s[eé]timo|oito|oitava|oitavo)\s+(?:para:?|por:?|como:?)\s*["'“]?(.+?)["'”]?$/i
-    );
+    const pageTextMatch =
+      command.match(
+        /(?:mude|mudar|altere|alterar|troque|trocar|coloque|colocar|ajuste|ajustar|atualize|atualizar|editar|edite|bota|botar)\s+(?:o\s+)?(texto|t[ií]tulo|titulo|subt[ií]tulo|subtitulo|claim|legenda|label|frase|headline|conte[uú]do|conteudo)\s+(?:da\s+)?(?:p[aá]gina|p[aá]g\.?|page|folha|l[aâ]mina|prancha)\s*(\d+|um|uma|primeira|primeiro|dois|duas|segunda|segundo|tr[eê]s|tres|terceira|terceiro|quatro|quarta|quarto|cinco|quinta|quinto|seis|meia|sexta|sexto|sete|s[eé]tima|setima|s[eé]timo|setimo|oito|oitava|oitavo)\s+(?:para:?|por:?|como:?)\s*["'“]?(.+?)["'”]?$/i
+      ) ||
+      lower.match(
+        /(?:mude|mudar|altere|alterar|troque|trocar|coloque|colocar|ajuste|ajustar|atualize|atualizar|editar|edite|adicionar|bota)\s+(?:o\s+)?(texto|titulo|subtitulo|claim|legenda|label|frase|headline|conteudo)\s+(?:da\s+)?(?:pagina)\s*(\d+|um|uma|primeira|primeiro|dois|duas|segunda|segundo|tres|terceira|terceiro|quatro|quarta|quarto|cinco|quinta|quinto|seis|meia|sexta|sexto|sete|setima|setimo|oito|oitava|oitavo)\s+(?:para:?|por:?|como:?)\s*["'“]?(.+?)["'”]?$/i
+      );
 
     if (pageTextMatch) {
-      const fieldType = pageTextMatch[1].toLowerCase();
+      const fieldType = (pageTextMatch[1] || 'texto').toLowerCase();
       const rawPage = pageTextMatch[2].toLowerCase();
-      const pageNum = isNaN(parseInt(rawPage, 10)) ? (pageWordToNumber[rawPage] || 1) : parseInt(rawPage, 10);
-      const newText = pageTextMatch[3].trim().replace(/^["':]|["']$/g, '').trim();
+      const pageNum = parseSpelledNumber(rawPage) || parseInt(rawPage, 10) || 1;
+
+      // Extrai o texto preservando a pontuação e caixa alta/baixa original do usuário
+      let newText = pageTextMatch[3]?.trim() || '';
+      const separatorMatch = command.match(/(?:para:?|por:?|como:?)\s*["'“]?(.+?)["'”]?$/i);
+      if (separatorMatch && separatorMatch[1]) {
+        newText = separatorMatch[1].trim();
+      }
+      newText = newText.replace(/^["':]|["']$/g, '').trim();
 
       const targetPageObj = state.pages.find((p) => p.pageNumber === pageNum);
       const isManifesto = targetPageObj?.type === 'manifesto';
@@ -4321,13 +4355,24 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // ==========================================
     // 5.1 INTENT: REAJUSTE DE PREÇOS EM MASSA / PERCENTUAL
     // ==========================================
-    const pctPriceMatch = command.match(
-      /(?:reajuste|reajustar|aumente|aumentar|reduza|reduzir|eleve|elevar|suba|subir|desconto|abaixe|abaixar)\s+(?:os\s+)?pre[cç]os\s+(?:em\s+)?([+-]?\d+(?:[.,]\d+)?)\s*%/i
-    ) || command.match(/\/reajustar-precos\s*([+-]?\d+)?/i);
+    const pctPriceMatch =
+      lower.match(
+        /(?:reajuste|reajustar|aumente|aumentar|reduza|reduzir|eleve|elevar|suba|subir|desconto|abaixe|abaixar|cortar|corta|sobe|baixa)\s+(?:os\s+)?precos?\s+(?:em\s+|de\s+)?([+-]?\d+(?:[.,]\d+)?)\s*%/i
+      ) ||
+      command.match(
+        /(?:reajuste|reajustar|aumente|aumentar|reduza|reduzir|eleve|elevar|suba|subir|desconto|abaixe|abaixar|cortar|corta|sobe|baixa)\s+(?:os\s+)?pre[cç]os?\s+(?:em\s+|de\s+)?([+-]?\d+(?:[.,]\d+)?)\s*%/i
+      ) ||
+      command.match(/\/reajustar-precos\s*([+-]?\d+)?/i);
 
     if (pctPriceMatch) {
       const rawPct = pctPriceMatch[1] ? parseFloat(pctPriceMatch[1].replace(',', '.')) : 10;
-      const isReduction = lower.includes('reduz') || lower.includes('desconto') || lower.includes('abaix') || rawPct < 0;
+      const isReduction =
+        lower.includes('reduz') ||
+        lower.includes('desconto') ||
+        lower.includes('abaix') ||
+        lower.includes('baixa') ||
+        lower.includes('corta') ||
+        rawPct < 0;
       const pct = Math.abs(rawPct);
 
       state.applySpreadPatch({
@@ -4490,9 +4535,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // ==========================================
     // 5.4 INTENT: REMOÇÃO DE FUNDO DE IMAGEM
     // ==========================================
-    const bgRemovalMatch = command.match(
-      /(?:remova|remover|retire|retirar|isole|isolar|fundo\s+transparente)\s+(?:o\s+)?fundo\s+(?:da\s+imagem|da\s+foto|do\s+produto)?\s*(?:de|do|da)?\s*(.+)?/i
-    );
+    const bgRemovalMatch =
+      lower.match(
+        /(?:remova|remover|retire|retirar|isole|isolar|fundo\s+transparente|tira|tirar)\s+(?:o\s+)?fundo\s+(?:da\s+imagem|da\s+foto|do\s+produto)?\s*(?:de|do|da)?\s*(.+)?/i
+      ) ||
+      command.match(
+        /(?:remova|remover|retire|retirar|isole|isolar|fundo\s+transparente|tira|tirar)\s+(?:o\s+)?fundo\s+(?:da\s+imagem|da\s+foto|do\s+produto)?\s*(?:de|do|da)?\s*(.+)?/i
+      );
 
     if (bgRemovalMatch) {
       const prodQuery = (bgRemovalMatch[1] || '').trim();
@@ -4504,13 +4553,18 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       let targetPageNum: number | undefined;
 
       if (prodQuery) {
+        const queryClean = removeAccents(prodQuery);
         for (const p of state.pages) {
-          const match = p.products?.find(
-            (pr) =>
-              pr.name.toLowerCase().includes(prodQuery.toLowerCase()) ||
-              prodQuery.toLowerCase().includes(pr.name.toLowerCase()) ||
-              (pr.sku && pr.sku.toLowerCase().includes(prodQuery.toLowerCase()))
-          );
+          const match = p.products?.find((pr) => {
+            const prNameClean = removeAccents(pr.name);
+            const prSkuClean = pr.sku ? pr.sku.toLowerCase() : '';
+            return (
+              prNameClean.includes(queryClean) ||
+              queryClean.includes(prNameClean) ||
+              (prSkuClean && prSkuClean.includes(queryClean)) ||
+              isFuzzyMatch(queryClean, prNameClean)
+            );
+          });
           if (match) {
             targetProd = match;
             targetPageNum = p.pageNumber;
@@ -4518,11 +4572,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           }
         }
         if (!targetProd) {
-          targetProd = state.unassignedProducts.find(
-            (pr) =>
-              pr.name.toLowerCase().includes(prodQuery.toLowerCase()) ||
-              prodQuery.toLowerCase().includes(pr.name.toLowerCase())
-          );
+          targetProd = state.unassignedProducts.find((pr) => {
+            const prNameClean = removeAccents(pr.name);
+            return (
+              prNameClean.includes(queryClean) ||
+              queryClean.includes(prNameClean) ||
+              isFuzzyMatch(queryClean, prNameClean)
+            );
+          });
         }
       }
 
@@ -4572,10 +4629,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       }
     }
 
-    // 6. Mudança de Preço
+    // 6. Mudança de Preço de Produto Específico
     const priceMatch = command.match(/r?\$?\s*([0-9]+[.,]?[0-9]*)/i);
-    if ((lower.includes('preço') || lower.includes('valor') || lower.includes('custa')) && priceMatch) {
-      const newPrice = `R$ ${priceMatch[1]}`;
+    const isSinglePriceIntent = (lower.includes('preco') || lower.includes('valor') || lower.includes('custa')) && Boolean(priceMatch);
+    if (isSinglePriceIntent && !pctPriceMatch) {
+      const newPrice = `R$ ${priceMatch![1]}`;
       let targetProduct = 'Bolsa Aurelia';
       let updated = false;
 
@@ -4584,9 +4642,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         return {
           ...p,
           products: p.products.map((prod) => {
+            const prodClean = removeAccents(prod.name.toLowerCase());
             if (
               (state.selectedElementId && state.selectedElementId.includes(prod.id)) ||
-              lower.includes(prod.name.toLowerCase()) ||
+              lower.includes(prodClean) ||
               (!updated && prod.id === 'prod-bolsa')
             ) {
               updated = true;
@@ -4632,8 +4691,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
 
     // 2. Mudança de Título ou Coleção
-    if (lower.includes('título') || lower.includes('coleção') || lower.includes('nome')) {
-      const cleanTitle = command.replace(/(mude|altere|troque|coloque|para|o|título|da|coleção|do|catálogo|:)+/gi, '').trim();
+    if (lower.includes('titulo') || lower.includes('colecao') || lower.includes('nome do catalogo')) {
+      const cleanTitle = command.replace(/(mude|altere|troque|coloque|para|o|título|titulo|da|coleção|colecao|do|catálogo|catalogo|:)+/gi, '').trim();
       const updatedTitle = cleanTitle.length > 2 ? cleanTitle : (state.catalogTitle || 'Novo Catálogo');
       
       set({ catalogTitle: updatedTitle, agentStatus: 'idle' });
@@ -4707,19 +4766,21 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       lower.includes('minimaliste') ||
       lower.includes('fundo') ||
       lower.includes('acento') ||
-      lower.includes('primária') ||
       lower.includes('primaria') ||
-      lower.includes('secundária') ||
       lower.includes('secundaria');
 
     if (isColorCommand && !lower.includes('remover fundo') && !lower.includes('sem fundo')) {
       // Caso 4.0: Cor específica de uma página (ex: "mude a cor da página 2 para #1A1817")
-      const pageColorMatch = command.match(
-        /(?:cor|fundo|acento)\s+(?:da\s+)?p[aá]gina\s+(\d+|um|uma|primeira|dois|duas|segunda)\s+(?:para\s+)?(#[0-9a-fA-F]{3,6}|preto|branco|claro|escuro|dourado)/i
-      );
+      const pageColorMatch =
+        lower.match(
+          /(?:cor|fundo|acento)\s+(?:da\s+)?pagina\s+(\d+|um|uma|primeira|dois|duas|segunda|tres|quatro|cinco|seis|meia|sete|oito)\s+(?:para\s+)?(#[0-9a-f]{3,6}|preto|branco|claro|escuro|dourado)/i
+        ) ||
+        command.match(
+          /(?:cor|fundo|acento)\s+(?:da\s+)?p[aá]gina\s+(\d+|um|uma|primeira|dois|duas|segunda)\s+(?:para\s+)?(#[0-9a-fA-F]{3,6}|preto|branco|claro|escuro|dourado)/i
+        );
       if (pageColorMatch) {
         const rawP = pageColorMatch[1].toLowerCase();
-        const pNum = isNaN(parseInt(rawP, 10)) ? (pageWordToNumber[rawP] || 1) : parseInt(rawP, 10);
+        const pNum = parseSpelledNumber(rawP) || parseInt(rawP, 10) || 1;
         const colorVal = pageColorMatch[2].toLowerCase();
         let targetHex = colorVal.startsWith('#') ? colorVal : '#1A1817';
         if (colorVal === 'branco' || colorVal === 'claro') targetHex = '#FFFFFF';
@@ -4743,7 +4804,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       if (hexMatch) {
         const hex = hexMatch[0];
         const isAccent = lower.includes('acento') || lower.includes('detalhe') || lower.includes('ouro') || lower.includes('metal');
-        const isBg = lower.includes('fundo') || lower.includes('background') || lower.includes('página');
+        const isBg = lower.includes('fundo') || lower.includes('background') || lower.includes('pagina');
         const updatedPal: StudioPalette = {
           ...state.activePalette,
           accent: isAccent ? hex : state.activePalette.accent,
@@ -4828,7 +4889,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       lower.includes('exportar pdf') ||
       lower.includes('baixar pdf') ||
       lower.includes('gerar pdf') ||
-      lower.includes('exportar catálogo') ||
+      lower.includes('exportar catalogo') ||
       lower.includes('imprimir')
     ) {
       state.openExportModal('pdf');
