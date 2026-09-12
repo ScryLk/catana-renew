@@ -20,7 +20,6 @@ import {
   CloudOff,
   Sparkles,
   Package,
-  Cpu,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
 import { Tooltip } from '../ui/Tooltip';
@@ -48,7 +47,6 @@ export const CanvasTopToolbar: React.FC = () => {
     isCoPilotOpen,
     toggleCoPilot,
     openExportModal,
-    openSystemDesignModal,
     pages,
     unassignedProducts,
     isProductDrawerOpen,
@@ -447,21 +445,6 @@ export const CanvasTopToolbar: React.FC = () => {
           </button>
         </Tooltip>
 
-        {/* System Design & Agent Playground Action */}
-        <Tooltip text="System Design & Laboratório de Agentes" position="bottom">
-          <button
-            type="button"
-            onClick={openSystemDesignModal}
-            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-              isDark
-                ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white'
-                : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300 text-zinc-700 hover:text-zinc-950'
-            }`}
-            aria-label="Abrir System Design e Laboratório de Agentes"
-          >
-            <Cpu className="size-3.5" />
-          </button>
-        </Tooltip>
 
         {/* Quick Export Action: Compartilhar (Icon only with Tooltip) */}
         <Tooltip text="Compartilhar catálogo (copiar link público)" position="bottom">

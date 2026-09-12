@@ -126,16 +126,19 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // O cookie catana_refresh_token e enviado automaticamente pelo browser
+        const storedRefresh = localStorage.getItem('refresh_token');
         const response = await axios.post(
           `${API_BASE_URL}/api/auth/token/refresh/`,
-          {},
+          { refresh: storedRefresh || undefined },
           { withCredentials: true }
         );
 
-        const { access } = response.data;
+        const { access, refresh: newRefresh } = response.data;
         setInMemoryAccessToken(access);
         localStorage.setItem('access_token', access);
+        if (newRefresh) {
+          localStorage.setItem('refresh_token', newRefresh);
+        }
 
         processQueue(null, access);
 

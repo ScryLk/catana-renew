@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import axios from 'axios';
+import api from '../services/api';
 import { toast } from 'sonner';
 import {
   CatalogPageData,
@@ -723,7 +724,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   generateAIProductImage: async (productId, name, category, description) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/v2/studio/products/generate-image/`, {
+      const response = await api.post(`/api/v2/studio/products/generate-image/`, {
         name,
         category: category || '',
         description: description || '',
@@ -731,12 +732,16 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       const imageUrl = response.data?.image_url;
       if (imageUrl) {
         get().updateProduct(productId, { image: imageUrl });
-        toast.success(`Fotografia de estudio gerada para "${name}"!`);
+        toast.success(`Fotografia de estúdio gerada para "${name}"!`);
         return imageUrl;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn('[generateAIProductImage] Falha ao gerar imagem com IA:', err);
-      toast.error('Falha ao gerar imagem com IA para o produto.');
+      if (err?.response?.status === 401) {
+        window.dispatchEvent(new CustomEvent('catana:unauthorized'));
+      } else {
+        toast.error('Falha ao gerar imagem com IA para o produto.');
+      }
     }
     return null;
   },
@@ -815,8 +820,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }, 1800);
 
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/api/v2/studio/catalogs/generate/`,
+      const response = await api.post(
+        `/api/v2/studio/catalogs/generate/`,
         { prompt, products },
         { timeout: 50000 }
       );
@@ -1525,23 +1530,23 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
     toast.info('Isolando produto e removendo fundo com IA...');
     try {
-      const token = localStorage.getItem('access_token');
-      const res = await axios.post(
-        `${API_BASE_URL}/api/v2/studio/media/remove-background/`,
-        { image_url: prod.image },
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          withCredentials: true,
-        }
+      const res = await api.post(
+        `/api/v2/studio/media/remove-background/`,
+        { image_url: prod.image }
       );
 
       if (res.data && res.data.processed_url) {
         get().updateProduct(productId, { image: res.data.processed_url });
         toast.success('Fundo do produto removido com sucesso!');
       }
-    } catch (err) {
-      console.warn('Falha na remocao de fundo:', err);
-      toast.error('Nao foi possivel remover o fundo desta imagem.');
+    } catch (err: any) {
+      console.warn('Falha na remoção de fundo:', err);
+      if (err?.response?.status === 401) {
+        window.dispatchEvent(new CustomEvent('catana:unauthorized'));
+        toast.error('Sessão expirada. Acesse sua conta novamente para continuar.');
+      } else {
+        toast.error('Não foi possível remover o fundo desta imagem.');
+      }
     }
   },
 
@@ -1640,20 +1645,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     set({ saveStatus: 'saving' });
 
     try {
-      const token = localStorage.getItem('access_token');
       const numericCatalogId = parseInt(catalogId, 10);
       if (!isNaN(numericCatalogId)) {
-        await axios.post(
-          `${API_BASE_URL}/api/v2/studio/catalogs/${numericCatalogId}/spreads/`,
+        await api.post(
+          `/api/v2/studio/catalogs/${numericCatalogId}/spreads/`,
           {
             spread_index: Math.floor((leftPageNum - 1) / 2),
             title: `Spread ${leftPageNum}-${rightPageNum}`,
             left_page_elements: leftPage ? [leftPage] : [],
             right_page_elements: rightPage ? [rightPage] : [],
-          },
-          {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-            withCredentials: true,
           }
         );
       }
@@ -1997,8 +1997,32 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
           case 'remove_background': {
             const targetP = typeof targetPage === 'number' ? targetPage : leftPageNum;
-            if (prodId) {
-              get().removeProductBackground(targetP, prodId);
+            let targetProdId = prodId;
+            if (!targetProdId) {
+              const targetPageObj = get().pages.find((p) => p.pageNumber === targetP);
+              if (targetPageObj?.products && targetPageObj.products.length > 0) {
+                targetProdId = targetPageObj.products[0].id;
+              }
+            }
+            if (targetProdId) {
+              get().removeProductBackground(targetP, targetProdId);
+            }
+            break;
+          }
+
+          case 'remove_image':
+          case 'clear_image': {
+            const targetP = typeof targetPage === 'number' ? targetPage : leftPageNum;
+            let targetProdId = prodId;
+            if (!targetProdId) {
+              const targetPageObj = get().pages.find((p) => p.pageNumber === targetP);
+              if (targetPageObj?.products && targetPageObj.products.length > 0) {
+                targetProdId = targetPageObj.products[0].id;
+              }
+            }
+            if (targetProdId) {
+              get().updateProduct(targetProdId, { image: '' });
+              toast.success(`Imagem do produto na Página ${targetP} removida.`);
             }
             break;
           }
@@ -2183,17 +2207,53 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     };
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v2/studio/chat/stream/`, {
+      let activeToken = token;
+      let response = await fetch(`${API_BASE_URL}/api/v2/studio/chat/stream/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
         },
         credentials: 'include',
         body: JSON.stringify(payload),
       });
 
+      if (!response.ok && response.status === 401) {
+        try {
+          const storedRefresh = localStorage.getItem('refresh_token');
+          const refreshRes = await axios.post(
+            `${API_BASE_URL}/api/auth/token/refresh/`,
+            { refresh: storedRefresh || undefined },
+            { withCredentials: true }
+          );
+          const newAccess = refreshRes.data?.access;
+          if (newAccess && typeof newAccess === 'string') {
+            activeToken = newAccess;
+            localStorage.setItem('access_token', newAccess);
+            if (refreshRes.data.refresh) {
+              localStorage.setItem('refresh_token', refreshRes.data.refresh);
+            }
+            response = await fetch(`${API_BASE_URL}/api/v2/studio/chat/stream/`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${newAccess}`,
+              },
+              credentials: 'include',
+              body: JSON.stringify(payload),
+            });
+          }
+        } catch {
+          // Refresh falhou
+        }
+      }
+
       if (!response.ok) {
+        if (response.status === 401) {
+          window.dispatchEvent(new CustomEvent('catana:unauthorized'));
+          set({ agentStatus: 'idle' });
+          return;
+        }
         throw new Error(`HTTP ${response.status}`);
       }
 
@@ -2231,6 +2291,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
               if (actType === 'set_palette') return 'Paleta cromática do catálogo atualizada';
               if (actType === 'brand_lock') return (act.locked ?? params.locked) ? 'Trava de Marca (Brand Lock) ativada' : 'Trava de Marca desativada';
               if (actType === 'remove_background') return 'Isolamento de silhueta e recorte de fundo executados';
+              if (actType === 'remove_image' || actType === 'clear_image') return `Imagem do produto na Página ${pageNum || 'visível'} removida`;
               if (actType === 'generate_photo') return 'Fotografia de estúdio em alta resolução gerada com IA';
               if (actType === 'update_text') return `Texto da Página ${pageNum || 1} (${field || 'conteúdo'}) atualizado`;
               return actType;

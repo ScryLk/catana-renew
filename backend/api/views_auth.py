@@ -146,6 +146,9 @@ class CatanaTokenRefreshView(APIView):
         except Exception:
             pass
 
+        if 'refresh' in data:
+            response_payload['refresh'] = data['refresh']
+
         response = Response(response_payload, status=status.HTTP_200_OK)
 
         # Se a rotacao gerou um novo refresh token, atualiza o cookie

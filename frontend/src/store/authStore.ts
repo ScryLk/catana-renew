@@ -2,6 +2,7 @@ import { logger } from '../utils/logger';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import axios from 'axios';
+import { toast } from 'sonner';
 import { setInMemoryAccessToken } from '../services/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -42,7 +43,7 @@ interface AuthStore {
   closeAuthModal: () => void;
   login: (credentials: { username: string; password: string }) => Promise<void>;
   googleLogin: (credential: string) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: (promptRelogin?: boolean) => Promise<void>;
   checkAuth: () => Promise<void>;
   silentRefresh: () => Promise<boolean>;
   clearError: () => void;
@@ -226,15 +227,19 @@ export const useAuthStore = create<AuthStore>()(
 
       silentRefresh: async () => {
         try {
+          const storedRefresh = localStorage.getItem('refresh_token');
           const response = await axios.post(
             `${API_BASE_URL}/api/auth/token/refresh/`,
-            {},
+            { refresh: storedRefresh || undefined },
             { withCredentials: true }
           );
 
-          const { access, user: rawUser } = response.data;
+          const { access, refresh: newRefresh, user: rawUser } = response.data;
           setInMemoryAccessToken(access);
           localStorage.setItem('access_token', access);
+          if (newRefresh) {
+            localStorage.setItem('refresh_token', newRefresh);
+          }
 
           let user = get().user;
           if (rawUser) {
@@ -280,11 +285,12 @@ export const useAuthStore = create<AuthStore>()(
         }
       },
 
-      logout: async () => {
+      logout: async (promptRelogin = false) => {
         try {
+          const storedRefresh = localStorage.getItem('refresh_token');
           await axios.post(
             `${API_BASE_URL}/api/auth/logout/`,
-            {},
+            { refresh: storedRefresh || undefined },
             { withCredentials: true }
           );
         } catch (e) {
@@ -295,7 +301,19 @@ export const useAuthStore = create<AuthStore>()(
           localStorage.removeItem('refresh_token');
           localStorage.removeItem('active_organization');
           localStorage.removeItem('active_sede');
-          set({ user: null, token: null, isAuthenticated: false, isAuthModalOpen: true, authModalView: 'login' });
+          set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            isAuthModalOpen: promptRelogin,
+            authModalView: 'login',
+          });
+          if (promptRelogin) {
+            toast.error('Sessão expirada. Acesse sua conta novamente para continuar com segurança.', {
+              id: 'catana-session-expired',
+              duration: 8000,
+            });
+          }
         }
       },
 
@@ -446,9 +464,24 @@ export const useAuthStore = create<AuthStore>()(
   )
 );
 
-// Listener global para tratar expiracao de sessao (HTTP 401) sem destruir a tela atual
+// Listener global para tratar expiracao de sessao (HTTP 401) e perda de conexao
 if (typeof window !== 'undefined') {
   window.addEventListener('catana:unauthorized', () => {
-    useAuthStore.getState().logout();
+    useAuthStore.getState().logout(true);
+  });
+
+  window.addEventListener('offline', () => {
+    toast.error('Conexão perdida. Verifique sua rede de internet.', {
+      id: 'catana-offline-toast',
+      duration: 6000,
+    });
+  });
+
+  window.addEventListener('online', () => {
+    toast.success('Conexão restabelecida!', {
+      id: 'catana-online-toast',
+      duration: 4000,
+    });
+    useAuthStore.getState().silentRefresh();
   });
 }

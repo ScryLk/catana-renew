@@ -182,8 +182,8 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=90),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
@@ -191,6 +191,7 @@ SIMPLE_JWT = {
     'SIGNING_KEY': SECRET_KEY,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 90  # 90 dias de sessao persistente estilo OpenAI/Gemini
 
 # Parametros para Cookie HttpOnly de Refresh Token (Opcao A)
 JWT_AUTH_COOKIE_REFRESH = 'catana_refresh_token'
