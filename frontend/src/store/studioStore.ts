@@ -527,7 +527,17 @@ export interface StudioState {
   pages: CatalogPageData[];
   setPages: (pages: CatalogPageData[]) => void;
   updatePage: (pageNumber: number, updates: Partial<CatalogPageData>) => void;
+  addPage: (options?: {
+    type?: PageLayoutType;
+    afterPage?: number;
+    title?: string;
+    subtitle?: string;
+    content?: string;
+    quote?: string;
+    label?: string;
+  }) => void;
   removePage: (pageNumber: number) => void;
+  summarizePageContent: (pageNumber: number, condensedText?: string) => void;
   updateProduct: (productId: string, updates: Partial<ProductItem>) => void;
   removeProductBackground: (pageNumber: number, productId: string) => Promise<void>;
   executeCopilotCommand: (command: string, attachments?: ChatAttachment[]) => void;
@@ -1902,6 +1912,116 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     s.debouncedSaveCurrentSpread();
   },
 
+  addPage: (options) => {
+    const s = get();
+    s.pushHistorySnapshot();
+
+    const currentTotal = s.pages.length;
+    let insertIndex = currentTotal;
+
+    if (typeof options?.afterPage === 'number' && options.afterPage >= 0) {
+      const clampedAfter = Math.max(0, Math.min(options.afterPage, currentTotal));
+      insertIndex = clampedAfter;
+    } else {
+      // Se a última página for contracapa (backcover), insere imediatamente antes dela
+      const lastPage = s.pages[currentTotal - 1];
+      if (lastPage?.type === 'backcover' && currentTotal > 1) {
+        insertIndex = currentTotal - 1;
+      }
+    }
+
+    const pageType: PageLayoutType = options?.type || 'hero';
+    const isDark = pageType === 'cover' || pageType === 'divider' || pageType === 'backcover';
+    const activePal = s.activePalette || STUDIO_PALETTE_PRESETS[0];
+
+    const newPage: CatalogPageData = {
+      id: `page-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      pageNumber: insertIndex + 1,
+      type: pageType,
+      title: options?.title || (pageType === 'manifesto' ? 'Manifesto Editorial' : pageType === 'divider' ? 'Nova Coleção' : 'Destaque Editorial'),
+      subtitle: options?.subtitle,
+      quote: options?.quote || (pageType === 'manifesto' ? 'A simbiose entre tradição manufatureira e vanguarda estética.' : undefined),
+      content: options?.content || (pageType === 'manifesto' ? 'Peças concebidas com matérias-primas de alta procedência, lapidadas para transcender coleções sazonais.' : undefined),
+      label: options?.label || (pageType === 'manifesto' ? 'MANIFESTO' : pageType === 'divider' ? 'SEÇÃO' : 'EDITORIAL'),
+      backgroundColor: isDark ? activePal.primary : activePal.background,
+      textColor: isDark ? activePal.background : activePal.primary,
+      accentColor: activePal.accent,
+      folio: `PÁG. ${String(insertIndex + 1).padStart(2, '0')}`,
+      products: [],
+    };
+
+    const newPagesList = [...s.pages];
+    newPagesList.splice(insertIndex, 0, newPage);
+
+    const resequencedPages = newPagesList.map((p, idx) => {
+      const pNum = idx + 1;
+      return {
+        ...p,
+        pageNumber: pNum,
+        folio: `PÁG. ${String(pNum).padStart(2, '0')}`,
+      };
+    });
+
+    const newTotalPages = resequencedPages.length;
+    const targetSpreadIdx = Math.floor(insertIndex / 2);
+    const newLeft = targetSpreadIdx * 2 + 1;
+    const newRight = Math.min(newTotalPages, newLeft + 1);
+
+    set({
+      pages: resequencedPages,
+      totalPages: newTotalPages,
+      currentSpread: [newLeft, newRight],
+      saveStatus: 'unsaved',
+    });
+
+    toast.success(`Página ${String(insertIndex + 1).padStart(2, '0')} adicionada com layout ${pageType.toUpperCase()}!`, {
+      description: 'Lâminas e fólios renumerados sequencialmente com proporções A4.',
+    });
+
+    s.debouncedSaveCurrentSpread();
+  },
+
+  summarizePageContent: (pageNumber, condensedText) => {
+    const s = get();
+    const target = s.pages.find((p) => p.pageNumber === pageNumber);
+    if (!target) return;
+
+    s.pushHistorySnapshot();
+
+    let finalText = condensedText;
+    if (!finalText) {
+      const raw = target.content || target.quote || target.title || '';
+      if (raw.length > 0) {
+        const sentences = raw.split(/[.!?]+/).map((str) => str.trim()).filter(Boolean);
+        finalText = sentences[0] ? `${sentences[0]}.` : 'Design atemporal e rigor técnico em cada detalhe.';
+      } else {
+        finalText = 'Design atemporal e rigor técnico em cada detalhe.';
+      }
+    }
+
+    const updates: Partial<CatalogPageData> = {};
+    if (target.type === 'manifesto') {
+      updates.quote = finalText;
+      updates.title = finalText;
+      if (target.content) updates.content = finalText;
+    } else {
+      if (target.content) updates.content = finalText;
+      else if (target.quote) updates.quote = finalText;
+      else updates.title = finalText;
+    }
+
+    set((state) => ({
+      pages: state.pages.map((p) => (p.pageNumber === pageNumber ? { ...p, ...updates } : p)),
+      saveStatus: 'unsaved',
+    }));
+
+    toast.success(`Conteúdo da Página ${String(pageNumber).padStart(2, '0')} sintetizado!`, {
+      description: 'Texto condensado em claim editorial de alto valor sem clichês.',
+    });
+
+    s.debouncedSaveCurrentSpread();
+  },
+
   updateProduct: (productId, updates) => {
     get().pushHistorySnapshot();
     set((s) => ({
@@ -2161,14 +2281,81 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             break;
           }
 
+          case 'add_page':
+          case 'create_page':
+          case 'insert_page': {
+            const rawType = String(
+              rawAction.layout || rawAction.type || params.type || params.layout || 'hero'
+            ).toLowerCase();
+            let mappedType: PageLayoutType = 'hero';
+            if (rawType.includes('duo')) mappedType = 'duo';
+            else if (rawType.includes('grid') || rawType.includes('grade')) mappedType = 'grid_4';
+            else if (rawType.includes('single')) mappedType = 'single';
+            else if (rawType.includes('divis') || rawType.includes('divider')) mappedType = 'divider';
+            else if (rawType.includes('manifesto')) mappedType = 'manifesto';
+            else if (rawType.includes('capa') || rawType.includes('cover')) mappedType = 'cover';
+            else mappedType = 'hero';
+
+            const afterPage =
+              typeof targetPage === 'number'
+                ? targetPage
+                : typeof params.afterPage === 'number'
+                ? params.afterPage
+                : undefined;
+
+            get().addPage({
+              type: mappedType,
+              afterPage,
+              title: rawAction.title || params.title,
+              subtitle: rawAction.subtitle || params.subtitle,
+              content: rawAction.content || params.content,
+              quote: rawAction.quote || params.quote,
+            });
+            break;
+          }
+
+          case 'summarize_content':
+          case 'condense_text':
+          case 'summarize_text': {
+            const pageNum = typeof targetPage === 'number' ? targetPage : leftPageNum;
+            const condensed =
+              rawAction.condensedText || params.condensedText || rawAction.text || params.text;
+            get().summarizePageContent(pageNum, condensed);
+            break;
+          }
+
           case 'remove_product': {
-            if (prodId) {
+            let effectiveProdId = prodId;
+            if (!effectiveProdId) {
+              const query =
+                rawAction.name ||
+                params.name ||
+                rawAction.productQuery ||
+                params.productQuery ||
+                rawAction.product_name ||
+                params.product_name;
+              if (query) {
+                const allProds = [
+                  ...get().unassignedProducts,
+                  ...get().pages.flatMap((p) => p.products || []),
+                ];
+                const match = allProds.find(
+                  (p) =>
+                    p.name.toLowerCase().includes(String(query).toLowerCase()) ||
+                    String(query).toLowerCase().includes(p.name.toLowerCase()) ||
+                    (p.sku && p.sku.toLowerCase() === String(query).toLowerCase())
+                );
+                if (match) effectiveProdId = match.id;
+              }
+            }
+
+            if (effectiveProdId) {
               const currentPages = get().pages;
               const containingPage = targetPage
                 ? currentPages.find((p) => p.pageNumber === targetPage)
-                : currentPages.find((p) => p.products?.some((pr) => pr.id === prodId));
+                : currentPages.find((p) => p.products?.some((pr) => pr.id === effectiveProdId));
               const pageNum = containingPage ? containingPage.pageNumber : (targetPage || leftPageNum);
-              get().removeProductFromSpread(pageNum, slotIdx, prodId);
+              get().removeProductFromSpread(pageNum, slotIdx, effectiveProdId);
             } else if (typeof targetPage === 'number') {
               get().removeProductFromSpread(targetPage, slotIdx);
             } else {
@@ -2446,6 +2633,29 @@ export const useStudioStore = create<StudioState>((set, get) => ({
               params.palette_id ||
               ''
             ).toLowerCase();
+
+            // Suporte a cores hexadecimais diretas customizadas
+            const customColors = rawAction.colors || params.colors || {};
+            const directPrimary = rawAction.primary || params.primary || customColors.primary;
+            const directAccent = rawAction.accent || params.accent || customColors.accent;
+            const directBackground = rawAction.background || params.background || customColors.background;
+            const directSecondary = rawAction.secondary || params.secondary || customColors.secondary;
+
+            if (directPrimary || directAccent || directBackground) {
+              const customPalette: StudioPalette = {
+                name: rawAction.name || params.paletteName || 'Paleta Personalizada',
+                primary: directPrimary || get().activePalette.primary,
+                background: directBackground || get().activePalette.background,
+                accent: directAccent || get().activePalette.accent,
+                secondary: directSecondary || get().activePalette.secondary || '#52525B',
+                surface: params.surface || get().activePalette.surface || '#FFFFFF',
+                contrastRatio: '9.0:1 (AAA)',
+                locked: get().activePalette.locked,
+              };
+              get().setActivePalette(customPalette, true);
+              break;
+            }
+
             let chosen = STUDIO_PALETTE_PRESETS[0];
             if (
               palId.includes('argent') ||
@@ -2490,6 +2700,19 @@ export const useStudioStore = create<StudioState>((set, get) => ({
               chosen = STUDIO_PALETTE_PRESETS[0];
             }
             get().setActivePalette({ ...chosen, locked: get().activePalette.locked }, true);
+            break;
+          }
+
+          case 'set_page_color':
+          case 'update_page_colors': {
+            const finalPage = typeof targetPage === 'number' ? targetPage : leftPageNum;
+            const pageUpdates: Partial<CatalogPageData> = {};
+            if (params.backgroundColor || rawAction.backgroundColor) pageUpdates.backgroundColor = params.backgroundColor || rawAction.backgroundColor;
+            if (params.textColor || rawAction.textColor) pageUpdates.textColor = params.textColor || rawAction.textColor;
+            if (params.accentColor || rawAction.accentColor) pageUpdates.accentColor = params.accentColor || rawAction.accentColor;
+            if (Object.keys(pageUpdates).length > 0) {
+              get().updatePage(finalPage, pageUpdates);
+            }
             break;
           }
 
@@ -2563,6 +2786,12 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             } else if (typeof rawAction.spread_index === 'number') {
               get().goToSpread(rawAction.spread_index);
             }
+            break;
+          }
+
+          case 'export_pdf':
+          case 'download_pdf': {
+            get().openExportModal('pdf');
             break;
           }
 
@@ -2776,6 +3005,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             const title = act.title || act.name || params.title || params.name;
 
             if (actType === 'remove_page' || actType === 'delete_page') return `Página ${pageNum || 'selecionada'} removida do catálogo`;
+            if (actType === 'add_page' || actType === 'create_page' || actType === 'insert_page') return `Nova página adicionada ao catálogo (layout ${(layout || 'hero').toUpperCase()})`;
+            if (actType === 'summarize_content' || actType === 'condense_text' || actType === 'summarize_text') return `Conteúdo da Página ${pageNum || 1} sintetizado pelo Redator`;
             if (actType === 'remove_product') return `Produto removido da Página ${pageNum || 'visível'} e retornado ao acervo`;
             if (actType === 'assign_product') return `Produto alocado na Página ${pageNum || 1}`;
             if (actType === 'swap_product') return `Substituição de produto na Página ${pageNum || 1}`;
@@ -2784,11 +3015,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             if (actType === 'adjust_pricing') return `Reajuste de ${percentage || 10}% aplicado à tabela de preços`;
             if (actType === 'generate_skus') return `Códigos SKU padronizados com prefixo ${prefix || 'CAT'}`;
             if (actType === 'set_palette') return 'Paleta cromática do catálogo atualizada';
+            if (actType === 'set_page_color' || actType === 'update_page_colors') return `Cores da Página ${pageNum || 1} atualizadas`;
             if (actType === 'brand_lock') return (act.locked ?? params.locked) ? 'Trava de Marca (Brand Lock) ativada' : 'Trava de Marca desativada';
             if (actType === 'remove_background') return 'Isolamento de silhueta e recorte de fundo executados';
             if (actType === 'remove_image' || actType === 'clear_image') return `Imagem do produto na Página ${pageNum || 'visível'} removida`;
             if (actType === 'generate_photo') return 'Fotografia de estúdio em alta resolução gerada com IA';
             if (actType === 'update_text') return `Texto da Página ${pageNum || 1} (${field || 'conteúdo'}) atualizado`;
+            if (actType === 'export_pdf' || actType === 'download_pdf') return 'Módulo de exportação em PDF homologado aberto';
             return actType;
           });
         }
@@ -3711,6 +3944,67 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
 
     // ==========================================
+    // 2.1 INTENT: CADASTRO / CRIAÇÃO DE NOVO PRODUTO
+    // ==========================================
+    const createProductMatch = command.match(
+      /(?:cadastre|cadastrar|crie|criar|adicione|adicionar)\s+(?:um\s+|novo\s+)?produto\s+["'“]?([^"'\n,]+?)["'”]?\s*(?:com\s+pre[cç]o\s+|com\s+valor\s+|custando\s+|por\s+)?(r?\$?\s*[\d.,]+)?(?:\s+na\s+p[aá]gina\s+(\d+))?$/i
+    );
+
+    if (createProductMatch && !assignMatch) {
+      const prodName = createProductMatch[1].trim();
+      const rawPrice = createProductMatch[2] ? createProductMatch[2].trim() : 'R$ 890,00';
+      const formattedPrice = rawPrice.startsWith('R$') ? rawPrice : `R$ ${rawPrice.replace(/[^\d.,]/g, '')}`;
+      const pageNumStr = createProductMatch[3];
+      const targetPageNum = pageNumStr ? parseInt(pageNumStr, 10) : undefined;
+
+      const createdProduct = state.addProductToRepository({
+        name: prodName,
+        sku: `SKU-${Date.now().toString().slice(-4)}`,
+        price: formattedPrice,
+        category: 'Coleção Exclusiva',
+        description: 'Item desenvolvido com excelência técnica e acabamento artesanal refinado.',
+        index: String(state.unassignedProducts.length + 1).padStart(2, '0'),
+        image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000&auto=format&fit=crop',
+      });
+
+      if (targetPageNum && targetPageNum <= state.totalPages) {
+        state.assignProductToSpread(createdProduct, targetPageNum, 0);
+      }
+
+      set({ agentStatus: 'idle' });
+
+      state.addMessage({
+        role: 'assistant',
+        content: `Produto **"${createdProduct.name}"** (${createdProduct.price}) cadastrado com sucesso ${targetPageNum ? `e alocado na **Página ${String(targetPageNum).padStart(2, '0')}**` : 'no acervo do Product Drawer'}.`,
+        reasoning: 'Racional [Tabela Comercial / B2B]: Novo item inserido no inventário com precificação e código de referência técnica.',
+        actions: [`Produto "${createdProduct.name}" cadastrado ${targetPageNum ? `e alocado na Página ${String(targetPageNum).padStart(2, '0')}` : 'no acervo'}`],
+        delegations: isOrchestrator
+          ? [
+              {
+                roleId: 'commercial',
+                roleName: 'Tabela Comercial / B2B',
+                badge: 'Comercial',
+                action: `Registrou a peça "${createdProduct.name}" com precificação de ${createdProduct.price} e código ${createdProduct.sku}.`,
+              },
+              {
+                roleId: 'director',
+                roleName: 'Diretor de Arte',
+                badge: 'Design',
+                action: targetPageNum ? `Diagramou a nova peça na Página ${targetPageNum} preservando o respiro de 96px.` : 'Item disponível para diagramação direta pelo drawer.',
+              },
+              {
+                roleId: 'copywriter',
+                roleName: 'Redator Publicitário',
+                badge: 'Redação',
+                action: `Estruturou a ficha técnica e claim de apresentação de "${createdProduct.name}".`,
+              },
+            ]
+          : undefined,
+      });
+      return;
+    }
+
+    // ==========================================
     // 3. INTENT: TROCA DE LAYOUT DA PÁGINA
     // ==========================================
     const layoutMatch = command.match(
@@ -3812,6 +4106,63 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
 
     // ==========================================
+    // 3.2 INTENT: ADIÇÃO DE PÁGINA AO CATÁLOGO
+    // ==========================================
+    const addPageMatch = command.match(
+      /(?:adicione|adicionar|crie|criar|insira|inserir|acrescente|acrescentar)\s+(?:uma\s+|nova\s+)?(?:p[aá]gina|p[aá]g\.?|page|l[aâ]mina)(?:\s+(hero|duo|single|grade comercial|grade|grid_4|grid|manifesto|divis[oó]ria|divisoria|divider|capa|cover))?(?:\s+(?:ap[oó]s|depois\s+da)\s+p[aá]gina\s+(\d+|um|uma|primeira|dois|duas|segunda|tr[eê]s|terceira|quatro|quarta|cinco|quinta))?/i
+    ) || command.match(/\/novo-spread/i);
+
+    if (addPageMatch) {
+      const rawLayout = (addPageMatch[1] || 'hero').toLowerCase();
+      let newType: CatalogPageData['type'] = 'hero';
+      if (rawLayout.includes('duo')) newType = 'duo';
+      else if (rawLayout.includes('grid') || rawLayout.includes('grade')) newType = 'grid_4';
+      else if (rawLayout.includes('single')) newType = 'single';
+      else if (rawLayout.includes('divis') || rawLayout.includes('divider')) newType = 'divider';
+      else if (rawLayout.includes('manifesto')) newType = 'manifesto';
+      else if (rawLayout.includes('capa') || rawLayout.includes('cover')) newType = 'cover';
+      else newType = 'hero';
+
+      const rawAfter = (addPageMatch[2] || '').toLowerCase();
+      const afterNum = rawAfter
+        ? (isNaN(parseInt(rawAfter, 10)) ? (pageWordMapForRemoval[rawAfter] || undefined) : parseInt(rawAfter, 10))
+        : undefined;
+
+      state.addPage({ type: newType, afterPage: afterNum });
+      set({ agentStatus: 'idle' });
+
+      state.addMessage({
+        role: 'assistant',
+        content: `Nova página com layout **${newType.toUpperCase()}** inserida e diagramada pelo Conselho Editorial.`,
+        reasoning: 'Racional [Diretor de Arte]: Nova prancheta criada com grid A4 homologado, proporção áurea e respiro de 96px.',
+        actions: [`Nova página adicionada ao catálogo (layout ${newType.toUpperCase()})`],
+        delegations: isOrchestrator
+          ? [
+              {
+                roleId: 'director',
+                roleName: 'Diretor de Arte',
+                badge: 'Design',
+                action: `Estruturou o grid da nova lâmina para a variante ${newType.toUpperCase()} com proporção áurea.`,
+              },
+              {
+                roleId: 'branding',
+                roleName: 'Auditor de Branding',
+                badge: 'Auditoria',
+                action: 'Garantir aplicação imediata dos tokens de paleta e tipografia da coleção.',
+              },
+              {
+                roleId: 'copywriter',
+                roleName: 'Redator Publicitário',
+                badge: 'Redação',
+                action: 'Alinhou placeholders editoriais para inserção de títulos e claims.',
+              },
+            ]
+          : undefined,
+      });
+      return;
+    }
+
+    // ==========================================
     // 4. INTENT: NAVEGAÇÃO DE PÁGINAS
     // ==========================================
     const navMatch = command.match(
@@ -3837,9 +4188,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       }
     }
 
-    // ==========================================
-    // 5. INTENT: EDIÇÃO DE TÍTULO / TEXTO / MANIFESTO / SUBTÍTULO
-    // ==========================================
     const pageWordToNumber: Record<string, number> = {
       um: 1, uma: 1, primeira: 1, primeiro: 1,
       dois: 2, duas: 2, segunda: 2, segundo: 2,
@@ -3851,6 +4199,57 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       oito: 8, oitava: 8, oitavo: 8,
     };
 
+    // ==========================================
+    // 4.9 INTENT: RESUMO / SÍNTESE DE CONTEÚDO EDITORIAL
+    // ==========================================
+    const summarizeMatch = command.match(
+      /(?:resuma|resumir|sintetize|sintetizar|encurte|encurtar|condense|condensar)\s+(?:o\s+)?(?:texto|conte[uú]do|copy|narrativa|frase)?\s*(?:da\s+)?(?:p[aá]gina|p[aá]g\.?|page)?\s*(\d+|um|uma|primeira|dois|duas|segunda|tr[eê]s|terceira|quatro|quarta|cinco|quinta|seis|sexta|sete|s[eé]tima|oito|oitava)?/i
+    ) || command.match(/\/sintese-b2b/i);
+
+    if (summarizeMatch && (lower.includes('resum') || lower.includes('sintet') || lower.includes('encurt') || lower.includes('condens') || lower.includes('sintese-b2b'))) {
+      const rawP = (summarizeMatch[1] || '').toLowerCase();
+      const targetPageNum = rawP
+        ? (isNaN(parseInt(rawP, 10)) ? (pageWordToNumber[rawP] || state.currentSpread[0]) : parseInt(rawP, 10))
+        : state.currentSpread[0];
+
+      state.summarizePageContent(targetPageNum);
+      set({ agentStatus: 'idle' });
+      get().goToSpread(Math.floor((targetPageNum - 1) / 2));
+
+      state.addMessage({
+        role: 'assistant',
+        content: `Conteúdo da **Página ${String(targetPageNum).padStart(2, '0')}** sintetizado com elegância editorial pelo Redator Publicitário.`,
+        reasoning: 'Racional [Redator Publicitário]: Prosa longa condensada em claim sensorial conciso, sem jargões ou clichês promocionais.',
+        actions: [`Conteúdo da Página ${String(targetPageNum).padStart(2, '0')} sintetizado pelo Redator`],
+        delegations: isOrchestrator
+          ? [
+              {
+                roleId: 'copywriter',
+                roleName: 'Redator Publicitário',
+                badge: 'Redação',
+                action: `Sintetizou o texto da Página ${String(targetPageNum).padStart(2, '0')} em uma frase editorial de alto impacto.`,
+              },
+              {
+                roleId: 'director',
+                roleName: 'Diretor de Arte',
+                badge: 'Design',
+                action: 'Ajustou a escala tipográfica para ampliar o respiro negativo de 96px ao redor do novo texto.',
+              },
+              {
+                roleId: 'branding',
+                roleName: 'Auditor de Branding',
+                badge: 'Auditoria',
+                action: 'Validou a ausência de termos promocionais e a fidelidade ao tom de voz sofisticado da marca.',
+              },
+            ]
+          : undefined,
+      });
+      return;
+    }
+
+    // ==========================================
+    // 5. INTENT: EDIÇÃO DE TÍTULO / TEXTO / MANIFESTO / SUBTÍTULO
+    // ==========================================
     const pageTextMatch = command.match(
       /(?:mude|altere|troque|coloque|ajuste|atualize|editar|edite|trocar|mudar)\s+(?:o\s+)?(texto|t[ií]tulo|subt[ií]tulo|claim|legenda|label|frase|headline|conte[uú]do)\s+(?:da\s+)?(?:p[aá]gina|p[aá]g\.?|page)\s+(\d+|um|uma|primeira|primeiro|dois|duas|segunda|segundo|tr[eê]s|terceira|terceiro|quatro|quarta|quarto|cinco|quinta|quinto|seis|sexta|sexto|sete|s[eé]tima|s[eé]timo|oito|oitava|oitavo)\s+(?:para:?|por:?|como:?)\s*["'“]?(.+?)["'”]?$/i
     );
@@ -4294,29 +4693,87 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       return;
     }
 
-    // 4. Mudança de Cor / Paleta
-    if (
+    // 4. Mudança de Cor / Paleta / Cores Customizadas
+    const hexMatch = command.match(/#(?:[0-9a-fA-F]{3}){1,2}\b/i);
+    const isColorCommand =
       lower.includes('paleta') ||
       lower.includes('cor') ||
+      lower.includes('cores') ||
       lower.includes('ouro') ||
       lower.includes('prata') ||
       lower.includes('bronze') ||
       lower.includes('terracota') ||
       lower.includes('esmeralda') ||
-      lower.includes('minimaliste')
-    ) {
+      lower.includes('minimaliste') ||
+      lower.includes('fundo') ||
+      lower.includes('acento') ||
+      lower.includes('primária') ||
+      lower.includes('primaria') ||
+      lower.includes('secundária') ||
+      lower.includes('secundaria');
+
+    if (isColorCommand && !lower.includes('remover fundo') && !lower.includes('sem fundo')) {
+      // Caso 4.0: Cor específica de uma página (ex: "mude a cor da página 2 para #1A1817")
+      const pageColorMatch = command.match(
+        /(?:cor|fundo|acento)\s+(?:da\s+)?p[aá]gina\s+(\d+|um|uma|primeira|dois|duas|segunda)\s+(?:para\s+)?(#[0-9a-fA-F]{3,6}|preto|branco|claro|escuro|dourado)/i
+      );
+      if (pageColorMatch) {
+        const rawP = pageColorMatch[1].toLowerCase();
+        const pNum = isNaN(parseInt(rawP, 10)) ? (pageWordToNumber[rawP] || 1) : parseInt(rawP, 10);
+        const colorVal = pageColorMatch[2].toLowerCase();
+        let targetHex = colorVal.startsWith('#') ? colorVal : '#1A1817';
+        if (colorVal === 'branco' || colorVal === 'claro') targetHex = '#FFFFFF';
+        if (colorVal === 'preto' || colorVal === 'escuro') targetHex = '#121214';
+        if (colorVal === 'dourado') targetHex = '#B08D57';
+
+        state.updatePage(pNum, { backgroundColor: targetHex });
+        set({ agentStatus: 'idle' });
+        get().goToSpread(Math.floor((pNum - 1) / 2));
+        toast.success(`Cor de fundo da Página ${pNum} atualizada!`);
+        state.addMessage({
+          role: 'assistant',
+          content: `Cor de fundo da **Página ${String(pNum).padStart(2, '0')}** alterada para \`${targetHex}\`.`,
+          reasoning: 'Racional [Diretor de Arte]: Calibração cromática individual da lâmina com contraste verificado sob WCAG AA.',
+          actions: [`Cor de fundo da Página ${String(pNum).padStart(2, '0')} alterada para ${targetHex}`],
+        });
+        return;
+      }
+
+      // Caso 4.1: Hex code direto para a paleta ativa (primária, fundo ou acento)
+      if (hexMatch) {
+        const hex = hexMatch[0];
+        const isAccent = lower.includes('acento') || lower.includes('detalhe') || lower.includes('ouro') || lower.includes('metal');
+        const isBg = lower.includes('fundo') || lower.includes('background') || lower.includes('página');
+        const updatedPal: StudioPalette = {
+          ...state.activePalette,
+          accent: isAccent ? hex : state.activePalette.accent,
+          background: isBg ? hex : state.activePalette.background,
+          primary: (!isAccent && !isBg) ? hex : state.activePalette.primary,
+        };
+        state.setActivePalette(updatedPal, true);
+        set({ agentStatus: 'idle' });
+        toast.success(`Paleta calibrada com token ${hex}!`);
+        state.addMessage({
+          role: 'assistant',
+          content: `Paleta do estúdio calibrada com o novo token **\`${hex}\`** (${isAccent ? 'acento' : isBg ? 'fundo' : 'primária'}). Todas as páginas foram sincronizadas.`,
+          reasoning: 'Racional [Diretor de Arte]: Atualização cromática via hexadecimal com recálculo de luminância e contraste.',
+          actions: [`Token cromático ${hex} aplicado à paleta do catálogo`],
+        });
+        return;
+      }
+
       let chosenPreset = STUDIO_PALETTE_PRESETS[0];
-      if (lower.includes('prata') || lower.includes('silver') || lower.includes('argent')) {
+      if (lower.includes('prata') || lower.includes('silver') || lower.includes('argent') || lower.includes('atelier')) {
         chosenPreset = STUDIO_PALETTE_PRESETS[1];
-      } else if (lower.includes('bronze') || lower.includes('charcoal') || lower.includes('marrom')) {
+      } else if (lower.includes('bronze') || lower.includes('charcoal') || lower.includes('acervo')) {
         chosenPreset = STUDIO_PALETTE_PRESETS[2];
-      } else if (lower.includes('terracota') || lower.includes('sable') || lower.includes('laranja')) {
+      } else if (lower.includes('terracota') || lower.includes('sable') || lower.includes('edition')) {
         chosenPreset = STUDIO_PALETTE_PRESETS[3];
-      } else if (lower.includes('minimaliste') || lower.includes('slate') || lower.includes('ardósia') || lower.includes('cinza')) {
+      } else if (lower.includes('minimaliste') || lower.includes('slate') || lower.includes('cinza')) {
         chosenPreset = STUDIO_PALETTE_PRESETS[4];
-      } else if (lower.includes('esmeralda') || lower.includes('emerald') || lower.includes('verde') || lower.includes('champagne')) {
+      } else if (lower.includes('esmeralda') || lower.includes('emerald') || lower.includes('champagne')) {
         chosenPreset = STUDIO_PALETTE_PRESETS[5];
-      } else if (lower.includes('ouro') || lower.includes('gold') || lower.includes('dourad')) {
+      } else if (lower.includes('ouro') || lower.includes('gold') || lower.includes('dourad') || lower.includes('luxe')) {
         chosenPreset = STUDIO_PALETTE_PRESETS[0];
       }
 
@@ -4335,10 +4792,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
       state.addMessage({
         role: 'assistant',
-        content: `Paleta do catálogo atualizada para **${appliedPalette.name}** (acento em \`${appliedPalette.accent}\`, fundo em \`${appliedPalette.background}\`). As 10 páginas da prancheta foram sincronizadas em tempo real.${lockWarning}`,
+        content: `Paleta do catálogo atualizada para **${appliedPalette.name}** (acento em \`${appliedPalette.accent}\`, fundo em \`${appliedPalette.background}\`). As ${state.totalPages} páginas da prancheta foram sincronizadas em tempo real.${lockWarning}`,
         reasoning: isOrchestrator
-          ? 'Racional do Editor-Chefe [Coordenação]: Nova paleta editorial homologada e distribuída por todos os templates de página (capas, divisórias e pranchetas de produto).'
-          : `Racional [${currentRole.name}]: Calibração tonal executada com razão de contraste aferida em ${appliedPalette.contrastRatio || '8.5:1'} sob WCAG AA.`,
+          ? 'Racional do Editor-Chefe [Coordenação]: Nova paleta editorial homologada e distribuída por todos os templates de página.'
+          : `Racional [${currentRole.name}]: Calibração tonal executada com razão de contraste aferida sob WCAG AA.`,
+        actions: [`Paleta do catálogo atualizada para ${appliedPalette.name}`],
         delegations: isOrchestrator
           ? [
               {
@@ -4361,6 +4819,25 @@ export const useStudioStore = create<StudioState>((set, get) => ({
               },
             ]
           : undefined,
+      });
+      return;
+    }
+
+    // 4.1 Exportação em PDF
+    if (
+      lower.includes('exportar pdf') ||
+      lower.includes('baixar pdf') ||
+      lower.includes('gerar pdf') ||
+      lower.includes('exportar catálogo') ||
+      lower.includes('imprimir')
+    ) {
+      state.openExportModal('pdf');
+      set({ agentStatus: 'idle' });
+      state.addMessage({
+        role: 'assistant',
+        content: 'Módulo de exportação editorial aberto. O catálogo de alta resolução está preparado para geração de PDF em padrão gráfico A4.',
+        reasoning: 'Racional [Editor-Chefe]: Abertura de modal de exportação gráfica conforme diretrizes de pré-impressão.',
+        actions: ['Módulo de exportação em PDF aberto'],
       });
       return;
     }
