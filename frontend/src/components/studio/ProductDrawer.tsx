@@ -389,7 +389,7 @@ export const ProductDrawer: React.FC = () => {
                     ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white'
                     : 'bg-white border-[#E4E0D6] hover:border-zinc-300 text-zinc-600 hover:text-zinc-950'
                 }`}
-                aria-label="Importar planilha de produtos"
+                aria-label="Importar produtos"
               >
                 <FileSpreadsheet className="size-4" />
               </button>

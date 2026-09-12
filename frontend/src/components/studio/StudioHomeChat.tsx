@@ -323,10 +323,10 @@ export const StudioHomeChat: React.FC = () => {
                       : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
                   }`}
                   title="Importar produtos de planilha Excel ou CSV com confirmação de colunas e IA"
-                  aria-label="Importar produtos de planilha"
+                  aria-label="Importar produtos"
                 >
                   <FileSpreadsheet className="size-3.5 text-zinc-400" />
-                  <span>Importar Planilha</span>
+                  <span>Importar Produtos</span>
                 </button>
               </div>
 

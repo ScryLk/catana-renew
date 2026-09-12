@@ -274,7 +274,7 @@ export const NewCatalogModal: React.FC = () => {
                 isDark ? 'border-zinc-800/80 bg-zinc-900/20' : 'border-zinc-100 bg-zinc-50/50'
               }`}
             >
-              {/* Left Buttons: Anexar arquivos, Importar Catálogo, Importar Planilha */}
+              {/* Left Buttons: Anexar arquivos, Importar Catálogo, Importar Produtos */}
               <div className="flex items-center gap-1 sm:gap-2">
                 <button
                   type="button"
@@ -321,10 +321,10 @@ export const NewCatalogModal: React.FC = () => {
                       : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
                   }`}
                   title="Importar produtos de planilha Excel ou CSV"
-                  aria-label="Importar Planilha"
+                  aria-label="Importar Produtos"
                 >
                   <FileSpreadsheet className="size-3.5 text-zinc-400" />
-                  <span>Importar Planilha</span>
+                  <span>Importar Produtos</span>
                 </button>
               </div>
 

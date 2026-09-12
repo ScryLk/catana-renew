@@ -892,7 +892,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         {
           id: `msg-welcome-${Date.now()}`,
           role: 'assistant',
-          content: `Novo catálogo **${catalogTitle}** criado com ${pagesCount} páginas em branco na prancheta. Você pode alocar produtos do acervo, importar planilha Excel ou me dar instruções de diagramação.`,
+          content: `Novo catálogo **${catalogTitle}** criado com ${pagesCount} páginas em branco na prancheta. Você pode alocar produtos do acervo, importar produtos ou me dar instruções de diagramação.`,
           timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         },
       ],
