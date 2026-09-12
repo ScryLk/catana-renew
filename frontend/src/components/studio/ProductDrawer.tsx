@@ -339,13 +339,13 @@ export const ProductDrawer: React.FC = () => {
         className={`fixed top-0 right-0 z-50 h-full w-full sm:w-[420px] lg:w-[460px] border-l shadow-2xl flex flex-col transition-transform duration-300 animate-in slide-in-from-right select-none ${
           isDark
             ? 'bg-[#0b0b0e] border-zinc-800 text-zinc-100 shadow-[0_0_60px_rgba(0,0,0,0.9)]'
-            : 'bg-[#FDFCFA] border-stone-200 text-stone-900 shadow-[0_0_40px_rgba(0,0,0,0.12)]'
+            : 'bg-[#FAF8F5] border-[#E4E0D6] text-zinc-900 shadow-[0_0_40px_rgba(0,0,0,0.08)]'
         }`}
       >
         {/* Header */}
         <div
           className={`px-5 py-4 border-b flex items-center justify-between shrink-0 ${
-            isDark ? 'border-zinc-800/90 bg-zinc-900/40' : 'border-stone-200 bg-[#F7F4EE]'
+            isDark ? 'border-zinc-800/90 bg-zinc-900/40' : 'border-[#E4E0D6] bg-[#F5F1EA]'
           }`}
         >
           <div className="flex items-center gap-3">
@@ -353,25 +353,27 @@ export const ProductDrawer: React.FC = () => {
               className={`p-2 rounded-xl border ${
                 isDark
                   ? 'bg-zinc-900 border-zinc-800 text-zinc-200'
-                  : 'bg-white border-stone-200 text-stone-800 shadow-2xs'
+                  : 'bg-white border-[#E4E0D6] text-zinc-800 shadow-2xs'
               }`}
             >
-              <Package className="size-4 text-amber-700 dark:text-zinc-300" />
+              <Package className="size-4 text-[#B08D57] dark:text-[#C5A26B]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold tracking-tight">Gaveta de Produtos</h2>
+                <h2 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+                  Gaveta de Produtos
+                </h2>
                 <span
                   className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
                     isDark
                       ? 'bg-zinc-900 border-zinc-800 text-zinc-400'
-                      : 'bg-white border-stone-200 text-stone-600'
+                      : 'bg-white border-[#E4E0D6] text-[#736E65]'
                   }`}
                 >
                   {allProducts.length} itens
                 </span>
               </div>
-              <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-stone-500'}`}>
+              <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>
                 Acervo central de produtos e alocação nas lâminas.
               </p>
             </div>
@@ -385,7 +387,7 @@ export const ProductDrawer: React.FC = () => {
                 className={`p-2 rounded-xl border transition-colors cursor-pointer ${
                   isDark
                     ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white'
-                    : 'bg-white border-stone-200 hover:border-stone-300 text-stone-600 hover:text-stone-950'
+                    : 'bg-white border-[#E4E0D6] hover:border-zinc-300 text-zinc-600 hover:text-zinc-950'
                 }`}
                 aria-label="Importar planilha de produtos"
               >
@@ -400,7 +402,7 @@ export const ProductDrawer: React.FC = () => {
                 className={`p-2 rounded-xl border transition-colors cursor-pointer ${
                   isDark
                     ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white'
-                    : 'bg-white border-stone-200 hover:border-stone-300 text-stone-700 hover:text-stone-950'
+                    : 'bg-white border-[#E4E0D6] hover:border-zinc-300 text-zinc-700 hover:text-zinc-950'
                 }`}
                 aria-label="Adicionar produto"
               >
@@ -415,7 +417,7 @@ export const ProductDrawer: React.FC = () => {
                 className={`p-2 rounded-xl border transition-colors cursor-pointer ${
                   isDark
                     ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white'
-                    : 'bg-white border-stone-200 hover:border-stone-300 text-stone-600 hover:text-stone-950'
+                    : 'bg-white border-[#E4E0D6] hover:border-zinc-300 text-zinc-600 hover:text-zinc-950'
                 }`}
                 aria-label="Fechar gaveta"
               >
@@ -428,26 +430,26 @@ export const ProductDrawer: React.FC = () => {
         {/* Metrics Overview Bar */}
         <div
           className={`grid grid-cols-3 gap-2 px-5 py-3 border-b shrink-0 ${
-            isDark ? 'border-zinc-800/60 bg-[#0e0e12]' : 'border-stone-200 bg-[#FBF9F5]'
+            isDark ? 'border-zinc-800/60 bg-[#0e0e12]' : 'border-[#E4E0D6] bg-[#F7F4EE]'
           }`}
         >
           <div className="flex flex-col">
-            <span className={`text-[10px] font-mono uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-stone-500'}`}>Alocados</span>
-            <span className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-stone-900'}`}>
+            <span className={`text-[10px] font-mono uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>Alocados</span>
+            <span className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-zinc-900'}`}>
               {metrics.allocatedCount} no catálogo
             </span>
           </div>
 
           <div className="flex flex-col">
-            <span className={`text-[10px] font-mono uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-stone-500'}`}>Disponíveis</span>
-            <span className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-stone-500'}`}>
+            <span className={`text-[10px] font-mono uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>Disponíveis</span>
+            <span className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
               {metrics.unassignedCount} no acervo
             </span>
           </div>
 
           <div className="flex flex-col">
-            <span className={`text-[10px] font-mono uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-stone-500'}`}>Ticket Médio</span>
-            <span className={`text-xs font-semibold font-mono ${isDark ? 'text-zinc-200' : 'text-stone-900'}`}>
+            <span className={`text-[10px] font-mono uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>Ticket Médio</span>
+            <span className={`text-xs font-semibold font-mono ${isDark ? 'text-zinc-200' : 'text-zinc-900'}`}>
               {metrics.avgTicket}
             </span>
           </div>
@@ -458,14 +460,14 @@ export const ProductDrawer: React.FC = () => {
           <div
             className={`px-5 py-3 border-b flex items-center justify-between shrink-0 animate-in fade-in slide-in-from-top-1 duration-150 ${
               isDark
-                ? 'bg-amber-950/20 border-amber-800/50 text-amber-200'
-                : 'bg-amber-50/90 border-amber-200/90 text-amber-900 shadow-2xs'
+                ? 'bg-zinc-900/90 border-zinc-800 border-l-3 border-l-[#B08D57] text-zinc-100'
+                : 'bg-[#F5F1EA] border-[#E4E0D6] border-l-3 border-l-[#B08D57] text-zinc-900 shadow-2xs'
             }`}
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <div
                 className={`p-1.5 rounded-lg shrink-0 ${
-                  isDark ? 'bg-amber-900/60 text-amber-300' : 'bg-amber-100 text-amber-800'
+                  isDark ? 'bg-[#B08D57]/20 text-[#C5A26B]' : 'bg-[#B08D57]/15 text-[#B08D57]'
                 }`}
               >
                 <Plus className="size-3.5" />
@@ -478,8 +480,8 @@ export const ProductDrawer: React.FC = () => {
                   <span
                     className={`text-[9px] font-mono px-1.5 py-0.2 rounded border font-semibold ${
                       isDark
-                        ? 'bg-amber-900/40 border-amber-700/60 text-amber-300'
-                        : 'bg-white border-amber-300 text-amber-900'
+                        ? 'bg-zinc-800 border-zinc-700 text-zinc-200'
+                        : 'bg-white border-[#E4E0D6] text-zinc-800'
                     }`}
                   >
                     PÁG. {String(activeTargetSlot.pageNumber).padStart(2, '0')}
@@ -495,8 +497,8 @@ export const ProductDrawer: React.FC = () => {
               onClick={() => setActiveTargetSlot(null)}
               className={`text-[11px] font-medium px-2.5 py-1 rounded-md border transition-colors cursor-pointer shrink-0 ${
                 isDark
-                  ? 'border-amber-700/60 hover:bg-amber-900/40 text-amber-300'
-                  : 'border-amber-300 bg-white hover:bg-amber-100 text-amber-900 shadow-2xs'
+                  ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-300'
+                  : 'border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 shadow-2xs'
               }`}
               title="Cancelar alocação no slot específico"
             >
@@ -506,7 +508,7 @@ export const ProductDrawer: React.FC = () => {
         )}
 
         {/* Search & Filters */}
-        <div className="p-4 border-b space-y-3 shrink-0">
+        <div className={`p-4 border-b space-y-3 shrink-0 ${isDark ? 'border-zinc-800' : 'border-[#E4E0D6]'}`}>
           {/* Search Box */}
           <div className="relative">
             <Search className="size-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -518,7 +520,7 @@ export const ProductDrawer: React.FC = () => {
               className={`w-full text-xs pl-8 pr-3 py-2 rounded-xl border outline-none transition-colors ${
                 isDark
                   ? 'bg-zinc-900 border-zinc-800 text-zinc-200 focus:border-zinc-600 placeholder-zinc-500'
-                  : 'bg-white border-stone-200 text-stone-900 focus:border-amber-600/60 placeholder-stone-400'
+                  : 'bg-white border-[#E4E0D6] text-zinc-900 focus:border-[#B08D57] placeholder-zinc-400'
               }`}
             />
             {searchQuery && (
@@ -541,11 +543,11 @@ export const ProductDrawer: React.FC = () => {
                 className={`px-2.5 py-1 rounded-lg font-medium text-[11px] transition-colors cursor-pointer ${
                   statusFilter === 'all'
                     ? isDark
-                      ? 'bg-zinc-200 text-zinc-950 font-bold'
-                      : 'bg-stone-900 text-white font-bold'
+                      ? 'bg-zinc-100 text-zinc-950 font-bold'
+                      : 'bg-zinc-900 text-white font-bold'
                     : isDark
                     ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-                    : 'text-stone-600 hover:text-stone-950 hover:bg-stone-100'
+                    : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
                 }`}
               >
                 Todos ({allProducts.length})
@@ -557,11 +559,11 @@ export const ProductDrawer: React.FC = () => {
                 className={`px-2.5 py-1 rounded-lg font-medium text-[11px] transition-colors cursor-pointer ${
                   statusFilter === 'assigned'
                     ? isDark
-                      ? 'bg-zinc-200 text-zinc-950 font-bold'
-                      : 'bg-stone-900 text-white font-bold'
+                      ? 'bg-zinc-100 text-zinc-950 font-bold'
+                      : 'bg-zinc-900 text-white font-bold'
                     : isDark
                     ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-                    : 'text-stone-600 hover:text-stone-950 hover:bg-stone-100'
+                    : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
                 }`}
               >
                 Alocados ({metrics.allocatedCount})
@@ -573,11 +575,11 @@ export const ProductDrawer: React.FC = () => {
                 className={`px-2.5 py-1 rounded-lg font-medium text-[11px] transition-colors cursor-pointer ${
                   statusFilter === 'unassigned'
                     ? isDark
-                      ? 'bg-zinc-200 text-zinc-950 font-bold'
-                      : 'bg-stone-900 text-white font-bold'
+                      ? 'bg-zinc-100 text-zinc-950 font-bold'
+                      : 'bg-zinc-900 text-white font-bold'
                     : isDark
                     ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-                    : 'text-stone-600 hover:text-stone-950 hover:bg-stone-100'
+                    : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
                 }`}
               >
                 Disponíveis ({metrics.unassignedCount})
@@ -592,7 +594,7 @@ export const ProductDrawer: React.FC = () => {
                 className={`text-[11px] px-2 py-1 rounded-lg border outline-none cursor-pointer max-w-[120px] truncate ${
                   isDark
                     ? 'bg-zinc-900 border-zinc-800 text-zinc-300'
-                    : 'bg-white border-stone-200 text-stone-800'
+                    : 'bg-white border-[#E4E0D6] text-zinc-800'
                 }`}
               >
                 <option value="all">Todas</option>
@@ -639,7 +641,7 @@ export const ProductDrawer: React.FC = () => {
                   className={`p-3.5 rounded-2xl border transition-all ${
                     isDark
                       ? 'bg-zinc-900/40 border-zinc-800 hover:border-zinc-700'
-                      : 'bg-white border-stone-200 hover:border-amber-600/40 hover:shadow-xs'
+                      : 'bg-white border-[#E4E0D6] hover:border-[#B08D57]/50 hover:shadow-xs'
                   }`}
                 >
                   <div className="flex gap-3 items-start">
@@ -716,7 +718,7 @@ export const ProductDrawer: React.FC = () => {
                           {/* Category & Status Badge */}
                           <div className="flex items-center justify-between gap-1 mb-1">
                             <span className={`text-[9px] font-mono uppercase tracking-wider truncate ${
-                              isDark ? 'text-zinc-400' : 'text-stone-500'
+                              isDark ? 'text-zinc-400' : 'text-[#736E65]'
                             }`}>
                               {prod.category} {prod.sku ? `· ${prod.sku}` : ''}
                             </span>
@@ -732,7 +734,7 @@ export const ProductDrawer: React.FC = () => {
                                   className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold cursor-pointer transition-colors border ${
                                     isDark
                                       ? 'bg-zinc-800 text-zinc-300 border-zinc-700/80 hover:bg-zinc-700/80'
-                                      : 'bg-stone-100 text-stone-700 border-stone-300 hover:bg-stone-200'
+                                      : 'bg-[#F5F1EA] text-zinc-800 border-[#E4E0D6] hover:bg-zinc-200/70'
                                   }`}
                                 >
                                   <span>Pág. {String(prod.pageNumber).padStart(2, '0')}</span>
@@ -742,8 +744,8 @@ export const ProductDrawer: React.FC = () => {
                             ) : (
                               <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-medium border ${
                                 isDark
-                                  ? 'bg-zinc-800/60 text-zinc-400 border-zinc-700/50'
-                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  ? 'bg-zinc-800/70 text-zinc-400 border-zinc-700/60'
+                                  : 'bg-[#F5F1EA] text-[#736E65] border-[#E4E0D6]'
                               }`}>
                                 Disponível
                               </span>
@@ -753,12 +755,12 @@ export const ProductDrawer: React.FC = () => {
                           {/* Product Title & Price */}
                           <div className="flex items-baseline justify-between gap-2 mb-1">
                             <h3 className={`text-xs font-semibold truncate ${
-                              isDark ? 'text-zinc-100' : 'text-stone-900'
+                              isDark ? 'text-zinc-100' : 'text-zinc-900'
                             }`}>
                               {prod.name}
                             </h3>
                             <span className={`text-xs font-mono font-bold shrink-0 ${
-                              isDark ? 'text-zinc-200' : 'text-amber-800'
+                              isDark ? 'text-zinc-100' : 'text-zinc-900'
                             }`}>
                               {prod.price}
                             </span>
@@ -766,7 +768,7 @@ export const ProductDrawer: React.FC = () => {
 
                           {/* Description */}
                           <p className={`text-[10.5px] line-clamp-1 leading-snug mb-2 ${
-                            isDark ? 'text-zinc-400' : 'text-stone-600'
+                            isDark ? 'text-zinc-400' : 'text-[#736E65]'
                           }`}>
                             {prod.description}
                           </p>
@@ -784,7 +786,7 @@ export const ProductDrawer: React.FC = () => {
                                     setEditPriceValue(prod.price);
                                   }}
                                   className={`p-1 rounded transition-colors cursor-pointer ${
-                                    isDark ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-stone-100 text-stone-600'
+                                    isDark ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-[#F5F1EA] text-[#736E65] hover:text-zinc-900'
                                   }`}
                                   aria-label="Editar dados"
                                 >
@@ -801,7 +803,7 @@ export const ProductDrawer: React.FC = () => {
                                   className={`p-1 rounded transition-colors cursor-pointer ${
                                     isDark
                                       ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200'
-                                      : 'hover:bg-stone-100 text-stone-600 hover:text-stone-900'
+                                      : 'hover:bg-[#F5F1EA] text-[#736E65] hover:text-zinc-900'
                                   }`}
                                   aria-label="Gerar foto com IA"
                                 >
@@ -835,12 +837,12 @@ export const ProductDrawer: React.FC = () => {
                                 onClick={() => handleAssignToActiveSlot(prod)}
                                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-xs ${
                                   isDark
-                                    ? 'bg-amber-600 hover:bg-amber-500 text-white'
-                                    : 'bg-amber-700 hover:bg-amber-800 text-white'
+                                    ? 'bg-zinc-100 hover:bg-white text-zinc-950'
+                                    : 'bg-zinc-900 hover:bg-zinc-800 text-white'
                                 }`}
                               >
-                                <Plus className="size-3.5" />
-                                <span>+ Alocar neste Slot</span>
+                                <Plus className="size-3.5 text-[#B08D57]" />
+                                <span>Alocar neste Slot</span>
                               </button>
                             ) : (
                               <button
@@ -849,7 +851,7 @@ export const ProductDrawer: React.FC = () => {
                                 className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-semibold transition-colors cursor-pointer ${
                                   isDark
                                     ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white'
-                                    : 'bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300/70'
+                                    : 'bg-[#F5F1EA] hover:bg-[#EBE7DE] text-zinc-800 border border-[#E4E0D6]'
                                 }`}
                               >
                                 <span>Alocar no Canvas</span>
@@ -871,15 +873,15 @@ export const ProductDrawer: React.FC = () => {
         {targetProductToAssign && (
           <div
             className={`p-4 border-t backdrop-blur-md animate-in slide-in-from-bottom duration-150 shrink-0 ${
-              isDark ? 'bg-zinc-950/95 border-zinc-800' : 'bg-[#FAF7F2]/98 border-stone-200 shadow-lg'
+              isDark ? 'bg-zinc-950/95 border-zinc-800' : 'bg-[#FAF8F5]/98 border-[#E4E0D6] shadow-lg'
             }`}
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2 min-w-0">
-                <span className={`text-xs font-semibold truncate ${isDark ? 'text-zinc-100' : 'text-stone-900'}`}>
+                <span className={`text-xs font-semibold truncate ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
                   Alocar "{targetProductToAssign.name}"
                 </span>
-                <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400 font-bold shrink-0">
+                <span className="text-[10px] font-mono text-[#B08D57] dark:text-[#C5A26B] font-bold shrink-0">
                   {targetProductToAssign.price}
                 </span>
               </div>
@@ -887,7 +889,7 @@ export const ProductDrawer: React.FC = () => {
                 type="button"
                 onClick={() => setTargetProductToAssign(null)}
                 className={`p-1 rounded-md transition-colors cursor-pointer shrink-0 ${
-                  isDark ? 'text-zinc-400 hover:text-white' : 'text-stone-500 hover:text-stone-900'
+                  isDark ? 'text-zinc-400 hover:text-white' : 'text-[#736E65] hover:text-zinc-900'
                 }`}
                 aria-label="Cancelar alocação"
               >
@@ -895,7 +897,7 @@ export const ProductDrawer: React.FC = () => {
               </button>
             </div>
 
-            <p className={`text-[11px] mb-2.5 ${isDark ? 'text-zinc-400' : 'text-stone-600'}`}>
+            <p className={`text-[11px] mb-2.5 ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>
               Selecione a página de destino e o slot onde deseja posicionar o item:
             </p>
 
@@ -913,16 +915,16 @@ export const ProductDrawer: React.FC = () => {
                       isSelected
                         ? isDark
                           ? 'bg-zinc-100 text-zinc-950 font-bold border-white'
-                          : 'bg-stone-900 text-white font-bold border-stone-900 shadow-xs'
+                          : 'bg-zinc-900 text-white font-bold border-zinc-900 shadow-xs'
                         : isDark
                         ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                        : 'bg-white border-stone-200 text-stone-600 hover:text-stone-900'
+                        : 'bg-white border-[#E4E0D6] text-zinc-600 hover:text-zinc-900'
                     }`}
                   >
                     <span>Pág. {String(p.pageNumber).padStart(2, '0')}</span>
                     <span className="opacity-70 ml-1">({p.type})</span>
                     {isCurrentSpreadPage && (
-                      <span className="ml-1 text-[9px] text-amber-700 dark:text-amber-400 font-bold font-mono">
+                      <span className="ml-1 text-[9px] text-[#B08D57] dark:text-[#C5A26B] font-bold font-mono">
                         · Ativa
                       </span>
                     )}
@@ -936,7 +938,7 @@ export const ProductDrawer: React.FC = () => {
               const selectedPage = pages.find((p) => p.pageNumber === selectedSubpanelPageNumber);
               if (!selectedPage) {
                 return (
-                  <p className="text-xs text-stone-400 text-center py-3">
+                  <p className="text-xs text-zinc-400 text-center py-3">
                     Nenhuma página com slots disponível.
                   </p>
                 );
@@ -946,7 +948,7 @@ export const ProductDrawer: React.FC = () => {
 
               return (
                 <div className="space-y-2">
-                  <div className="text-[10px] font-mono uppercase tracking-wider text-stone-500 flex items-center justify-between">
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-[#736E65] flex items-center justify-between">
                     <span>
                       Slots em Pág. {String(selectedPage.pageNumber).padStart(2, '0')} ({selectedPage.type})
                     </span>
@@ -963,12 +965,12 @@ export const ProductDrawer: React.FC = () => {
                           onClick={() => handleConfirmAssignment(selectedPage.pageNumber, slot.slotIndex)}
                           className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between group ${
                             isDark
-                              ? 'bg-zinc-900/80 border-zinc-800 hover:border-amber-600/70 hover:bg-zinc-800/80'
-                              : 'bg-white border-stone-200 hover:border-amber-600/70 hover:bg-amber-50/40 shadow-xs'
+                              ? 'bg-zinc-900/80 border-zinc-800 hover:border-[#B08D57]/70 hover:bg-zinc-800/80'
+                              : 'bg-white border-[#E4E0D6] hover:border-[#B08D57]/70 hover:bg-[#F5F1EA]/60 shadow-xs'
                           }`}
                         >
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-amber-700 dark:text-amber-400">
+                            <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-[#B08D57] dark:text-[#C5A26B]">
                               {slot.label}
                             </span>
                             <span
@@ -978,8 +980,8 @@ export const ProductDrawer: React.FC = () => {
                                     ? 'bg-zinc-800 text-zinc-400 border-zinc-700'
                                     : 'bg-stone-100 text-stone-500 border-stone-200'
                                   : isDark
-                                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800/60'
-                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  ? 'bg-zinc-800/70 text-zinc-400 border-zinc-700/60'
+                                  : 'bg-[#F5F1EA] text-[#736E65] border-[#E4E0D6]'
                               }`}
                             >
                               {isOccupied ? 'Ocupado' : 'Livre'}
@@ -988,11 +990,11 @@ export const ProductDrawer: React.FC = () => {
 
                           <div className="text-xs font-semibold truncate">
                             {isOccupied ? (
-                              <span className={isDark ? 'text-zinc-300' : 'text-stone-700'}>
+                              <span className={isDark ? 'text-zinc-300' : 'text-zinc-700'}>
                                 Substituir: {slot.currentProduct?.name}
                               </span>
                             ) : (
-                              <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                              <span className="text-zinc-900 dark:text-zinc-100 font-medium">
                                 + Alocar neste espaço
                               </span>
                             )}
@@ -1011,20 +1013,20 @@ export const ProductDrawer: React.FC = () => {
         {isAddModalOpen && (
           <div
             className={`absolute inset-0 z-50 p-6 flex flex-col justify-between animate-in zoom-in-95 duration-150 ${
-              isDark ? 'bg-black/90 backdrop-blur-sm text-zinc-100' : 'bg-[#FAF7F2]/98 backdrop-blur-sm text-stone-900'
+              isDark ? 'bg-black/90 backdrop-blur-sm text-zinc-100' : 'bg-[#FAF8F5]/98 backdrop-blur-sm text-zinc-900'
             }`}
           >
             <div className="space-y-4">
               <div
                 className={`flex items-center justify-between border-b pb-3 ${
-                  isDark ? 'border-zinc-800' : 'border-stone-200'
+                  isDark ? 'border-zinc-800' : 'border-[#E4E0D6]'
                 }`}
               >
                 <h3 className="text-sm font-semibold">Novo Produto no Acervo</h3>
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className={`cursor-pointer ${isDark ? 'text-zinc-400 hover:text-white' : 'text-stone-500 hover:text-stone-900'}`}
+                  className={`cursor-pointer ${isDark ? 'text-zinc-400 hover:text-white' : 'text-[#736E65] hover:text-zinc-900'}`}
                 >
                   <X className="size-4" />
                 </button>
@@ -1032,7 +1034,7 @@ export const ProductDrawer: React.FC = () => {
 
               <form onSubmit={handleCreateProduct} className="space-y-3 text-xs">
                 <div>
-                  <label className={`block text-[11px] font-medium mb-1 ${isDark ? 'text-zinc-400' : 'text-stone-600'}`}>
+                  <label className={`block text-[11px] font-medium mb-1 ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>
                     Nome da Peça
                   </label>
                   <input
@@ -1044,14 +1046,14 @@ export const ProductDrawer: React.FC = () => {
                     className={`w-full px-3 py-2 rounded-lg border outline-none transition-colors ${
                       isDark
                         ? 'bg-zinc-900 border-zinc-700 text-zinc-100 focus:border-zinc-500'
-                        : 'bg-white border-stone-200 text-stone-900 focus:border-amber-600/60'
+                        : 'bg-white border-[#E4E0D6] text-zinc-900 focus:border-[#B08D57]'
                     }`}
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className={`block text-[11px] font-medium mb-1 ${isDark ? 'text-zinc-400' : 'text-stone-600'}`}>
+                    <label className={`block text-[11px] font-medium mb-1 ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>
                       Categoria
                     </label>
                     <input
@@ -1062,13 +1064,13 @@ export const ProductDrawer: React.FC = () => {
                       className={`w-full px-3 py-2 rounded-lg border outline-none transition-colors ${
                         isDark
                           ? 'bg-zinc-900 border-zinc-700 text-zinc-100 focus:border-zinc-500'
-                          : 'bg-white border-stone-200 text-stone-900 focus:border-amber-600/60'
+                          : 'bg-white border-[#E4E0D6] text-zinc-900 focus:border-[#B08D57]'
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className={`block text-[11px] font-medium mb-1 ${isDark ? 'text-zinc-400' : 'text-stone-600'}`}>
+                    <label className={`block text-[11px] font-medium mb-1 ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>
                       Preço
                     </label>
                     <input
@@ -1079,7 +1081,7 @@ export const ProductDrawer: React.FC = () => {
                       className={`w-full px-3 py-2 rounded-lg border font-mono outline-none transition-colors ${
                         isDark
                           ? 'bg-zinc-900 border-zinc-700 text-zinc-100 focus:border-zinc-500'
-                          : 'bg-white border-stone-200 text-stone-900 focus:border-amber-600/60'
+                          : 'bg-white border-[#E4E0D6] text-zinc-900 focus:border-[#B08D57]'
                       }`}
                     />
                   </div>
@@ -1087,7 +1089,7 @@ export const ProductDrawer: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className={`block text-[11px] font-medium mb-1 ${isDark ? 'text-zinc-400' : 'text-stone-600'}`}>
+                    <label className={`block text-[11px] font-medium mb-1 ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>
                       SKU / Código
                     </label>
                     <input
@@ -1098,13 +1100,13 @@ export const ProductDrawer: React.FC = () => {
                       className={`w-full px-3 py-2 rounded-lg border font-mono outline-none transition-colors ${
                         isDark
                           ? 'bg-zinc-900 border-zinc-700 text-zinc-100 focus:border-zinc-500'
-                          : 'bg-white border-stone-200 text-stone-900 focus:border-amber-600/60'
+                          : 'bg-white border-[#E4E0D6] text-zinc-900 focus:border-[#B08D57]'
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className={`block text-[11px] font-medium mb-1 ${isDark ? 'text-zinc-400' : 'text-stone-600'}`}>
+                    <label className={`block text-[11px] font-medium mb-1 ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>
                       Tag Especial
                     </label>
                     <input
@@ -1115,14 +1117,14 @@ export const ProductDrawer: React.FC = () => {
                       className={`w-full px-3 py-2 rounded-lg border outline-none transition-colors ${
                         isDark
                           ? 'bg-zinc-900 border-zinc-700 text-zinc-100 focus:border-zinc-500'
-                          : 'bg-white border-stone-200 text-stone-900 focus:border-amber-600/60'
+                          : 'bg-white border-[#E4E0D6] text-zinc-900 focus:border-[#B08D57]'
                       }`}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className={`block text-[11px] font-medium mb-1 ${isDark ? 'text-zinc-400' : 'text-stone-600'}`}>
+                  <label className={`block text-[11px] font-medium mb-1 ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>
                     Descrição Editorial
                   </label>
                   <textarea
@@ -1133,13 +1135,13 @@ export const ProductDrawer: React.FC = () => {
                     className={`w-full px-3 py-2 rounded-lg border outline-none resize-none transition-colors ${
                       isDark
                         ? 'bg-zinc-900 border-zinc-700 text-zinc-100 focus:border-zinc-500'
-                        : 'bg-white border-stone-200 text-stone-900 focus:border-amber-600/60'
+                        : 'bg-white border-[#E4E0D6] text-zinc-900 focus:border-[#B08D57]'
                     }`}
                   />
                 </div>
 
                 <div>
-                  <label className={`block text-[11px] font-medium mb-1 ${isDark ? 'text-zinc-400' : 'text-stone-600'}`}>
+                  <label className={`block text-[11px] font-medium mb-1 ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>
                     Caminho ou URL da Imagem
                   </label>
                   <input
@@ -1150,7 +1152,7 @@ export const ProductDrawer: React.FC = () => {
                     className={`w-full px-3 py-2 rounded-lg border outline-none font-mono text-[11px] transition-colors ${
                       isDark
                         ? 'bg-zinc-900 border-zinc-700 text-zinc-100 focus:border-zinc-500'
-                        : 'bg-white border-stone-200 text-stone-900 focus:border-amber-600/60'
+                        : 'bg-white border-[#E4E0D6] text-zinc-900 focus:border-[#B08D57]'
                     }`}
                   />
                 </div>
@@ -1161,7 +1163,7 @@ export const ProductDrawer: React.FC = () => {
                     className={`flex-1 py-2.5 px-4 rounded-xl font-semibold text-xs transition-colors cursor-pointer ${
                       isDark
                         ? 'bg-zinc-100 hover:bg-white text-zinc-950'
-                        : 'bg-stone-900 hover:bg-stone-800 text-white'
+                        : 'bg-zinc-900 hover:bg-zinc-800 text-white'
                     }`}
                   >
                     Salvar no Acervo
@@ -1172,7 +1174,7 @@ export const ProductDrawer: React.FC = () => {
                     className={`py-2.5 px-4 rounded-xl text-xs border cursor-pointer transition-colors ${
                       isDark
                         ? 'text-zinc-400 hover:text-white border-zinc-700'
-                        : 'text-stone-600 hover:text-stone-950 border-stone-200 bg-white'
+                        : 'text-zinc-700 hover:text-zinc-950 border-[#E4E0D6] bg-white'
                     }`}
                   >
                     Cancelar
