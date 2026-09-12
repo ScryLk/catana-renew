@@ -939,20 +939,24 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
     const initialMessages: ChatMessage[] = [
       {
-        id: 'msg-1',
-        role: 'user',
-        content: target.initialPrompt || `Criar catalogo ${target.title}`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-      {
-        id: 'msg-2',
+        id: 'msg-welcome',
         role: 'assistant',
         content: `Catálogo **"${target.title}"** gerado e diagramado com sucesso!\n\nEstruturei **${target.totalPages} páginas em ${Math.ceil(target.totalPages / 2)} spreads duplos**, com direção de arte em harmonia com a paleta **${target.palette.name}**.\n\n${target.summary}\n\n**Você pode interagir livremente:**\n- **Clique em qualquer elemento** na prancheta para editar textos, preços e imagens.\n- **Use o chat do Co-Pilot** para solicitar alterações com auxílio do Conselho Editorial.\n- **Navegue pelos spreads** pelo filmstrip inferior ou teclas de seta.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         reasoning: target.reasoning,
         delegations: target.councilDelegations,
+        actions: [`Catálogo "${target.title}" estruturado em ${target.totalPages} páginas sob a paleta ${target.palette.name}`],
       },
     ];
+
+    if (target.initialPrompt && target.initialPrompt.trim()) {
+      initialMessages.push({
+        id: 'msg-user-briefing',
+        role: 'user',
+        content: target.initialPrompt.trim(),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+    }
 
     const initialThread: ChatThread = {
       id: 'thread-main',
@@ -2136,6 +2140,52 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       let accumulatedContent = '';
       let appliedPatch: any = null;
 
+      const syncMessageMetadata = (patchObj: any) => {
+        if (!patchObj) return;
+
+        const actionSummaries = Array.isArray(patchObj.actions)
+          ? patchObj.actions.map((act: any) => {
+              if (act.type === 'remove_product') return `Produto removido da Página ${act.page || 'visível'} e retornado ao acervo`;
+              if (act.type === 'assign_product') return `Produto alocado na Página ${act.page || 1}`;
+              if (act.type === 'swap_product') return `Substituição de produto na Página ${act.page || 1}`;
+              if (act.type === 'create_product') return `Produto "${act.title || act.name || 'Novo'}" cadastrado e alocado`;
+              if (act.type === 'change_layout') return `Layout da Página ${act.page || 1} convertido para ${(act.layout || 'hero').toUpperCase()}`;
+              if (act.type === 'adjust_pricing') return `Reajuste de ${act.percentage || 10}% aplicado à tabela de preços`;
+              if (act.type === 'generate_skus') return `Códigos SKU padronizados com prefixo ${act.prefix || 'CAT'}`;
+              if (act.type === 'set_palette') return 'Paleta cromática do catálogo atualizada';
+              if (act.type === 'brand_lock') return act.locked ? 'Trava de Marca (Brand Lock) ativada' : 'Trava de Marca desativada';
+              if (act.type === 'remove_background') return 'Isolamento de silhueta e recorte de fundo executados';
+              if (act.type === 'generate_photo') return 'Fotografia de estúdio em alta resolução gerada com IA';
+              if (act.type === 'update_text') return `Texto da Página ${act.page || 1} (${act.field}) atualizado`;
+              return act.type;
+            })
+          : patchObj.summary
+          ? [patchObj.summary]
+          : [];
+
+        if (patchObj.delegations || patchObj.reasoning || actionSummaries.length > 0) {
+          set((s) => ({
+            threads: s.threads.map((t) =>
+              t.id === s.activeThreadId
+                ? {
+                    ...t,
+                    messages: t.messages.map((m) =>
+                      m.id === assistantMsgId
+                        ? {
+                            ...m,
+                            reasoning: patchObj.reasoning || m.reasoning,
+                            delegations: patchObj.delegations || m.delegations,
+                            actions: actionSummaries.length > 0 ? actionSummaries : m.actions,
+                          }
+                        : m
+                    ),
+                  }
+                : t
+            ),
+          }));
+        }
+      };
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -2172,35 +2222,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
               }));
             }
 
-            const syncMessageMetadata = (patchObj: any) => {
-              if (!patchObj) return;
-              if (patchObj.delegations || patchObj.reasoning) {
-                set((s) => ({
-                  threads: s.threads.map((t) =>
-                    t.id === s.activeThreadId
-                      ? {
-                          ...t,
-                          messages: t.messages.map((m) =>
-                            m.id === assistantMsgId
-                              ? {
-                                  ...m,
-                                  reasoning: patchObj.reasoning || m.reasoning,
-                                  delegations: patchObj.delegations || m.delegations,
-                                }
-                              : m
-                          ),
-                        }
-                      : t
-                  ),
-                }));
-              }
-            };
-
             if (data.event === 'patch' && data.patch && !appliedPatch) {
               appliedPatch = data.patch;
               get().applySpreadPatch(data.patch);
               syncMessageMetadata(data.patch);
-              toast.success(data.patch.summary || 'Alteracoes aplicadas ao spread!');
+              toast.success('Prancheta Sincronizada', {
+                description: data.patch.summary || 'Alterações aplicadas com sucesso pelo Conselho Editorial.',
+              });
             }
 
             if (data.event === 'done') {
@@ -2208,7 +2236,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
                 appliedPatch = data.patch;
                 get().applySpreadPatch(data.patch);
                 syncMessageMetadata(data.patch);
-                toast.success(data.patch.summary || 'Alteracoes aplicadas ao spread!');
+                toast.success('Prancheta Sincronizada', {
+                  description: data.patch.summary || 'Alterações aplicadas com sucesso pelo Conselho Editorial.',
+                });
               }
             }
           } catch {
@@ -2225,27 +2255,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             const parsed = JSON.parse(match[1]);
             appliedPatch = parsed;
             get().applySpreadPatch(parsed);
-            if (parsed.delegations || parsed.reasoning) {
-              set((s) => ({
-                threads: s.threads.map((t) =>
-                  t.id === s.activeThreadId
-                    ? {
-                        ...t,
-                        messages: t.messages.map((m) =>
-                          m.id === assistantMsgId
-                            ? {
-                                ...m,
-                                reasoning: parsed.reasoning || m.reasoning,
-                                delegations: parsed.delegations || m.delegations,
-                              }
-                            : m
-                        ),
-                      }
-                    : t
-                ),
-              }));
-            }
-            toast.success(parsed.summary || 'Alteracoes aplicadas ao spread!');
+            syncMessageMetadata(parsed);
+            toast.success('Prancheta Sincronizada', {
+              description: parsed.summary || 'Alterações aplicadas com sucesso pelo Conselho Editorial.',
+            });
           } catch {}
         }
       }
@@ -2750,6 +2763,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             reasoning: isOrchestrator
               ? `Racional do Editor-Chefe [Remoção Executiva]: Produto desvinculado da lâmina ${targetPageNum}. Respiro e proporção A4 restaurados; item devolvido ao acervo.`
               : `Racional [${currentRole.name}]: Produto removido da página conforme a diretriz.`,
+            actions: [`"${removedNames}" removido da Página ${String(targetPageNum).padStart(2, '0')} e retornado ao acervo`],
             delegations: isOrchestrator
               ? [
                   {
@@ -2799,6 +2813,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             role: 'assistant',
             content: `A Página ${String(targetPageNum).padStart(2, '0')} (${targetPage.type === 'divider' ? 'Divisória de Categoria' : 'página'}) não continha produtos alocados. Identifiquei e retirei o produto **"${removedNames}"** da **Página ${String(siblingPageNum).padStart(2, '0')}** (mesmo spread visual), devolvendo-o ao acervo.\n\nO slot da Página ${String(siblingPageNum).padStart(2, '0')} agora está livre e pronto para receber uma nova peça.`,
             reasoning: `Racional do Editor-Chefe [Resolução Contextual]: O usuário solicitou remoção no spread ${spreadIndex + 1}; o produto localizado na lâmina parceira (${siblingPageNum}) foi retirado com precisão.`,
+            actions: [`"${removedNames}" retirado da Página ${String(siblingPageNum).padStart(2, '0')} e retornado ao acervo`],
             delegations: isOrchestrator
               ? [
                   {
@@ -2867,6 +2882,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           role: 'assistant',
           content: `O produto **"${matchedProdName}"** foi localizado na **Página ${String(matchedPageNum).padStart(2, '0')}**, desvinculado da lâmina e retornado ao seu acervo.\n\nA prancheta foi reorganizada para manter o equilíbrio visual.`,
           reasoning: `Racional do Editor-Chefe [Busca Semântica & Remoção]: Produto identificado na Página ${matchedPageNum} e retirado da grade.`,
+          actions: [`"${matchedProdName}" removido da Página ${String(matchedPageNum).padStart(2, '0')} e retornado ao acervo`],
           delegations: isOrchestrator
             ? [
                 {
@@ -2914,6 +2930,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           role: 'assistant',
           content: `Retirei **"${removedNames}"** da **Página ${String(activePageWithProduct.pageNumber).padStart(2, '0')}** da lâmina visível, retornando-o ao acervo.`,
           reasoning: 'Racional do Editor-Chefe [Spread Ativo]: Produto removido do spread focado pelo usuário.',
+          actions: [`"${removedNames}" retirado da Página ${String(activePageWithProduct.pageNumber).padStart(2, '0')} e devolvido ao acervo`],
         });
         return;
       }
@@ -2953,6 +2970,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           reasoning: isOrchestrator
             ? `Racional do Editor-Chefe [Alocação Executiva]: Produto "${foundProduct.name}" inserido na Página ${targetPageNum}. Grid A4 e proporção áurea reajustados para comportar a peça.`
             : `Racional [${currentRole.name}]: Alocação realizada conforme diretriz.`,
+          actions: [`"${foundProduct.name}" alocado na Página ${String(targetPageNum).padStart(2, '0')} (Slot 0${slotIdx + 1})`],
           delegations: isOrchestrator
             ? [
                 {
@@ -3008,12 +3026,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       state.updatePage(pageNum, { type: newType });
       set({ agentStatus: 'idle' });
       get().goToSpread(Math.floor((pageNum - 1) / 2));
-      toast.success(`Página ${String(pageNum).padStart(2, '0')} convertida para layout ${newType.toUpperCase()}!`);
+      toast.success(`Página ${String(pageNum).padStart(2, '0')} convertida para layout ${newType.toUpperCase()}!`, {
+        description: 'Template reorganizado com proporção áurea e respiro de 96px.',
+      });
 
       state.addMessage({
         role: 'assistant',
         content: `O layout da **Página ${String(pageNum).padStart(2, '0')}** foi convertido para **${newType.toUpperCase()}**.\n\nA composição geométrica, os slots de produto e o grid editorial foram reorganizados pelo Diretor de Arte.`,
         reasoning: `Racional do Diretor de Arte: Conversão de template da Página ${pageNum} para ${newType}, recalculando respiros e alinhamentos de leitura sob proporções A4.`,
+        actions: [`Layout da Página ${String(pageNum).padStart(2, '0')} convertido para ${newType.toUpperCase()}`],
         delegations: isOrchestrator
           ? [
               {
@@ -3046,11 +3067,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         const spreadIdx = Math.floor((pageNum - 1) / 2);
         state.goToSpread(spreadIdx);
         set({ agentStatus: 'idle' });
+        toast.info(`Navegando para a Página ${String(pageNum).padStart(2, '0')}`, {
+          description: `Lâmina ${spreadIdx + 1} de ${Math.ceil(state.totalPages / 2)} centralizada no canvas.`,
+        });
 
         state.addMessage({
           role: 'assistant',
           content: `Navegando para a **Página ${String(pageNum).padStart(2, '0')}** (Lâmina ${spreadIdx + 1} de ${Math.ceil(state.totalPages / 2)}).`,
           reasoning: 'Racional [Navegação]: Prancheta centralizada na lâmina solicitada.',
+          actions: [`Navegação para a Página ${String(pageNum).padStart(2, '0')} (Lâmina ${spreadIdx + 1})`],
         });
         return;
       }
@@ -3071,12 +3096,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       state.updatePage(pageNum, { [fieldKey]: newText });
       set({ agentStatus: 'idle' });
       get().goToSpread(Math.floor((pageNum - 1) / 2));
-      toast.success(`${fieldType} da Página ${pageNum} atualizado!`);
+      toast.success(`${fieldType} da Página ${pageNum} atualizado!`, {
+        description: `Texto revisado com tom de voz da coleção e tipografia Cormorant.`,
+      });
 
       state.addMessage({
         role: 'assistant',
         content: `O ${fieldType} da **Página ${String(pageNum).padStart(2, '0')}** foi atualizado para **"${newText}"**.`,
         reasoning: 'Racional [Redator Publicitário]: Refinamento de texto com vocabulário alinhado ao posicionamento da coleção.',
+        actions: [`${fieldType} da Página ${String(pageNum).padStart(2, '0')} atualizado para "${newText}"`],
       });
       return;
     }
@@ -3105,12 +3133,17 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       });
 
       set({ agentStatus: 'idle' });
+      toast.success(`Preços reajustados em ${isReduction ? '-' : '+'}${pct}%!`, {
+        description: 'Tabela comercial de atacado recalculada com precisão centesimal.',
+      });
+
       state.addMessage({
         role: 'assistant',
         content: `Reajuste de **${isReduction ? '-' : '+'}${pct}%** aplicado com sucesso a todas as referências do catálogo e acervo comercial.`,
         reasoning: isOrchestrator
           ? 'Racional do Editor-Chefe [Rebalanceamento Financeiro B2B]: Markups e tabelas de atacado recalculados em consonância com as diretrizes comerciais e alinhamento numérico preservado.'
           : `Racional [${currentRole.name}]: Tabela de preços atualizada com precisão centesimal sob as diretrizes do cargo.`,
+        actions: [`Reajuste de ${isReduction ? '-' : '+'}${pct}% aplicado aos preços de todo o catálogo`],
         delegations: isOrchestrator
           ? [
               {
@@ -3157,12 +3190,17 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       });
 
       set({ agentStatus: 'idle' });
+      toast.success('Códigos SKU padronizados!', {
+        description: 'Matriz sequencial institucional CAT-101 gerada para todas as peças.',
+      });
+
       state.addMessage({
         role: 'assistant',
         content: 'Todos os produtos do catálogo e acervo receberam códigos SKU padronizados sequencialmente (ex: `CAT-101`, `CAT-102`, `CAT-103`).',
         reasoning: isOrchestrator
           ? 'Racional do Editor-Chefe [Padronização Logística]: Normalização de catálogo B2B para integração com ERP e exportação de fichas técnicas.'
           : `Racional [${currentRole.name}]: Nomenclatura SKU padronizada conforme as regras comerciais vigentes.`,
+        actions: ['Códigos SKU padronizados sequencialmente (CAT-101 em diante)'],
         delegations: isOrchestrator
           ? [
               {
@@ -3218,6 +3256,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           reasoning: isOrchestrator
             ? `Racional do Editor-Chefe [Fotografia IA]: Síntese visual de estúdio disparada para "${targetProd.name}", mantendo o padrão fotográfico de alta joalheria.`
             : `Racional [${currentRole.name}]: Disparo de geração visual em conformidade com o briefing do catálogo.`,
+          actions: [`Fotografia de estúdio com IA disparada para "${targetProd.name}"`],
           delegations: isOrchestrator
             ? [
                 {
@@ -3302,6 +3341,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           reasoning: isOrchestrator
             ? `Racional do Editor-Chefe [Tratamento de Imagem]: Recorte alpha disparado para "${targetProd.name}" para sobreposição perfeita no layout.`
             : `Racional [${currentRole.name}]: Isolamento de fundo executado para atender às diretrizes visuais.`,
+          actions: [`Remoção de fundo com IA solicitada para "${targetProd.name}"`],
           delegations: isOrchestrator
             ? [
                 {

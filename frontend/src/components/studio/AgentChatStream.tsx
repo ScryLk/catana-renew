@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Cpu,
   ArrowRight,
+  CheckCircle2,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
 import { toast } from 'sonner';
@@ -43,9 +44,26 @@ export const AgentChatStream: React.FC = () => {
           'Harmonizar paleta cromática da coleção',
         ];
 
+  // Garante que a mensagem nativa de boas-vindas do sistema/geracao fique no topo, com mensagens do usuario abaixo
+  const displayMessages = React.useMemo(() => {
+    if (messages.length >= 2) {
+      const firstIsUser = messages[0].role === 'user';
+      const secondIsWelcome =
+        messages[1].role === 'assistant' &&
+        (messages[1].id === 'msg-2' ||
+          messages[1].id === 'msg-welcome' ||
+          messages[1].content.includes('gerado e diagramado com sucesso!'));
+
+      if (firstIsUser && secondIsWelcome) {
+        return [messages[1], messages[0], ...messages.slice(2)];
+      }
+    }
+    return messages;
+  }, [messages]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [displayMessages]);
 
   const handleChipClick = (chipText: string) => {
     addMessage({
@@ -60,7 +78,7 @@ export const AgentChatStream: React.FC = () => {
 
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar px-3 py-4 space-y-4 text-xs select-text">
-      {messages.length === 0 && (
+      {displayMessages.length === 0 && (
         <div className="h-full flex flex-col items-center justify-center text-center p-4 space-y-3">
           <div
             className={`size-10 rounded-2xl border flex items-center justify-center transition-colors ${
@@ -105,7 +123,7 @@ export const AgentChatStream: React.FC = () => {
         </div>
       )}
 
-      {messages.map((msg) => {
+      {displayMessages.map((msg) => {
         const isUser = msg.role === 'user';
 
         if (isUser) {
@@ -182,6 +200,39 @@ export const AgentChatStream: React.FC = () => {
                 }`}
               >
                 <p className="whitespace-pre-line text-pretty">{msg.content}</p>
+
+                {/* Alerta Intuitivo de Acao Operacional Executada */}
+                {msg.actions && msg.actions.length > 0 && (
+                  <div
+                    className={`mt-2.5 p-2.5 rounded-xl border flex items-start gap-2.5 transition-all ${
+                      isDark
+                        ? 'bg-[#181614] border-[#B08D57]/30 text-zinc-200'
+                        : 'bg-[#FDFBF7] border-[#B08D57]/40 text-zinc-900'
+                    }`}
+                  >
+                    <div className="size-5 rounded-full bg-[#B08D57]/20 border border-[#B08D57]/40 flex items-center justify-center shrink-0 mt-0.5">
+                      <CheckCircle2 className="size-3 text-[#B08D57]" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-[#B08D57] font-semibold">
+                          Ação Editorial Executada
+                        </span>
+                        <span className="text-[9px] font-mono text-zinc-400">
+                          Sincronizado
+                        </span>
+                      </div>
+                      <div className="mt-1 space-y-1">
+                        {msg.actions.map((act, idx) => (
+                          <div key={idx} className="flex items-start gap-1.5 text-[11px] font-medium leading-snug">
+                            <span className="text-[#B08D57] font-mono text-xs shrink-0">•</span>
+                            <span>{act}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Captured Brand Dossier & Agents Suite */}
                 {msg.capturedDossier && (
