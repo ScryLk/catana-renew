@@ -126,21 +126,53 @@ export const NewCatalogModal: React.FC = () => {
         }}
       >
         <div className="relative w-full max-w-3xl animate-in zoom-in-95 duration-200">
-          {/* Botão de Fechar no canto superior */}
-          <button
-            type="button"
-            onClick={closeNewCatalogModal}
-            className={`absolute -top-10 right-0 p-1.5 rounded-lg border transition-colors cursor-pointer flex items-center gap-1.5 text-xs ${
-              isDark
-                ? 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:text-white'
-                : 'bg-white/80 border-zinc-200 text-zinc-600 hover:text-zinc-950'
-            }`}
-            aria-label="Fechar"
-            title="Fechar (Esc)"
-          >
-            <X className="size-3.5" />
-            <span className="text-[11px] font-mono">Esc</span>
-          </button>
+          {/* Top Bar with Catana Brand Logo and Close Button */}
+          <div className="flex items-center justify-between mb-4 px-1">
+            <div className="size-8" aria-hidden="true" />
+
+            {/* Logo Catana 2.0 */}
+            <div className="flex items-center gap-3 select-none">
+              <svg
+                viewBox="40 10 640 170"
+                className={`h-8 sm:h-9 fill-none stroke-current transition-colors ${
+                  isDark
+                    ? 'text-white drop-shadow-[0_2px_12px_rgba(255,255,255,0.15)]'
+                    : 'text-zinc-950 drop-shadow-[0_2px_12px_rgba(0,0,0,0.08)]'
+                }`}
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-label="Logo Catana"
+              >
+                <path d="M 132 96 C 124 82 104 76 88 86 C 70 97 62 122 74 138 C 84 150 104 148 116 136 C 128 148 146 142 158 120 C 170 100 190 90 206 90 C 194 78 172 80 160 94 C 148 108 148 128 160 140 C 170 149 186 145 196 132 C 202 124 206 108 208 92 C 206 112 206 130 214 142 C 222 152 236 146 244 128 C 256 102 270 66 282 44 C 280 70 276 110 278 132 C 280 148 294 152 308 138 C 322 124 344 100 384 90 C 370 78 348 80 336 94 C 324 108 324 128 336 140 C 346 149 362 145 372 132 C 378 124 382 108 384 92 C 382 112 382 130 390 142 C 398 152 412 146 420 128 C 428 110 438 96 446 88 C 448 106 446 128 448 142 C 458 116 472 94 486 88 C 494 84 498 92 498 104 C 498 120 496 132 502 142 C 508 150 520 146 528 128 C 536 112 560 92 592 90 C 578 78 556 80 544 94 C 532 108 532 128 544 140 C 554 149 570 145 580 132 C 586 124 590 108 592 92 C 590 112 590 130 598 142 C 608 154 626 148 640 124" />
+                <path d="M 250 76 C 272 68 300 64 328 70" />
+              </svg>
+              <span
+                className={`text-xs font-mono tracking-wider font-semibold px-2 py-0.5 rounded-full border ${
+                  isDark
+                    ? 'bg-zinc-800/80 border-zinc-700/60 text-zinc-300'
+                    : 'bg-zinc-100 border-zinc-200 text-zinc-700'
+                }`}
+              >
+                2.0
+              </span>
+            </div>
+
+            {/* Botão de Fechar sem o texto Esc */}
+            <button
+              type="button"
+              onClick={closeNewCatalogModal}
+              className={`p-2 rounded-xl border transition-colors cursor-pointer flex items-center justify-center ${
+                isDark
+                  ? 'bg-zinc-900/80 hover:bg-zinc-800 border-zinc-800 text-zinc-400 hover:text-white'
+                  : 'bg-white/80 hover:bg-zinc-100 border-zinc-200 text-zinc-600 hover:text-zinc-950'
+              }`}
+              aria-label="Fechar modal"
+              title="Fechar (Esc)"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
 
           {/* Input Box Card (exato como na imagem) */}
           <div
