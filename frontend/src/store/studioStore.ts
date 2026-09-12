@@ -2663,26 +2663,52 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         return [];
       };
 
-      const resolveDelegations = (patchObj: any): ChatDelegation[] | undefined => {
-        if (!patchObj || !Array.isArray(patchObj.delegations)) return undefined;
-        return patchObj.delegations.map((d: any) => {
-          const role = d.roleId || d.role;
-          let roleName = d.roleName;
-          let badge = d.badge;
-          if (!roleName) {
-            if (role === 'director') { roleName = 'Diretor de Arte'; badge = 'Design'; }
-            else if (role === 'copywriter') { roleName = 'Redator Publicitário'; badge = 'Redação'; }
-            else if (role === 'commercial') { roleName = 'Tabela Comercial / B2B'; badge = 'Comercial'; }
-            else if (role === 'branding') { roleName = 'Auditor de Branding'; badge = 'Auditoria'; }
-            else { roleName = role; badge = 'Conselho'; }
+      const resolveDelegations = (patchObj: any, rawText?: string): ChatDelegation[] | undefined => {
+        let list: ChatDelegation[] = [];
+        if (patchObj && Array.isArray(patchObj.delegations)) {
+          list = patchObj.delegations.map((d: any) => {
+            const role = d.roleId || d.role;
+            let roleName = d.roleName;
+            let badge = d.badge;
+            if (!roleName) {
+              if (role === 'director') { roleName = 'Diretor de Arte'; badge = 'Design'; }
+              else if (role === 'copywriter') { roleName = 'Redator Publicitário'; badge = 'Redação'; }
+              else if (role === 'commercial') { roleName = 'Tabela Comercial / B2B'; badge = 'Comercial'; }
+              else if (role === 'branding') { roleName = 'Auditor de Branding'; badge = 'Auditoria'; }
+              else { roleName = role; badge = 'Conselho'; }
+            }
+            return {
+              roleId: role,
+              roleName: roleName || role,
+              badge: badge || 'Agente',
+              action: d.action || d.opinion || '',
+            };
+          });
+        }
+
+        // Se o patch não trouxe delegações mas o texto acumulado contém opiniões dos agentes
+        if (list.length === 0 && rawText) {
+          const patterns = [
+            { roleId: 'director', roleName: 'Diretor de Arte', badge: 'Design', regex: /(?:(?:\d+\.?\s*)?(?:Diretor de Arte|Arte|Design)[:\-]\s*)([\s\S]*?)(?=(?:\d+\.?\s*)?(?:Redator|Tabela|Auditor|Redação|Comercial|Branding)|$)/i },
+            { roleId: 'copywriter', roleName: 'Redator Publicitário', badge: 'Redação', regex: /(?:(?:\d+\.?\s*)?(?:Redator Publicit[aá]rio|Redator|Reda[cç][aã]o)[:\-]\s*)([\s\S]*?)(?=(?:\d+\.?\s*)?(?:Diretor|Tabela|Auditor|Arte|Comercial|Branding)|$)/i },
+            { roleId: 'commercial', roleName: 'Tabela Comercial / B2B', badge: 'Comercial', regex: /(?:(?:\d+\.?\s*)?(?:Tabela Comercial(?:\s*\/|\s*-)?\s*B2B|Tabela Comercial|Comercial|B2B)[:\-]\s*)([\s\S]*?)(?=(?:\d+\.?\s*)?(?:Diretor|Redator|Auditor|Arte|Redação|Branding)|$)/i },
+            { roleId: 'branding', roleName: 'Auditor de Branding', badge: 'Auditoria', regex: /(?:(?:\d+\.?\s*)?(?:Auditor de Branding|Branding|Auditoria)[:\-]\s*)([\s\S]*?)(?=(?:\d+\.?\s*)?(?:Diretor|Redator|Tabela|Arte|Redação|Comercial)|$)/i },
+          ];
+
+          for (const p of patterns) {
+            const m = rawText.match(p.regex);
+            if (m && m[1] && m[1].trim().length > 5) {
+              list.push({
+                roleId: p.roleId,
+                roleName: p.roleName,
+                badge: p.badge,
+                action: m[1].trim(),
+              });
+            }
           }
-          return {
-            roleId: role,
-            roleName: roleName || role,
-            badge: badge || 'Agente',
-            action: d.action || d.opinion || '',
-          };
-        });
+        }
+
+        return list.length > 0 ? list : undefined;
       };
 
       while (true) {
@@ -2748,13 +2774,33 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
       // Extrai açoes e delegaçoes para a mensagem formada
       const actionSummaries = appliedPatch ? resolveActionSummaries(appliedPatch) : [];
-      const mappedDelegations = appliedPatch ? resolveDelegations(appliedPatch) : undefined;
+      const mappedDelegations = resolveDelegations(appliedPatch, accumulatedContent);
 
       // Limpa blocos de patch e tags tecnicas do conteudo apresentado ao usuario
       let cleanContent = accumulatedContent
         .replace(/```(?:json:patch|json)?[\s\S]*?```/g, '')
         .replace(/\[CONTEXTO DO PROJETO\][\s\S]*?(?=\n\n|$)/gi, '')
         .trim();
+
+      // Mantem apenas a acao realizada se o texto tiver relatorio detalhado dos agentes
+      const hasAgentReport = /(?:Relat[oó]rio\s+Editorial\s+Executivo|\d+\.\s*(?:Diretor de Arte|Redator|Tabela Comercial|Auditor))/i.test(cleanContent);
+      if (hasAgentReport) {
+        if (appliedPatch?.summary) {
+          cleanContent = appliedPatch.summary;
+        } else if (actionSummaries.length > 0) {
+          cleanContent = actionSummaries.join(' · ');
+        } else {
+          const firstAgentIdx = cleanContent.search(/(?:\d+\.?\s*)?(?:Diretor de Arte|Redator|Tabela Comercial|Auditor de Branding)/i);
+          let candidate = firstAgentIdx > 0
+            ? cleanContent.substring(0, firstAgentIdx).replace(/Relat[oó]rio\s+Editorial\s+Executivo:?/gi, '').trim()
+            : '';
+          if (candidate.length > 10) {
+            cleanContent = candidate;
+          } else {
+            cleanContent = 'Ajuste executado com sucesso e diagramação sincronizada pelo Conselho Editorial.';
+          }
+        }
+      }
 
       if (!cleanContent && appliedPatch?.summary) {
         cleanContent = appliedPatch.summary;

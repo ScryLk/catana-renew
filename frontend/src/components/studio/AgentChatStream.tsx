@@ -9,12 +9,11 @@ import {
   ShieldCheck,
   Cpu,
   ArrowRight,
-  CheckCircle2,
   ThumbsUp,
   ThumbsDown,
   ChevronDown,
 } from 'lucide-react';
-import { useStudioStore } from '../../store/studioStore';
+import { useStudioStore, type ChatMessage, type ChatDelegation } from '../../store/studioStore';
 import { toast } from 'sonner';
 
 interface TypewriterTextProps {
@@ -223,7 +222,89 @@ export const AgentChatStream: React.FC = () => {
   const cleanMessageContent = (content: string) => {
     return content
       .replace(/```(?:json:patch|json)?[\s\S]*?```/g, '')
+      .replace(/\[CONTEXTO DO PROJETO\][\s\S]*?(?=\n\n|$)/gi, '')
       .trim();
+  };
+
+  const parseAssistantMessage = (msg: ChatMessage) => {
+    const rawContent = cleanMessageContent(msg.content || '');
+    let delegations: ChatDelegation[] = Array.isArray(msg.delegations) ? [...msg.delegations] : [];
+
+    const hasAgentReport = /(?:Relat[oó]rio\s+Editorial\s+Executivo|\d+\.\s*(?:Diretor de Arte|Redator|Tabela Comercial|Auditor de Branding))/i.test(rawContent);
+
+    if (hasAgentReport && delegations.length === 0) {
+      const patterns = [
+        {
+          roleId: 'director',
+          roleName: 'Diretor de Arte',
+          badge: 'Design',
+          regex: /(?:(?:\d+\.?\s*)?(?:Diretor de Arte|Arte|Design)[:\-]\s*)([\s\S]*?)(?=(?:\d+\.?\s*)?(?:Redator|Tabela|Auditor|Redação|Comercial|Branding)|$)/i,
+        },
+        {
+          roleId: 'copywriter',
+          roleName: 'Redator Publicitário',
+          badge: 'Redação',
+          regex: /(?:(?:\d+\.?\s*)?(?:Redator Publicit[aá]rio|Redator|Reda[cç][aã]o)[:\-]\s*)([\s\S]*?)(?=(?:\d+\.?\s*)?(?:Diretor|Tabela|Auditor|Arte|Comercial|Branding)|$)/i,
+        },
+        {
+          roleId: 'commercial',
+          roleName: 'Tabela Comercial / B2B',
+          badge: 'Comercial',
+          regex: /(?:(?:\d+\.?\s*)?(?:Tabela Comercial(?:\s*\/|\s*-)?\s*B2B|Tabela Comercial|Comercial|B2B)[:\-]\s*)([\s\S]*?)(?=(?:\d+\.?\s*)?(?:Diretor|Redator|Auditor|Arte|Redação|Branding)|$)/i,
+        },
+        {
+          roleId: 'branding',
+          roleName: 'Auditor de Branding',
+          badge: 'Auditoria',
+          regex: /(?:(?:\d+\.?\s*)?(?:Auditor de Branding|Branding|Auditoria)[:\-]\s*)([\s\S]*?)(?=(?:\d+\.?\s*)?(?:Diretor|Redator|Tabela|Arte|Redação|Comercial)|$)/i,
+        },
+      ];
+
+      for (const p of patterns) {
+        const m = rawContent.match(p.regex);
+        if (m && m[1] && m[1].trim().length > 3) {
+          delegations.push({
+            roleId: p.roleId,
+            roleName: p.roleName,
+            badge: p.badge,
+            action: m[1].trim(),
+          });
+        }
+      }
+    }
+
+    let actionText = rawContent;
+
+    if (hasAgentReport) {
+      const stripped = rawContent
+        .replace(/Relat[oó]rio\s+Editorial\s+Executivo:?/gi, '')
+        .replace(/(?:\d+\.?\s*)?(?:Diretor de Arte|Arte|Design)[:\-]\s*[\s\S]*?(?=(?:\d+\.?\s*)?(?:Redator|Tabela|Auditor|Redação|Comercial|Branding)|$)/gi, '')
+        .replace(/(?:\d+\.?\s*)?(?:Redator Publicit[aá]rio|Redator|Reda[cç][aã]o)[:\-]\s*[\s\S]*?(?=(?:\d+\.?\s*)?(?:Diretor|Tabela|Auditor|Arte|Comercial|Branding)|$)/gi, '')
+        .replace(/(?:\d+\.?\s*)?(?:Tabela Comercial(?:\s*\/|\s*-)?\s*B2B|Tabela Comercial|Comercial|B2B)[:\-]\s*[\s\S]*?(?=(?:\d+\.?\s*)?(?:Diretor|Redator|Auditor|Arte|Redação|Branding)|$)/gi, '')
+        .replace(/(?:\d+\.?\s*)?(?:Auditor de Branding|Branding|Auditoria)[:\-]\s*[\s\S]*?(?=(?:\d+\.?\s*)?(?:Diretor|Redator|Tabela|Arte|Redação|Comercial)|$)/gi, '')
+        .trim();
+
+      if (stripped.length > 5) {
+        actionText = stripped;
+      } else if (msg.actions && msg.actions.length > 0) {
+        actionText = msg.actions.join(' · ');
+      } else {
+        actionText = 'Ajuste executado com sucesso e diagramação sincronizada pelo Conselho Editorial.';
+      }
+    }
+
+    if (!actionText) {
+      if (msg.actions && msg.actions.length > 0) {
+        actionText = msg.actions.join(' · ');
+      } else {
+        actionText = 'Ajuste executado com sucesso pelo Conselho Editorial.';
+      }
+    }
+
+    return {
+      actionText,
+      delegations,
+    };
   };
 
   const handleChipClick = (chipText: string) => {
@@ -338,6 +419,8 @@ export const AgentChatStream: React.FC = () => {
           );
         }
 
+        const parsed = parseAssistantMessage(msg);
+
         return (
           <div key={msg.id} className="flex items-start gap-2.5 max-w-[95%]">
             {/* Assistant Avatar */}
@@ -360,43 +443,25 @@ export const AgentChatStream: React.FC = () => {
                     : 'bg-white border-zinc-200 text-zinc-800'
                 }`}
               >
-                <TypewriterText
-                  text={cleanMessageContent(msg.content)}
-                  isStreaming={msg.id === latestAssistantMsgId && agentStatus === 'generating'}
-                  isCompleted={completedMessageIds.has(msg.id)}
-                  onAnimationEnd={() => markMessageCompleted(msg.id)}
-                />
+                {/* Texto Principal: Apenas a acao realizada */}
+                <div className="text-[13px] leading-relaxed">
+                  <TypewriterText
+                    text={parsed.actionText}
+                    isStreaming={msg.id === latestAssistantMsgId && agentStatus === 'generating'}
+                    isCompleted={completedMessageIds.has(msg.id)}
+                    onAnimationEnd={() => markMessageCompleted(msg.id)}
+                  />
+                </div>
 
-                {/* Alerta Intuitivo de Acao Operacional Executada */}
-                {msg.actions && msg.actions.length > 0 && (
-                  <div
-                    className={`mt-2.5 p-2.5 rounded-xl border flex items-start gap-2.5 transition-all ${
-                      isDark
-                        ? 'bg-[#181614] border-[#B08D57]/30 text-zinc-200'
-                        : 'bg-[#FDFBF7] border-[#B08D57]/40 text-zinc-900'
-                    }`}
-                  >
-                    <div className="size-5 rounded-full bg-[#B08D57]/20 border border-[#B08D57]/40 flex items-center justify-center shrink-0 mt-0.5">
-                      <CheckCircle2 className="size-3 text-[#B08D57]" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-[#B08D57] font-semibold">
-                          Ação Editorial Executada
-                        </span>
-                        <span className="text-[9px] font-mono text-zinc-400">
-                          Sincronizado
-                        </span>
+                {/* Sub-itens de acoes adicionais caso haja instrucoes multiplas pontuais */}
+                {msg.actions && msg.actions.length > 1 && !msg.actions.every((act) => parsed.actionText.includes(act)) && (
+                  <div className="mt-2 pl-2 border-l border-[#B08D57]/40 space-y-1">
+                    {msg.actions.map((act, idx) => (
+                      <div key={idx} className="flex items-start gap-1.5 text-[11px] font-medium leading-snug text-zinc-400">
+                        <span className="text-[#B08D57] font-mono text-xs shrink-0">•</span>
+                        <span>{act}</span>
                       </div>
-                      <div className="mt-1 space-y-1">
-                        {msg.actions.map((act, idx) => (
-                          <div key={idx} className="flex items-start gap-1.5 text-[11px] font-medium leading-snug">
-                            <span className="text-[#B08D57] font-mono text-xs shrink-0">•</span>
-                            <span>{act}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 )}
 
@@ -641,157 +706,151 @@ export const AgentChatStream: React.FC = () => {
                   </div>
                 )}
 
-                {/* Alternativa Interativa: Opinião e Parecer de Outros Agentes */}
-                {((msg.delegations && msg.delegations.length > 0) || msg.reasoning) && (
-                  <div className="mt-2.5 pt-2 border-t border-inherit/40">
-                    <button
-                      type="button"
-                      onClick={() => toggleOpinions(msg.id)}
-                      className={`w-full px-2.5 py-1.5 rounded-lg border text-[11px] font-medium flex items-center justify-between transition-all cursor-pointer ${
-                        expandedOpinions[msg.id]
-                          ? isDark
-                            ? 'bg-[#181614] border-[#B08D57]/40 text-zinc-200'
-                            : 'bg-[#FDFBF7] border-[#B08D57]/50 text-zinc-900'
-                          : isDark
-                            ? 'bg-zinc-900/40 border-zinc-800/80 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
-                            : 'bg-zinc-50/80 border-zinc-200 hover:border-zinc-300 text-zinc-600 hover:text-zinc-900'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <Users
-                          className={`size-3.5 ${
-                            expandedOpinions[msg.id] ? 'text-[#B08D57]' : 'text-zinc-400'
-                          }`}
-                        />
+                {/* Barra Inferior: Detalhes / Parecer dos Agentes e Feedback Like/Dislike */}
+                <div className="mt-2.5 pt-2 border-t border-inherit/40 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {parsed.delegations.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleOpinions(msg.id)}
+                        className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                          expandedOpinions[msg.id]
+                            ? isDark
+                              ? 'bg-[#181614] border-[#B08D57]/50 text-[#B08D57]'
+                              : 'bg-[#FDFBF7] border-[#B08D57]/60 text-[#8C6D3B]'
+                            : isDark
+                              ? 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
+                              : 'bg-zinc-100/80 border-zinc-200 hover:border-zinc-300 text-zinc-600 hover:text-zinc-900'
+                        }`}
+                      >
+                        <Users className="size-3 text-[#B08D57]" />
                         <span>
-                          Opinião de outros agentes ({msg.delegations?.length || 1})
+                          {expandedOpinions[msg.id]
+                            ? 'Ocultar parecer dos agentes'
+                            : `Parecer dos agentes (${parsed.delegations.length})`}
                         </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-[10px] font-mono text-zinc-400">
-                        <span>{expandedOpinions[msg.id] ? 'Ocultar pareceres' : 'Consultar pareceres'}</span>
                         <ChevronDown
                           className={`size-3 transition-transform duration-200 ${
                             expandedOpinions[msg.id] ? 'rotate-180 text-[#B08D57]' : ''
                           }`}
                         />
-                      </div>
-                    </button>
+                      </button>
+                    ) : (
+                      <span className={`text-[10px] tabular-nums ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                        Katana Studio · {msg.timestamp}
+                      </span>
+                    )}
+                  </div>
 
-                    {/* Pareceres Expandidos dos Especialistas */}
-                    {expandedOpinions[msg.id] && (
-                      <div
-                        className={`mt-2 p-3 rounded-xl border space-y-2.5 text-xs transition-all ${
-                          isDark
-                            ? 'border-zinc-800/80 bg-[#121214] text-zinc-300'
-                            : 'border-zinc-200 bg-[#FAF8F5] text-zinc-800'
+                  <div className="flex items-center gap-2 shrink-0">
+                    {parsed.delegations.length > 0 && (
+                      <span className={`text-[10px] tabular-nums hidden sm:inline ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                        Katana Studio · {msg.timestamp}
+                      </span>
+                    )}
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleFeedback(msg.id, 'like')}
+                        title="Avaliar resposta como positiva (Curtir)"
+                        className={`size-6 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
+                          (feedbacks[msg.id] || msg.feedback) === 'like'
+                            ? isDark
+                              ? 'bg-[#B08D57]/25 border-[#B08D57] text-[#B08D57]'
+                              : 'bg-[#B08D57]/20 border-[#B08D57] text-[#8C6D3B]'
+                            : isDark
+                              ? 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                              : 'bg-white border-zinc-200 text-zinc-500 hover:text-zinc-800 hover:border-zinc-300 shadow-2xs'
                         }`}
                       >
-                        <div className="flex items-center justify-between pb-1.5 border-b border-inherit">
-                          <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-semibold flex items-center gap-1.5">
-                            <BrainCircuit className="size-3 text-[#B08D57]" />
-                            Pareceres do Conselho Editorial
-                          </span>
-                          <span className="text-[9px] font-mono text-zinc-400">
-                            Multi-Agente Katana
-                          </span>
-                        </div>
+                        <ThumbsUp className="size-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleFeedback(msg.id, 'dislike')}
+                        title="Avaliar resposta como negativa (Descurtir)"
+                        className={`size-6 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
+                          (feedbacks[msg.id] || msg.feedback) === 'dislike'
+                            ? isDark
+                              ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
+                              : 'bg-zinc-200 border-zinc-400 text-zinc-800'
+                            : isDark
+                              ? 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                              : 'bg-white border-zinc-200 text-zinc-500 hover:text-zinc-800 hover:border-zinc-300 shadow-2xs'
+                        }`}
+                      >
+                        <ThumbsDown className="size-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
-                        {msg.delegations && msg.delegations.length > 0 && (
-                          <div className="space-y-2 pt-0.5">
-                            {msg.delegations.map((del, i) => (
-                              <div key={i} className="flex items-start gap-2 text-[11px] leading-relaxed">
-                                <span className="text-[#B08D57] shrink-0 font-mono text-xs mt-0.5">↳</span>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-1.5 mb-0.5">
-                                    <span
-                                      className={`px-1.5 py-0.2 rounded text-[9px] font-mono uppercase shrink-0 ${
-                                        isDark
-                                          ? 'bg-zinc-800 text-zinc-300 border border-zinc-700'
-                                          : 'bg-zinc-200 text-zinc-700 border border-zinc-300'
-                                      }`}
-                                    >
-                                      {del.badge}
-                                    </span>
-                                    <strong className={`text-[11px] ${isDark ? 'text-zinc-200' : 'text-zinc-900'}`}>
-                                      {del.roleName}
-                                    </strong>
-                                  </div>
-                                  <p className={`text-[11px] ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
-                                    {del.action}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                {/* Detalhes / Pareceres Expandidos dos Agentes Especialistas */}
+                {expandedOpinions[msg.id] && parsed.delegations.length > 0 && (
+                  <div
+                    className={`mt-2 p-3 rounded-xl border space-y-2.5 text-xs transition-all ${
+                      isDark
+                        ? 'border-zinc-800/80 bg-[#121214] text-zinc-300'
+                        : 'border-zinc-200 bg-[#FAF8F5] text-zinc-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between pb-1.5 border-b border-inherit">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-semibold flex items-center gap-1.5">
+                        <BrainCircuit className="size-3 text-[#B08D57]" />
+                        Pareceres do Conselho Editorial
+                      </span>
+                      <span className="text-[9px] font-mono text-zinc-400">
+                        Multi-Agente Katana
+                      </span>
+                    </div>
 
-                        {msg.reasoning && (
-                          <div
-                            className={`pt-2 border-t border-inherit flex items-start gap-2 text-[10.5px] ${
-                              isDark ? 'text-zinc-400' : 'text-zinc-600'
-                            }`}
-                          >
-                            <div className="size-4 rounded-full bg-[#B08D57]/15 border border-[#B08D57]/30 flex items-center justify-center shrink-0 mt-0.5">
-                              <ShieldCheck className="size-2.5 text-[#B08D57]" />
-                            </div>
-                            <div>
-                              <span className={`font-semibold block ${isDark ? 'text-zinc-300' : 'text-zinc-800'}`}>
-                                Racional Editorial:
+                    <div className="space-y-2 pt-0.5">
+                      {parsed.delegations.map((del, i) => (
+                        <div key={i} className="flex items-start gap-2 text-[11px] leading-relaxed">
+                          <span className="text-[#B08D57] shrink-0 font-mono text-xs mt-0.5">↳</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span
+                                className={`px-1.5 py-0.2 rounded text-[9px] font-mono uppercase shrink-0 ${
+                                  isDark
+                                    ? 'bg-zinc-800 text-zinc-300 border border-zinc-700'
+                                    : 'bg-zinc-200 text-zinc-700 border border-zinc-300'
+                                }`}
+                              >
+                                {del.badge}
                               </span>
-                              <span className="text-pretty">{msg.reasoning}</span>
+                              <strong className={`text-[11px] ${isDark ? 'text-zinc-200' : 'text-zinc-900'}`}>
+                                {del.roleName}
+                              </strong>
                             </div>
+                            <p className={`text-[11px] ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                              {del.action}
+                            </p>
                           </div>
-                        )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {msg.reasoning && (
+                      <div
+                        className={`pt-2 border-t border-inherit flex items-start gap-2 text-[10.5px] ${
+                          isDark ? 'text-zinc-400' : 'text-zinc-600'
+                        }`}
+                      >
+                        <div className="size-4 rounded-full bg-[#B08D57]/15 border border-[#B08D57]/30 flex items-center justify-center shrink-0 mt-0.5">
+                          <ShieldCheck className="size-2.5 text-[#B08D57]" />
+                        </div>
+                        <div>
+                          <span className={`font-semibold block ${isDark ? 'text-zinc-300' : 'text-zinc-800'}`}>
+                            Racional Editorial:
+                          </span>
+                          <span className="text-pretty">{msg.reasoning}</span>
+                        </div>
                       </div>
                     )}
                   </div>
                 )}
-
-                {/* Rodapé da Mensagem: Assinatura e Botões de Feedback (Curtir / Descurtir) */}
-                <div className="mt-3 pt-2 border-t border-inherit/40 flex items-center justify-between text-[10px]">
-                  <div
-                    className={`tabular-nums ${
-                      isDark ? 'text-zinc-500' : 'text-zinc-400'
-                    }`}
-                  >
-                    Katana Studio · {msg.timestamp}
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleFeedback(msg.id, 'like')}
-                      title="Avaliar resposta como positiva (Curtir)"
-                      className={`size-6 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
-                        (feedbacks[msg.id] || msg.feedback) === 'like'
-                          ? isDark
-                            ? 'bg-[#B08D57]/25 border-[#B08D57] text-[#B08D57]'
-                            : 'bg-[#B08D57]/20 border-[#B08D57] text-[#8C6D3B]'
-                          : isDark
-                            ? 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
-                            : 'bg-white border-zinc-200 text-zinc-500 hover:text-zinc-800 hover:border-zinc-300 shadow-2xs'
-                      }`}
-                    >
-                      <ThumbsUp className="size-3" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleFeedback(msg.id, 'dislike')}
-                      title="Avaliar resposta como negativa (Descurtir)"
-                      className={`size-6 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
-                        (feedbacks[msg.id] || msg.feedback) === 'dislike'
-                          ? isDark
-                            ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
-                            : 'bg-zinc-200 border-zinc-400 text-zinc-800'
-                          : isDark
-                            ? 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
-                            : 'bg-white border-zinc-200 text-zinc-500 hover:text-zinc-800 hover:border-zinc-300 shadow-2xs'
-                      }`}
-                    >
-                      <ThumbsDown className="size-3" />
-                    </button>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
