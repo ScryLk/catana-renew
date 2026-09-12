@@ -170,7 +170,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Google Gemini AI configuration
 GEMINI_API_KEY = env('GEMINI_API_KEY', default='')
-AI_DEFAULT_MODEL = env('AI_DEFAULT_MODEL', default='gemini-3-flash-preview')
+AI_DEFAULT_MODEL = env('AI_DEFAULT_MODEL', default='gemini-flash-latest')
 
 # ==============================================================================
 # CATANA 2.0 - AUTENTICACAO AVANCADA, SIMPLE_JWT & GOOGLE OAUTH 2.0

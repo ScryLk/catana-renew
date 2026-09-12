@@ -1,7 +1,12 @@
+import os
+import io
 import json
 import logging
 import re
+import base64
+import urllib.request
 from typing import Generator, Optional, Dict, Any
+from django.conf import settings
 from django.http import StreamingHttpResponse, JsonResponse
 from django.db.models import Q
 from rest_framework.views import APIView
@@ -719,31 +724,92 @@ class StudioMediaRemoveBackgroundView(APIView):
 
     def post(self, request):
         uploaded_image = request.FILES.get("image")
+        img_bytes = None
+        filename = "image.png"
+
         if uploaded_image:
             img_bytes = uploaded_image.read()
-            filename = uploaded_image.name
+            filename = uploaded_image.name or "product.png"
         elif request.data.get("image_url"):
-            import urllib.request
-            url = request.data.get("image_url")
-            media_url = getattr(settings, 'MEDIA_URL', '/media/')
-            media_root = getattr(settings, 'MEDIA_ROOT', os.path.join(settings.BASE_DIR, 'media'))
-            if url.startswith(media_url):
-                rel_path = url[len(media_url):]
-                abs_path = os.path.join(media_root, rel_path)
-                if os.path.exists(abs_path):
-                    with open(abs_path, "rb") as f:
-                        img_bytes = f.read()
-                    filename = os.path.basename(abs_path)
-                else:
-                    return Response({"error": "Arquivo de imagem local nao encontrado."}, status=status.HTTP_404_NOT_FOUND)
-            else:
+            raw_url = str(request.data.get("image_url", "")).strip()
+            if not raw_url:
+                return Response({"error": "URL de imagem fornecida e vazia."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Caso 1: Data URI (base64)
+            if raw_url.startswith("data:image/"):
                 try:
-                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-                    with urllib.request.urlopen(req, timeout=10) as response:
-                        img_bytes = response.read()
-                    filename = "external_image.png"
-                except Exception as dl_err:
-                    return Response({"error": f"Falha ao baixar imagem remota: {dl_err}"}, status=status.HTTP_400_BAD_REQUEST)
+                    header, data_b64 = raw_url.split(",", 1)
+                    img_bytes = base64.b64decode(data_b64)
+                    ext = "png"
+                    if "jpeg" in header or "jpg" in header:
+                        ext = "jpg"
+                    elif "webp" in header:
+                        ext = "webp"
+                    filename = f"upload_data_uri.{ext}"
+                except Exception as b64_err:
+                    return Response({"error": f"Falha ao decodificar imagem base64: {b64_err}"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Caso 2: URL local ou relativa
+            else:
+                url_clean = raw_url
+                # Remove origin se for frontend dev server
+                for dev_origin in ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://127.0.0.1:3000"]:
+                    if url_clean.startswith(dev_origin):
+                        url_clean = url_clean[len(dev_origin):]
+                        break
+
+                media_url = getattr(settings, 'MEDIA_URL', '/media/')
+                media_root = getattr(settings, 'MEDIA_ROOT', os.path.join(settings.BASE_DIR, 'media'))
+
+                # Se comeca com /media/ ou caminho relativo
+                if url_clean.startswith(media_url):
+                    rel_path = url_clean[len(media_url):]
+                    abs_path = os.path.join(media_root, rel_path)
+                    if os.path.exists(abs_path):
+                        with open(abs_path, "rb") as f:
+                            img_bytes = f.read()
+                        filename = os.path.basename(abs_path)
+
+                # Se comeca com / (ativos estaticos do frontend: /catalogos/..., /aurea/..., etc.)
+                if img_bytes is None and (url_clean.startswith("/") or not url_clean.startswith("http")):
+                    norm_path = url_clean.lstrip("/")
+                    possible_paths = [
+                        os.path.join(settings.BASE_DIR, "..", "frontend", "public", norm_path),
+                        os.path.join(settings.BASE_DIR, "..", "frontend", "dist", norm_path),
+                        os.path.join(media_root, norm_path),
+                        os.path.join(settings.BASE_DIR, norm_path),
+                    ]
+                    for candidate in possible_paths:
+                        candidate_abs = os.path.abspath(candidate)
+                        if os.path.exists(candidate_abs) and os.path.isfile(candidate_abs):
+                            try:
+                                with open(candidate_abs, "rb") as f:
+                                    img_bytes = f.read()
+                                filename = os.path.basename(candidate_abs)
+                                break
+                            except Exception:
+                                pass
+
+                # Caso 3: URL externa HTTP/HTTPS
+                if img_bytes is None and (url_clean.startswith("http://") or url_clean.startswith("https://")):
+                    try:
+                        req = urllib.request.Request(
+                            url_clean,
+                            headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'}
+                        )
+                        with urllib.request.urlopen(req, timeout=12) as response:
+                            img_bytes = response.read()
+                        clean_ext_name = os.path.basename(url_clean.split("?")[0])
+                        filename = clean_ext_name or "external_image.png"
+                    except Exception as dl_err:
+                        logger.warning(f"[RemoveBackground] Falha ao baixar imagem remota '{url_clean}': {dl_err}")
+                        return Response({"error": f"Falha ao baixar imagem remota: {dl_err}"}, status=status.HTTP_400_BAD_REQUEST)
+
+                if img_bytes is None:
+                    return Response(
+                        {"error": f"Nao foi possivel localizar ou carregar a imagem de '{raw_url}'."},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
         else:
             return Response({"error": "Envie um arquivo de imagem ou forneca image_url."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -751,8 +817,11 @@ class StudioMediaRemoveBackgroundView(APIView):
             result = BackgroundRemovalService.process_and_save(img_bytes, original_filename=filename)
             return Response(result, status=status.HTTP_200_OK)
         except Exception as exc:
-            logger.error(f"[RemoveBackground] Erro ao remover fundo: {exc}")
-            return Response({"error": f"Falha ao remover fundo: {str(exc)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error(f"[RemoveBackground] Erro ao remover fundo da imagem ({filename}): {exc}")
+            return Response(
+                {"error": f"Nao foi possivel isolar o fundo da imagem: {str(exc)}"},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY
+            )
 
 
 class StudioCatalogGenerateView(APIView):

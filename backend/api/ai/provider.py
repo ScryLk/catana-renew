@@ -278,14 +278,19 @@ class GeminiAIProvider:
 
     def __init__(self, api_key: Optional[str] = None, default_model: Optional[str] = None):
         self.api_key = api_key or getattr(settings, "GEMINI_API_KEY", "") or os.environ.get("GEMINI_API_KEY", "")
-        self.default_model = default_model or getattr(settings, "AI_DEFAULT_MODEL", "gemini-2.5-flash")
+        self.default_model = default_model or getattr(settings, "AI_DEFAULT_MODEL", "gemini-flash-latest")
         self.mock_provider = MockGeminiProvider()
         self.client = None
 
         if self.api_key and self.api_key.strip() and self.api_key != "SUA_API_KEY_AQUI":
             try:
                 from google import genai
-                self.client = genai.Client(api_key=self.api_key.strip())
+                from google.genai import types
+                http_opts = types.HttpOptions(
+                    timeout=12000,
+                    retry_options=types.HttpRetryOptions(attempts=1),
+                )
+                self.client = genai.Client(api_key=self.api_key.strip(), http_options=http_opts)
                 logger.info(f"GeminiAIProvider inicializado com sucesso (modelo: {self.default_model}).")
             except Exception as exc:
                 logger.warning(f"Nao foi possivel inicializar cliente Gemini: {exc}. Usando fallback mock.")
@@ -411,10 +416,11 @@ class GeminiAIProvider:
 
             # Lista de modelos candidatos em ordem de prioridade com rodízio inteligente
             candidate_models = [
-                self.default_model,
-                "gemini-3.5-flash",
+                self.default_model or "gemini-flash-latest",
+                "gemini-flash-latest",
+                "gemini-flash-lite-latest",
+                "gemini-2.5-flash",
                 "gemini-3-flash-preview",
-                "gemini-3.5-flash-lite",
             ]
             ordered_models = []
             for m in candidate_models:

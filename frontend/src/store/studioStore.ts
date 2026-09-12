@@ -823,7 +823,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       const response = await api.post(
         `/api/v2/studio/catalogs/generate/`,
         { prompt, products },
-        { timeout: 50000 }
+        { timeout: 60000 }
       );
 
       clearTimeout(timer2);
@@ -1530,10 +1530,19 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
     toast.info('Isolando produto e removendo fundo com IA...');
     try {
-      const res = await api.post(
-        `/api/v2/studio/media/remove-background/`,
-        { image_url: prod.image }
-      );
+      let res;
+      if (prod.image.startsWith('blob:')) {
+        const blobRes = await fetch(prod.image);
+        const blobData = await blobRes.blob();
+        const formData = new FormData();
+        formData.append('image', blobData, 'product.png');
+        res = await api.post(`/api/v2/studio/media/remove-background/`, formData);
+      } else {
+        res = await api.post(
+          `/api/v2/studio/media/remove-background/`,
+          { image_url: prod.image }
+        );
+      }
 
       if (res.data && res.data.processed_url) {
         get().updateProduct(productId, { image: res.data.processed_url });
@@ -1545,7 +1554,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         window.dispatchEvent(new CustomEvent('catana:unauthorized'));
         toast.error('Sessão expirada. Acesse sua conta novamente para continuar.');
       } else {
-        toast.error('Não foi possível remover o fundo desta imagem.');
+        const detail = err?.response?.data?.error;
+        toast.error(detail || 'Não foi possível remover o fundo desta imagem.');
       }
     }
   },

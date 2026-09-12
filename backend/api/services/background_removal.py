@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import uuid
 import math
 import logging
@@ -111,14 +112,22 @@ class BackgroundRemovalService:
         """
         Executa a remocao de fundo e grava o arquivo resultante no diretorio media do Django.
         """
-        nobg_bytes = cls.remove_background(image_bytes)
+        try:
+            nobg_bytes = cls.remove_background(image_bytes)
+        except Exception as exc:
+            logger.warning(f"[BackgroundRemoval] Falha na remocao de fundo ({exc}). Salvando conversao RGBA direta.")
+            fallback_io = io.BytesIO()
+            img_fb = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+            img_fb.save(fallback_io, format="PNG")
+            nobg_bytes = fallback_io.getvalue()
 
         media_root = getattr(settings, 'MEDIA_ROOT', os.path.join(settings.BASE_DIR, 'media'))
         studio_dir = os.path.join(media_root, 'studio', 'transparent')
         os.makedirs(studio_dir, exist_ok=True)
 
         base_name, _ = os.path.splitext(os.path.basename(original_filename))
-        unique_name = f"{base_name}-nobg-{uuid.uuid4().hex[:8]}.png"
+        clean_base = re.sub(r'[^a-zA-Z0-9_-]', '_', base_name) or "prod"
+        unique_name = f"{clean_base}-nobg-{uuid.uuid4().hex[:8]}.png"
         file_path = os.path.join(studio_dir, unique_name)
 
         with open(file_path, "wb") as f:
