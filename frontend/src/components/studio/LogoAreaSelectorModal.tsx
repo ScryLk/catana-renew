@@ -373,8 +373,10 @@ export const LogoAreaSelectorModal: React.FC<LogoAreaSelectorModalProps> = ({
         <div className="px-5 py-4 border-b border-inherit flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div
-              className={`size-8 rounded-lg flex items-center justify-center border ${
-                isDark ? 'bg-zinc-900 border-zinc-700 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-700'
+              className={`p-2 rounded-xl border ${
+                isDark
+                  ? 'bg-zinc-900 border-zinc-800 text-zinc-300'
+                  : 'bg-zinc-100 border-zinc-200 text-zinc-700'
               }`}
             >
               <Crop className="size-4" />
@@ -411,12 +413,12 @@ export const LogoAreaSelectorModal: React.FC<LogoAreaSelectorModalProps> = ({
               onClick={handleAutoTrim}
               className={`px-2.5 py-1.5 rounded-lg border font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
                 isDark
-                  ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-700 text-zinc-200'
+                  ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300 hover:text-white'
                   : 'bg-white hover:bg-zinc-100 border-zinc-300 text-zinc-800'
               }`}
               title="Enquadrar automaticamente as bordas do logotipo"
             >
-              <Maximize2 className="size-3.5 text-amber-400" />
+              <Maximize2 className="size-3.5 text-zinc-400" />
               <span>Enquadrar Símbolo</span>
             </button>
 
@@ -425,7 +427,7 @@ export const LogoAreaSelectorModal: React.FC<LogoAreaSelectorModalProps> = ({
               onClick={handleSelectAll}
               className={`px-2.5 py-1.5 rounded-lg border font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
                 isDark
-                  ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-700 text-zinc-200'
+                  ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300 hover:text-white'
                   : 'bg-white hover:bg-zinc-100 border-zinc-300 text-zinc-800'
               }`}
               title="Selecionar imagem completa"
@@ -440,15 +442,15 @@ export const LogoAreaSelectorModal: React.FC<LogoAreaSelectorModalProps> = ({
               className={`px-2.5 py-1.5 rounded-lg border font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
                 isEyedropperActive
                   ? isDark
-                    ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                    : 'bg-amber-100 border-amber-400 text-amber-900'
+                    ? 'bg-zinc-800 border-zinc-500 text-white shadow-xs'
+                    : 'bg-zinc-200 border-zinc-400 text-zinc-950 shadow-xs'
                   : isDark
-                  ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-700 text-zinc-200'
-                  : 'bg-white hover:bg-zinc-100 border-zinc-300 text-zinc-800'
+                  ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300 hover:text-white'
+                  : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-700'
               }`}
               title="Ativar pipeta para clicar em um pixel específico da logo"
             >
-              <Pipette className="size-3.5 text-amber-400" />
+              <Pipette className={`size-3.5 ${isEyedropperActive ? 'text-white' : 'text-zinc-400'}`} />
               <span>{isEyedropperActive ? 'Pipeta Ativa (clique na logo)' : 'Pipeta'}</span>
             </button>
           </div>
@@ -459,14 +461,14 @@ export const LogoAreaSelectorModal: React.FC<LogoAreaSelectorModalProps> = ({
                 type="checkbox"
                 checked={ignoreDark}
                 onChange={handleToggleIgnoreDark}
-                className="rounded border-zinc-700 text-amber-500 focus:ring-amber-500 bg-zinc-900 size-3.5"
+                className="rounded border-zinc-700 text-zinc-100 focus:ring-zinc-400 bg-zinc-900 size-3.5 accent-zinc-200"
               />
               <span>Ignorar bordas pretas / escuras</span>
             </label>
 
             {isExtracting && (
-              <div className="flex items-center gap-1.5 text-amber-400 text-[11px]">
-                <Sparkles className="size-3 animate-spin" />
+              <div className="flex items-center gap-1.5 text-zinc-400 text-[11px]">
+                <Sparkles className="size-3 animate-spin text-zinc-400" />
                 <span>Atualizando cores...</span>
               </div>
             )}
@@ -533,7 +535,7 @@ export const LogoAreaSelectorModal: React.FC<LogoAreaSelectorModalProps> = ({
 
                 {/* Retângulo de Seleção Ativo */}
                 <div
-                  className="absolute border-2 border-amber-400 bg-amber-400/10 shadow-[0_0_0_1px_rgba(0,0,0,0.8)] cursor-move"
+                  className="absolute border border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.7)] cursor-move"
                   style={{
                     left: `${crop.x * 100}%`,
                     top: `${crop.y * 100}%`,
@@ -543,49 +545,49 @@ export const LogoAreaSelectorModal: React.FC<LogoAreaSelectorModalProps> = ({
                   onMouseDown={(e) => handleMouseDown('move', e)}
                 >
                   {/* Linhas de grade estilo terços fotográficos */}
-                  <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-40">
-                    <div className="border-r border-b border-amber-300/40" />
-                    <div className="border-r border-b border-amber-300/40" />
-                    <div className="border-b border-amber-300/40" />
-                    <div className="border-r border-b border-amber-300/40" />
-                    <div className="border-r border-b border-amber-300/40" />
-                    <div className="border-b border-amber-300/40" />
-                    <div className="border-r border-amber-300/40" />
-                    <div className="border-r border-amber-300/40" />
+                  <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-30">
+                    <div className="border-r border-b border-white/25" />
+                    <div className="border-r border-b border-white/25" />
+                    <div className="border-b border-white/25" />
+                    <div className="border-r border-b border-white/25" />
+                    <div className="border-r border-b border-white/25" />
+                    <div className="border-b border-white/25" />
+                    <div className="border-r border-b border-white/25" />
+                    <div className="border-r border-b border-white/25" />
                     <div />
                   </div>
 
-                  {/* Alças de Redimensionamento (8 pontos) */}
+                  {/* Alças de Redimensionamento (8 pontos minimalistas brancos/cinza) */}
                   <div
-                    className="absolute -top-1.5 -left-1.5 size-3 bg-amber-400 border border-black rounded-sm cursor-nwse-resize"
+                    className="absolute -top-1.5 -left-1.5 size-2.5 bg-white border border-zinc-900/80 rounded-[2px] shadow-sm cursor-nwse-resize"
                     onMouseDown={(e) => handleMouseDown('nw', e)}
                   />
                   <div
-                    className="absolute -top-1.5 left-1/2 -translate-x-1/2 size-3 bg-amber-400 border border-black rounded-sm cursor-ns-resize"
+                    className="absolute -top-1.5 left-1/2 -translate-x-1/2 size-2.5 bg-white border border-zinc-900/80 rounded-[2px] shadow-sm cursor-ns-resize"
                     onMouseDown={(e) => handleMouseDown('n', e)}
                   />
                   <div
-                    className="absolute -top-1.5 -right-1.5 size-3 bg-amber-400 border border-black rounded-sm cursor-nesw-resize"
+                    className="absolute -top-1.5 -right-1.5 size-2.5 bg-white border border-zinc-900/80 rounded-[2px] shadow-sm cursor-nesw-resize"
                     onMouseDown={(e) => handleMouseDown('ne', e)}
                   />
                   <div
-                    className="absolute top-1/2 -right-1.5 -translate-y-1/2 size-3 bg-amber-400 border border-black rounded-sm cursor-ew-resize"
+                    className="absolute top-1/2 -right-1.5 -translate-y-1/2 size-2.5 bg-white border border-zinc-900/80 rounded-[2px] shadow-sm cursor-ew-resize"
                     onMouseDown={(e) => handleMouseDown('e', e)}
                   />
                   <div
-                    className="absolute -bottom-1.5 -right-1.5 size-3 bg-amber-400 border border-black rounded-sm cursor-nwse-resize"
+                    className="absolute -bottom-1.5 -right-1.5 size-2.5 bg-white border border-zinc-900/80 rounded-[2px] shadow-sm cursor-nwse-resize"
                     onMouseDown={(e) => handleMouseDown('se', e)}
                   />
                   <div
-                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 size-3 bg-amber-400 border border-black rounded-sm cursor-ns-resize"
+                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 size-2.5 bg-white border border-zinc-900/80 rounded-[2px] shadow-sm cursor-ns-resize"
                     onMouseDown={(e) => handleMouseDown('s', e)}
                   />
                   <div
-                    className="absolute -bottom-1.5 -left-1.5 size-3 bg-amber-400 border border-black rounded-sm cursor-nesw-resize"
+                    className="absolute -bottom-1.5 -left-1.5 size-2.5 bg-white border border-zinc-900/80 rounded-[2px] shadow-sm cursor-nesw-resize"
                     onMouseDown={(e) => handleMouseDown('sw', e)}
                   />
                   <div
-                    className="absolute top-1/2 -left-1.5 -translate-y-1/2 size-3 bg-amber-400 border border-black rounded-sm cursor-ew-resize"
+                    className="absolute top-1/2 -left-1.5 -translate-y-1/2 size-2.5 bg-white border border-zinc-900/80 rounded-[2px] shadow-sm cursor-ew-resize"
                     onMouseDown={(e) => handleMouseDown('w', e)}
                   />
                 </div>
@@ -615,10 +617,10 @@ export const LogoAreaSelectorModal: React.FC<LogoAreaSelectorModalProps> = ({
                 className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 ${
                   activeSlot === 'primary'
                     ? isDark
-                      ? 'bg-zinc-800/80 border-amber-400 ring-1 ring-amber-400/40'
-                      : 'bg-zinc-100 border-amber-500 ring-1 ring-amber-500/40'
+                      ? 'bg-zinc-800/90 border-zinc-400 ring-1 ring-zinc-400/30 shadow-xs'
+                      : 'bg-white border-zinc-900 ring-1 ring-zinc-900/20 shadow-xs'
                     : isDark
-                    ? 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'
+                    ? 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700'
                     : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300'
                 }`}
               >
@@ -643,10 +645,10 @@ export const LogoAreaSelectorModal: React.FC<LogoAreaSelectorModalProps> = ({
                 className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 ${
                   activeSlot === 'secondary'
                     ? isDark
-                      ? 'bg-zinc-800/80 border-amber-400 ring-1 ring-amber-400/40'
-                      : 'bg-zinc-100 border-amber-500 ring-1 ring-amber-500/40'
+                      ? 'bg-zinc-800/90 border-zinc-400 ring-1 ring-zinc-400/30 shadow-xs'
+                      : 'bg-white border-zinc-900 ring-1 ring-zinc-900/20 shadow-xs'
                     : isDark
-                    ? 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'
+                    ? 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700'
                     : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300'
                 }`}
               >
@@ -671,10 +673,10 @@ export const LogoAreaSelectorModal: React.FC<LogoAreaSelectorModalProps> = ({
                 className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 ${
                   activeSlot === 'accent'
                     ? isDark
-                      ? 'bg-zinc-800/80 border-amber-400 ring-1 ring-amber-400/40'
-                      : 'bg-zinc-100 border-amber-500 ring-1 ring-amber-500/40'
+                      ? 'bg-zinc-800/90 border-zinc-400 ring-1 ring-zinc-400/30 shadow-xs'
+                      : 'bg-white border-zinc-900 ring-1 ring-zinc-900/20 shadow-xs'
                     : isDark
-                    ? 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'
+                    ? 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700'
                     : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300'
                 }`}
               >
@@ -724,7 +726,7 @@ export const LogoAreaSelectorModal: React.FC<LogoAreaSelectorModalProps> = ({
                 type="checkbox"
                 checked={shouldCropLogo}
                 onChange={(e) => setShouldCropLogo(e.target.checked)}
-                className="rounded border-zinc-700 text-amber-500 focus:ring-amber-500 bg-zinc-900 size-4"
+                className="rounded border-zinc-700 text-zinc-100 focus:ring-zinc-400 bg-zinc-900 size-4 accent-zinc-200"
               />
               <span>Atualizar arquivo do logotipo com esta área recortada</span>
             </label>
@@ -746,7 +748,11 @@ export const LogoAreaSelectorModal: React.FC<LogoAreaSelectorModalProps> = ({
                 type="button"
                 disabled={isApplying}
                 onClick={handleConfirm}
-                className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition-colors flex items-center gap-1.5 shadow-lg shadow-amber-500/20 cursor-pointer disabled:opacity-50"
+                className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shadow-sm ${
+                  isDark
+                    ? 'bg-zinc-100 hover:bg-white text-zinc-950'
+                    : 'bg-zinc-900 hover:bg-zinc-800 text-white'
+                }`}
               >
                 <Check className="size-3.5 stroke-[2.5]" />
                 <span>{isApplying ? 'Aplicando...' : 'Aplicar Paleta e Concluir'}</span>

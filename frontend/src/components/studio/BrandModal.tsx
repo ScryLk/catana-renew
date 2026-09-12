@@ -519,12 +519,12 @@ export const BrandModal: React.FC = () => {
                       onClick={() => handleExtractColors(logoUrl)}
                       className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
                         isDark
-                          ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-700 text-amber-300 hover:text-amber-200'
-                          : 'bg-white hover:bg-zinc-50 border-zinc-200 text-amber-700'
+                          ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300 hover:text-white'
+                          : 'bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-700 hover:text-zinc-950'
                       }`}
                       title="Selecionar área e extrair paleta cromática da logo"
                     >
-                      <Crop className="size-3" />
+                      <Crop className="size-3 text-zinc-400" />
                       <span>Extrair Cores</span>
                     </button>
                     <button
