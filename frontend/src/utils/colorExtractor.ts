@@ -77,7 +77,7 @@ export const extractColorsFromImage = (imageSrc: string): Promise<StudioPalette>
 
         const colors = Object.values(colorCounts);
 
-        // 1. Identificar Acento (Accent): Cor mais saturada e representativa da marca
+        // 1. Identificar Acento (Accent / Terciária): Cor mais saturada e representativa da marca
         const chromaticColors = colors.filter((c) => c.sat > 0.25 && c.lum > 0.08 && c.lum < 0.9);
         let accentHex = '#B08D57'; // Fallback nobre
         if (chromaticColors.length > 0) {
@@ -86,7 +86,7 @@ export const extractColorsFromImage = (imageSrc: string): Promise<StudioPalette>
           accentHex = rgbToHex(topAccent.r, topAccent.g, topAccent.b);
         }
 
-        // 2. Identificar Dominante Escura (Primary)
+        // 2. Identificar Dominante Escura (Primary / Primária)
         const darkColors = colors.filter((c) => c.lum < 0.2);
         let primaryHex = '#1A1817';
         if (darkColors.length > 0) {
@@ -95,7 +95,20 @@ export const extractColorsFromImage = (imageSrc: string): Promise<StudioPalette>
           primaryHex = rgbToHex(Math.min(topDark.r, 35), Math.min(topDark.g, 35), Math.min(topDark.b, 38));
         }
 
-        // 3. Fundo (Background) Off-White harmonizado
+        // 3. Identificar Secundária (Secondary): Segunda cor cromática ou tom médio
+        let secondaryHex = '#52525B';
+        if (chromaticColors.length > 1) {
+          const secondAccent = chromaticColors[1];
+          secondaryHex = rgbToHex(secondAccent.r, secondAccent.g, secondAccent.b);
+        } else {
+          const midColors = colors.filter((c) => c.lum >= 0.2 && c.lum <= 0.7);
+          if (midColors.length > 0) {
+            midColors.sort((a, b) => b.count - a.count);
+            secondaryHex = rgbToHex(midColors[0].r, midColors[0].g, midColors[0].b);
+          }
+        }
+
+        // 4. Fundo (Background) Off-White harmonizado
         const backgroundHex = '#F6F5F2';
 
         const extractedPalette: StudioPalette = {
@@ -103,7 +116,7 @@ export const extractColorsFromImage = (imageSrc: string): Promise<StudioPalette>
           primary: primaryHex,
           background: backgroundHex,
           accent: accentHex,
-          secondary: '#52525B',
+          secondary: secondaryHex,
           surface: '#FFFFFF',
           contrastRatio: '9.2:1 (AAA)',
           locked: true,

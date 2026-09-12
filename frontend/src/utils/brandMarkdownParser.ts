@@ -71,7 +71,13 @@ export const parseBrandMarkdown = (markdown: string): ParsedBrandData => {
           result.palette = result.palette || {};
           result.palette.primary = hexMatch[0].toUpperCase();
         }
-      } else if (key.includes('acento') || key.includes('accent') || key.includes('destaque')) {
+      } else if (key.includes('secundaria') || key.includes('secondary')) {
+        const hexMatch = val.match(/#[0-9a-fA-F]{6}/);
+        if (hexMatch) {
+          result.palette = result.palette || {};
+          result.palette.secondary = hexMatch[0].toUpperCase();
+        }
+      } else if (key.includes('terciaria') || key.includes('tertiary') || key.includes('acento') || key.includes('accent') || key.includes('destaque')) {
         const hexMatch = val.match(/#[0-9a-fA-F]{6}/);
         if (hexMatch) {
           result.palette = result.palette || {};
@@ -118,7 +124,8 @@ export const generateBrandTemplateMarkdown = (brandName = 'Minha Marca'): string
 
 ## Cores Institucionais
 - **Cor Primária**: #18181B
-- **Cor de Acento**: #D97706
+- **Cor Secundária**: #52525B
+- **Cor Terciária**: #B08D57
 - **Cor de Fundo**: #FAFAFA
 
 ## Tom de Voz Editorial

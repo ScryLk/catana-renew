@@ -48,6 +48,9 @@ export const BrandModal: React.FC = () => {
   const isDark = theme === 'dark';
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mdFileInputRef = useRef<HTMLInputElement>(null);
+  const primaryColorRef = useRef<HTMLInputElement>(null);
+  const secondaryColorRef = useRef<HTMLInputElement>(null);
+  const tertiaryColorRef = useRef<HTMLInputElement>(null);
 
   const editingBrand = brandModalEditingId
     ? brands.find((b) => b.id === brandModalEditingId)
@@ -55,9 +58,6 @@ export const BrandModal: React.FC = () => {
 
   const [name, setName] = useState('');
   const [segment, setSegment] = useState(SEGMENTS[0]);
-  const [paletteName, setPaletteName] = useState(STUDIO_PALETTE_PRESETS[0].name);
-  const [customPalette, setCustomPalette] = useState<StudioPalette | null>(null);
-  const [isExtractingColors, setIsExtractingColors] = useState(false);
   const [logoUrl, setLogoUrl] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [email, setEmail] = useState('');
@@ -66,13 +66,17 @@ export const BrandModal: React.FC = () => {
   const [toneOfVoice, setToneOfVoice] = useState('');
   const [brandMarkdown, setBrandMarkdown] = useState('');
   const [showMarkdownPreview, setShowMarkdownPreview] = useState(false);
+  const [isExtractingColors, setIsExtractingColors] = useState(false);
+
+  // 3 Cores da Paleta da Marca
+  const [primaryColor, setPrimaryColor] = useState('#18181B');
+  const [secondaryColor, setSecondaryColor] = useState('#52525B');
+  const [tertiaryColor, setTertiaryColor] = useState('#B08D57');
 
   useEffect(() => {
     if (editingBrand) {
       setName(editingBrand.name);
       setSegment(editingBrand.segment || SEGMENTS[0]);
-      setPaletteName(editingBrand.paletteName || STUDIO_PALETTE_PRESETS[0].name);
-      setCustomPalette(editingBrand.customPalette || null);
       setLogoUrl(editingBrand.logoUrl || '');
       setWhatsapp(editingBrand.commercialContact?.whatsapp || '');
       setEmail(editingBrand.commercialContact?.email || '');
@@ -80,11 +84,22 @@ export const BrandModal: React.FC = () => {
       setInstagram(editingBrand.commercialContact?.instagram || '');
       setToneOfVoice(editingBrand.toneOfVoice || '');
       setBrandMarkdown(editingBrand.brandMarkdown || '');
+
+      if (editingBrand.customPalette) {
+        setPrimaryColor(editingBrand.customPalette.primary || '#18181B');
+        setSecondaryColor(editingBrand.customPalette.secondary || '#52525B');
+        setTertiaryColor(editingBrand.customPalette.accent || '#B08D57');
+      } else {
+        const preset =
+          STUDIO_PALETTE_PRESETS.find((p) => p.name === editingBrand.paletteName) ||
+          STUDIO_PALETTE_PRESETS[0];
+        setPrimaryColor(preset.primary);
+        setSecondaryColor(preset.secondary || '#52525B');
+        setTertiaryColor(preset.accent);
+      }
     } else {
       setName('');
       setSegment(SEGMENTS[0]);
-      setPaletteName(STUDIO_PALETTE_PRESETS[0].name);
-      setCustomPalette(null);
       setLogoUrl('');
       setWhatsapp('');
       setEmail('');
@@ -92,6 +107,9 @@ export const BrandModal: React.FC = () => {
       setInstagram('');
       setToneOfVoice('');
       setBrandMarkdown('');
+      setPrimaryColor('#18181B');
+      setSecondaryColor('#52525B');
+      setTertiaryColor('#B08D57');
     }
     setShowMarkdownPreview(false);
   }, [editingBrand, isBrandModalOpen]);
@@ -117,9 +135,10 @@ export const BrandModal: React.FC = () => {
     setIsExtractingColors(true);
     try {
       const palette = await extractColorsFromImage(imageUrl);
-      setCustomPalette(palette);
-      setPaletteName(palette.name);
-      toast.success('Paleta cromática extraída da logo com sucesso!');
+      setPrimaryColor(palette.primary);
+      setSecondaryColor(palette.secondary || '#52525B');
+      setTertiaryColor(palette.accent);
+      toast.success('Cores extraídas da logo com sucesso!');
     } catch {
       toast.error('Não foi possível extrair as cores do logotipo.');
     } finally {
@@ -170,20 +189,9 @@ export const BrandModal: React.FC = () => {
         if (parsed.commercialContact.instagram) setInstagram(parsed.commercialContact.instagram);
         if (parsed.toneOfVoice) setToneOfVoice(parsed.toneOfVoice);
 
-        if (parsed.palette?.primary && parsed.palette?.accent) {
-          const importedPalette: StudioPalette = {
-            name: 'Paleta BRAND.md',
-            primary: parsed.palette.primary,
-            accent: parsed.palette.accent,
-            background: parsed.palette.background || '#F6F5F2',
-            secondary: '#52525B',
-            surface: '#FFFFFF',
-            contrastRatio: '9.2:1 (AAA)',
-            locked: true,
-          };
-          setCustomPalette(importedPalette);
-          setPaletteName(importedPalette.name);
-        }
+        if (parsed.palette?.primary) setPrimaryColor(parsed.palette.primary);
+        if (parsed.palette?.secondary) setSecondaryColor(parsed.palette.secondary);
+        if (parsed.palette?.accent) setTertiaryColor(parsed.palette.accent);
 
         toast.success('Diretrizes da marca importadas com sucesso!');
       }
@@ -217,11 +225,22 @@ export const BrandModal: React.FC = () => {
       return;
     }
 
+    const customPalette: StudioPalette = {
+      name: `Paleta ${brandName}`,
+      primary: primaryColor,
+      secondary: secondaryColor,
+      accent: tertiaryColor,
+      background: '#F6F5F2',
+      surface: '#FFFFFF',
+      contrastRatio: '9.2:1 (AAA)',
+      locked: true,
+    };
+
     const brandData = {
       name: brandName,
       segment,
-      paletteName,
-      customPalette: customPalette || undefined,
+      paletteName: customPalette.name,
+      customPalette,
       brandMarkdown: brandMarkdown.trim() || undefined,
       toneOfVoice: toneOfVoice.trim() || undefined,
       logoUrl: logoUrl || undefined,
@@ -247,17 +266,6 @@ export const BrandModal: React.FC = () => {
       closeBrandModal();
     }
   };
-
-  // Coleta lista de paletas exibidas (customizada + presets)
-  const availablePalettes: StudioPalette[] = [];
-  if (customPalette) {
-    availablePalettes.push(customPalette);
-  }
-  STUDIO_PALETTE_PRESETS.slice(0, customPalette ? 3 : 4).forEach((p) => {
-    if (!availablePalettes.find((item) => item.name === p.name)) {
-      availablePalettes.push(p);
-    }
-  });
 
   return (
     <div
@@ -521,63 +529,159 @@ export const BrandModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Linha 3: Paleta Cromática Institucional (Cards compactos incluindo paleta extraída) */}
+          {/* Linha 3: Paleta Cromática da Marca (3 bolinhas separadas identificando primária, secundária e terciária) */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center justify-between mb-2">
               <label className="font-medium text-zinc-300 text-[11px] flex items-center gap-1.5">
                 <Palette className="size-3 text-zinc-400" />
                 <span>Paleta Cromática da Marca</span>
               </label>
-              {customPalette && (
-                <span className="text-[10px] text-zinc-400">
-                  {customPalette.name} ativa
-                </span>
-              )}
+              <span className="text-[10px] text-zinc-500">
+                Clique nas amostras para personalizar
+              </span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {availablePalettes.map((p) => {
-                const isSelected = paletteName === p.name;
-                const isCustom = p.name.includes('Extraída') || p.name.includes('BRAND.md');
-                return (
-                  <button
-                    key={p.name}
-                    type="button"
-                    onClick={() => {
-                      setPaletteName(p.name);
-                    }}
-                    className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
-                      isSelected
-                        ? isDark
-                          ? 'bg-zinc-800/80 border-zinc-500 text-zinc-100 shadow-xs ring-1 ring-zinc-600/40'
-                          : 'bg-zinc-100 border-zinc-400 text-zinc-900 shadow-xs'
-                        : isDark
-                          ? 'bg-zinc-900/30 border-zinc-800/70 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
-                          : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:text-zinc-900'
-                    }`}
-                  >
-                    <div className="truncate min-w-0 flex-1">
-                      <div className="font-medium truncate text-[11px] flex items-center gap-1">
-                        {isCustom && <Sparkles className="size-2.5 text-amber-400 shrink-0" />}
-                        <span className="truncate">{p.name}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span
-                        className="size-3 rounded-full border border-black/20"
-                        style={{ backgroundColor: p.primary }}
-                      />
-                      <span
-                        className="size-3 rounded-full border border-black/20"
-                        style={{ backgroundColor: p.accent }}
-                      />
-                      <span
-                        className="size-3 rounded-full border border-black/20"
-                        style={{ backgroundColor: p.background }}
-                      />
-                    </div>
-                  </button>
-                );
-              })}
+
+            <div className="grid grid-cols-3 gap-3">
+              {/* 1. Cor Primária */}
+              <div
+                className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-2 transition-all ${
+                  isDark
+                    ? 'bg-zinc-900/40 border-zinc-800/80 hover:border-zinc-700'
+                    : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300'
+                }`}
+              >
+                <span className="text-[11px] font-medium text-zinc-300">
+                  Cor Primária
+                </span>
+
+                <div
+                  className="relative group cursor-pointer"
+                  onClick={() => primaryColorRef.current?.click()}
+                  title="Alterar Cor Primária"
+                >
+                  <div
+                    className="size-10 rounded-full border-2 border-zinc-700 shadow-sm transition-transform group-hover:scale-105"
+                    style={{ backgroundColor: primaryColor }}
+                  />
+                  <input
+                    ref={primaryColorRef}
+                    type="color"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value.toUpperCase())}
+                    className="sr-only"
+                  />
+                </div>
+
+                <input
+                  type="text"
+                  maxLength={7}
+                  value={primaryColor}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (!val.startsWith('#') && val.length > 0) val = '#' + val;
+                    setPrimaryColor(val.toUpperCase());
+                  }}
+                  className={`w-20 px-1.5 py-0.5 rounded text-[11px] font-mono text-center outline-none border transition-colors ${
+                    isDark
+                      ? 'bg-zinc-900 border-zinc-800 text-zinc-200 focus:border-zinc-600'
+                      : 'bg-white border-zinc-300 text-zinc-800 focus:border-zinc-400'
+                  }`}
+                />
+              </div>
+
+              {/* 2. Cor Secundária */}
+              <div
+                className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-2 transition-all ${
+                  isDark
+                    ? 'bg-zinc-900/40 border-zinc-800/80 hover:border-zinc-700'
+                    : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300'
+                }`}
+              >
+                <span className="text-[11px] font-medium text-zinc-300">
+                  Cor Secundária
+                </span>
+
+                <div
+                  className="relative group cursor-pointer"
+                  onClick={() => secondaryColorRef.current?.click()}
+                  title="Alterar Cor Secundária"
+                >
+                  <div
+                    className="size-10 rounded-full border-2 border-zinc-700 shadow-sm transition-transform group-hover:scale-105"
+                    style={{ backgroundColor: secondaryColor }}
+                  />
+                  <input
+                    ref={secondaryColorRef}
+                    type="color"
+                    value={secondaryColor}
+                    onChange={(e) => setSecondaryColor(e.target.value.toUpperCase())}
+                    className="sr-only"
+                  />
+                </div>
+
+                <input
+                  type="text"
+                  maxLength={7}
+                  value={secondaryColor}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (!val.startsWith('#') && val.length > 0) val = '#' + val;
+                    setSecondaryColor(val.toUpperCase());
+                  }}
+                  className={`w-20 px-1.5 py-0.5 rounded text-[11px] font-mono text-center outline-none border transition-colors ${
+                    isDark
+                      ? 'bg-zinc-900 border-zinc-800 text-zinc-200 focus:border-zinc-600'
+                      : 'bg-white border-zinc-300 text-zinc-800 focus:border-zinc-400'
+                  }`}
+                />
+              </div>
+
+              {/* 3. Cor Terciária */}
+              <div
+                className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-2 transition-all ${
+                  isDark
+                    ? 'bg-zinc-900/40 border-zinc-800/80 hover:border-zinc-700'
+                    : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300'
+                }`}
+              >
+                <span className="text-[11px] font-medium text-zinc-300">
+                  Cor Terciária
+                </span>
+
+                <div
+                  className="relative group cursor-pointer"
+                  onClick={() => tertiaryColorRef.current?.click()}
+                  title="Alterar Cor Terciária"
+                >
+                  <div
+                    className="size-10 rounded-full border-2 border-zinc-700 shadow-sm transition-transform group-hover:scale-105"
+                    style={{ backgroundColor: tertiaryColor }}
+                  />
+                  <input
+                    ref={tertiaryColorRef}
+                    type="color"
+                    value={tertiaryColor}
+                    onChange={(e) => setTertiaryColor(e.target.value.toUpperCase())}
+                    className="sr-only"
+                  />
+                </div>
+
+                <input
+                  type="text"
+                  maxLength={7}
+                  value={tertiaryColor}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (!val.startsWith('#') && val.length > 0) val = '#' + val;
+                    setTertiaryColor(val.toUpperCase());
+                  }}
+                  className={`w-20 px-1.5 py-0.5 rounded text-[11px] font-mono text-center outline-none border transition-colors ${
+                    isDark
+                      ? 'bg-zinc-900 border-zinc-800 text-zinc-200 focus:border-zinc-600'
+                      : 'bg-white border-zinc-300 text-zinc-800 focus:border-zinc-400'
+                  }`}
+                />
+              </div>
             </div>
           </div>
 
