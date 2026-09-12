@@ -76,6 +76,7 @@ export const StudioSidebar: React.FC = () => {
     toggleStudioSidebar,
     hasStartedSession,
     resetToHome,
+    openNewCatalogModal,
     activeCatalogId,
     loadExistingCatalog,
     agentStatus,
@@ -146,7 +147,7 @@ export const StudioSidebar: React.FC = () => {
   };
 
   const handleNewCatalog = () => {
-    resetToHome();
+    openNewCatalogModal();
   };
 
   if (!isStudioSidebarOpen) return null;
@@ -163,7 +164,7 @@ export const StudioSidebar: React.FC = () => {
       <div className="h-13 px-3.5 flex items-center justify-between border-b border-inherit shrink-0">
         <button
           type="button"
-          onClick={handleNewCatalog}
+          onClick={resetToHome}
           className="flex items-center gap-2 cursor-pointer group bg-transparent border-none p-0"
           title="Ir para o início"
         >

@@ -7,6 +7,7 @@ import {
   ProductItem,
   StudioPalette,
   STUDIO_PALETTE_PRESETS,
+  PageLayoutType,
 } from '../data/aureaCatalog.mock';
 import { generateCatalogFromPrompt, GeneratedCatalogResult } from '../utils/catalogGenerator';
 
@@ -248,6 +249,13 @@ export interface StudioState {
   setActiveCatalogId: (id: string | null) => void;
   setHasStartedSession: (started: boolean) => void;
   loadExistingCatalog: (catalogId: string) => void;
+
+  // New Catalog Creation Modal
+  isNewCatalogModalOpen: boolean;
+  setIsNewCatalogModalOpen: (open: boolean) => void;
+  openNewCatalogModal: () => void;
+  closeNewCatalogModal: () => void;
+  createBlankCatalog: (title?: string, pagesCount?: number, paletteName?: string) => void;
 
   // Export Catalog Modal
   isExportModalOpen: boolean;
@@ -519,6 +527,103 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   activeCatalogId: null,
   setActiveCatalogId: (id) => set({ activeCatalogId: id }),
   setHasStartedSession: (started) => set({ hasStartedSession: started }),
+
+  // New Catalog Creation Modal
+  isNewCatalogModalOpen: false,
+  setIsNewCatalogModalOpen: (open) => set({ isNewCatalogModalOpen: open }),
+  openNewCatalogModal: () => set({ isNewCatalogModalOpen: true }),
+  closeNewCatalogModal: () => set({ isNewCatalogModalOpen: false }),
+  createBlankCatalog: (title, pagesCount = 6, paletteName) => {
+    const catalogTitle = title?.trim() || 'Novo Catálogo';
+    const catalogId = `cat-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const palette = STUDIO_PALETTE_PRESETS.find((p) => p.name === paletteName) || STUDIO_PALETTE_PRESETS[0];
+
+    const pages: CatalogPageData[] = [];
+    // Capa
+    pages.push({
+      id: `${catalogId}-p1`,
+      pageNumber: 1,
+      type: 'cover',
+      title: catalogTitle.toUpperCase(),
+      subtitle: 'COLEÇÃO EDITORIAL 2026',
+      label: 'NOVO CATÁLOGO',
+      backgroundColor: palette.primary,
+      textColor: palette.background,
+      accentColor: palette.accent,
+    });
+
+    // Lâminas intermediárias
+    for (let i = 2; i < pagesCount; i++) {
+      const pageType: PageLayoutType = i === 2 ? 'manifesto' : (i % 2 === 1 ? 'hero' : 'duo');
+      pages.push({
+        id: `${catalogId}-p${i}`,
+        pageNumber: i,
+        type: pageType,
+        title: pageType === 'manifesto' ? 'Manifesto Editorial' : undefined,
+        label: pageType === 'manifesto' ? 'MANIFESTO' : `LÂMINA ${String(i).padStart(2, '0')}`,
+        folio: `${String(i).padStart(2, '0')} · ${catalogTitle.toUpperCase()}`,
+        content: pageType === 'manifesto' ? 'Espaço reservado para o manifesto da marca e diretrizes conceituais.' : undefined,
+        products: [],
+        backgroundColor: palette.background,
+        textColor: palette.primary,
+        accentColor: palette.accent,
+      });
+    }
+
+    // Contracapa
+    pages.push({
+      id: `${catalogId}-p${pagesCount}`,
+      pageNumber: pagesCount,
+      type: 'backcover',
+      title: 'KATANA STUDIO',
+      label: 'CONTATO COMERCIAL',
+      content: 'Canal direto de vendas, pedidos e atendimento corporativo.',
+      folio: `${String(pagesCount).padStart(2, '0')} · CONTRA-CAPA`,
+      backgroundColor: palette.primary,
+      textColor: palette.background,
+      accentColor: palette.accent,
+    });
+
+    const initialThread: ChatThread = {
+      id: `thread-${Date.now()}`,
+      title: catalogTitle,
+      mode: 'director',
+      createdAt: new Date().toISOString(),
+      messages: [
+        {
+          id: `msg-welcome-${Date.now()}`,
+          role: 'assistant',
+          content: `Novo catálogo **${catalogTitle}** criado com ${pagesCount} páginas em branco na prancheta. Você pode alocar produtos do acervo, importar planilha Excel ou me dar instruções de diagramação.`,
+          timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        },
+      ],
+    };
+
+    set({
+      hasStartedSession: true,
+      activeCatalogId: catalogId,
+      catalogTitle,
+      pages,
+      totalPages: pagesCount,
+      activePalette: palette,
+      currentSpread: [1, 2],
+      agentStatus: 'idle',
+      threads: [initialThread],
+      activeThreadId: initialThread.id,
+      messages: initialThread.messages,
+      executionPlan: [
+        { id: 'step-1', label: `Prancheta "${catalogTitle}" inicializada no padrão A4`, status: 'completed', roleBadge: 'Estrutura' },
+        { id: 'step-2', label: `Paleta ${palette.name} associada`, status: 'completed', roleBadge: 'Design' },
+        { id: 'step-3', label: `${pagesCount} lâminas preparadas para alocação`, status: 'completed', roleBadge: 'Diagramação' },
+      ],
+      isPlanCollapsed: true,
+      isPlanHidden: false,
+      selectedElementId: null,
+      isNewCatalogModalOpen: false,
+    });
+
+    toast.success(`Catálogo "${catalogTitle}" pronto para edição!`);
+  },
 
   // Export Catalog Modal
   isExportModalOpen: false,

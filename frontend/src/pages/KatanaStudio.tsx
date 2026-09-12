@@ -12,6 +12,7 @@ import { ExportCatalogModal } from '../components/studio/ExportCatalogModal';
 import { ProductDrawer } from '../components/studio/ProductDrawer';
 import { StudioExcelImportModal } from '../components/studio/StudioExcelImportModal';
 import { StudioSystemDesignModal } from '../components/studio/StudioSystemDesignModal';
+import { NewCatalogModal } from '../components/studio/NewCatalogModal';
 import { AuthModal } from '../components/auth/AuthModal';
 import { useStudioStore } from '../store/studioStore';
 import { useAuthStore, isAutoLoginSettled } from '../store/authStore';
@@ -60,7 +61,7 @@ export const KatanaStudio: React.FC = () => {
     toggleStudioSidebar,
     isCoPilotOpen,
     toggleCoPilot,
-    resetToHome,
+    openNewCatalogModal,
     theme,
     isAccountSettingsOpen,
     closeAccountSettings,
@@ -127,7 +128,7 @@ export const KatanaStudio: React.FC = () => {
 
           <button
             type="button"
-            onClick={resetToHome}
+            onClick={openNewCatalogModal}
             className={`p-2 rounded-xl border transition-all cursor-pointer shadow-md flex items-center justify-center ${
               isDark
                 ? 'bg-[#0b0b0e]/95 hover:bg-zinc-800 border-zinc-800 text-zinc-300 hover:text-white backdrop-blur-md'
@@ -158,6 +159,9 @@ export const KatanaStudio: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Modal de Criação de Novo Catálogo */}
+      <NewCatalogModal />
 
       {/* Modal de Configuracoes da Conta */}
       <AccountSettingsModal
