@@ -22,9 +22,11 @@ import { ResetPassword } from './pages/ResetPassword';
 import { Transparency } from './pages/Transparency';
 import { SystemDesignPage } from './pages/SystemDesignPage';
 import { Toaster } from 'sonner';
+import { useStudioStore } from './store/studioStore';
 
 function App() {
   const { checkAuth } = useAuthStore();
+  const theme = useStudioStore((s) => s.theme);
   const [selectedProductCode, setSelectedProductCode] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,7 +58,16 @@ function App() {
 
   return (
     <>
-      <Toaster position="top-right" theme="dark" richColors />
+      <Toaster
+        position="top-right"
+        theme={theme}
+        richColors
+        closeButton
+        toastOptions={{
+          closeButton: true,
+          closeButtonAriaLabel: 'Fechar notificação',
+        }}
+      />
       <Router>
         <Routes>
           {/* Public Auth Routes & AI Studio Experience */}

@@ -369,3 +369,18 @@ html:not(.dark) .scrollbar-thin::-webkit-scrollbar-thumb:hover {
 .animate-tool-activate {
   animation: tool-activate 140ms ease-out;
 }
+
+/* ============================================
+   SONNER TOAST - BOTAO DE FECHAMENTO (X)
+   ============================================ */
+[data-sonner-toast] [data-close-button] {
+  opacity: 0.85 !important;
+  display: flex !important;
+  cursor: pointer !important;
+  transition: opacity 120ms ease, transform 120ms ease, background-color 120ms ease !important;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+  opacity: 1 !important;
+  transform: var(--toast-close-button-transform) scale(1.1) !important;
+}
