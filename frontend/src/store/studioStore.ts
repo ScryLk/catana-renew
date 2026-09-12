@@ -346,6 +346,66 @@ export const saveStoredBrands = (brands: Brand[]) => {
   }
 };
 
+export interface StoredProjectSession {
+  threads: ChatThread[];
+  activeThreadId: string;
+  catalogTitle?: string;
+  activePalette?: StudioPalette;
+  currentSpread?: [number, number];
+  pages?: CatalogPageData[];
+  totalPages?: number;
+}
+
+const STORAGE_KEY_PREFIX = 'katana_studio_project_session_';
+
+export const getStoredProjectSession = (catalogId: string): StoredProjectSession | null => {
+  if (typeof window === 'undefined' || !catalogId) return null;
+  try {
+    const raw = localStorage.getItem(`${STORAGE_KEY_PREFIX}${catalogId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.threads) && parsed.threads.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Erro ao carregar sessao do projeto:', e);
+  }
+  return null;
+};
+
+export const saveStoredProjectSession = (catalogId: string, session: StoredProjectSession) => {
+  if (typeof window === 'undefined' || !catalogId) return;
+  try {
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}${catalogId}`, JSON.stringify(session));
+    localStorage.setItem('katana_studio_last_active_catalog', catalogId);
+  } catch (e) {
+    console.warn('Erro ao salvar sessao do projeto:', e);
+  }
+};
+
+export const syncActiveCatalogStorage = (state: {
+  activeCatalogId: string | null;
+  threads: ChatThread[];
+  activeThreadId: string;
+  catalogTitle: string;
+  activePalette: StudioPalette;
+  currentSpread: [number, number];
+  pages: CatalogPageData[];
+  totalPages: number;
+}) => {
+  if (typeof window === 'undefined' || !state.activeCatalogId) return;
+  saveStoredProjectSession(state.activeCatalogId, {
+    threads: state.threads,
+    activeThreadId: state.activeThreadId,
+    catalogTitle: state.catalogTitle,
+    activePalette: state.activePalette,
+    currentSpread: state.currentSpread,
+    pages: state.pages,
+    totalPages: state.totalPages,
+  });
+};
+
 export interface StudioState {
   // Session & Workspace Mode
   hasStartedSession: boolean;
@@ -861,6 +921,16 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       isNewCatalogModalOpen: false,
     });
 
+    saveStoredProjectSession(catalogId, {
+      threads: [initialThread],
+      activeThreadId: initialThread.id,
+      catalogTitle,
+      activePalette: palette,
+      currentSpread: [1, 2],
+      pages,
+      totalPages: pagesCount,
+    });
+
     const activeBrandId = get().activeBrandId;
     if (activeBrandId) {
       const updatedBrands = get().brands.map((b) => {
@@ -1369,6 +1439,17 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       isPlanCollapsed: true,
       isPlanHidden: false,
     });
+
+    saveStoredProjectSession(target.catalogId, {
+      threads: [initialThread],
+      activeThreadId: initialThread.id,
+      catalogTitle: target.title,
+      activePalette: target.palette,
+      currentSpread: [1, 2],
+      pages: target.pages,
+      totalPages: target.totalPages,
+    });
+
     toast.success(`Catálogo "${target.title}" gerado com sucesso!`);
   },
 
@@ -1384,75 +1465,129 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
 
   loadExistingCatalog: (catalogId: string) => {
-    if (catalogId === 'lookbook-editorial-2026' || catalogId === 'aurea-2026' || catalogId.includes('aurea')) {
-      const generated = generateCatalogFromPrompt('Lookbook editorial de moda e acessórios de luxo');
-      set({
-        hasStartedSession: true,
-        catalogTitle: generated.title,
-        activeCatalogId: catalogId,
-        pages: generated.pages,
-        totalPages: generated.totalPages,
-        currentSpread: [1, 2],
-        activePalette: generated.palette,
-      });
-      get().addMessage({
-        role: 'assistant',
-        content: `Catálogo **${generated.title}** carregado com sucesso para edição. Os ${generated.totalPages} spreads e os agentes estão ativos para alterações.`,
-        reasoning: 'Racional do Orquestrador: Carregamento do catálogo editorial com paleta harmônica e modos de diagramação A4 aplicados.',
-      });
-    } else if (catalogId === 'techgear-2026') {
-      const generated = generateCatalogFromPrompt('Catálogo TechGear hardware e setup');
-      set({
-        hasStartedSession: true,
-        catalogTitle: generated.title,
-        activeCatalogId: 'techgear-2026',
-        pages: generated.pages,
-        totalPages: generated.totalPages,
-        activePalette: generated.palette,
-        currentSpread: [1, 2],
-      });
-      get().addMessage({
-        role: 'assistant',
-        content: 'Catálogo **TechGear 2026 — Setup & Tech** aberto para edição na prancheta.',
-      });
-    } else if (catalogId === 'confeitaria-artesanal') {
-      const generated = generateCatalogFromPrompt('Catálogo de confeitaria artesanal doces gourmet');
-      set({
-        hasStartedSession: true,
-        catalogTitle: generated.title,
-        activeCatalogId: 'confeitaria-artesanal',
-        pages: generated.pages,
-        totalPages: generated.totalPages,
-        activePalette: generated.palette,
-        currentSpread: [1, 2],
-      });
-      get().addMessage({
-        role: 'assistant',
-        content: 'Catálogo **Confeitaria Artesanal** aberto para edição na prancheta.',
-      });
-    } else if (catalogId === 'cristallo-joias') {
-      const generated = generateCatalogFromPrompt('Alta joalheria cristallo gemas ouro');
-      set({
-        hasStartedSession: true,
-        catalogTitle: generated.title,
-        activeCatalogId: 'cristallo-joias',
-        pages: generated.pages,
-        totalPages: generated.totalPages,
-        activePalette: generated.palette,
-        currentSpread: [1, 2],
-      });
-      get().addMessage({
-        role: 'assistant',
-        content: 'Catálogo **Cristallo Joalheria** aberto para edição na prancheta.',
-      });
-    } else {
-      set({
-        hasStartedSession: true,
-        catalogTitle: 'Catálogo Comercial',
-        activeCatalogId: catalogId,
-        currentSpread: [1, 2],
+    const s = get();
+
+    // 1. Persiste o catálogo que está saindo se houver sessão ativa
+    if (s.activeCatalogId && s.threads && s.threads.length > 0) {
+      saveStoredProjectSession(s.activeCatalogId, {
+        threads: s.threads,
+        activeThreadId: s.activeThreadId,
+        catalogTitle: s.catalogTitle,
+        activePalette: s.activePalette,
+        currentSpread: s.currentSpread,
+        pages: s.pages,
+        totalPages: s.totalPages,
       });
     }
+
+    // 2. Mapeamento de títulos e briefings padrão
+    let defaultTitle = 'Catálogo Comercial';
+    let defaultPrompt = 'Lookbook editorial de moda e acessórios de luxo';
+
+    if (catalogId === 'lookbook-editorial-2026' || catalogId === 'aurea-2026' || catalogId.includes('aurea')) {
+      defaultTitle = 'Coleção Inverno 2026';
+      defaultPrompt = 'Lookbook editorial de moda e acessórios de luxo';
+    } else if (catalogId === 'capsula-linho-2026') {
+      defaultTitle = 'Lookbook Cápsula de Seda';
+      defaultPrompt = 'Alta moda lookbook capsula de seda e linho';
+    } else if (catalogId === 'techgear-2026') {
+      defaultTitle = 'Setup & Hardware B2B';
+      defaultPrompt = 'Catálogo TechGear hardware e setup';
+    } else if (catalogId === 'confeitaria-artesanal') {
+      defaultTitle = 'Confeitaria & Pâtisserie';
+      defaultPrompt = 'Catálogo de confeitaria artesanal doces gourmet';
+    } else if (catalogId === 'cristallo-joias') {
+      defaultTitle = 'Joalheria & Gemas Raras';
+      defaultPrompt = 'Alta joalheria cristallo gemas ouro';
+    }
+
+    // 3. Tenta carregar a sessão persistida deste projeto
+    const existing = getStoredProjectSession(catalogId);
+
+    if (existing && existing.threads && existing.threads.length > 0) {
+      const activeThread =
+        existing.threads.find((t) => t.id === existing.activeThreadId) ||
+        existing.threads[0];
+      const activeRole = activeThread.roleId || activeThread.mode || 'orchestrator';
+      const pagesToUse =
+        existing.pages && existing.pages.length > 0
+          ? existing.pages
+          : generateCatalogFromPrompt(defaultPrompt).pages;
+      const paletteToUse = existing.activePalette || STUDIO_PALETTE_PRESETS[0];
+
+      set({
+        hasStartedSession: true,
+        catalogTitle: existing.catalogTitle || defaultTitle,
+        activeCatalogId: catalogId,
+        pages: pagesToUse,
+        totalPages: existing.totalPages || pagesToUse.length,
+        currentSpread: existing.currentSpread || [1, 2],
+        activePalette: paletteToUse,
+        threads: existing.threads,
+        activeThreadId: activeThread.id,
+        messages: activeThread.messages || [],
+        activeRoleId: activeRole,
+        activeMode: activeRole,
+        agentStatus: 'idle',
+      });
+
+      saveStoredProjectSession(catalogId, {
+        threads: existing.threads,
+        activeThreadId: activeThread.id,
+        catalogTitle: existing.catalogTitle || defaultTitle,
+        activePalette: paletteToUse,
+        currentSpread: existing.currentSpread || [1, 2],
+        pages: pagesToUse,
+        totalPages: existing.totalPages || pagesToUse.length,
+      });
+      return;
+    }
+
+    // 4. Primeira abertura deste projeto: inicializa prancheta e cria thread contextualizada
+    const generated = generateCatalogFromPrompt(defaultPrompt);
+    const initialThreadId = `thread-${catalogId}-${Date.now()}`;
+    const initialMsg: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      role: 'assistant',
+      content: `Catálogo **${generated.title}** aberto para edição na prancheta. Os ${generated.totalPages} spreads e os agentes do conselho editorial estão prontos para alterações e diagramação.`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      reasoning: 'Racional do Editor-Chefe: Sessão editorial aberta para o projeto com paleta harmônica e modos de diagramação A4 aplicados.',
+    };
+
+    const initialThread: ChatThread = {
+      id: initialThreadId,
+      title: 'Coordenação Editorial',
+      mode: 'orchestrator',
+      roleId: 'orchestrator',
+      messages: [initialMsg],
+      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    set({
+      hasStartedSession: true,
+      catalogTitle: generated.title,
+      activeCatalogId: catalogId,
+      pages: generated.pages,
+      totalPages: generated.totalPages,
+      currentSpread: [1, 2],
+      activePalette: generated.palette,
+      threads: [initialThread],
+      activeThreadId: initialThreadId,
+      messages: [initialMsg],
+      activeRoleId: 'orchestrator',
+      activeMode: 'orchestrator',
+      agentStatus: 'idle',
+    });
+
+    saveStoredProjectSession(catalogId, {
+      threads: [initialThread],
+      activeThreadId: initialThreadId,
+      catalogTitle: generated.title,
+      activePalette: generated.palette,
+      currentSpread: [1, 2],
+      pages: generated.pages,
+      totalPages: generated.totalPages,
+    });
   },
 
   applyCouncilResolutions: ({ summary, productUpdates, pageUpdates, delegations, reasoning }) => {
@@ -1639,6 +1774,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       activeRoleId: threadRoleId,
       activeMode: threadRoleId,
     });
+    syncActiveCatalogStorage(get());
 
     return id;
   },
@@ -1654,6 +1790,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       activeMode: roleId,
       activeRoleId: roleId,
     });
+    syncActiveCatalogStorage(get());
   },
 
   closeThread: (threadId) => {
@@ -1681,6 +1818,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         activeThreadId: freshId,
         messages: resetThread.messages,
       });
+      syncActiveCatalogStorage(get());
       return;
     }
 
@@ -1703,6 +1841,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       activeMode: roleId,
       activeRoleId: roleId,
     });
+    syncActiveCatalogStorage(get());
   },
 
   renameThread: (threadId, title) => {
@@ -1711,6 +1850,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     set((s) => ({
       threads: s.threads.map((t) => (t.id === threadId ? { ...t, title: trimmed } : t)),
     }));
+    syncActiveCatalogStorage(get());
   },
 
   executionPlan: [],
@@ -1786,13 +1926,16 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         messages: activeThread ? activeThread.messages : [...s.messages, newMsg],
       };
     });
+    syncActiveCatalogStorage(get());
   },
-  clearMessages: () =>
+  clearMessages: () => {
     set((s) => ({
       messages: [],
       threads: s.threads.map((t) => (t.id === s.activeThreadId ? { ...t, messages: [] } : t)),
-    })),
-  setMessageFeedback: (messageId, feedback) =>
+    }));
+    syncActiveCatalogStorage(get());
+  },
+  setMessageFeedback: (messageId, feedback) => {
     set((s) => {
       const updatedThreads = s.threads.map((t) => ({
         ...t,
@@ -1809,7 +1952,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
               m.id === messageId ? { ...m, feedback } : m
             ),
       };
-    }),
+    });
+    syncActiveCatalogStorage(get());
+  },
 
   viewMode: 'spread',
   setViewMode: (mode) => set({ viewMode: mode }),
@@ -2904,6 +3049,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         messages: updatedMessages,
       };
     });
+    syncActiveCatalogStorage(get());
 
     // 2. Monta o contexto para o backend
     const [leftPageNum, rightPageNum] = state.currentSpread;
@@ -3209,6 +3355,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           messages: updatedMessages,
         };
       });
+      syncActiveCatalogStorage(get());
 
       await get().flushSaveSpread();
 
@@ -5019,6 +5166,21 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
 
   resetToHome: () => {
+    const s = get();
+    if (s.activeCatalogId && s.threads && s.threads.length > 0) {
+      saveStoredProjectSession(s.activeCatalogId, {
+        threads: s.threads,
+        activeThreadId: s.activeThreadId,
+        catalogTitle: s.catalogTitle,
+        activePalette: s.activePalette,
+        currentSpread: s.currentSpread,
+        pages: s.pages,
+        totalPages: s.totalPages,
+      });
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('katana_studio_last_active_catalog');
+    }
     set({
       hasStartedSession: false,
       activeCatalogId: null,

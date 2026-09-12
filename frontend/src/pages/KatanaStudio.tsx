@@ -67,9 +67,22 @@ export const KatanaStudio: React.FC = () => {
     isAccountSettingsOpen,
     closeAccountSettings,
     toggleProductDrawer,
+    loadExistingCatalog,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
+
+  // Restaura projeto ativo apos recarregar a pagina (F5)
+  useEffect(() => {
+    try {
+      const lastActiveCatalogId = localStorage.getItem('katana_studio_last_active_catalog');
+      if (lastActiveCatalogId && !useStudioStore.getState().hasStartedSession) {
+        loadExistingCatalog(lastActiveCatalogId);
+      }
+    } catch (e) {
+      console.warn('Erro ao restaurar sessao do catalogo:', e);
+    }
+  }, [loadExistingCatalog]);
 
   // Global shortcut Ctrl+B / Cmd+B to toggle global sidebar, Ctrl+J / Cmd+J to toggle AI CoPilot
   useEffect(() => {
