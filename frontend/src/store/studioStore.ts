@@ -527,6 +527,7 @@ export interface StudioState {
   pages: CatalogPageData[];
   setPages: (pages: CatalogPageData[]) => void;
   updatePage: (pageNumber: number, updates: Partial<CatalogPageData>) => void;
+  removePage: (pageNumber: number) => void;
   updateProduct: (productId: string, updates: Partial<ProductItem>) => void;
   removeProductBackground: (pageNumber: number, productId: string) => Promise<void>;
   executeCopilotCommand: (command: string, attachments?: ChatAttachment[]) => void;
@@ -1854,6 +1855,53 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     get().debouncedSaveCurrentSpread();
   },
 
+  removePage: (pageNumber) => {
+    const s = get();
+    if (s.pages.length <= 1) {
+      toast.error('Não é possível remover a única página do catálogo.');
+      return;
+    }
+
+    const pageToRemove = s.pages.find((p) => p.pageNumber === pageNumber);
+    if (!pageToRemove) return;
+
+    s.pushHistorySnapshot();
+
+    const recoveredProducts = pageToRemove.products || [];
+
+    const remainingPages = s.pages
+      .filter((p) => p.pageNumber !== pageNumber)
+      .map((p, index) => {
+        const newPageNum = index + 1;
+        return {
+          ...p,
+          pageNumber: newPageNum,
+          folio: `PÁG. ${String(newPageNum).padStart(2, '0')}`,
+        };
+      });
+
+    const newTotalPages = remainingPages.length;
+    const maxSpreadIdx = Math.max(0, Math.ceil(newTotalPages / 2) - 1);
+    const currentSpreadIdx = Math.floor((s.currentSpread[0] - 1) / 2);
+    const targetSpread = Math.min(currentSpreadIdx, maxSpreadIdx);
+    const newLeft = targetSpread * 2 + 1;
+    const newRight = Math.min(newTotalPages, newLeft + 1);
+
+    set((state) => ({
+      pages: remainingPages,
+      totalPages: newTotalPages,
+      unassignedProducts: [...recoveredProducts, ...state.unassignedProducts],
+      currentSpread: [newLeft, newRight],
+      saveStatus: 'unsaved',
+    }));
+
+    toast.success(`Página ${String(pageNumber).padStart(2, '0')} removida do catálogo!`, {
+      description: 'Lâminas, fólios e diagramação reorganizados pelo Conselho Editorial.',
+    });
+
+    s.debouncedSaveCurrentSpread();
+  },
+
   updateProduct: (productId, updates) => {
     get().pushHistorySnapshot();
     set((s) => ({
@@ -2104,6 +2152,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             : undefined;
 
         switch (actType) {
+          case 'remove_page':
+          case 'delete_page': {
+            const pageNumToRemove = typeof targetPage === 'number' ? targetPage : undefined;
+            if (typeof pageNumToRemove === 'number') {
+              get().removePage(pageNumToRemove);
+            }
+            break;
+          }
+
           case 'remove_product': {
             if (prodId) {
               const currentPages = get().pages;
@@ -2718,6 +2775,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             const field = act.field || params.field;
             const title = act.title || act.name || params.title || params.name;
 
+            if (actType === 'remove_page' || actType === 'delete_page') return `Página ${pageNum || 'selecionada'} removida do catálogo`;
             if (actType === 'remove_product') return `Produto removido da Página ${pageNum || 'visível'} e retornado ao acervo`;
             if (actType === 'assign_product') return `Produto alocado na Página ${pageNum || 1}`;
             if (actType === 'swap_product') return `Substituição de produto na Página ${pageNum || 1}`;
@@ -3696,6 +3754,56 @@ export const useStudioStore = create<StudioState>((set, get) => ({
                 roleName: 'Auditor de Branding',
                 badge: 'Auditoria',
                 action: 'Validou a conformidade de proporções de respiro de 96px sob o novo grid.',
+              },
+            ]
+          : undefined,
+      });
+      return;
+    }
+
+    // ==========================================
+    // 3.1 INTENT: REMOÇÃO DE PÁGINA DO CATÁLOGO
+    // ==========================================
+    const pageWordMapForRemoval: Record<string, number> = {
+      um: 1, uma: 1, primeira: 1, primeiro: 1,
+      dois: 2, duas: 2, segunda: 2, segundo: 2,
+      tres: 3, três: 3, terceira: 3, terceiro: 3,
+      quatro: 4, quarta: 4, quarto: 4,
+      cinco: 5, quinta: 5, quinto: 5,
+      seis: 6, sexta: 6, sexto: 6,
+      sete: 7, setima: 7, sétima: 7,
+      oito: 8, oitava: 8, oitavo: 8,
+    };
+
+    const removePageMatch = command.match(
+      /(?:retire|retirar|remova|remover|apague|apagar|exclua|excluir|delete|deletar|elimine|eliminar)\s+(?:a\s+)?(?:p[aá]gina|p[aá]g\.?|page)?\s*(\d+|um|uma|primeira|primeiro|dois|duas|segunda|segundo|tr[eê]s|terceira|terceiro|quatro|quarta|quarto|cinco|quinta|quinto|seis|sexta|sexto|sete|s[eé]tima|s[eé]timo|oito|oitava|oitavo)\s*(?:p[aá]gina)?/i
+    );
+
+    if (removePageMatch) {
+      const rawPage = removePageMatch[1].toLowerCase();
+      const pageNum = isNaN(parseInt(rawPage, 10)) ? (pageWordMapForRemoval[rawPage] || 1) : parseInt(rawPage, 10);
+
+      state.removePage(pageNum);
+      set({ agentStatus: 'idle' });
+
+      state.addMessage({
+        role: 'assistant',
+        content: `Página **${String(pageNum).padStart(2, '0')}** removida e diagramação reorganizada pelo Conselho Editorial.`,
+        reasoning: 'Racional [Diretor de Arte]: Lâmina eliminada do catálogo, produtos redirecionados ao acervo e fólios renumerados sequencialmente.',
+        actions: [`Página ${String(pageNum).padStart(2, '0')} removida do catálogo`],
+        delegations: isOrchestrator
+          ? [
+              {
+                roleId: 'director',
+                roleName: 'Diretor de Arte',
+                badge: 'Design',
+                action: `Renumerou a sequência de páginas e reajustou os fólios após a remoção da Página ${String(pageNum).padStart(2, '0')}.`,
+              },
+              {
+                roleId: 'branding',
+                roleName: 'Auditor de Branding',
+                badge: 'Auditoria',
+                action: 'Validou a integridade e o ritmo visual do catálogo após a exclusão da lâmina.',
               },
             ]
           : undefined,
