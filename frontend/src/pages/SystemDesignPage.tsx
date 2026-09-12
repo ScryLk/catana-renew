@@ -896,7 +896,7 @@ export const SystemDesignPage: React.FC = () => {
                     {/* Trigger Button */}
                     <div className="flex items-center justify-between pt-1">
                       <span className="text-[10px] text-zinc-400 font-mono">
-                        Validacao direta com Google Gemini 2.5
+                        Validacao direta com Google Gemini
                       </span>
                       <button
                         type="button"

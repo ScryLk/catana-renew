@@ -189,7 +189,7 @@ export const Transparency: React.FC = () => {
               <div className="p-3.5 rounded-xl border border-zinc-800 bg-zinc-950/40 space-y-1.5">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-200">
                   <Server className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Google Gemini 2.0 Flash</span>
+                  <span>Google Gemini</span>
                 </div>
                 <p className="text-[11px] text-zinc-400 leading-relaxed">
                   Motor de orquestração e redação multi-agente (Conselho Editorial). Conexão segura sob TLS 1.3.

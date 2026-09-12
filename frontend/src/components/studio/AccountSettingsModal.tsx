@@ -687,7 +687,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                   <div className="p-3 rounded-xl border border-inherit flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span className="text-xs font-medium">Google Gemini 2.0 Flash</span>
+                      <span className="text-xs font-medium">Google Gemini</span>
                     </div>
                     <span className="text-[11px] text-emerald-400 font-medium">Conectado</span>
                   </div>

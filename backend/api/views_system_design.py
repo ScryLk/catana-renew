@@ -54,7 +54,7 @@ SYSTEM_DESIGN_SPEC = {
             "stage": 2,
             "name": "Inteligencia Semantica & Deteccao de Utilidade",
             "description": "Analise semantica profunda de cada item pelo Google Gemini para inferir o que o produto e, sua aplicacao real no mercado e seus diferenciais tecnicos.",
-            "components": ["SYSTEM_CATALOG_WITH_PRODUCTS_PROMPT", "Google Gemini 2.5 Flash"]
+            "components": ["SYSTEM_CATALOG_WITH_PRODUCTS_PROMPT", "Google Gemini"]
         },
         {
             "stage": 3,
@@ -315,7 +315,7 @@ class StudioSystemDesignView(APIView):
             "system_agents_count": len(system_agents),
             "custom_agents_count": len(custom_agents),
             "selected_user_id": user_id or "all",
-            "engine": "Google Gemini 2.5 Flash Enterprise",
+            "engine": "Google Gemini",
         }, status=status.HTTP_200_OK)
 
 

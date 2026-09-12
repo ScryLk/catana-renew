@@ -344,7 +344,7 @@ export const MultiAgentShowcase: React.FC = () => {
         <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between text-[11px] text-zinc-500 font-mono">
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
-            <span>Google Gemini 2.0 Flash</span>
+            <span>Google Gemini</span>
           </div>
           <span>Multi-Agent Orchestration</span>
         </div>

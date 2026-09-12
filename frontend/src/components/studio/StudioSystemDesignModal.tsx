@@ -280,7 +280,7 @@ export const StudioSystemDesignModal: React.FC = () => {
                     Paradigma de Engenharia
                   </span>
                   <span className="text-[10px] font-mono text-zinc-400 bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-700/60">
-                    Engine: Google Gemini 2.5 Flash
+                    Engine: Google Gemini
                   </span>
                 </div>
                 <h3 className="text-sm font-semibold text-zinc-100">
@@ -331,7 +331,7 @@ export const StudioSystemDesignModal: React.FC = () => {
                 <div className="space-y-2">
                   {(systemData?.pipeline_stages || [
                     { stage: 1, name: 'Ingestao de Planilhas & Normalizacao', description: 'Leitura de arquivos Excel (.xlsx, .xls) e CSV com deteccao heuristica multi-criterio de colunas.', components: ['StudioExcelImportModal', 'SheetJS'] },
-                    { stage: 2, name: 'Inteligencia Semantica & Deteccao de Utilidade', description: 'O Gemini investiga o nome e especificacoes do produto para entender sua funcao e utilidade comercial.', components: ['Gemini 2.5 Flash', 'Semantic Reasoning'] },
+                    { stage: 2, name: 'Inteligencia Semantica & Deteccao de Utilidade', description: 'O Gemini investiga o nome e especificacoes do produto para entender sua funcao e utilidade comercial.', components: ['Google Gemini', 'Semantic Reasoning'] },
                     { stage: 3, name: 'RAG de Blueprints Editoriais', description: 'Recuperacao vetorial de gabaritos homologados com base na categoria e numero de itens.', components: ['TemplateRAGService', 'Cosine Similarity'] },
                     { stage: 4, name: 'Sintese Multi-Agente do Conselho', description: 'Orquestracao entre Direcao de Arte, Redacao, Comercial B2B e Auditoria de Branding.', components: ['Multi-Agent Council'] },
                     { stage: 5, name: 'Renderizacao do Canvas A4 em Tempo Real', description: 'Renderizacao fluida com edicao inline WYSIWYG e alocacao por drag-and-drop da gaveta.', components: ['SpreadViewport', 'ProductDrawer'] },
