@@ -565,20 +565,41 @@ class StudioAgentTestView(APIView):
         model_name = provider.default_model
 
         if provider.client:
+            candidate_models = [
+                provider.default_model,
+                "gemini-3.5-flash",
+                "gemini-3-flash-preview",
+                "gemini-3.5-flash-lite",
+            ]
+            ordered_models = []
+            for m in candidate_models:
+                if m and m not in ordered_models:
+                    ordered_models.append(m)
+
             try:
                 from google.genai import types
                 config = types.GenerateContentConfig(
                     system_instruction=system_prompt,
                     temperature=0.6,
                 )
-                res = provider.client.models.generate_content(
-                    model=model_name,
-                    contents=final_user_prompt,
-                    config=config,
-                )
-                response_text = res.text or ""
-            except Exception as err:
-                logger.warning(f"[AgentTestView] API remota temporariamente indisponivel ({err}). Ativando sintese de contingencia editorial para '{agent_role}'.")
+                for m_candidate in ordered_models:
+                    try:
+                        res = provider.client.models.generate_content(
+                            model=m_candidate,
+                            contents=final_user_prompt,
+                            config=config,
+                        )
+                        if res.text:
+                            response_text = res.text
+                            model_name = m_candidate
+                            break
+                    except Exception as model_err:
+                        logger.warning(f"[AgentTestView] Modelo '{m_candidate}' falhou ({model_err}). Tentando proximo...")
+            except Exception as outer_err:
+                logger.warning(f"[AgentTestView] Falha geral de integracao ({outer_err}).")
+
+            if not response_text:
+                logger.warning(f"[AgentTestView] API remota temporariamente indisponivel. Ativando sintese de contingencia editorial para '{agent_role}'.")
                 contingency_responses = {
                     "director": (
                         "Como Diretor de Arte do Katana Studio, estabeleço para esta demanda uma diagramação em grid editorial de 12 colunas "

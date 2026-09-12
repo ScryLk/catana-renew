@@ -189,20 +189,37 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
                 temperature=0.6,
                 response_mime_type="application/json",
             )
-            response = provider.client.models.generate_content(
-                model=provider.default_model,
-                contents=user_contents,
-                config=config,
-            )
-            raw_text = response.text.strip()
-            if raw_text.startswith("```json"):
-                raw_text = raw_text[7:]
-            if raw_text.startswith("```"):
-                raw_text = raw_text[3:]
-            if raw_text.endswith("```"):
-                raw_text = raw_text[:-3]
+            candidate_models = [
+                provider.default_model,
+                "gemini-3.5-flash",
+                "gemini-3-flash-preview",
+                "gemini-3.5-flash-lite",
+            ]
+            ordered_models = []
+            for m in candidate_models:
+                if m and m not in ordered_models:
+                    ordered_models.append(m)
 
-            synthesis_data = json.loads(raw_text.strip())
+            for m_candidate in ordered_models:
+                try:
+                    response = provider.client.models.generate_content(
+                        model=m_candidate,
+                        contents=user_contents,
+                        config=config,
+                    )
+                    raw_text = response.text.strip()
+                    if raw_text.startswith("```json"):
+                        raw_text = raw_text[7:]
+                    if raw_text.startswith("```"):
+                        raw_text = raw_text[3:]
+                    if raw_text.endswith("```"):
+                        raw_text = raw_text[:-3]
+
+                    synthesis_data = json.loads(raw_text.strip())
+                    if synthesis_data and isinstance(synthesis_data, dict):
+                        break
+                except Exception as m_err:
+                    logger.warning(f"[CatalogBuilder] Modelo '{m_candidate}' falhou ({m_err}). Tentando proximo...")
         except Exception as exc:
             logger.warning(f"[CatalogBuilder] Gemini indisponivel ou cota zerada ({exc}). Acionando sintese de contingencia.")
 

@@ -1676,21 +1676,44 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
     // 1. Processar Acoes Operacionais do Conselho Editorial
     if (hasActions && patch.actions) {
-      for (const action of patch.actions) {
-        if (!action || !action.type) continue;
+      for (const rawAction of patch.actions) {
+        if (!rawAction) continue;
+        const actType = rawAction.action || rawAction.type;
+        if (!actType) continue;
 
-        switch (action.type) {
+        const targetStr = String(rawAction.target || '');
+        const params = rawAction.params || {};
+
+        let targetPage = typeof rawAction.page === 'number' ? rawAction.page : undefined;
+        if (targetPage === undefined && targetStr.startsWith('page:')) {
+          const parsed = parseInt(targetStr.replace('page:', ''), 10);
+          if (!isNaN(parsed)) targetPage = parsed;
+        }
+
+        const prodId =
+          rawAction.product_id ||
+          rawAction.productId ||
+          params.product_id ||
+          params.productId ||
+          (targetStr.startsWith('product:') ? targetStr.replace('product:', '') : undefined);
+
+        const slotIdx =
+          typeof rawAction.slot_index === 'number'
+            ? rawAction.slot_index
+            : typeof params.slotIndex === 'number'
+            ? params.slotIndex
+            : typeof params.slot_index === 'number'
+            ? params.slot_index
+            : undefined;
+
+        switch (actType) {
           case 'remove_product': {
-            const targetPage = typeof action.page === 'number' ? action.page : undefined;
-            const prodId = action.product_id || action.productId;
-            const slotIdx = typeof action.slot_index === 'number' ? action.slot_index : undefined;
-
             if (prodId) {
               const currentPages = get().pages;
               const containingPage = targetPage
                 ? currentPages.find((p) => p.pageNumber === targetPage)
                 : currentPages.find((p) => p.products?.some((pr) => pr.id === prodId));
-              const pageNum = containingPage ? containingPage.pageNumber : leftPageNum;
+              const pageNum = containingPage ? containingPage.pageNumber : (targetPage || leftPageNum);
               get().removeProductFromSpread(pageNum, slotIdx, prodId);
             } else if (typeof targetPage === 'number') {
               get().removeProductFromSpread(targetPage, slotIdx);
@@ -1708,27 +1731,28 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           }
 
           case 'assign_product': {
-            const prodId = action.product_id || action.productId;
             const allProducts = [
               ...get().unassignedProducts,
               ...get().pages.flatMap((p) => p.products || []),
             ];
+            const pQuery = rawAction.productQuery || params.productQuery || prodId;
             const foundProd = allProducts.find(
               (p) =>
-                p.id === prodId ||
-                (p.name && prodId && p.name.toLowerCase() === String(prodId).toLowerCase())
-            );
+                (prodId && p.id === prodId) ||
+                (pQuery && p.name && p.name.toLowerCase().includes(String(pQuery).toLowerCase())) ||
+                (pQuery && p.sku && p.sku.toLowerCase() === String(pQuery).toLowerCase())
+            ) || allProducts[0];
             if (foundProd) {
-              const targetPage = typeof action.page === 'number' ? action.page : leftPageNum;
-              const slotIdx = typeof action.slot_index === 'number' ? action.slot_index : 0;
-              get().assignProductToSpread(foundProd, targetPage, slotIdx);
+              const finalTarget = typeof targetPage === 'number' ? targetPage : leftPageNum;
+              const finalSlot = typeof slotIdx === 'number' ? slotIdx : 0;
+              get().assignProductToSpread(foundProd, finalTarget, finalSlot);
             }
             break;
           }
 
           case 'swap_product': {
-            const curId = action.current_product_id || action.currentProductId;
-            const newId = action.new_product_id || action.newProductId;
+            const curId = rawAction.current_product_id || rawAction.currentProductId || params.current_product_id;
+            const newId = rawAction.new_product_id || rawAction.newProductId || params.new_product_id;
             const allProds = [
               ...get().unassignedProducts,
               ...get().pages.flatMap((p) => p.products || []),
@@ -1739,47 +1763,50 @@ export const useStudioStore = create<StudioState>((set, get) => ({
                 (p.name && newId && p.name.toLowerCase() === String(newId).toLowerCase())
             );
             if (newProd) {
-              let targetPage = typeof action.page === 'number' ? action.page : undefined;
-              let slotIdx = 0;
+              let finalPage = typeof targetPage === 'number' ? targetPage : undefined;
+              let sIdx = 0;
               if (curId) {
                 const foundPage = get().pages.find((p) => p.products?.some((pr) => pr.id === curId));
                 if (foundPage) {
-                  targetPage = foundPage.pageNumber;
+                  finalPage = foundPage.pageNumber;
                   const curIdx = foundPage.products?.findIndex((pr) => pr.id === curId) ?? 0;
-                  if (curIdx >= 0) slotIdx = curIdx;
+                  if (curIdx >= 0) sIdx = curIdx;
                 }
               }
-              const finalPage = targetPage || leftPageNum;
+              const pageToUse = finalPage || leftPageNum;
               if (curId) {
-                get().removeProductFromSpread(finalPage, undefined, curId);
+                get().removeProductFromSpread(pageToUse, undefined, curId);
               }
-              get().assignProductToSpread(newProd, finalPage, slotIdx);
+              get().assignProductToSpread(newProd, pageToUse, sIdx);
             }
             break;
           }
 
           case 'create_product': {
-            const name = action.title || action.name || 'Novo Produto';
+            const name = rawAction.title || rawAction.name || params.title || params.name || 'Novo Produto';
             const created = get().addProductToRepository({
               name,
-              sku: action.sku || `SKU-${Date.now().toString().slice(-4)}`,
-              price: action.price || 'R$ 0,00',
-              category: action.category || 'Coleção',
-              description: action.description || 'Item de alta precisão e acabamento manual.',
-              index: action.index || '01',
+              sku: rawAction.sku || params.sku || `SKU-${Date.now().toString().slice(-4)}`,
+              price: rawAction.price || params.price || 'R$ 0,00',
+              category: rawAction.category || params.category || 'Coleção',
+              description: rawAction.description || params.description || 'Item de alta precisão e acabamento manual.',
+              index: rawAction.index || params.index || '01',
               image:
-                action.image ||
+                rawAction.image ||
+                params.image ||
                 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000&auto=format&fit=crop',
             });
-            if (typeof action.page === 'number') {
-              get().assignProductToSpread(created, action.page, action.slot_index ?? 0);
+            if (typeof targetPage === 'number') {
+              get().assignProductToSpread(created, targetPage, slotIdx ?? 0);
             }
             break;
           }
 
           case 'change_layout': {
-            const targetPage = typeof action.page === 'number' ? action.page : leftPageNum;
-            const rawLayout = String(action.layout || action.type || 'hero').toLowerCase();
+            const finalPage = typeof targetPage === 'number' ? targetPage : leftPageNum;
+            const rawLayout = String(
+              rawAction.layout || rawAction.type || params.type || params.layout || 'hero'
+            ).toLowerCase();
             let mappedType: CatalogPageData['type'] = 'hero';
             if (rawLayout.includes('duo')) mappedType = 'duo';
             else if (
@@ -1796,27 +1823,40 @@ export const useStudioStore = create<StudioState>((set, get) => ({
               mappedType = 'cover';
             else mappedType = 'hero';
 
-            get().updatePage(targetPage, { type: mappedType });
+            get().updatePage(finalPage, { type: mappedType });
             break;
           }
 
           case 'update_text': {
-            const targetPage = typeof action.page === 'number' ? action.page : leftPageNum;
-            const field = action.field || 'title';
-            const val = action.value;
+            const finalPage = typeof targetPage === 'number' ? targetPage : leftPageNum;
+            const field = rawAction.field || params.field || 'title';
+            const val = rawAction.value !== undefined ? rawAction.value : params.value;
             if (field && val !== undefined) {
-              get().updatePage(targetPage, { [field]: val });
+              get().updatePage(finalPage, { [field]: val });
             }
             break;
           }
 
           case 'adjust_pricing': {
+            const rawPctVal =
+              rawAction.percentage ??
+              rawAction.percent ??
+              params.percentage ??
+              params.percent ??
+              params.amount;
+            const parsedPct =
+              typeof rawPctVal === 'number'
+                ? rawPctVal
+                : typeof rawPctVal === 'string'
+                ? parseFloat(rawPctVal.replace('%', '').trim())
+                : NaN;
+            const pct = !isNaN(parsedPct) ? parsedPct : 10;
             const mode =
-              action.mode ||
-              (action.percentage ? (action.percentage < 0 ? 'decrease' : 'increase') : 'set');
-            const pct = typeof action.percentage === 'number' ? action.percentage : 0;
-            const targetVal = typeof action.value === 'number' ? action.value : 0;
-            const targetPageNum = typeof action.page === 'number' ? action.page : undefined;
+              rawAction.mode ||
+              params.mode ||
+              (pct < 0 ? 'decrease' : 'increase');
+            const targetVal = typeof rawAction.value === 'number' ? rawAction.value : (typeof params.value === 'number' ? params.value : 0);
+            const targetPageNum = typeof targetPage === 'number' ? targetPage : undefined;
 
             get().pushHistorySnapshot();
             set((s) => {
@@ -1858,9 +1898,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           }
 
           case 'generate_skus': {
-            const prefix = action.prefix || 'CAT';
-            let counter = typeof action.start_number === 'number' ? action.start_number : 100;
-            const targetPageNum = typeof action.page === 'number' ? action.page : undefined;
+            const prefix = rawAction.prefix || params.prefix || 'CAT';
+            let counter = typeof rawAction.start_number === 'number' ? rawAction.start_number : (typeof params.start_number === 'number' ? params.start_number : 100);
+            const targetPageNum = typeof targetPage === 'number' ? targetPage : undefined;
 
             get().pushHistorySnapshot();
             set((s) => {
@@ -1895,9 +1935,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
           case 'set_palette': {
             const palId = (
-              action.palette_id ||
-              action.paletteId ||
-              action.name ||
+              rawAction.palette_id ||
+              rawAction.paletteId ||
+              rawAction.name ||
+              params.paletteName ||
+              params.palette_id ||
               ''
             ).toLowerCase();
             let chosen = STUDIO_PALETTE_PRESETS[0];
@@ -1948,53 +1990,56 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           }
 
           case 'brand_lock': {
-            get().setPaletteLocked(action.locked !== false);
+            const isLock = rawAction.locked !== undefined ? rawAction.locked : params.locked;
+            get().setPaletteLocked(isLock !== false);
             break;
           }
 
           case 'remove_background': {
-            const prodId = action.product_id || action.productId;
-            const targetPage = typeof action.page === 'number' ? action.page : leftPageNum;
+            const targetP = typeof targetPage === 'number' ? targetPage : leftPageNum;
             if (prodId) {
-              get().removeProductBackground(targetPage, prodId);
+              get().removeProductBackground(targetP, prodId);
             }
             break;
           }
 
           case 'generate_photo': {
-            const prodId = action.product_id || action.productId;
+            const prodToGen = prodId;
             const allProds = [
               ...get().unassignedProducts,
               ...get().pages.flatMap((p) => p.products || []),
             ];
             const targetProd = allProds.find(
               (p) =>
-                p.id === prodId ||
-                (p.name && prodId && p.name.toLowerCase().includes(prodId.toLowerCase()))
+                p.id === prodToGen ||
+                (p.name && prodToGen && p.name.toLowerCase().includes(prodToGen.toLowerCase()))
             );
             if (targetProd) {
               get().generateAIProductImage(
                 targetProd.id,
                 targetProd.name,
                 targetProd.category || 'Editorial',
-                action.prompt ||
-                  'Fotografia de estudio profissional em alta resolucao com iluminacao suave'
+                rawAction.prompt ||
+                  params.prompt ||
+                  'Fotografia de estúdio profissional em alta resolução com iluminação suave'
               );
             }
             break;
           }
 
           case 'navigate': {
-            if (typeof action.spread_index === 'number') {
-              get().goToSpread(action.spread_index);
-            } else if (typeof action.page === 'number') {
-              get().goToSpread(Math.floor((action.page - 1) / 2));
+            if (typeof targetPage === 'number') {
+              get().goToSpread(Math.floor((targetPage - 1) / 2));
+            } else if (typeof params.spread_index === 'number') {
+              get().goToSpread(params.spread_index);
+            } else if (typeof rawAction.spread_index === 'number') {
+              get().goToSpread(rawAction.spread_index);
             }
             break;
           }
 
           default:
-            console.warn('[applySpreadPatch] Acao nao reconhecida:', action.type);
+            console.warn('[applySpreadPatch] Ação não reconhecida:', actType);
             break;
         }
       }
@@ -2167,19 +2212,28 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
         const actionSummaries = Array.isArray(patchObj.actions)
           ? patchObj.actions.map((act: any) => {
-              if (act.type === 'remove_product') return `Produto removido da Página ${act.page || 'visível'} e retornado ao acervo`;
-              if (act.type === 'assign_product') return `Produto alocado na Página ${act.page || 1}`;
-              if (act.type === 'swap_product') return `Substituição de produto na Página ${act.page || 1}`;
-              if (act.type === 'create_product') return `Produto "${act.title || act.name || 'Novo'}" cadastrado e alocado`;
-              if (act.type === 'change_layout') return `Layout da Página ${act.page || 1} convertido para ${(act.layout || 'hero').toUpperCase()}`;
-              if (act.type === 'adjust_pricing') return `Reajuste de ${act.percentage || 10}% aplicado à tabela de preços`;
-              if (act.type === 'generate_skus') return `Códigos SKU padronizados com prefixo ${act.prefix || 'CAT'}`;
-              if (act.type === 'set_palette') return 'Paleta cromática do catálogo atualizada';
-              if (act.type === 'brand_lock') return act.locked ? 'Trava de Marca (Brand Lock) ativada' : 'Trava de Marca desativada';
-              if (act.type === 'remove_background') return 'Isolamento de silhueta e recorte de fundo executados';
-              if (act.type === 'generate_photo') return 'Fotografia de estúdio em alta resolução gerada com IA';
-              if (act.type === 'update_text') return `Texto da Página ${act.page || 1} (${act.field}) atualizado`;
-              return act.type;
+              const actType = act.type || act.action;
+              const pageNum = act.page || (typeof act.target === 'string' && act.target.startsWith('page:') ? parseInt(act.target.split(':')[1], 10) : undefined);
+              const params = act.params || {};
+              const layout = act.layout || params.layout;
+              const percentage = act.percentage ?? params.percentage ?? act.percent ?? params.percent;
+              const prefix = act.prefix || params.prefix;
+              const field = act.field || params.field;
+              const title = act.title || act.name || params.title || params.name;
+
+              if (actType === 'remove_product') return `Produto removido da Página ${pageNum || 'visível'} e retornado ao acervo`;
+              if (actType === 'assign_product') return `Produto alocado na Página ${pageNum || 1}`;
+              if (actType === 'swap_product') return `Substituição de produto na Página ${pageNum || 1}`;
+              if (actType === 'create_product') return `Produto "${title || 'Novo'}" cadastrado e alocado`;
+              if (actType === 'change_layout') return `Layout da Página ${pageNum || 1} convertido para ${(layout || 'hero').toUpperCase()}`;
+              if (actType === 'adjust_pricing') return `Reajuste de ${percentage || 10}% aplicado à tabela de preços`;
+              if (actType === 'generate_skus') return `Códigos SKU padronizados com prefixo ${prefix || 'CAT'}`;
+              if (actType === 'set_palette') return 'Paleta cromática do catálogo atualizada';
+              if (actType === 'brand_lock') return (act.locked ?? params.locked) ? 'Trava de Marca (Brand Lock) ativada' : 'Trava de Marca desativada';
+              if (actType === 'remove_background') return 'Isolamento de silhueta e recorte de fundo executados';
+              if (actType === 'generate_photo') return 'Fotografia de estúdio em alta resolução gerada com IA';
+              if (actType === 'update_text') return `Texto da Página ${pageNum || 1} (${field || 'conteúdo'}) atualizado`;
+              return actType;
             })
           : patchObj.summary
           ? [patchObj.summary]

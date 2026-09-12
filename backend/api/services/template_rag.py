@@ -86,16 +86,16 @@ def generate_embedding(text: str) -> List[float]:
     if not provider.is_mock and provider.client:
         try:
             res = provider.client.models.embed_content(
-                model="text-embedding-004",
+                model="gemini-embedding-001",
                 contents=text,
             )
-            if hasattr(res, 'embedding') and hasattr(res.embedding, 'values'):
-                vals = list(res.embedding.values)
-                # Normaliza para norma unitaria
-                norm = math.sqrt(sum(v * v for v in vals))
-                return [v / norm for v in vals] if norm > 0 else vals
-            elif hasattr(res, 'embeddings') and len(res.embeddings) > 0:
+            vals = None
+            if hasattr(res, 'embeddings') and res.embeddings and len(res.embeddings) > 0:
                 vals = list(res.embeddings[0].values)
+            elif hasattr(res, 'embedding') and getattr(res.embedding, 'values', None):
+                vals = list(res.embedding.values)
+
+            if vals:
                 norm = math.sqrt(sum(v * v for v in vals))
                 return [v / norm for v in vals] if norm > 0 else vals
         except Exception as exc:
