@@ -1,6 +1,7 @@
 import { FC, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useStudioStore } from '../store/studioStore';
 import { chatService } from '../services/chatService';
 import {
   LayoutDashboard,
@@ -40,6 +41,7 @@ const bottomMenuItems: MenuItem[] = [
 export const Sidebar: FC = () => {
   const location = useLocation();
   const [unreadCount, setUnreadCount] = useState(0);
+  const isDark = useStudioStore((s) => s.theme === 'dark');
 
   useEffect(() => {
     const fetchUnread = async () => {
@@ -70,14 +72,9 @@ export const Sidebar: FC = () => {
       <div className="flex items-center justify-center h-20 border-b border-zinc-200 dark:border-zinc-800 px-2">
         <Link to="/" className="flex items-center justify-center w-full">
           <img
-            src="/logo/catana_logo_dark.png"
+            src={isDark ? '/logo/catana_logo_white.png' : '/logo/catana_logo_dark.png'}
             alt="Catana Logo"
-            className="w-11 h-auto object-contain dark:hidden cursor-pointer hover:opacity-80 transition-opacity"
-          />
-          <img
-            src="/logo/catana_logo_white.png"
-            alt="Catana Logo"
-            className="w-11 h-auto object-contain hidden dark:block cursor-pointer hover:opacity-80 transition-opacity"
+            className="w-11 h-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
           />
         </Link>
       </div>

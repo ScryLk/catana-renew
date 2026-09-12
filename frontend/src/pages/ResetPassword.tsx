@@ -81,14 +81,9 @@ export const ResetPassword = () => {
         <div className="w-full lg:w-5/12 p-8 sm:p-12 flex flex-col justify-center relative overflow-y-auto">
           <div className="mb-6">
             <img
-              src="/logo/catana_logo_dark.png"
+              src={isDark ? '/logo/catana_logo_white.png' : '/logo/catana_logo_dark.png'}
               alt="Catana"
-              className="h-8 w-auto object-contain dark:hidden"
-            />
-            <img
-              src="/logo/catana_logo_white.png"
-              alt="Catana"
-              className="h-8 w-auto object-contain hidden dark:block"
+              className="h-8 w-auto object-contain"
             />
           </div>
 

@@ -8,9 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { useStudioStore } from '../store/studioStore';
 
 export const Login = () => {
   const navigate = useNavigate();
+  const isDark = useStudioStore((s) => s.theme === 'dark');
   const { login, googleLogin, isLoading, error, clearError, isAuthenticated } = useAuthStore();
 
   const [username, setUsername] = useState('');
@@ -43,14 +45,9 @@ export const Login = () => {
         <div className="w-full lg:w-5/12 p-8 sm:p-12 flex flex-col justify-center relative">
           <div className="mb-6">
             <img
-              src="/logo/catana_logo_dark.png"
+              src={isDark ? '/logo/catana_logo_white.png' : '/logo/catana_logo_dark.png'}
               alt="Catana"
-              className="h-8 w-auto object-contain dark:hidden"
-            />
-            <img
-              src="/logo/catana_logo_white.png"
-              alt="Catana"
-              className="h-8 w-auto object-contain hidden dark:block"
+              className="h-8 w-auto object-contain"
             />
           </div>
 

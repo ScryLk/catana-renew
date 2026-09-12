@@ -188,14 +188,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="mb-5 text-center">
             <div className="flex justify-center mb-3">
               <img
-                src="/logo/catana_logo_dark.png"
+                src={isDark ? '/logo/catana_logo_white.png' : '/logo/catana_logo_dark.png'}
                 alt="Catana"
-                className="h-8 w-auto object-contain dark:hidden"
-              />
-              <img
-                src="/logo/catana_logo_white.png"
-                alt="Catana"
-                className="h-8 w-auto object-contain hidden dark:block"
+                className="h-8 w-auto object-contain"
               />
             </div>
 

@@ -9,11 +9,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, AlertCircle, ArrowLeft, ArrowRight, Check, Building2, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useStudioStore } from '../store/studioStore';
 
 type AccountType = 'individual' | 'company';
 
 export const Register = () => {
   const navigate = useNavigate();
+  const isDark = useStudioStore((s) => s.theme === 'dark');
   const { register, googleLogin, isLoading, error: authError, clearError } = useAuthStore();
 
   const [currentStep, setCurrentStep] = useState('account');
@@ -133,14 +135,9 @@ export const Register = () => {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <img
-                src="/logo/catana_logo_dark.png"
+                src={isDark ? '/logo/catana_logo_white.png' : '/logo/catana_logo_dark.png'}
                 alt="Catana"
-                className="h-7 w-auto object-contain dark:hidden"
-              />
-              <img
-                src="/logo/catana_logo_white.png"
-                alt="Catana"
-                className="h-7 w-auto object-contain hidden dark:block"
+                className="h-7 w-auto object-contain"
               />
             </div>
             <div className="flex gap-1">
