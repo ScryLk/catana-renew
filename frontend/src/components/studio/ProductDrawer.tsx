@@ -234,9 +234,9 @@ export const ProductDrawer: React.FC = () => {
     setIsAddModalOpen(false);
   };
 
-  // Páginas do catálogo aptas a receber produtos
+  // Páginas do catálogo aptas a receber produtos (todas as páginas de conteúdo)
   const productPages = useMemo(
-    () => pages.filter((p) => ['hero', 'duo', 'single', 'grid_4'].includes(p.type)),
+    () => pages.filter((p) => p.pageNumber > 1),
     [pages]
   );
 
@@ -248,12 +248,8 @@ export const ProductDrawer: React.FC = () => {
     if (targetProductToAssign) {
       const leftPageNum = currentSpread[0];
       const rightPageNum = currentSpread[1];
-      const leftIsEligible = pages.find(
-        (p) => p.pageNumber === leftPageNum && ['hero', 'duo', 'single', 'grid_4'].includes(p.type)
-      );
-      const rightIsEligible = pages.find(
-        (p) => p.pageNumber === rightPageNum && ['hero', 'duo', 'single', 'grid_4'].includes(p.type)
-      );
+      const leftIsEligible = pages.find((p) => p.pageNumber === leftPageNum && p.pageNumber > 1);
+      const rightIsEligible = pages.find((p) => p.pageNumber === rightPageNum && p.pageNumber > 1);
 
       if (leftIsEligible) {
         setSelectedSubpanelPageNumber(leftPageNum);
@@ -298,7 +294,13 @@ export const ProductDrawer: React.FC = () => {
         currentProduct: targetPage.products?.[idx] || null,
       }));
     }
-    return [];
+    return [
+      {
+        slotIndex: 0,
+        label: `Slot 01 · ${targetPage.type === 'divider' ? 'Divisória' : targetPage.type === 'manifesto' ? 'Manifesto' : 'Lâmina'} (Converter para Hero)`,
+        currentProduct: targetPage.products?.[0] || null,
+      },
+    ];
   };
 
   // Ação: 1-Clique para alocar diretamente no slot ativo

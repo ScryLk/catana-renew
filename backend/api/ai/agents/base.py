@@ -31,7 +31,7 @@ class BaseAgent:
             "   {\n"
             "     \"spread_index\": <numero_do_spread>,\n"
             "     \"updates\": [\n"
-            "       {\"target\": \"left_page\" | \"right_page\" | \"<product_id>\", \"field\": \"<campo>\", \"value\": <novo_valor>}\n"
+            "       {\"target\": \"left_page\" | \"right_page\" | \"page:<numero>\" | \"<product_id>\", \"field\": \"<campo>\", \"value\": <novo_valor>}\n"
             "     ],\n"
             "     \"summary\": \"<descricao concisa da alteracao>\"\n"
             "   }\n"

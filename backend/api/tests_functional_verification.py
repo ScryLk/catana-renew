@@ -532,5 +532,51 @@ class SystemDesignAndFunctionalVerificationTests(TestCase):
         matches = EMOJI_PATTERN.findall(raw_json)
         self.assertEqual(len(matches), 0, f"Emoji detectado no catalogo gerado: {matches}")
 
+    def test_12_functional_agent_patch_protocol_and_orchestrator_directives(self):
+        """
+        MODULO 12: Verifica o protocolo de agentes funcionais (Canvas JSON Delta Patch)
+        e a capacidade de emissao de diretrizes de remocao de produto e layout.
+        """
+        from api.views_studio import extract_patch_from_text
+        from api.ai.agents.orchestrator import OrchestratorAgent
+        from api.ai.agents.base import BaseAgent
+
+        # 1. OrchestratorAgent possui instrucoes do protocolo json:patch
+        orchestrator = get_agent("orchestrator")
+        prompt = orchestrator.get_system_prompt()
+        self.assertIn("json:patch", prompt)
+        self.assertIn("Protocolo de Modificacao do Canvas", prompt)
+        self.assertIn("spread_index", prompt)
+        self.assertIn("page:<numero>", prompt)
+
+        # 2. BaseAgent possui target page:<numero>
+        base_agent = BaseAgent()
+        base_prompt = base_agent.get_system_prompt()
+        self.assertIn("page:<numero>", base_prompt)
+
+        # 3. Extrator de patch extrai corretamente comandos de remocao de produto
+        sample_response = (
+            "Compreendido. Estou removendo o produto da pagina 3 para abrir espaco editorial.\n\n"
+            "```json:patch\n"
+            "{\n"
+            '  "spread_index": 1,\n'
+            '  "updates": [\n'
+            '    {"target": "page:3", "field": "products", "value": []}\n'
+            "  ],\n"
+            '  "summary": "Produto removido da Pagina 3"\n'
+            "}\n"
+            "```\n"
+            "A prancheta foi atualizada com sucesso."
+        )
+
+        extracted = extract_patch_from_text(sample_response)
+        self.assertIsNotNone(extracted)
+        self.assertEqual(extracted["spread_index"], 1)
+        self.assertEqual(len(extracted["updates"]), 1)
+        self.assertEqual(extracted["updates"][0]["target"], "page:3")
+        self.assertEqual(extracted["updates"][0]["field"], "products")
+        self.assertEqual(extracted["updates"][0]["value"], [])
+        self.assertEqual(extracted["summary"], "Produto removido da Pagina 3")
+
 
 

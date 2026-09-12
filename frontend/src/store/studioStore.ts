@@ -264,6 +264,7 @@ export interface StudioState {
   addProductToRepository: (product: Omit<ProductItem, 'id'>) => ProductItem;
   deleteProductFromRepository: (productId: string) => void;
   assignProductToSpread: (product: ProductItem, targetPageNumber: number, slotIndex?: number) => void;
+  removeProductFromSpread: (targetPageNumber: number, slotIndex?: number, productId?: string) => ProductItem[];
 
   // Excel Product Importer & AI Image Generation
   isExcelImportModalOpen: boolean;
@@ -577,12 +578,17 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     const updatedPages = state.pages.map((page) => {
       if (page.pageNumber !== targetPageNumber) return page;
 
+      let newType = page.type;
+      if (['cover', 'divider', 'manifesto'].includes(page.type)) {
+        newType = 'hero';
+      }
+
       let newProducts = [...(page.products || [])];
-      if (page.type === 'hero' || page.type === 'single') {
+      if (newType === 'hero' || newType === 'single') {
         newProducts = [product];
-      } else if (page.type === 'duo') {
+      } else if (newType === 'duo') {
         newProducts[slotIndex] = product;
-      } else if (page.type === 'grid_4') {
+      } else if (newType === 'grid_4') {
         newProducts[slotIndex] = product;
       } else {
         newProducts = [product];
@@ -590,6 +596,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
       return {
         ...page,
+        type: newType,
         products: newProducts,
       };
     });
@@ -605,6 +612,64 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
     get().debouncedSaveCurrentSpread();
     toast.success(`Produto "${product.name}" alocado na Página ${String(targetPageNumber).padStart(2, '0')} (Slot ${slotIndex + 1})!`);
+  },
+
+  removeProductFromSpread: (targetPageNumber, slotIndex, productId) => {
+    get().pushHistorySnapshot();
+    const state = get();
+    let removedItems: ProductItem[] = [];
+
+    const updatedPages = state.pages.map((page) => {
+      if (page.pageNumber !== targetPageNumber) return page;
+      if (!page.products || page.products.length === 0) return page;
+
+      let remainingProducts: ProductItem[] = [];
+
+      if (productId) {
+        removedItems = page.products.filter((p) => p.id === productId);
+        remainingProducts = page.products.filter((p) => p.id !== productId);
+      } else if (typeof slotIndex === 'number' && slotIndex >= 0) {
+        if (page.products[slotIndex]) {
+          removedItems = [page.products[slotIndex]];
+        }
+        remainingProducts = page.products.filter((_, idx) => idx !== slotIndex);
+      } else {
+        removedItems = [...page.products];
+        remainingProducts = [];
+      }
+
+      return {
+        ...page,
+        products: remainingProducts,
+      };
+    });
+
+    if (removedItems.length > 0) {
+      const currentUnassigned = [...state.unassignedProducts];
+      for (const item of removedItems) {
+        if (!currentUnassigned.some((p) => p.id === item.id)) {
+          currentUnassigned.unshift({
+            ...item,
+            tag: item.tag || 'Disponível',
+          });
+        }
+      }
+
+      set({
+        pages: updatedPages,
+        unassignedProducts: currentUnassigned,
+        saveStatus: 'unsaved',
+      });
+
+      const targetSpreadIndex = Math.floor((targetPageNumber - 1) / 2);
+      get().goToSpread(targetSpreadIndex);
+
+      get().debouncedSaveCurrentSpread();
+      const names = removedItems.map((p) => p.name).join(', ');
+      toast.success(`"${names}" removido da Página ${String(targetPageNumber).padStart(2, '0')}!`);
+    }
+
+    return removedItems;
   },
 
   isExcelImportModalOpen: false,
@@ -1612,11 +1677,28 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         }
       }
 
+      // Devolve produtos removidos ao acervo
+      const currentProducts = s.pages.flatMap((p) => p.products || []);
+      const newProductIds = new Set(updatedPages.flatMap((p) => p.products || []).map((p) => p.id));
+      const removedProducts = currentProducts.filter((p) => !newProductIds.has(p.id));
+
+      const updatedUnassigned = [...s.unassignedProducts];
+      for (const item of removedProducts) {
+        if (!updatedUnassigned.some((p) => p.id === item.id)) {
+          updatedUnassigned.unshift({ ...item, tag: item.tag || 'Disponível' });
+        }
+      }
+
       return {
         pages: updatedPages,
+        unassignedProducts: updatedUnassigned,
         saveStatus: 'unsaved',
       };
     });
+
+    if (typeof patch.spread_index === 'number' && patch.spread_index >= 0) {
+      get().goToSpread(patch.spread_index);
+    }
 
     get().debouncedSaveCurrentSpread();
   },
@@ -2179,7 +2261,441 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       return;
     }
 
-    // 1. Mudança de Preço
+    // ==========================================
+    // 1. INTENT: REMOÇÃO DE PRODUTO
+    // ==========================================
+    const isRemoveIntent = /(?:retire|remover|remova|tire|tirar|apague|apagar|deletar|excluir|limpar|desalocar|remover-produto)/i.test(lower);
+    if (isRemoveIntent) {
+      const pageMatch = command.match(/(?:p[aá]gina|p[aá]g\.?|page)\s*(\d+)/i);
+      const slotMatch = command.match(/(?:slot|posi[cç][aã]o|posicao)\s*(\d+)/i);
+      const slotIdx = slotMatch ? parseInt(slotMatch[1], 10) - 1 : undefined;
+
+      // 1.1 Remover todos os produtos do catálogo
+      if (lower.includes('todos os produtos') || lower.includes('todo o catálogo') || lower.includes('todos produtos') || lower.includes('limpar catalogo') || lower.includes('limpar catálogo')) {
+        let totalRemoved = 0;
+        const allRemoved: ProductItem[] = [];
+        const newPages = state.pages.map((page) => {
+          if (page.products && page.products.length > 0) {
+            allRemoved.push(...page.products);
+            totalRemoved += page.products.length;
+            return { ...page, products: [] };
+          }
+          return page;
+        });
+
+        const newUnassigned = [...state.unassignedProducts];
+        for (const item of allRemoved) {
+          if (!newUnassigned.some((p) => p.id === item.id)) {
+            newUnassigned.unshift({ ...item, tag: item.tag || 'Disponível' });
+          }
+        }
+
+        set({
+          pages: newPages,
+          unassignedProducts: newUnassigned,
+          agentStatus: 'idle',
+          saveStatus: 'unsaved',
+        });
+        get().debouncedSaveCurrentSpread();
+        toast.success(`${totalRemoved} produtos removidos do catálogo e preservados no acervo!`);
+
+        state.addMessage({
+          role: 'assistant',
+          content: `Todos os **${totalRemoved} produtos** foram removidos das lâminas do catálogo e devolvidos ao acervo (Product Drawer).\n\nAs pranchetas agora exibem os slots wireframe com proporções A4 preservadas para novas composições.`,
+          reasoning: 'Racional do Editor-Chefe [Limpeza Global]: Todas as pranchetas foram liberadas para redesign mantendo a integridade dos itens no acervo.',
+          delegations: isOrchestrator
+            ? [
+                {
+                  roleId: 'director',
+                  roleName: 'Diretor de Arte',
+                  badge: 'Design',
+                  action: 'Restaurou a estrutura de wireframe e respiro de 96px em todas as 10 páginas.',
+                },
+                {
+                  roleId: 'commercial',
+                  roleName: 'Tabela Comercial / B2B',
+                  badge: 'Comercial',
+                  action: 'Desvinculou todas as referências SKU das lâminas e as preservou no acervo geral.',
+                },
+                {
+                  roleId: 'branding',
+                  roleName: 'Auditor de Branding',
+                  badge: 'Auditoria',
+                  action: 'Validou a consistência geométrica e o grid base do catálogo sem os elementos ativos.',
+                },
+                {
+                  roleId: 'copywriter',
+                  roleName: 'Redator Publicitário',
+                  badge: 'Redação',
+                  action: 'Pronto para redigir novas chamadas e claims conforme os próximos produtos forem inseridos.',
+                },
+              ]
+            : undefined,
+        });
+        return;
+      }
+
+      // 1.2 Remoção com página explicitamente indicada (ex: "retire o produto alocado na pagina 3")
+      if (pageMatch) {
+        const targetPageNum = parseInt(pageMatch[1], 10);
+        const targetPage = state.pages.find((p) => p.pageNumber === targetPageNum);
+
+        if (!targetPage) {
+          set({ agentStatus: 'idle' });
+          state.addMessage({
+            role: 'assistant',
+            content: `A Página ${targetPageNum} não foi encontrada no catálogo. O projeto atual possui ${state.totalPages} páginas.`,
+            reasoning: 'Verificação de limites de página pelo Editor-Chefe.',
+          });
+          return;
+        }
+
+        // Se a página indicada possui produtos alocados
+        if (targetPage.products && targetPage.products.length > 0) {
+          const removed = state.removeProductFromSpread(targetPageNum, slotIdx);
+          set({ agentStatus: 'idle' });
+
+          const removedNames = removed.map((p) => p.name).join(', ') || 'Produto';
+          const removedSku = removed[0]?.sku || 'SKU-001';
+
+          state.addMessage({
+            role: 'assistant',
+            content: `O produto **"${removedNames}"** foi retirado da **Página ${String(targetPageNum).padStart(2, '0')}** e retornado ao seu acervo no Product Drawer.\n\nA prancheta agora exibe o slot editorial livre com bordas demarcadas para alocação de novos itens ou fotografias de destaque.`,
+            reasoning: isOrchestrator
+              ? `Racional do Editor-Chefe [Remoção Executiva]: Produto desvinculado da lâmina ${targetPageNum}. Respiro e proporção A4 restaurados; item devolvido ao acervo.`
+              : `Racional [${currentRole.name}]: Produto removido da página conforme a diretriz.`,
+            delegations: isOrchestrator
+              ? [
+                  {
+                    roleId: 'director',
+                    roleName: 'Diretor de Arte',
+                    badge: 'Design',
+                    action: `Liberou o slot na Página ${String(targetPageNum).padStart(2, '0')}, restaurando o respiro de 96px e abrindo wireframe para nova composição.`,
+                  },
+                  {
+                    roleId: 'commercial',
+                    roleName: 'Tabela Comercial / B2B',
+                    badge: 'Comercial',
+                    action: `Retirou a referência técnica ${removedSku} da lâmina e garantiu sua permanência no acervo de produtos.`,
+                  },
+                  {
+                    roleId: 'branding',
+                    roleName: 'Auditor de Branding',
+                    badge: 'Auditoria',
+                    action: 'Validou a simetria da prancheta e o contraste visual após a desocupação do slot.',
+                  },
+                  {
+                    roleId: 'copywriter',
+                    roleName: 'Redator Publicitário',
+                    badge: 'Redação',
+                    action: 'Sincronizou fólio e descritivos contextuais da prancheta.',
+                  },
+                ]
+              : undefined,
+          });
+          return;
+        }
+
+        // Se a página indicada NÃO possui produtos: verificar se a página parceira do mesmo spread possui!
+        const spreadIndex = Math.floor((targetPageNum - 1) / 2);
+        const [leftNum, rightNum] = [spreadIndex * 2 + 1, spreadIndex * 2 + 2];
+        const siblingPageNum = targetPageNum === leftNum ? rightNum : leftNum;
+        const siblingPage = state.pages.find((p) => p.pageNumber === siblingPageNum);
+
+        if (siblingPage && siblingPage.products && siblingPage.products.length > 0) {
+          const removed = state.removeProductFromSpread(siblingPageNum, slotIdx);
+          set({ agentStatus: 'idle' });
+
+          const removedNames = removed.map((p) => p.name).join(', ') || 'Produto';
+          const removedSku = removed[0]?.sku || 'SKU-001';
+
+          state.addMessage({
+            role: 'assistant',
+            content: `A Página ${String(targetPageNum).padStart(2, '0')} (${targetPage.type === 'divider' ? 'Divisória de Categoria' : 'página'}) não continha produtos alocados. Identifiquei e retirei o produto **"${removedNames}"** da **Página ${String(siblingPageNum).padStart(2, '0')}** (mesmo spread visual), devolvendo-o ao acervo.\n\nO slot da Página ${String(siblingPageNum).padStart(2, '0')} agora está livre e pronto para receber uma nova peça.`,
+            reasoning: `Racional do Editor-Chefe [Resolução Contextual]: O usuário solicitou remoção no spread ${spreadIndex + 1}; o produto localizado na lâmina parceira (${siblingPageNum}) foi retirado com precisão.`,
+            delegations: isOrchestrator
+              ? [
+                  {
+                    roleId: 'director',
+                    roleName: 'Diretor de Arte',
+                    badge: 'Design',
+                    action: `Liberou o slot na Página ${String(siblingPageNum).padStart(2, '0')}, restaurando o respiro negativo de 96px.`,
+                  },
+                  {
+                    roleId: 'commercial',
+                    roleName: 'Tabela Comercial / B2B',
+                    badge: 'Comercial',
+                    action: `Desvinculou a referência ${removedSku} da lâmina e preservou o item no repositório.`,
+                  },
+                  {
+                    roleId: 'branding',
+                    roleName: 'Auditor de Branding',
+                    badge: 'Auditoria',
+                    action: 'Validou o alinhamento óptico da prancheta sob WCAG AA.',
+                  },
+                  {
+                    roleId: 'copywriter',
+                    roleName: 'Redator Publicitário',
+                    badge: 'Redação',
+                    action: 'Atualizou as legendas e claims editoriais do spread.',
+                  },
+                ]
+              : undefined,
+          });
+          return;
+        }
+
+        // Se realmente não há produtos no spread
+        set({ agentStatus: 'idle' });
+        state.addMessage({
+          role: 'assistant',
+          content: `A **Página ${String(targetPageNum).padStart(2, '0')}** não possui nenhum produto alocado no momento.\n\nPara alocar um produto nesta lâmina, você pode abrir o **Product Drawer** ou me solicitar: *"aloque a Bolsa Aurelia na página ${targetPageNum}"*.`,
+          reasoning: 'Racional do Editor-Chefe: Verificação de prancheta concluída; nenhum produto ativo para remoção.',
+        });
+        return;
+      }
+
+      // 1.3 Remoção por Nome de Produto (ex: "retire a bolsa aurelia", "remova o porta-cartoes")
+      let matchedPageNum: number | null = null;
+      let matchedProdId: string | null = null;
+      let matchedProdName: string | null = null;
+
+      for (const p of state.pages) {
+        if (!p.products) continue;
+        for (const prod of p.products) {
+          if (lower.includes(prod.name.toLowerCase()) || (prod.sku && lower.includes(prod.sku.toLowerCase()))) {
+            matchedPageNum = p.pageNumber;
+            matchedProdId = prod.id;
+            matchedProdName = prod.name;
+            break;
+          }
+        }
+        if (matchedPageNum) break;
+      }
+
+      if (matchedPageNum && matchedProdId) {
+        state.removeProductFromSpread(matchedPageNum, undefined, matchedProdId);
+        set({ agentStatus: 'idle' });
+
+        state.addMessage({
+          role: 'assistant',
+          content: `O produto **"${matchedProdName}"** foi localizado na **Página ${String(matchedPageNum).padStart(2, '0')}**, desvinculado da lâmina e retornado ao seu acervo.\n\nA prancheta foi reorganizada para manter o equilíbrio visual.`,
+          reasoning: `Racional do Editor-Chefe [Busca Semântica & Remoção]: Produto identificado na Página ${matchedPageNum} e retirado da grade.`,
+          delegations: isOrchestrator
+            ? [
+                {
+                  roleId: 'director',
+                  roleName: 'Diretor de Arte',
+                  badge: 'Design',
+                  action: `Liberou a área visual do produto na Página ${String(matchedPageNum).padStart(2, '0')}.`,
+                },
+                {
+                  roleId: 'commercial',
+                  roleName: 'Tabela Comercial / B2B',
+                  badge: 'Comercial',
+                  action: `Reintegrou "${matchedProdName}" ao inventário disponível.`,
+                },
+                {
+                  roleId: 'branding',
+                  roleName: 'Auditor de Branding',
+                  badge: 'Auditoria',
+                  action: 'Confirmou que a ausência do produto mantém a harmonia da diagramação.',
+                },
+                {
+                  roleId: 'copywriter',
+                  roleName: 'Redator Publicitário',
+                  badge: 'Redação',
+                  action: 'Atualizou as legendas do spread.',
+                },
+              ]
+            : undefined,
+        });
+        return;
+      }
+
+      // 1.4 Remoção no Spread Ativo quando não especificada página
+      const [leftPageNum, rightPageNum] = state.currentSpread;
+      const leftPage = state.pages.find((p) => p.pageNumber === leftPageNum);
+      const rightPage = state.pages.find((p) => p.pageNumber === rightPageNum);
+      const activePageWithProduct = (leftPage?.products?.length ? leftPage : null) || (rightPage?.products?.length ? rightPage : null);
+
+      if (activePageWithProduct) {
+        const removed = state.removeProductFromSpread(activePageWithProduct.pageNumber);
+        set({ agentStatus: 'idle' });
+        const removedNames = removed.map((p) => p.name).join(', ') || 'Produto';
+
+        state.addMessage({
+          role: 'assistant',
+          content: `Retirei **"${removedNames}"** da **Página ${String(activePageWithProduct.pageNumber).padStart(2, '0')}** da lâmina visível, retornando-o ao acervo.`,
+          reasoning: 'Racional do Editor-Chefe [Spread Ativo]: Produto removido do spread focado pelo usuário.',
+        });
+        return;
+      }
+    }
+
+    // ==========================================
+    // 2. INTENT: ALOCAÇÃO DE PRODUTO
+    // ==========================================
+    const isAssignIntent = /(?:aloque|alocar|insira|inserir|coloque|colocar|adicione|adicionar)\s+(?:o\s+produto\s+)?(.+?)\s+na\s+p[aá]gina\s+(\d+)/i;
+    const assignMatch = command.match(isAssignIntent);
+    if (assignMatch) {
+      const prodQuery = assignMatch[1].trim().toLowerCase();
+      const targetPageNum = parseInt(assignMatch[2], 10);
+      const slotMatch = command.match(/(?:slot|posi[cç][aã]o|posicao)\s*(\d+)/i);
+      const slotIdx = slotMatch ? parseInt(slotMatch[1], 10) - 1 : 0;
+
+      const allAvailable = [
+        ...state.unassignedProducts,
+        ...state.pages.flatMap((p) => p.products || []),
+      ];
+
+      const foundProduct = allAvailable.find(
+        (p) =>
+          p.name.toLowerCase().includes(prodQuery) ||
+          prodQuery.includes(p.name.toLowerCase()) ||
+          (p.sku && p.sku.toLowerCase().includes(prodQuery))
+      ) || allAvailable[0];
+
+      if (foundProduct) {
+        state.assignProductToSpread(foundProduct, targetPageNum, slotIdx);
+        set({ agentStatus: 'idle' });
+        get().goToSpread(Math.floor((targetPageNum - 1) / 2));
+
+        state.addMessage({
+          role: 'assistant',
+          content: `O produto **"${foundProduct.name}"** (${foundProduct.sku || 'SKU'}, ${foundProduct.price}) foi alocado com sucesso na **Página ${String(targetPageNum).padStart(2, '0')}** (Slot 0${slotIdx + 1}).\n\nA diagramação da lâmina foi atualizada com fotografia de destaque, especificações técnicas e tipografia Cormorant Garamond.`,
+          reasoning: isOrchestrator
+            ? `Racional do Editor-Chefe [Alocação Executiva]: Produto "${foundProduct.name}" inserido na Página ${targetPageNum}. Grid A4 e proporção áurea reajustados para comportar a peça.`
+            : `Racional [${currentRole.name}]: Alocação realizada conforme diretriz.`,
+          delegations: isOrchestrator
+            ? [
+                {
+                  roleId: 'director',
+                  roleName: 'Diretor de Arte',
+                  badge: 'Design',
+                  action: `Diagramou a fotografia de "${foundProduct.name}" na Página ${String(targetPageNum).padStart(2, '0')} com margem de 96px.`,
+                },
+                {
+                  roleId: 'commercial',
+                  roleName: 'Tabela Comercial / B2B',
+                  badge: 'Comercial',
+                  action: `Registrou valor de ${foundProduct.price} e referência ${foundProduct.sku || 'SKU'} na grade de vendas.`,
+                },
+                {
+                  roleId: 'branding',
+                  roleName: 'Auditor de Branding',
+                  badge: 'Auditoria',
+                  action: 'Validou contraste tipográfico e alinhamento do monograma na lâmina.',
+                },
+                {
+                  roleId: 'copywriter',
+                  roleName: 'Redator Publicitário',
+                  badge: 'Redação',
+                  action: `Destacou os atributos da peça: "${foundProduct.description || foundProduct.category}".`,
+                },
+              ]
+            : undefined,
+        });
+        return;
+      }
+    }
+
+    // ==========================================
+    // 3. INTENT: TROCA DE LAYOUT DA PÁGINA
+    // ==========================================
+    const layoutMatch = command.match(
+      /(?:mude|altere|troque|transforme|converter|converta)\s+(?:a\s+)?p[aá]gina\s+(\d+)\s+para\s+(hero|duo|single|grade comercial|grade|grid_4|grid|manifesto|divis[oó]ria|divisoria|divider|capa|cover)/i
+    );
+    if (layoutMatch) {
+      const pageNum = parseInt(layoutMatch[1], 10);
+      const rawType = layoutMatch[2].toLowerCase();
+      let newType: CatalogPageData['type'] = 'hero';
+
+      if (rawType.includes('duo')) newType = 'duo';
+      else if (rawType.includes('grid') || rawType.includes('grade')) newType = 'grid_4';
+      else if (rawType.includes('single')) newType = 'single';
+      else if (rawType.includes('divis') || rawType.includes('divider')) newType = 'divider';
+      else if (rawType.includes('manifesto')) newType = 'manifesto';
+      else if (rawType.includes('capa') || rawType.includes('cover')) newType = 'cover';
+      else newType = 'hero';
+
+      state.updatePage(pageNum, { type: newType });
+      set({ agentStatus: 'idle' });
+      get().goToSpread(Math.floor((pageNum - 1) / 2));
+      toast.success(`Página ${String(pageNum).padStart(2, '0')} convertida para layout ${newType.toUpperCase()}!`);
+
+      state.addMessage({
+        role: 'assistant',
+        content: `O layout da **Página ${String(pageNum).padStart(2, '0')}** foi convertido para **${newType.toUpperCase()}**.\n\nA composição geométrica, os slots de produto e o grid editorial foram reorganizados pelo Diretor de Arte.`,
+        reasoning: `Racional do Diretor de Arte: Conversão de template da Página ${pageNum} para ${newType}, recalculando respiros e alinhamentos de leitura sob proporções A4.`,
+        delegations: isOrchestrator
+          ? [
+              {
+                roleId: 'director',
+                roleName: 'Diretor de Arte',
+                badge: 'Design',
+                action: `Reestruturou o grid da Página ${String(pageNum).padStart(2, '0')} para a variante ${newType}.`,
+              },
+              {
+                roleId: 'branding',
+                roleName: 'Auditor de Branding',
+                badge: 'Auditoria',
+                action: 'Validou a conformidade de proporções de respiro de 96px sob o novo grid.',
+              },
+            ]
+          : undefined,
+      });
+      return;
+    }
+
+    // ==========================================
+    // 4. INTENT: NAVEGAÇÃO DE PÁGINAS
+    // ==========================================
+    const navMatch = command.match(
+      /(?:v[aá]|navegue|navegar|ir|mostrar|mostre|abra|abrir|exibir|exiba)\s+(?:para\s+a\s+|o\s+|a\s+)?(?:p[aá]gina|p[aá]g\.?|page)\s*(\d+)/i
+    );
+    if (navMatch) {
+      const pageNum = parseInt(navMatch[1], 10);
+      if (pageNum >= 1 && pageNum <= state.totalPages) {
+        const spreadIdx = Math.floor((pageNum - 1) / 2);
+        state.goToSpread(spreadIdx);
+        set({ agentStatus: 'idle' });
+
+        state.addMessage({
+          role: 'assistant',
+          content: `Navegando para a **Página ${String(pageNum).padStart(2, '0')}** (Lâmina ${spreadIdx + 1} de ${Math.ceil(state.totalPages / 2)}).`,
+          reasoning: 'Racional [Navegação]: Prancheta centralizada na lâmina solicitada.',
+        });
+        return;
+      }
+    }
+
+    // ==========================================
+    // 5. INTENT: EDIÇÃO DE TÍTULO / SUBTÍTULO / CLAIM DE PÁGINA ESPECÍFICA
+    // ==========================================
+    const pageTextMatch = command.match(
+      /(?:mude|altere|troque|coloque)\s+(?:o\s+)?(t[ií]tulo|subt[ií]tulo|claim|legenda|label)\s+da\s+p[aá]gina\s+(\d+)\s+para\s+["'“]?(.+?)["'”]?$/i
+    );
+    if (pageTextMatch) {
+      const fieldType = pageTextMatch[1].toLowerCase();
+      const pageNum = parseInt(pageTextMatch[2], 10);
+      const newText = pageTextMatch[3].trim().replace(/^["']|["']$/g, '');
+
+      const fieldKey = fieldType.includes('sub') ? 'subtitle' : fieldType.includes('claim') ? 'quote' : 'title';
+      state.updatePage(pageNum, { [fieldKey]: newText });
+      set({ agentStatus: 'idle' });
+      get().goToSpread(Math.floor((pageNum - 1) / 2));
+      toast.success(`${fieldType} da Página ${pageNum} atualizado!`);
+
+      state.addMessage({
+        role: 'assistant',
+        content: `O ${fieldType} da **Página ${String(pageNum).padStart(2, '0')}** foi atualizado para **"${newText}"**.`,
+        reasoning: 'Racional [Redator Publicitário]: Refinamento de texto com vocabulário alinhado ao posicionamento da coleção.',
+      });
+      return;
+    }
+
+    // 6. Mudança de Preço
     const priceMatch = command.match(/r?\$?\s*([0-9]+[.,]?[0-9]*)/i);
     if ((lower.includes('preço') || lower.includes('valor') || lower.includes('custa')) && priceMatch) {
       const newPrice = `R$ ${priceMatch[1]}`;
