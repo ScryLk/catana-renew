@@ -175,6 +175,7 @@ export interface ChatMessage {
   delegations?: ChatDelegation[];
   attachments?: ChatAttachment[];
   capturedDossier?: CapturedDossier;
+  feedback?: 'like' | 'dislike' | null;
 }
 
 export interface ChatThread {
@@ -338,6 +339,7 @@ export interface StudioState {
   messages: ChatMessage[];
   addMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
   clearMessages: () => void;
+  setMessageFeedback: (messageId: string, feedback: 'like' | 'dislike' | null) => void;
 
   // Canvas Workspace
   viewMode: CanvasViewMode;
@@ -1407,6 +1409,24 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       messages: [],
       threads: s.threads.map((t) => (t.id === s.activeThreadId ? { ...t, messages: [] } : t)),
     })),
+  setMessageFeedback: (messageId, feedback) =>
+    set((s) => {
+      const updatedThreads = s.threads.map((t) => ({
+        ...t,
+        messages: t.messages.map((m) =>
+          m.id === messageId ? { ...m, feedback } : m
+        ),
+      }));
+      const activeThread = updatedThreads.find((t) => t.id === s.activeThreadId);
+      return {
+        threads: updatedThreads,
+        messages: activeThread
+          ? activeThread.messages
+          : s.messages.map((m) =>
+              m.id === messageId ? { ...m, feedback } : m
+            ),
+      };
+    }),
 
   viewMode: 'spread',
   setViewMode: (mode) => set({ viewMode: mode }),
@@ -2073,13 +2093,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     set((s) => {
       const activeThread = s.threads.find((t) => t.id === s.activeThreadId);
       if (!activeThread) return s;
+      const updatedMessages = [...activeThread.messages, userMsg, assistantMsg];
       return {
         agentStatus: 'thinking',
         threads: s.threads.map((t) =>
           t.id === s.activeThreadId
-            ? { ...t, messages: [...t.messages, userMsg, assistantMsg] }
+            ? { ...t, messages: updatedMessages }
             : t
         ),
+        messages: updatedMessages,
       };
     });
 
@@ -2163,9 +2185,30 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           ? [patchObj.summary]
           : [];
 
-        if (patchObj.delegations || patchObj.reasoning || actionSummaries.length > 0) {
-          set((s) => ({
-            threads: s.threads.map((t) =>
+        const mappedDelegations: ChatDelegation[] | undefined = Array.isArray(patchObj.delegations)
+          ? patchObj.delegations.map((d: any) => {
+              const role = d.roleId || d.role;
+              let roleName = d.roleName;
+              let badge = d.badge;
+              if (!roleName) {
+                if (role === 'director') { roleName = 'Diretor de Arte'; badge = 'Design'; }
+                else if (role === 'copywriter') { roleName = 'Redator Publicitário'; badge = 'Redação'; }
+                else if (role === 'commercial') { roleName = 'Tabela Comercial / B2B'; badge = 'Comercial'; }
+                else if (role === 'branding') { roleName = 'Auditor de Branding'; badge = 'Auditoria'; }
+                else { roleName = role; badge = 'Conselho'; }
+              }
+              return {
+                roleId: role,
+                roleName: roleName || role,
+                badge: badge || 'Agente',
+                action: d.action || d.opinion || '',
+              };
+            })
+          : undefined;
+
+        if (mappedDelegations || patchObj.reasoning || actionSummaries.length > 0) {
+          set((s) => {
+            const updatedThreads = s.threads.map((t) =>
               t.id === s.activeThreadId
                 ? {
                     ...t,
@@ -2174,15 +2217,20 @@ export const useStudioStore = create<StudioState>((set, get) => ({
                         ? {
                             ...m,
                             reasoning: patchObj.reasoning || m.reasoning,
-                            delegations: patchObj.delegations || m.delegations,
+                            delegations: mappedDelegations || m.delegations,
                             actions: actionSummaries.length > 0 ? actionSummaries : m.actions,
                           }
                         : m
                     ),
                   }
                 : t
-            ),
-          }));
+            );
+            const activeThread = updatedThreads.find((t) => t.id === s.activeThreadId);
+            return {
+              threads: updatedThreads,
+              messages: activeThread ? activeThread.messages : s.messages,
+            };
+          });
         }
       };
 
@@ -2206,8 +2254,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
             if (data.event === 'token' && data.text) {
               accumulatedContent += data.text;
-              set((s) => ({
-                threads: s.threads.map((t) =>
+              set((s) => {
+                const updatedThreads = s.threads.map((t) =>
                   t.id === s.activeThreadId
                     ? {
                         ...t,
@@ -2218,8 +2266,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
                         ),
                       }
                     : t
-                ),
-              }));
+                );
+                const activeThread = updatedThreads.find((t) => t.id === s.activeThreadId);
+                return {
+                  threads: updatedThreads,
+                  messages: activeThread ? activeThread.messages : s.messages,
+                };
+              });
             }
 
             if (data.event === 'patch' && data.patch && !appliedPatch) {

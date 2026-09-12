@@ -10,9 +10,105 @@ import {
   Cpu,
   ArrowRight,
   CheckCircle2,
+  ThumbsUp,
+  ThumbsDown,
+  ChevronDown,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
 import { toast } from 'sonner';
+
+interface TypewriterTextProps {
+  text: string;
+  isStreaming?: boolean;
+  isCompleted?: boolean;
+  onAnimationEnd?: () => void;
+  className?: string;
+}
+
+const TypewriterText: React.FC<TypewriterTextProps> = ({
+  text,
+  isStreaming = false,
+  isCompleted = false,
+  onAnimationEnd,
+  className = '',
+}) => {
+  const [displayedChars, setDisplayedChars] = React.useState(() =>
+    isCompleted ? text.length : 0
+  );
+
+  React.useEffect(() => {
+    if (isCompleted) {
+      setDisplayedChars(text.length);
+      return;
+    }
+
+    if (isStreaming) {
+      setDisplayedChars(text.length);
+      return;
+    }
+
+    if (displayedChars >= text.length) {
+      onAnimationEnd?.();
+      return;
+    }
+
+    // Ritmo adaptativo de digitacao (300ms a 750ms total)
+    const remaining = text.length - displayedChars;
+    const step = Math.max(1, Math.ceil(remaining / 14));
+
+    const timer = setTimeout(() => {
+      setDisplayedChars((prev) => {
+        const next = Math.min(prev + step, text.length);
+        if (next >= text.length) {
+          onAnimationEnd?.();
+        }
+        return next;
+      });
+    }, 18);
+
+    return () => clearTimeout(timer);
+  }, [displayedChars, text.length, isStreaming, isCompleted, onAnimationEnd]);
+
+  const visibleText = text.slice(0, displayedChars);
+  const isTyping = !isCompleted && (isStreaming || displayedChars < text.length);
+
+  const renderFormatted = (str: string) => {
+    const parts = str.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+        return (
+          <strong key={i} className="font-semibold text-inherit">
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+      if (part.startsWith('**')) {
+        return <span key={i}>{part.slice(2)}</span>;
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
+  return (
+    <p
+      className={`whitespace-pre-line text-pretty cursor-text ${className}`}
+      onClick={() => {
+        if (displayedChars < text.length) {
+          setDisplayedChars(text.length);
+          onAnimationEnd?.();
+        }
+      }}
+    >
+      {renderFormatted(visibleText)}
+      {isTyping && (
+        <span
+          aria-hidden="true"
+          className="inline-block w-1.5 h-3.5 ml-0.5 bg-[#B08D57] animate-pulse align-middle rounded-xs"
+        />
+      )}
+    </p>
+  );
+};
 
 export const AgentChatStream: React.FC = () => {
   const {
@@ -22,6 +118,7 @@ export const AgentChatStream: React.FC = () => {
     activeRoleId,
     addMessage,
     setAgentStatus,
+    agentStatus,
     executeCopilotCommand,
     setIsRoleManagerOpen,
     toggleRoleEnabled,
@@ -29,6 +126,7 @@ export const AgentChatStream: React.FC = () => {
     setActivePalette,
     setIsPalettePanelOpen,
     activePalette,
+    setMessageFeedback,
   } = useStudioStore();
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -64,6 +162,69 @@ export const AgentChatStream: React.FC = () => {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [displayMessages]);
+
+  const initialIdsRef = useRef<Set<string> | null>(null);
+  const [completedMessageIds, setCompletedMessageIds] = React.useState<Set<string>>(() => new Set());
+  const [expandedOpinions, setExpandedOpinions] = React.useState<Record<string, boolean>>({});
+  const [feedbacks, setFeedbacks] = React.useState<Record<string, 'like' | 'dislike' | null>>({});
+
+  useEffect(() => {
+    if (!initialIdsRef.current && messages.length > 0) {
+      const existingIds = new Set(messages.map((m) => m.id));
+      initialIdsRef.current = existingIds;
+      setCompletedMessageIds(existingIds);
+    }
+  }, [messages]);
+
+  const markMessageCompleted = React.useCallback((id: string) => {
+    setCompletedMessageIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleOpinions = (msgId: string) => {
+    setExpandedOpinions((prev) => ({
+      ...prev,
+      [msgId]: !prev[msgId],
+    }));
+  };
+
+  const handleFeedback = (msgId: string, type: 'like' | 'dislike') => {
+    const current = feedbacks[msgId];
+    const next = current === type ? null : type;
+    setFeedbacks((prev) => ({ ...prev, [msgId]: next }));
+    setMessageFeedback(msgId, next);
+
+    if (next === 'like') {
+      toast.success('Resposta avaliada como positiva.', {
+        description: 'Anotamos sua avaliação para calibrar os especialistas do conselho.',
+      });
+    } else if (next === 'dislike') {
+      toast.info('Resposta avaliada como negativa.', {
+        description: 'Registramos seu feedback para aprimorar os ajustes futuros.',
+      });
+    } else {
+      toast.info('Avaliação removida.');
+    }
+  };
+
+  const latestAssistantMsgId = React.useMemo(() => {
+    for (let i = displayMessages.length - 1; i >= 0; i--) {
+      if (displayMessages[i].role === 'assistant') {
+        return displayMessages[i].id;
+      }
+    }
+    return null;
+  }, [displayMessages]);
+
+  const cleanMessageContent = (content: string) => {
+    return content
+      .replace(/```(?:json:patch|json)?[\s\S]*?```/g, '')
+      .trim();
+  };
 
   const handleChipClick = (chipText: string) => {
     addMessage({
@@ -199,7 +360,12 @@ export const AgentChatStream: React.FC = () => {
                     : 'bg-white border-zinc-200 text-zinc-800'
                 }`}
               >
-                <p className="whitespace-pre-line text-pretty">{msg.content}</p>
+                <TypewriterText
+                  text={cleanMessageContent(msg.content)}
+                  isStreaming={msg.id === latestAssistantMsgId && agentStatus === 'generating'}
+                  isCompleted={completedMessageIds.has(msg.id)}
+                  onAnimationEnd={() => markMessageCompleted(msg.id)}
+                />
 
                 {/* Alerta Intuitivo de Acao Operacional Executada */}
                 {msg.actions && msg.actions.length > 0 && (
@@ -475,77 +641,156 @@ export const AgentChatStream: React.FC = () => {
                   </div>
                 )}
 
-                {/* Delegations Tree (Orchestrator Coordination) */}
-                {msg.delegations && msg.delegations.length > 0 && (
-                  <div
-                    className={`mt-3 pt-2.5 border-t space-y-2 p-2.5 rounded-lg text-xs transition-colors ${
-                      isDark ? 'border-zinc-800 bg-zinc-900/50' : 'border-zinc-100 bg-zinc-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-semibold flex items-center gap-1.5">
-                        <Users className="size-3 text-zinc-400" />
-                        Coordenação Editorial · Delegações
-                      </span>
-                      <span className={`text-[10px] ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                        {msg.delegations.length} frentes
-                      </span>
-                    </div>
+                {/* Alternativa Interativa: Opinião e Parecer de Outros Agentes */}
+                {((msg.delegations && msg.delegations.length > 0) || msg.reasoning) && (
+                  <div className="mt-2.5 pt-2 border-t border-inherit/40">
+                    <button
+                      type="button"
+                      onClick={() => toggleOpinions(msg.id)}
+                      className={`w-full px-2.5 py-1.5 rounded-lg border text-[11px] font-medium flex items-center justify-between transition-all cursor-pointer ${
+                        expandedOpinions[msg.id]
+                          ? isDark
+                            ? 'bg-[#181614] border-[#B08D57]/40 text-zinc-200'
+                            : 'bg-[#FDFBF7] border-[#B08D57]/50 text-zinc-900'
+                          : isDark
+                            ? 'bg-zinc-900/40 border-zinc-800/80 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
+                            : 'bg-zinc-50/80 border-zinc-200 hover:border-zinc-300 text-zinc-600 hover:text-zinc-900'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Users
+                          className={`size-3.5 ${
+                            expandedOpinions[msg.id] ? 'text-[#B08D57]' : 'text-zinc-400'
+                          }`}
+                        />
+                        <span>
+                          Opinião de outros agentes ({msg.delegations?.length || 1})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] font-mono text-zinc-400">
+                        <span>{expandedOpinions[msg.id] ? 'Ocultar pareceres' : 'Consultar pareceres'}</span>
+                        <ChevronDown
+                          className={`size-3 transition-transform duration-200 ${
+                            expandedOpinions[msg.id] ? 'rotate-180 text-[#B08D57]' : ''
+                          }`}
+                        />
+                      </div>
+                    </button>
 
-                    <div className="space-y-1.5 pt-0.5">
-                      {msg.delegations.map((del, i) => (
-                        <div key={i} className="flex items-start gap-1.5 text-[11px] leading-relaxed">
-                          <span className="text-zinc-500 shrink-0 font-mono text-xs">↳</span>
-                          <span
-                            className={`px-1.5 py-0.2 rounded text-[9px] font-mono uppercase shrink-0 ${
-                              isDark
-                                ? 'bg-zinc-800 text-zinc-300 border border-zinc-700'
-                                : 'bg-zinc-200 text-zinc-700'
-                            }`}
-                          >
-                            {del.badge}
-                          </span>
-                          <span className={isDark ? 'text-zinc-300' : 'text-zinc-700'}>
-                            <strong className={isDark ? 'text-zinc-200' : 'text-zinc-900'}>
-                              {del.roleName}:
-                            </strong>{' '}
-                            {del.action}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Optional Rationale / Reasoning Box */}
-                {msg.reasoning && (
-                  <div
-                    className={`mt-3 pt-2.5 border-t flex items-start gap-2 text-[11px] p-2.5 rounded-lg transition-colors ${
-                      isDark
-                        ? 'border-zinc-800 text-zinc-400 bg-zinc-900/60'
-                        : 'border-zinc-100 text-zinc-600 bg-zinc-50'
-                    }`}
-                  >
-                    <BrainCircuit className="size-3.5 shrink-0 mt-0.5" />
-                    <div>
-                      <span
-                        className={`font-semibold block mb-0.5 ${
-                          isDark ? 'text-zinc-300' : 'text-zinc-800'
+                    {/* Pareceres Expandidos dos Especialistas */}
+                    {expandedOpinions[msg.id] && (
+                      <div
+                        className={`mt-2 p-3 rounded-xl border space-y-2.5 text-xs transition-all ${
+                          isDark
+                            ? 'border-zinc-800/80 bg-[#121214] text-zinc-300'
+                            : 'border-zinc-200 bg-[#FAF8F5] text-zinc-800'
                         }`}
                       >
-                        Racional Editorial:
-                      </span>
-                      <span className="text-pretty">{msg.reasoning}</span>
-                    </div>
+                        <div className="flex items-center justify-between pb-1.5 border-b border-inherit">
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-semibold flex items-center gap-1.5">
+                            <BrainCircuit className="size-3 text-[#B08D57]" />
+                            Pareceres do Conselho Editorial
+                          </span>
+                          <span className="text-[9px] font-mono text-zinc-400">
+                            Multi-Agente Katana
+                          </span>
+                        </div>
+
+                        {msg.delegations && msg.delegations.length > 0 && (
+                          <div className="space-y-2 pt-0.5">
+                            {msg.delegations.map((del, i) => (
+                              <div key={i} className="flex items-start gap-2 text-[11px] leading-relaxed">
+                                <span className="text-[#B08D57] shrink-0 font-mono text-xs mt-0.5">↳</span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 mb-0.5">
+                                    <span
+                                      className={`px-1.5 py-0.2 rounded text-[9px] font-mono uppercase shrink-0 ${
+                                        isDark
+                                          ? 'bg-zinc-800 text-zinc-300 border border-zinc-700'
+                                          : 'bg-zinc-200 text-zinc-700 border border-zinc-300'
+                                      }`}
+                                    >
+                                      {del.badge}
+                                    </span>
+                                    <strong className={`text-[11px] ${isDark ? 'text-zinc-200' : 'text-zinc-900'}`}>
+                                      {del.roleName}
+                                    </strong>
+                                  </div>
+                                  <p className={`text-[11px] ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                                    {del.action}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {msg.reasoning && (
+                          <div
+                            className={`pt-2 border-t border-inherit flex items-start gap-2 text-[10.5px] ${
+                              isDark ? 'text-zinc-400' : 'text-zinc-600'
+                            }`}
+                          >
+                            <div className="size-4 rounded-full bg-[#B08D57]/15 border border-[#B08D57]/30 flex items-center justify-center shrink-0 mt-0.5">
+                              <ShieldCheck className="size-2.5 text-[#B08D57]" />
+                            </div>
+                            <div>
+                              <span className={`font-semibold block ${isDark ? 'text-zinc-300' : 'text-zinc-800'}`}>
+                                Racional Editorial:
+                              </span>
+                              <span className="text-pretty">{msg.reasoning}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
-                <div
-                  className={`mt-2 text-[10px] tabular-nums ${
-                    isDark ? 'text-zinc-500' : 'text-zinc-400'
-                  }`}
-                >
-                  Katana Studio · {msg.timestamp}
+                {/* Rodapé da Mensagem: Assinatura e Botões de Feedback (Curtir / Descurtir) */}
+                <div className="mt-3 pt-2 border-t border-inherit/40 flex items-center justify-between text-[10px]">
+                  <div
+                    className={`tabular-nums ${
+                      isDark ? 'text-zinc-500' : 'text-zinc-400'
+                    }`}
+                  >
+                    Katana Studio · {msg.timestamp}
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleFeedback(msg.id, 'like')}
+                      title="Avaliar resposta como positiva (Curtir)"
+                      className={`size-6 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
+                        (feedbacks[msg.id] || msg.feedback) === 'like'
+                          ? isDark
+                            ? 'bg-[#B08D57]/25 border-[#B08D57] text-[#B08D57]'
+                            : 'bg-[#B08D57]/20 border-[#B08D57] text-[#8C6D3B]'
+                          : isDark
+                            ? 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                            : 'bg-white border-zinc-200 text-zinc-500 hover:text-zinc-800 hover:border-zinc-300 shadow-2xs'
+                      }`}
+                    >
+                      <ThumbsUp className="size-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFeedback(msg.id, 'dislike')}
+                      title="Avaliar resposta como negativa (Descurtir)"
+                      className={`size-6 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
+                        (feedbacks[msg.id] || msg.feedback) === 'dislike'
+                          ? isDark
+                            ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
+                            : 'bg-zinc-200 border-zinc-400 text-zinc-800'
+                          : isDark
+                            ? 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                            : 'bg-white border-zinc-200 text-zinc-500 hover:text-zinc-800 hover:border-zinc-300 shadow-2xs'
+                      }`}
+                    >
+                      <ThumbsDown className="size-3" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
