@@ -1,4 +1,4 @@
-import { CatalogPageData, StudioPalette, STUDIO_PALETTE_PRESETS } from '../data/aureaCatalog.mock';
+import { CatalogPageData, StudioPalette, STUDIO_PALETTE_PRESETS } from '../data/editorialCatalog.mock';
 import { ChatAttachment } from '../store/studioStore';
 
 export interface GeneratedCatalogResult {
@@ -476,7 +476,7 @@ export function generateCatalogFromPrompt(
       totalPages: pages.length,
       initialPrompt: prompt,
       summary: 'Catálogo de alta joalheria com diagramação nobre, tipografia refinada e acabamento monocromático prateado.',
-      reasoning: 'Racional do Orquestrador: Estrutura voltada ao mercado de ultra-luxo, utilizando proporção áurea e respiros amplos para enaltecer as joias e certificações gemológicas.',
+      reasoning: 'Racional do Orquestrador: Estrutura voltada ao mercado de ultra-luxo, utilizando proporção harmônica e respiros amplos para enaltecer as joias e certificações gemológicas.',
       councilDelegations: [
         { roleId: 'director', roleName: 'Diretor de Arte', badge: 'Design', action: 'Definiu paleta Noir & Argent 925 com contraste luminoso.' },
         { roleId: 'copywriter', roleName: 'Redator de Luxo', badge: 'Redação', action: 'Criou descrições detalhando pureza, peso em quilates e herança de atelier.' },

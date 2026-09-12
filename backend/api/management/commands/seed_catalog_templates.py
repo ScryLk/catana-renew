@@ -20,11 +20,11 @@ CANONICAL_TEMPLATES = [
             "backgroundColor": "#1A1817",
             "textColor": "#F5F1EA",
             "accentColor": "#B08D57",
-            "title": "A U R E A",
-            "subtitle": "Edicao Limitada / Alta Marroquinaria",
-            "label": "COLECAO OUTONO-INVERNO 2026",
+            "title": "CATALOGO EDITORIAL",
+            "subtitle": "Edicao Comercial · Volume I",
+            "label": "COLECAO 2026",
             "folio": "01",
-            "editorialImage": "/aurea/aurea-monograma.png",
+            "editorialImage": None,
         },
     },
     {
@@ -91,7 +91,7 @@ CANONICAL_TEMPLATES = [
                     {
                         "id": "prod-hero-1",
                         "name": "Bolsa Tote Monolith Couro Floter",
-                        "sku": "AUR-TOT-01",
+                        "sku": "EDT-TOT-01",
                         "price": "R$ 4.890,00",
                         "description": "Couro bovino integral de curtimento vegetal com ferragens em latao banhado a ouro 18k.",
                         "image": "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=600&q=80",
@@ -123,7 +123,7 @@ CANONICAL_TEMPLATES = [
                     {
                         "id": "prod-duo-1",
                         "name": "Carteira Bifold Minimalista",
-                        "sku": "AUR-WAL-02",
+                        "sku": "EDT-WAL-02",
                         "price": "R$ 890,00",
                         "description": "Acabamento fosco, 6 compartimentos para cartoes e forro em seda.",
                         "image": "https://images.unsplash.com/photo-1627123424574-724758594e93?w=600&q=80",
@@ -140,7 +140,7 @@ CANONICAL_TEMPLATES = [
                     {
                         "id": "prod-duo-2",
                         "name": "Cinto Casual Fivela Escovada",
-                        "sku": "AUR-BEL-03",
+                        "sku": "EDT-BEL-03",
                         "price": "R$ 720,00",
                         "description": "Couro atanado premium com fivela macica em acabamento prata 925.",
                         "image": "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=600&q=80",

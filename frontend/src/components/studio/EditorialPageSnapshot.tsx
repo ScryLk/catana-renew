@@ -1,5 +1,5 @@
 import React from 'react';
-import { CatalogPageData, StudioPalette } from '../../data/aureaCatalog.mock';
+import { CatalogPageData, StudioPalette } from '../../data/editorialCatalog.mock';
 
 interface EditorialPageSnapshotProps {
   page: CatalogPageData;

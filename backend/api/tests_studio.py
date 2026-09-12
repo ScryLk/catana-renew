@@ -208,7 +208,7 @@ class StudioBackendTests(TestCase):
 
         prompt = director.build_user_prompt(
             user_message="Crie uma capa sofisticada para a colecao de joias",
-            catalog_context={"brand_name": "Aurea Joias", "style_preset": "noir_or"}
+            catalog_context={"brand_name": "Luxe Joias", "style_preset": "noir_or"}
         )
 
         self.assertIn("[REFERENCIA EDITORIAL DE TEMPLATE (RAG)]", prompt)

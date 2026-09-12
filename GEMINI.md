@@ -42,9 +42,9 @@ catana-renew/
 │   │   ├── components/studio/   # Componentes da suite Katana 2.0
 │   │   ├── pages/               # KatanaStudio, Products, Catalogs, Auth
 │   │   ├── store/studioStore.ts # Store central
-│   │   ├── data/                # aureaCatalog.mock.ts, studioSkills.ts
+│   │   ├── data/                # editorialCatalog.mock.ts, studioSkills.ts
 │   │   └── services/            # API, persistência e exportação PDF
-│   └── public/                  # Ativos da coleção ÁUREA e logo v2
+│   └── public/                  # Ativos editoriais e logo v2
 └── backend/
     ├── catana_back/             # Settings Django
     └── api/                     # Endpoints e models (Catalog, Page, Product, Media)

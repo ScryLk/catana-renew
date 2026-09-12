@@ -1,5 +1,5 @@
 import React from 'react';
-import { CatalogPageData } from '../../data/aureaCatalog.mock';
+import { CatalogPageData } from '../../data/editorialCatalog.mock';
 
 interface MiniPageThumbnailProps {
   page: CatalogPageData;

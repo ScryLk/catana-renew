@@ -14,7 +14,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
-import { ProductItem } from '../../data/aureaCatalog.mock';
+import { ProductItem } from '../../data/editorialCatalog.mock';
 import { Tooltip } from '../ui/Tooltip';
 import { toast } from 'sonner';
 
@@ -48,12 +48,12 @@ export const ProductDrawer: React.FC = () => {
   // Modal / Subpainel de Novo Produto
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newProductName, setNewProductName] = useState('');
-  const [newProductCategory, setNewProductCategory] = useState('MARROQUINARIA');
-  const [newProductPrice, setNewProductPrice] = useState('R$ 1.200');
+  const [newProductCategory, setNewProductCategory] = useState('GERAL');
+  const [newProductPrice, setNewProductPrice] = useState('R$ 490');
   const [newProductSku, setNewProductSku] = useState('');
   const [newProductTag, setNewProductTag] = useState('');
   const [newProductDescription, setNewProductDescription] = useState('');
-  const [newProductImage, setNewProductImage] = useState('/aurea/images/det-costura.jpg');
+  const [newProductImage, setNewProductImage] = useState('');
 
   // Modal / Menu rápido de Alocação
   const [targetProductToAssign, setTargetProductToAssign] = useState<ProductItem | null>(null);
@@ -222,7 +222,7 @@ export const ProductDrawer: React.FC = () => {
       sku: defaultSku,
       tag: newProductTag.trim() || 'Novo',
       description: newProductDescription.trim() || 'Peça confeccionada com acabamento artesanal de alto padrão.',
-      image: newProductImage.trim() || '/aurea/images/det-costura.jpg',
+      image: newProductImage.trim() || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80',
       index: nextIndex,
     });
 
@@ -1146,7 +1146,7 @@ export const ProductDrawer: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="/aurea/images/det-atelier.jpg"
+                    placeholder="https://images.unsplash.com/photo-..."
                     value={newProductImage}
                     onChange={(e) => setNewProductImage(e.target.value)}
                     className={`w-full px-3 py-2 rounded-lg border outline-none font-mono text-[11px] transition-colors ${

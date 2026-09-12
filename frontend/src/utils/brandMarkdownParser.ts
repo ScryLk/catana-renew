@@ -1,4 +1,4 @@
-import { StudioPalette } from '../data/aureaCatalog.mock';
+import { StudioPalette } from '../data/editorialCatalog.mock';
 
 export interface ParsedBrandData {
   name?: string;

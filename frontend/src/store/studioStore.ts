@@ -8,7 +8,7 @@ import {
   StudioPalette,
   STUDIO_PALETTE_PRESETS,
   PageLayoutType,
-} from '../data/aureaCatalog.mock';
+} from '../data/editorialCatalog.mock';
 import { generateCatalogFromPrompt, GeneratedCatalogResult } from '../utils/catalogGenerator';
 import {
   preprocessUserCommand,
@@ -969,35 +969,35 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   unassignedProducts: [
     {
       id: 'prod-unassigned-1',
-      category: 'COURO LEGITIMO',
+      category: 'ACESSORIOS',
       index: '08',
-      name: 'Porta-Cartoes Verona',
-      sku: 'ART-008',
+      name: 'Porta-Cartoes Minimalista',
+      sku: 'EDT-008',
       price: 'R$ 490',
-      description: 'Couro vegetal encerado com bordas polidas artesanalmente a quente.',
-      image: '/aurea/images/det-costura.jpg',
+      description: 'Acabamento encerado com bordas polidas artesanalmente a quente.',
+      image: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=800&q=80',
       tag: 'Disponivel',
     },
     {
       id: 'prod-unassigned-2',
-      category: 'MARROQUINARIA',
+      category: 'DESIGN',
       index: '09',
-      name: 'Bolsa Tote Amalfi',
-      sku: 'ART-009',
+      name: 'Peca de Destaque Atelier',
+      sku: 'EDT-009',
       price: 'R$ 3.800',
-      description: 'Espaco generoso com forro em camurca natural e ferragens em latao escovado.',
-      image: '/aurea/images/det-atelier.jpg',
+      description: 'Estrutura refinada com materias-primas nobres e ferragens escovadas.',
+      image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&q=80',
       tag: 'Edicao Limitada',
     },
     {
       id: 'prod-unassigned-3',
-      category: 'SEDA & CASHMERE',
+      category: 'TEXTIL',
       index: '10',
-      name: 'Lenco de Bolso Lucca',
-      sku: 'ART-010',
+      name: 'Lenco Geometrico Seda',
+      sku: 'EDT-010',
       price: 'R$ 320',
-      description: 'Twill de seda pura com bainha enrolada a mao em padrao geometrico discreto.',
-      image: '/aurea/images/det-tecido.jpg',
+      description: 'Tecido nobre com acabamento manual em padrao geometrico discreto.',
+      image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=800&q=80',
       tag: 'Seda Pura',
     },
   ],
@@ -1140,7 +1140,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         category: (item.category || 'COLECAO 2026').trim(),
         sku: (item.sku || `SKU-${String(idx + 1).padStart(3, '0')}`).trim(),
         description: (item.description || 'Item catalogado via importacao de planilha comercial.').trim(),
-        image: item.image && item.image.trim().startsWith('http') ? item.image.trim() : (item.image?.trim() || '/aurea/images/prod-bolsa.jpg'),
+        image: item.image && item.image.trim().startsWith('http') ? item.image.trim() : (item.image?.trim() || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80'),
         tag: (item.tag || 'Importado').trim(),
         index: String(idx + 1).padStart(2, '0'),
       };
@@ -1484,7 +1484,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     let defaultTitle = 'Catálogo Comercial';
     let defaultPrompt = 'Lookbook editorial de moda e acessórios de luxo';
 
-    if (catalogId === 'lookbook-editorial-2026' || catalogId === 'aurea-2026' || catalogId.includes('aurea')) {
+    if (catalogId === 'lookbook-editorial-2026' || catalogId === 'editorial-2026') {
       defaultTitle = 'Coleção Inverno 2026';
       defaultPrompt = 'Lookbook editorial de moda e acessórios de luxo';
     } else if (catalogId === 'capsula-linho-2026') {

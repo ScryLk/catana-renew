@@ -27,7 +27,7 @@ catana-renew/
 │   │   │       ├── PaletteManagerModal.tsx    # Brand Lock e Paletas Semânticas
 │   │   │       └── SkillsCatalogModal.tsx     # Catálogo de 24 Skills especializadas
 │   │   ├── store/studioStore.ts               # Estado central reativo do estúdio
-│   │   ├── data/aureaCatalog.mock.ts          # Dataset da coleção ÁUREA
+│   │   ├── data/editorialCatalog.mock.ts      # Tipagens e catálogo editorial base
 │   │   └── data/studioSkills.ts               # Documentação das 24 habilidades ativas
 │   └── public/                                # Ativos de alta resolução e monogramas
 └── backend/                 # API Django 5 + Django REST Framework + SimpleJWT

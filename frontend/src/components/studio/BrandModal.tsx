@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useStudioStore } from '../../store/studioStore';
-import { StudioPalette, STUDIO_PALETTE_PRESETS } from '../../data/aureaCatalog.mock';
+import { StudioPalette, STUDIO_PALETTE_PRESETS } from '../../data/editorialCatalog.mock';
 import { LogoAreaSelectorModal } from './LogoAreaSelectorModal';
 import { parseBrandMarkdown, generateBrandTemplateMarkdown } from '../../utils/brandMarkdownParser';
 import {

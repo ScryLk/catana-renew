@@ -11,7 +11,7 @@ import {
   Package,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
-import { CatalogPageData } from '../../data/aureaCatalog.mock';
+import { CatalogPageData } from '../../data/editorialCatalog.mock';
 import { MiniPageThumbnail } from './MiniPageThumbnail';
 import { Tooltip } from '../ui/Tooltip';
 import { toast } from 'sonner';

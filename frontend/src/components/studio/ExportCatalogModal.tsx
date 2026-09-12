@@ -83,8 +83,8 @@ export const ExportCatalogModal: React.FC = () => {
   // Calculo de URLs públicas
   const slug = (catalogTitle || 'catalogo').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   const publicUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/c/${slug || 'aurea-2026'}`
-    : `https://usecatana.com.br/c/${slug || 'aurea-2026'}`;
+    ? `${window.location.origin}/c/${slug || 'catalogo-2026'}`
+    : `https://usecatana.com.br/c/${slug || 'catalogo-2026'}`;
 
   // Copiar link público
   const handleCopyLink = () => {

@@ -634,7 +634,7 @@ class SystemDesignAndFunctionalVerificationTests(TestCase):
             '  "actions": [\n'
             '    {"type": "remove_product", "page": 3, "product_id": "prod-123"},\n'
             '    {"type": "adjust_pricing", "percentage": 10, "mode": "increase"},\n'
-            '    {"type": "generate_skus", "prefix": "AUREA", "start_number": 100},\n'
+            '    {"type": "generate_skus", "prefix": "CATANA", "start_number": 100},\n'
             '    {"type": "set_palette", "palette_id": "editorial-dark"},\n'
             '    {"type": "brand_lock", "locked": true}\n'
             '  ]\n'
@@ -651,7 +651,7 @@ class SystemDesignAndFunctionalVerificationTests(TestCase):
         self.assertEqual(extracted["actions"][1]["type"], "adjust_pricing")
         self.assertEqual(extracted["actions"][1]["percentage"], 10)
         self.assertEqual(extracted["actions"][2]["type"], "generate_skus")
-        self.assertEqual(extracted["actions"][2]["prefix"], "AUREA")
+        self.assertEqual(extracted["actions"][2]["prefix"], "CATANA")
         self.assertEqual(extracted["actions"][3]["type"], "set_palette")
         self.assertEqual(extracted["actions"][4]["type"], "brand_lock")
         self.assertEqual(len(extracted["delegations"]), 2)

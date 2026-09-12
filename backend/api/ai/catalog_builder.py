@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import time
 from typing import Dict, Any, Optional, List
 from .provider import get_ai_provider
@@ -8,7 +9,10 @@ logger = logging.getLogger(__name__)
 
 IMAGE_STOCK_BY_NICHE = {
     'embalagens': {
-        'dividers': ['/aurea/images/div-acessorios.jpg', '/aurea/images/div-seda.jpg'],
+        'dividers': [
+            'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1200&q=80',
+            'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=1200&q=80',
+        ],
         'products': [
             '/catalogos/foodServiceSemFundo/fs-01.png',
             '/catalogos/foodServiceSemFundo/fs-02.png',
@@ -28,7 +32,10 @@ IMAGE_STOCK_BY_NICHE = {
         ],
     },
     'confeitaria': {
-        'dividers': ['/aurea/images/div-acessorios.jpg', '/aurea/images/div-seda.jpg'],
+        'dividers': [
+            'https://images.unsplash.com/photo-1486427944299-d1955d23e34d?w=1200&q=80',
+            'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=1200&q=80',
+        ],
         'products': [
             '/catalogos/produtosConfeitaria/pf-10.png',
             '/catalogos/produtosConfeitaria/pf-11.png',
@@ -41,7 +48,10 @@ IMAGE_STOCK_BY_NICHE = {
         ],
     },
     'acougue': {
-        'dividers': ['/aurea/images/div-acessorios.jpg', '/aurea/images/div-seda.jpg'],
+        'dividers': [
+            'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=1200&q=80',
+            'https://images.unsplash.com/photo-1544025162-d76694265947?w=1200&q=80',
+        ],
         'products': [
             '/catalogos/produtoAcougue/a-02.png',
             '/catalogos/produtoAcougue/a-03.png',
@@ -88,18 +98,19 @@ IMAGE_STOCK_BY_NICHE = {
         ],
     },
     'padrao': {
-        'dividers': ['/aurea/images/div-acessorios.jpg', '/aurea/images/div-seda.jpg'],
+        'dividers': [
+            'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1200&q=80',
+            'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&q=80',
+        ],
         'products': [
-            '/aurea/images/prod-bolsa.jpg',
-            '/aurea/images/prod-cinto.jpg',
-            '/aurea/images/prod-luvas.jpg',
-            '/aurea/images/prod-camisa.jpg',
-            '/aurea/images/prod-echarpe.jpg',
-            '/aurea/images/prod-lenco.jpg',
-            '/aurea/images/prod-trico.jpg',
-            '/aurea/images/det-atelier.jpg',
-            '/aurea/images/det-costura.jpg',
-            '/aurea/images/det-tecido.jpg',
+            'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80',
+            'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&q=80',
+            'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=800&q=80',
+            'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80',
+            'https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=800&q=80',
+            'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=800&q=80',
+            'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=800&q=80',
+            'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=800&q=80',
         ],
     },
 }
@@ -136,9 +147,9 @@ DIRETRIZES DE CRIACAO:
 2. Capa e Selos: Crie um titulo imponente para a marca/colecao, subtitulo e um selo editorial refinado ('cover_label', ex: 'COLECAO FORJA ANCESTRAL · VOLUME I', 'CATALOGO EXCLUSIVO 2026', etc.). NUNCA invente marcas ou estacoes fora do contexto do briefing.
 3. Manifesto: Crie um manifesto filosofico com uma citacao de impacto e 1 a 2 paragrafos em prosa elegante.
 4. PRODUTOS:
-   - Se houver produtos reais fornecidos na secao 'PRODUTOS CADASTRADOS' ou descritos no 'Briefing do Catalogo', extraia e preserve fielmente cada um deles com nome, sku, preco, categoria, descricao sensorial e tag comercial.
-   - Se o usuario descreveu itens no texto do briefing, extraia todos eles com seus precos e especificacoes.
-   - Se NENHUM produto foi citado no briefing nem na lista, GERE CRIATIVAMENTE entre 4 a 8 produtos comerciais inovadores, coerentes e de alto padrao para o segmento, com precos realistas em Reais (R$), codigos SKU unicos e especificacoes refinadas.
+   - Se houver produtos fornecidos na secao 'PRODUTOS CADASTRADOS' ou descritos detalhadamente no 'Briefing do Catalogo', extraia e preserve fielmente cada um deles com nome, sku, preco, categoria, descricao sensorial e tag comercial.
+   - Se o usuario descreveu itens no texto do briefing (ex: itens numerados, nomes de pecas, precos em R$, dimensoes), extraia todos eles com seus precos e especificacoes no array 'products'.
+   - Se o briefing for apenas conceitual sem citacao a produtos especificos (e nao houver produtos cadastrados), retorne 'products' obrigatoriamente como um array vazio [] para permitir que o Studio crie pranchetas com slots conceituais abertos para alocacao.
 
 Retorne EXCLUSIVAMENTE um objeto JSON valido (sem tags markdown, apenas o JSON puro) com a seguinte estrutura:
 {
@@ -213,6 +224,11 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
         try:
             from google.genai import types
 
+            has_text_products = bool(
+                re.search(r'(R\$|\$\s*\d|\b\d+[\.,]\d{2}\b|\bSKU\b|\bdimens|\bcm\b|\bmm\b|\bpeso\b|\bpreco\b|\bpreço\b)', prompt, re.IGNORECASE) or
+                re.search(r'^\s*(\d+[\.\)-]|[-*•])\s+[A-Za-z]', prompt, re.MULTILINE)
+            )
+
             if clean_products:
                 prods_summary = "\n".join([
                     f"- [{p['index']}] {p['name']} | Categoria: {p['category']} | Preco: {p['price']} | SKU: {p['sku']} | Descricao previa: {p['description'][:60]}"
@@ -225,14 +241,21 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
                     "INSTRUCAO: Sintetize o titulo da colecao, a paleta de cores nobre com contraste AAA, "
                     "o selo de capa (cover_label), o manifesto e enriqueça a lista de produtos com descricoes sensoriais e tags comerciais."
                 )
+            elif has_text_products:
+                user_contents = (
+                    f"Briefing do Catalogo: {prompt}\n"
+                    f"Segmento Identificado: {detected_industry}\n\n"
+                    "INSTRUCAO: Analise minuciosamente o briefing. O usuario descreveu produtos no texto. "
+                    "Extraia integralmente cada um dos produtos no array 'products' com nome, categoria, SKU, preco e especificacoes tecnicas.\n"
+                    "Crie tambem o titulo da colecao, paleta cromatica refinada com contraste AAA, selo de capa (cover_label) e manifesto poetico da marca."
+                )
             else:
                 user_contents = (
                     f"Briefing do Catalogo: {prompt}\n"
                     f"Segmento Identificado: {detected_industry}\n\n"
-                    "INSTRUCAO: Analise minuciosamente o briefing. Crie a identidade da colecao (titulo, categoria, summary, reasoning), "
+                    "INSTRUCAO: Analise o briefing conceitual. Crie a identidade da colecao (titulo, categoria, summary, reasoning), "
                     "paleta cromatica refinada com contraste AAA, selo de capa (cover_label) e manifesto poetico da marca.\n"
-                    "PRODUTOS: Se houver produtos descritos no texto do briefing, extraia-os integralmente (com nomes, SKUs, precos e descricoes). "
-                    "Caso o briefing nao liste produtos especificos, crie entre 4 a 8 produtos comerciais inovadores de altissimo padrao para este segmento no array 'products'."
+                    "PRODUTOS: Como este briefing e puramente conceitual e nao detalha produtos individuais, retorne 'products' obrigatoriamente como um array vazio []."
                 )
 
             config = types.GenerateContentConfig(
@@ -350,8 +373,7 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
             page_obj["subtitle"] = catalog_summary.upper()
             page_obj["label"] = synthesis_data.get("cover_label") or f"COLECAO EXCLUSIVA · {catalog_category.upper()}"
             page_obj["folio"] = "01"
-            # Nao força imagem estatica /aurea/aurea-monograma.png.
-            # Deixar editorialImage = None permite ao Studio renderizar o monograma dinamico com a inicial da marca!
+            # Deixar editorialImage = None permite ao Studio renderizar o monograma dinamico com a inicial da marca.
             page_obj["editorialImage"] = None
 
         elif p_type == "manifesto":
@@ -466,8 +488,14 @@ def _get_contingency_synthesis(prompt: str, products: List[Dict[str, Any]], indu
     """
     Gera a sintese criativa de contingencia quando a API remota de IA estiver indisponivel.
     """
+    has_text_products = bool(
+        re.search(r'(R\$|\$\s*\d|\b\d+[\.,]\d{2}\b|\bSKU\b|\bdimens|\bcm\b|\bmm\b|\bpeso\b|\bpreco\b|\bpreço\b)', prompt, re.IGNORECASE) or
+        re.search(r'^\s*(\d+[\.\)-]|[-*•])\s+[A-Za-z]', prompt, re.MULTILINE)
+    )
+    should_include_products = bool(products or has_text_products)
+
     if industry == "cutlery_craftsmanship":
-        contingency_prods = products if products else [
+        contingency_prods = products if products else ([
             {
                 "index": "01",
                 "name": "Faca do Chef Damasco 240mm — Edição Shiro",
@@ -531,7 +559,7 @@ def _get_contingency_synthesis(prompt: str, products: List[Dict[str, Any]], indu
                 "description": "Compartimentos acolchoados para 6 facas com fivelas em latão envelhecido.",
                 "tag": "Exclusivo",
             },
-        ]
+        ] if should_include_products else [])
         return {
             "title": "Katana Atelier — Forja & Tradição",
             "category": "Alta Cutelaria Artesanal",
@@ -555,12 +583,12 @@ def _get_contingency_synthesis(prompt: str, products: List[Dict[str, Any]], indu
             "products": contingency_prods,
         }
     elif industry == "packaging_food_service":
-        contingency_prods = products if products else [
+        contingency_prods = products if products else ([
             {"index": "01", "name": "Pote Redondo Hermético 500ml", "category": "Food Service", "sku": "FS-POT-500", "price": "R$ 48,00 /pct", "description": "Vedação perimetral estanque livre de BPA.", "tag": "Mais Vendido"},
             {"index": "02", "name": "Marmita Térmica Kraft 750ml", "category": "Food Service", "sku": "FS-KRF-750", "price": "R$ 62,00 /pct", "description": "Papel kraft virgem impermeabilizado para refeições quentes.", "tag": "Sustentável"},
             {"index": "03", "name": "Copo Cristal PET com Tampa Bolha 400ml", "category": "Food Service", "sku": "FS-COP-400", "price": "R$ 39,00 /pct", "description": "Transparência cristalina e travamento firme para sobremesas.", "tag": "Linha Festa"},
             {"index": "04", "name": "Sacola Delivery Fundo Largo Reforçada", "category": "Transporte", "sku": "FS-SAC-LAR", "price": "R$ 55,00 /pct", "description": "Capacidade para 3 marmitas empilhadas sem tombar.", "tag": "Essencial"},
-        ]
+        ] if should_include_products else [])
         return {
             "title": "Colecao EcoPack Pro",
             "category": "Embalagens & Food Service",
@@ -584,12 +612,12 @@ def _get_contingency_synthesis(prompt: str, products: List[Dict[str, Any]], indu
             "products": contingency_prods,
         }
     elif industry == "gastronomy_sweets":
-        contingency_prods = products if products else [
+        contingency_prods = products if products else ([
             {"index": "01", "name": "Torta Mousse Chocolat Noir 70%", "category": "Patisserie", "sku": "DOC-TRT-01", "price": "R$ 145,00", "description": "Glaçagem espelhada de cacau de origem com base crocante praliné.", "tag": "Assinatura"},
             {"index": "02", "name": "Pote Redondo Velvet Silvestre", "category": "Potes Gourmet", "sku": "DOC-POT-02", "price": "R$ 28,00", "description": "Camadas de bolo red velvet com compota de frutas vermelhas.", "tag": "Mais Vendido"},
             {"index": "03", "name": "Caixa Degustação Macarons Parisienses", "category": "Presenteáveis", "sku": "DOC-MAC-06", "price": "R$ 64,00", "description": "Seleção com 6 macarons de pistache, fava de baunilha e maracujá.", "tag": "Artesanal"},
             {"index": "04", "name": "Mini Domo Cristal Fondant", "category": "Linha Festa", "sku": "DOC-DOM-04", "price": "R$ 36,00", "description": "Domo individual para doces finos de recepção executiva.", "tag": "Eventos"},
-        ]
+        ] if should_include_products else [])
         return {
             "title": "Atelier Gourmet",
             "category": "Confeitaria & Padaria Fina",
@@ -613,12 +641,12 @@ def _get_contingency_synthesis(prompt: str, products: List[Dict[str, Any]], indu
             "products": contingency_prods,
         }
     else:
-        contingency_prods = products if products else [
+        contingency_prods = products if products else ([
             {"index": "01", "name": "Peça de Assinatura Edição Limitada", "category": "Coleção Principal", "sku": "EDT-001", "price": "R$ 480,00", "description": "Design contemporâneo com acabamento de precisão e materiais nobres.", "tag": "Destaque"},
             {"index": "02", "name": "Item Harmônico Série A", "category": "Complementos", "sku": "EDT-002", "price": "R$ 290,00", "description": "Equilíbrio funcional para integrar à rotina ou compor kits.", "tag": "Mais Vendido"},
-            {"index": "03", "name": "Item Harmônico Série B", "category": "Complementos", "sku": "EDT-003", "price": "R$ 340,00", "description": "Geometria minimalista com proporção áurea e alta durabilidade.", "tag": "Novo"},
+            {"index": "03", "name": "Item Harmônico Série B", "category": "Complementos", "sku": "EDT-003", "price": "R$ 340,00", "description": "Geometria minimalista com proporção harmônica e alta durabilidade.", "tag": "Novo"},
             {"index": "04", "name": "Suporte Técnico de Mesa", "category": "Acessórios", "sku": "EDT-004", "price": "R$ 180,00", "description": "Estrutura estável usinada com proteção de superfície.", "tag": "Essencial"},
-        ]
+        ] if should_include_products else [])
         return {
             "title": "Colecao Editorial 2026",
             "category": "Design & Produtos",
@@ -697,7 +725,7 @@ def generate_product_image_with_ai(name: str, category: str = "", description: s
         idx = abs(hash(name_clean)) % len(prod_images)
         chosen_img = prod_images[idx]
     else:
-        chosen_img = "/aurea/images/prod-bolsa.jpg"
+        chosen_img = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80"
 
     return {
         "image_url": chosen_img,

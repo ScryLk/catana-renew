@@ -54,7 +54,7 @@ const GENERATION_STEPS: GenerationStep[] = [
     shortLabel: 'Grid A4',
     icon: LayoutGrid,
     agent: 'Diagramador A4',
-    detail: 'Estruturando margens editoriais de 96px, colunas e proporção áurea.',
+    detail: 'Estruturando margens editoriais de 96px, colunas e proporção harmônica.',
   },
   {
     id: 5,

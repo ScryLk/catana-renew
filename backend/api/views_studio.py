@@ -770,7 +770,7 @@ class StudioMediaRemoveBackgroundView(APIView):
                             img_bytes = f.read()
                         filename = os.path.basename(abs_path)
 
-                # Se comeca com / (ativos estaticos do frontend: /catalogos/..., /aurea/..., etc.)
+                # Se comeca com / (ativos estaticos do frontend: /catalogos/..., etc.)
                 if img_bytes is None and (url_clean.startswith("/") or not url_clean.startswith("http")):
                     norm_path = url_clean.lstrip("/")
                     possible_paths = [

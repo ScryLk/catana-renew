@@ -9,7 +9,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
-import { STUDIO_PALETTE_PRESETS, StudioPalette } from '../../data/aureaCatalog.mock';
+import { STUDIO_PALETTE_PRESETS, StudioPalette } from '../../data/editorialCatalog.mock';
 import { toast } from 'sonner';
 
 export const PaletteManagerModal: React.FC = () => {

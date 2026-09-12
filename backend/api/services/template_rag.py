@@ -305,6 +305,28 @@ class TemplateRAGService:
             page_specs.append({"type": "duo", "capacity": 2})
             if n_prods == 4:
                 page_specs.append({"type": "single", "capacity": 1})
+        elif industry == "packaging_food_service":
+            # Catalogo tecnico B2B com matrizes comerciais (grid_4)
+            if n_prods in [5, 6]:
+                page_specs.append({"type": "grid_4", "capacity": 4})
+                page_specs.append({"type": "duo", "capacity": 2})
+            elif n_prods in [7, 8]:
+                page_specs.append({"type": "grid_4", "capacity": 4})
+                page_specs.append({"type": "grid_4", "capacity": 4})
+            else:
+                page_specs.append({"type": "grid_4", "capacity": 4})
+                page_specs.append({"type": "grid_4", "capacity": 4})
+                rem = n_prods - 8
+                while rem > 0:
+                    if rem >= 4:
+                        page_specs.append({"type": "grid_4", "capacity": 4})
+                        rem -= 4
+                    elif rem >= 2:
+                        page_specs.append({"type": "duo", "capacity": 2})
+                        rem -= 2
+                    else:
+                        page_specs.append({"type": "single", "capacity": 1})
+                        rem -= 1
         elif n_prods in [5, 6]:
             page_specs.append({"type": "hero", "capacity": 1})
             page_specs.append({"type": "duo", "capacity": 2})
