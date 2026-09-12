@@ -32,6 +32,7 @@ export const SpreadViewport: React.FC = () => {
     swapSpreadPages,
     activePalette,
     openProductDrawer,
+    catalogTitle,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -304,7 +305,7 @@ export const SpreadViewport: React.FC = () => {
                       color: accent,
                     }}
                   >
-                    {(page.title || 'C').charAt(0)}
+                    {(page.title || catalogTitle || 'C').trim().charAt(0).toUpperCase()}
                   </span>
                 )}
               </div>
@@ -1172,9 +1173,9 @@ export const SpreadViewport: React.FC = () => {
               >
                 <span
                   className="text-3xl font-serif text-[#F5F1EA]"
-                  style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                  style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", color: accent }}
                 >
-                  Á
+                  {(page.title || catalogTitle || 'C').trim().charAt(0).toUpperCase()}
                 </span>
               </div>
 

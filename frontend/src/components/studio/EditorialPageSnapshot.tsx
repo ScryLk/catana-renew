@@ -523,9 +523,9 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
               >
                 <span
                   className="text-3xl font-serif text-[#F5F1EA]"
-                  style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                  style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", color: accent }}
                 >
-                  A
+                  {(page.title || 'C').trim().charAt(0).toUpperCase()}
                 </span>
               </div>
 

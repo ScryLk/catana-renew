@@ -251,6 +251,8 @@ class TemplateRAGService:
             for p in products[:6]:
                 text_corpus += " " + (p.get("name", "") + " " + p.get("category", "") + " " + p.get("description", "")).lower()
 
+        if any(k in text_corpus for k in ["cutelaria", "faca", "facas", "forja", "damasco", "chef", "lamina", "lâmina", "artesanal", "cutelo", "afiador", "katana"]):
+            return "cutlery_craftsmanship"
         if any(k in text_corpus for k in ["embalag", "descartav", "pote", "marmita", "food service", "vedacao", "vedação", "pet redondo", "sacola", "copo", "delivery"]):
             return "packaging_food_service"
         if any(k in text_corpus for k in ["doce", "confeit", "bolo", "patisserie", "sobremesa", "chocolate", "brigadeiro", "festa", "torta", "padaria", "cafe"]):
@@ -304,18 +306,35 @@ class TemplateRAGService:
             if n_prods == 4:
                 page_specs.append({"type": "single", "capacity": 1})
         elif n_prods in [5, 6]:
-            page_specs.append({"type": "grid_4", "capacity": 4})
+            page_specs.append({"type": "hero", "capacity": 1})
             page_specs.append({"type": "duo", "capacity": 2})
+            if n_prods == 6:
+                page_specs.append({"type": "divider", "capacity": 0})
+            page_specs.append({"type": "grid_4", "capacity": 4 if n_prods == 6 else 2})
         elif n_prods in [7, 8]:
-            page_specs.append({"type": "grid_4", "capacity": 4})
-            page_specs.append({"type": "grid_4", "capacity": 4})
-        else:
-            # n_prods >= 9
-            page_specs.append({"type": "grid_4", "capacity": 4})
+            page_specs.append({"type": "hero", "capacity": 1})
+            page_specs.append({"type": "duo", "capacity": 2})
             page_specs.append({"type": "divider", "capacity": 0})
             page_specs.append({"type": "grid_4", "capacity": 4})
-            if n_prods >= 10:
-                page_specs.append({"type": "duo", "capacity": 2})
+            if n_prods == 8:
+                page_specs.append({"type": "single", "capacity": 1})
+        else:
+            # n_prods >= 9
+            page_specs.append({"type": "hero", "capacity": 1})
+            page_specs.append({"type": "duo", "capacity": 2})
+            page_specs.append({"type": "divider", "capacity": 0})
+            page_specs.append({"type": "grid_4", "capacity": 4})
+            rem = n_prods - 7
+            while rem > 0:
+                if rem >= 4:
+                    page_specs.append({"type": "grid_4", "capacity": 4})
+                    rem -= 4
+                elif rem >= 2:
+                    page_specs.append({"type": "duo", "capacity": 2})
+                    rem -= 2
+                else:
+                    page_specs.append({"type": "single", "capacity": 1})
+                    rem -= 1
 
         # 4. Contracapa sempre presente
         page_specs.append({"type": "backcover", "capacity": 0})
