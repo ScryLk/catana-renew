@@ -236,8 +236,37 @@ export const SpreadViewport: React.FC = () => {
 
   // ================= RENDERIZADORES DE PÁGINA =================
 
+  const isDarkPageBg = (bgColor?: string): boolean => {
+    if (!bgColor) return false;
+    const clean = bgColor.trim().toLowerCase();
+    if (clean === 'transparent') return false;
+    if (clean.startsWith('#')) {
+      const hex = clean.replace('#', '');
+      if (hex.length === 3) {
+        const r = parseInt(hex[0] + hex[0], 16);
+        const g = parseInt(hex[1] + hex[1], 16);
+        const b = parseInt(hex[2] + hex[2], 16);
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5;
+      }
+      if (hex.length === 6) {
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5;
+      }
+    }
+    if (clean.startsWith('rgb')) {
+      const parts = clean.replace(/[^0-9,]/g, '').split(',').map(Number);
+      if (parts.length >= 3) {
+        return (0.299 * parts[0] + 0.587 * parts[1] + 0.114 * parts[2]) / 255 < 0.5;
+      }
+    }
+    return false;
+  };
+
   const renderPageContent = (page: CatalogPageData) => {
     const accent = page.accentColor || activePalette.accent;
+    const isDarkPage = isDarkPageBg(page.backgroundColor);
 
     switch (page.type) {
       // ---------------- PÁGINA 01: CAPA ----------------
@@ -434,28 +463,31 @@ export const SpreadViewport: React.FC = () => {
                 }
                 className="w-full h-[360px] rounded-sm border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center p-6 text-center group"
                 style={{
-                  borderColor: isDark ? 'rgba(63, 63, 70, 0.8)' : `${accent}70`,
-                  backgroundColor: isDark ? 'rgba(24, 24, 27, 0.4)' : 'rgba(255, 255, 255, 0.65)',
+                  borderColor: isDarkPage ? 'rgba(255, 255, 255, 0.2)' : `${accent}50`,
+                  backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.04)' : 'rgba(255, 255, 255, 0.65)',
                 }}
               >
                 <div
                   className="size-14 rounded-full border flex items-center justify-center mb-3 group-hover:scale-110 transition-all shadow-xs"
                   style={{
-                    backgroundColor: isDark ? 'rgba(39, 39, 42, 0.7)' : '#FFFFFF',
-                    borderColor: isDark ? '#3f3f46' : `${accent}50`,
+                    backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.08)' : '#FFFFFF',
+                    borderColor: isDarkPage ? 'rgba(255, 255, 255, 0.25)' : `${accent}60`,
                   }}
                 >
-                  <Plus className="size-6 text-stone-600 dark:text-zinc-400 group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors" />
+                  <Plus
+                    className="size-6 transition-colors"
+                    style={{ color: isDarkPage ? '#F5F1EA' : '#44403C' }}
+                  />
                 </div>
                 <span
                   className="text-[11px] font-mono tracking-widest uppercase font-semibold mb-1"
-                  style={{ color: isDark ? '#d4d4d8' : '#292524' }}
+                  style={{ color: isDarkPage ? '#F5F1EA' : '#1C1917' }}
                 >
                   LÂMINA HERO · SLOT DESTAQUE
                 </span>
                 <p
                   className="text-xs max-w-xs mb-3 font-light leading-relaxed"
-                  style={{ color: isDark ? '#a1a1aa' : '#57534e' }}
+                  style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.75)' : '#57534E' }}
                 >
                   Espaço reservado para o produto principal. Clique para selecionar do acervo ou arraste da planilha.
                 </p>
@@ -470,10 +502,10 @@ export const SpreadViewport: React.FC = () => {
                       pageType: page.type,
                     });
                   }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium shadow-sm transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-medium shadow-xs transition-all cursor-pointer hover:opacity-90"
                   style={{
-                    backgroundColor: isDark ? '#f4f4f5' : '#1c1917',
-                    color: isDark ? '#18181b' : '#fafaf9',
+                    backgroundColor: isDarkPage ? '#F5F1EA' : '#18181B',
+                    color: isDarkPage ? '#18181B' : '#FAF8F5',
                   }}
                 >
                   <Package className="size-3.5" />
@@ -483,31 +515,45 @@ export const SpreadViewport: React.FC = () => {
 
               {/* Product Placeholder Copy */}
               <div
-                className="p-3 rounded-lg border border-dashed"
+                className="p-3.5 rounded-lg border border-dashed transition-all"
                 style={{
-                  borderColor: isDark ? 'rgba(63, 63, 70, 0.6)' : `${accent}40`,
-                  backgroundColor: isDark ? 'rgba(24, 24, 27, 0.3)' : 'rgba(255, 255, 255, 0.5)',
+                  borderColor: isDarkPage ? 'rgba(255, 255, 255, 0.15)' : `${accent}40`,
+                  backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.55)',
                 }}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[9px] tracking-[0.3em] font-semibold uppercase" style={{ color: accent }}>
                     SLOT 01 · {page.label || 'DESTAQUE EXCLUSIVO'}
                   </span>
-                  <span className="text-[9px] font-mono text-stone-400">SKU-PENDENTE</span>
+                  <span
+                    className="text-[9px] font-mono"
+                    style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.5)' : '#78716C' }}
+                  >
+                    SKU-PENDENTE
+                  </span>
                 </div>
                 <div className="w-10 h-[1px] mb-2.5" style={{ backgroundColor: accent }} />
                 <div className="flex items-baseline justify-between gap-4 mb-2">
                   <h3
-                    className="text-2xl text-[#1A1817] dark:text-zinc-200 font-medium italic opacity-70"
-                    style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                    className="text-2xl font-medium italic opacity-85"
+                    style={{
+                      fontFamily: "'Cormorant Garamond', Georgia, serif",
+                      color: isDarkPage ? '#F5F1EA' : '#1A1817',
+                    }}
                   >
                     Título do Produto em Destaque
                   </h3>
-                  <span className="text-sm font-sans tracking-wider text-stone-400 font-semibold tabular-nums">
+                  <span
+                    className="text-sm font-sans tracking-wider font-semibold tabular-nums"
+                    style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.6)' : '#78716C' }}
+                  >
                     R$ 0,00
                   </span>
                 </div>
-                <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-[1.65] font-light">
+                <p
+                  className="text-[11px] leading-[1.65] font-light"
+                  style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.7)' : '#57534E' }}
+                >
                   Aguardando vinculação do produto. As especificações técnicas, selo editorial e precificação serão renderizadas aqui automaticamente.
                 </p>
               </div>
@@ -515,7 +561,10 @@ export const SpreadViewport: React.FC = () => {
               {/* Folio Footer */}
               <div className="flex flex-col items-center">
                 <div className="w-6 h-[1px] mb-2" style={{ backgroundColor: accent }} />
-                <span className="text-[9px] tracking-[0.3em] text-[#1A1817]/70 font-mono">
+                <span
+                  className="text-[9px] tracking-[0.3em] font-mono"
+                  style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.7)' : 'rgba(26, 24, 23, 0.7)' }}
+                >
                   {page.folio || `PÁG. ${String(page.pageNumber).padStart(2, '0')}`}
                 </span>
               </div>
@@ -657,46 +706,68 @@ export const SpreadViewport: React.FC = () => {
                 }
                 className="w-full h-44 rounded-sm border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center p-3 text-center group"
                 style={{
-                  borderColor: isDark ? 'rgba(63, 63, 70, 0.8)' : `${accent}70`,
-                  backgroundColor: isDark ? 'rgba(24, 24, 27, 0.4)' : 'rgba(255, 255, 255, 0.65)',
+                  borderColor: isDarkPage ? 'rgba(255, 255, 255, 0.2)' : `${accent}50`,
+                  backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.04)' : 'rgba(255, 255, 255, 0.65)',
                 }}
               >
                 <div
                   className="size-9 rounded-full border flex items-center justify-center mb-1.5 group-hover:scale-110 transition-all shadow-2xs"
                   style={{
-                    backgroundColor: isDark ? 'rgba(39, 39, 42, 0.7)' : '#FFFFFF',
-                    borderColor: isDark ? '#3f3f46' : `${accent}50`,
+                    backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.08)' : '#FFFFFF',
+                    borderColor: isDarkPage ? 'rgba(255, 255, 255, 0.25)' : `${accent}60`,
                   }}
                 >
-                  <Plus className="size-4 text-stone-600 dark:text-zinc-400 group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors" />
+                  <Plus
+                    className="size-4 transition-colors"
+                    style={{ color: isDarkPage ? '#F5F1EA' : '#44403C' }}
+                  />
                 </div>
                 <span
                   className="text-[9px] font-mono tracking-wider uppercase font-semibold"
-                  style={{ color: isDark ? '#d4d4d8' : '#292524' }}
+                  style={{ color: isDarkPage ? '#F5F1EA' : '#1C1917' }}
                 >
                   SLOT {slotIdx + 1} · DUO
                 </span>
-                <span className="text-[9px] text-stone-500 dark:text-zinc-400 mt-0.5">Clique para alocar</span>
+                <span
+                  className="text-[9px] mt-0.5"
+                  style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.6)' : '#78716C' }}
+                >
+                  Clique para alocar
+                </span>
               </div>
               <div
-                className="p-1.5 rounded border border-dashed"
+                className="p-1.5 rounded border border-dashed transition-all"
                 style={{
-                  borderColor: isDark ? 'rgba(63, 63, 70, 0.6)' : `${accent}40`,
-                  backgroundColor: isDark ? 'rgba(24, 24, 27, 0.3)' : 'rgba(255, 255, 255, 0.5)',
+                  borderColor: isDarkPage ? 'rgba(255, 255, 255, 0.15)' : `${accent}40`,
+                  backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.55)',
                 }}
               >
-                <span className="text-[8px] tracking-[0.25em] uppercase font-semibold block mb-0.5 text-stone-400">
+                <span
+                  className="text-[8px] tracking-[0.25em] uppercase font-semibold block mb-0.5"
+                  style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.6)' : '#78716C' }}
+                >
                   SLOT LIVRE · {slotIdx === 0 ? 'ITEM A' : 'ITEM B'}
                 </span>
                 <div className="w-8 h-[1px] mb-1 opacity-40" style={{ backgroundColor: accent }} />
                 <h4
-                  className="text-sm text-stone-400 font-medium italic mb-0.5"
-                  style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                  className="text-sm font-medium italic mb-0.5"
+                  style={{
+                    fontFamily: "'Cormorant Garamond', Georgia, serif",
+                    color: isDarkPage ? '#F5F1EA' : '#1A1817',
+                  }}
                 >
                   Produto Par {slotIdx + 1}
                 </h4>
-                <div className="text-[10px] text-stone-400 font-mono mb-0.5">R$ 0,00</div>
-                <p className="text-[9px] text-stone-400/80 leading-tight">
+                <div
+                  className="text-[10px] font-mono mb-0.5"
+                  style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.6)' : '#78716C' }}
+                >
+                  R$ 0,00
+                </div>
+                <p
+                  className="text-[9px] leading-tight font-light"
+                  style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.65)' : '#57534E' }}
+                >
                   Aguardando item da coleção.
                 </p>
               </div>
@@ -715,7 +786,10 @@ export const SpreadViewport: React.FC = () => {
             {/* Folio Footer */}
             <div className="flex flex-col items-center mt-4">
               <div className="w-6 h-[1px] mb-2" style={{ backgroundColor: accent }} />
-              <span className="text-[9px] tracking-[0.3em] text-[#1A1817]/70 font-mono">
+              <span
+                className="text-[9px] tracking-[0.3em] font-mono"
+                style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.7)' : 'rgba(26, 24, 23, 0.7)' }}
+              >
                 {page.folio || `PÁG. ${String(page.pageNumber).padStart(2, '0')}`}
               </span>
             </div>
@@ -741,28 +815,31 @@ export const SpreadViewport: React.FC = () => {
                   }
                   className="w-64 h-72 rounded-sm border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center p-5 text-center group mb-6"
                   style={{
-                    borderColor: isDark ? 'rgba(63, 63, 70, 0.8)' : `${accent}70`,
-                    backgroundColor: isDark ? 'rgba(24, 24, 27, 0.4)' : 'rgba(255, 255, 255, 0.65)',
+                    borderColor: isDarkPage ? 'rgba(255, 255, 255, 0.2)' : `${accent}50`,
+                    backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.04)' : 'rgba(255, 255, 255, 0.65)',
                   }}
                 >
                   <div
                     className="size-12 rounded-full border flex items-center justify-center mb-2.5 group-hover:scale-110 transition-all shadow-xs"
                     style={{
-                      backgroundColor: isDark ? 'rgba(39, 39, 42, 0.7)' : '#FFFFFF',
-                      borderColor: isDark ? '#3f3f46' : `${accent}50`,
+                      backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.08)' : '#FFFFFF',
+                      borderColor: isDarkPage ? 'rgba(255, 255, 255, 0.25)' : `${accent}60`,
                     }}
                   >
-                    <Plus className="size-5 text-stone-600 dark:text-zinc-400 group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors" />
+                    <Plus
+                      className="size-5 transition-colors"
+                      style={{ color: isDarkPage ? '#F5F1EA' : '#44403C' }}
+                    />
                   </div>
                   <span
                     className="text-[10px] font-mono tracking-widest uppercase font-semibold mb-1"
-                    style={{ color: isDark ? '#d4d4d8' : '#292524' }}
+                    style={{ color: isDarkPage ? '#F5F1EA' : '#1C1917' }}
                   >
                     LÂMINA SINGLE · FECHAMENTO
                   </span>
                   <p
                     className="text-[11px] max-w-[200px] mb-2 font-light leading-snug"
-                    style={{ color: isDark ? '#a1a1aa' : '#57534e' }}
+                    style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.75)' : '#57534E' }}
                   >
                     Slot reservado para peça singular de fechamento editorial.
                   </p>
@@ -777,38 +854,50 @@ export const SpreadViewport: React.FC = () => {
                         pageType: page.type,
                       });
                     }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer shadow-xs"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium transition-all cursor-pointer shadow-xs hover:opacity-90"
                     style={{
-                      backgroundColor: isDark ? '#f4f4f5' : '#1c1917',
-                      color: isDark ? '#18181b' : '#fafaf9',
+                      backgroundColor: isDarkPage ? '#F5F1EA' : '#18181B',
+                      color: isDarkPage ? '#18181B' : '#FAF8F5',
                     }}
                   >
                     <Package className="size-3" />
-                    + Inserir Produto
+                    <span>+ Inserir Produto</span>
                   </button>
                 </div>
 
                 <div
-                  className="p-3 rounded-lg border border-dashed max-w-[320px]"
+                  className="p-3 rounded-lg border border-dashed max-w-[320px] transition-all"
                   style={{
-                    borderColor: isDark ? 'rgba(63, 63, 70, 0.6)' : `${accent}40`,
-                    backgroundColor: isDark ? 'rgba(24, 24, 27, 0.3)' : 'rgba(255, 255, 255, 0.5)',
+                    borderColor: isDarkPage ? 'rgba(255, 255, 255, 0.15)' : `${accent}40`,
+                    backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.55)',
                   }}
                 >
-                  <span className="text-[9px] tracking-[0.3em] font-semibold uppercase block mb-1 text-stone-400">
+                  <span
+                    className="text-[9px] tracking-[0.3em] font-semibold uppercase block mb-1"
+                    style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.6)' : '#78716C' }}
+                  >
                     SLOT 01 · {page.label || 'EDIÇÃO LIMITADA'}
                   </span>
                   <div className="w-8 h-[1px] mx-auto mb-2 opacity-40" style={{ backgroundColor: accent }} />
                   <h3
-                    className="text-2xl text-[#1A1817] dark:text-zinc-200 font-medium italic opacity-70 mb-1"
-                    style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                    className="text-2xl font-medium italic opacity-85 mb-1"
+                    style={{
+                      fontFamily: "'Cormorant Garamond', Georgia, serif",
+                      color: isDarkPage ? '#F5F1EA' : '#1A1817',
+                    }}
                   >
                     Produto de Fechamento
                   </h3>
-                  <div className="text-sm font-semibold text-stone-400 tabular-nums mb-2">
+                  <div
+                    className="text-sm font-semibold tabular-nums mb-2"
+                    style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.6)' : '#78716C' }}
+                  >
                     R$ 0,00
                   </div>
-                  <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed font-light">
+                  <p
+                    className="text-[11px] leading-relaxed font-light"
+                    style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.7)' : '#57534E' }}
+                  >
                     Espaço editorial pronto para receber a imagem de alta resolução e ficha de catálogo.
                   </p>
                 </div>
@@ -817,7 +906,10 @@ export const SpreadViewport: React.FC = () => {
               {/* Folio Footer */}
               <div className="flex flex-col items-center">
                 <div className="w-6 h-[1px] mb-2" style={{ backgroundColor: accent }} />
-                <span className="text-[9px] tracking-[0.3em] text-[#1A1817]/70 font-mono">
+                <span
+                  className="text-[9px] tracking-[0.3em] font-mono"
+                  style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.7)' : 'rgba(26, 24, 23, 0.7)' }}
+                >
                   {page.folio || `PÁG. ${String(page.pageNumber).padStart(2, '0')}`}
                 </span>
               </div>
@@ -885,11 +977,17 @@ export const SpreadViewport: React.FC = () => {
         return (
           <div className="h-full flex flex-col justify-between py-8 px-8 select-none">
             {/* Header / Section Label */}
-            <div className="flex items-center justify-between mb-4 border-b pb-2 border-stone-200 dark:border-zinc-800">
+            <div
+              className="flex items-center justify-between mb-4 border-b pb-2"
+              style={{ borderColor: isDarkPage ? 'rgba(255, 255, 255, 0.12)' : '#E7E5E4' }}
+            >
               <span className="text-[10px] tracking-[0.3em] font-semibold uppercase" style={{ color: accent }}>
                 {page.label || 'MATRIZ COMERCIAL · 4 PRODUTOS'}
               </span>
-              <span className="text-[9px] font-mono text-stone-400">
+              <span
+                className="text-[9px] font-mono"
+                style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.5)' : '#78716C' }}
+              >
                 {gridProducts.length}/4 ITENS ALOCADOS
               </span>
             </div>
@@ -903,15 +1001,20 @@ export const SpreadViewport: React.FC = () => {
                   return (
                     <div
                       key={prod.id || `grid-prod-${slotIdx}`}
-                      className={`flex flex-col justify-between p-2.5 rounded-sm border transition-all cursor-pointer bg-white/40 dark:bg-black/10 ${
+                      className={`flex flex-col justify-between p-2.5 rounded-sm border transition-all cursor-pointer ${
                         isSelected
                           ? 'ring-2 ring-amber-600 border-amber-600/80 bg-black/5'
-                          : 'border-stone-200/80 dark:border-zinc-800/80 hover:border-stone-400'
+                          : isDarkPage
+                          ? 'border-white/10 bg-white/5 hover:border-white/20'
+                          : 'border-stone-200/80 bg-white/60 hover:border-stone-400'
                       }`}
                       onClick={(e) => handleSelect(prod.id, e, prod.name, prod.price)}
                     >
                       {/* Thumbnail Image */}
-                      <div className="w-full h-28 bg-stone-100 dark:bg-zinc-800/50 overflow-hidden rounded-xs relative mb-2">
+                      <div
+                        className="w-full h-28 overflow-hidden rounded-xs relative mb-2"
+                        style={{ backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.08)' : '#F5F5F4' }}
+                      >
                         <img
                           src={prod.image}
                           alt={prod.name}
@@ -927,18 +1030,32 @@ export const SpreadViewport: React.FC = () => {
                       {/* Metadata */}
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-baseline justify-between gap-1">
-                          <span className="text-[7px] font-mono text-stone-400">{prod.sku}</span>
-                          <span className="text-[10px] font-semibold text-[#1A1817] dark:text-zinc-100 tabular-nums">
+                          <span
+                            className="text-[7px] font-mono"
+                            style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.5)' : '#78716C' }}
+                          >
+                            {prod.sku}
+                          </span>
+                          <span
+                            className="text-[10px] font-semibold tabular-nums"
+                            style={{ color: isDarkPage ? '#F5F1EA' : '#1A1817' }}
+                          >
                             {prod.price}
                           </span>
                         </div>
                         <h4
-                          className="text-xs text-[#1A1817] dark:text-zinc-100 font-medium truncate"
-                          style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                          className="text-xs font-medium truncate"
+                          style={{
+                            fontFamily: "'Cormorant Garamond', Georgia, serif",
+                            color: isDarkPage ? '#F5F1EA' : '#1A1817',
+                          }}
                         >
                           {prod.name}
                         </h4>
-                        <p className="text-[9px] text-stone-600 dark:text-zinc-400 line-clamp-1 font-light">
+                        <p
+                          className="text-[9px] line-clamp-1 font-light"
+                          style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.7)' : '#57534E' }}
+                        >
                           {prod.description}
                         </p>
                       </div>
@@ -960,38 +1077,57 @@ export const SpreadViewport: React.FC = () => {
                     }
                     className="flex flex-col justify-between p-3 rounded-sm border-2 border-dashed transition-all cursor-pointer group"
                     style={{
-                      borderColor: isDark ? 'rgba(63, 63, 70, 0.8)' : `${accent}70`,
-                      backgroundColor: isDark ? 'rgba(24, 24, 27, 0.4)' : 'rgba(255, 255, 255, 0.65)',
+                      borderColor: isDarkPage ? 'rgba(255, 255, 255, 0.2)' : `${accent}50`,
+                      backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.04)' : 'rgba(255, 255, 255, 0.65)',
                     }}
                   >
                     <div
-                      className="w-full h-24 rounded-xs flex flex-col items-center justify-center border mb-2"
+                      className="w-full h-24 rounded-xs flex flex-col items-center justify-center border mb-2 transition-all"
                       style={{
-                        backgroundColor: isDark ? 'rgba(39, 39, 42, 0.3)' : '#FFFFFF',
-                        borderColor: isDark ? '#3f3f46' : `${accent}40`,
+                        backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.04)' : '#FFFFFF',
+                        borderColor: isDarkPage ? 'rgba(255, 255, 255, 0.15)' : `${accent}35`,
                       }}
                     >
                       <div
                         className="size-8 rounded-full border flex items-center justify-center mb-1 group-hover:scale-110 transition-all shadow-2xs"
                         style={{
-                          backgroundColor: isDark ? 'rgba(39, 39, 42, 0.7)' : '#FFFFFF',
-                          borderColor: isDark ? '#3f3f46' : `${accent}50`,
+                          backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.08)' : '#FFFFFF',
+                          borderColor: isDarkPage ? 'rgba(255, 255, 255, 0.25)' : `${accent}50`,
                         }}
                       >
-                        <Plus className="size-4 text-stone-600 dark:text-zinc-400 group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors" />
+                        <Plus
+                          className="size-4 transition-colors"
+                          style={{ color: isDarkPage ? '#F5F1EA' : '#44403C' }}
+                        />
                       </div>
-                      <span className="text-[8px] font-mono uppercase text-stone-500 dark:text-zinc-400">
+                      <span
+                        className="text-[8px] font-mono uppercase font-semibold"
+                        style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.6)' : '#78716C' }}
+                      >
                         Slot {slotIdx + 1}
                       </span>
                     </div>
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-baseline justify-between">
-                        <span className="text-[7px] font-mono text-stone-400">SLOT-{slotIdx + 1}</span>
-                        <span className="text-[9px] font-mono text-stone-400">Vazio</span>
+                        <span
+                          className="text-[7px] font-mono"
+                          style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.45)' : '#A8A29E' }}
+                        >
+                          SLOT-{slotIdx + 1}
+                        </span>
+                        <span
+                          className="text-[9px] font-mono"
+                          style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.5)' : '#78716C' }}
+                        >
+                          Vazio
+                        </span>
                       </div>
                       <span
-                        className="text-xs text-stone-400 font-medium italic truncate"
-                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                        className="text-xs font-medium italic truncate"
+                        style={{
+                          fontFamily: "'Cormorant Garamond', Georgia, serif",
+                          color: isDarkPage ? 'rgba(245, 241, 234, 0.5)' : '#78716C',
+                        }}
                       >
                         Aguardando Produto
                       </span>
@@ -1004,7 +1140,10 @@ export const SpreadViewport: React.FC = () => {
             {/* Folio Footer */}
             <div className="flex flex-col items-center mt-3">
               <div className="w-6 h-[1px] mb-1.5" style={{ backgroundColor: accent }} />
-              <span className="text-[9px] tracking-[0.3em] text-[#1A1817]/70 font-mono">
+              <span
+                className="text-[9px] tracking-[0.3em] font-mono"
+                style={{ color: isDarkPage ? 'rgba(245, 241, 234, 0.7)' : 'rgba(26, 24, 23, 0.7)' }}
+              >
                 {page.folio || `PAG. ${String(page.pageNumber).padStart(2, '0')}`}
               </span>
             </div>
