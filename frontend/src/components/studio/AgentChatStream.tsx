@@ -161,7 +161,7 @@ export const AgentChatStream: React.FC = () => {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [displayMessages]);
+  }, [displayMessages, agentStatus]);
 
   const initialIdsRef = useRef<Set<string> | null>(null);
   const [completedMessageIds, setCompletedMessageIds] = React.useState<Set<string>>(() => new Set());
@@ -797,6 +797,39 @@ export const AgentChatStream: React.FC = () => {
           </div>
         );
       })}
+
+      {/* Indicador Editorial de Processamento dos Agentes */}
+      {(agentStatus === 'thinking' || agentStatus === 'generating') && (
+        <div className="flex items-start gap-2.5 max-w-[95%] animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div
+            className={`size-6 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+              isDark
+                ? 'bg-zinc-800 border-zinc-700 text-zinc-300'
+                : 'bg-zinc-200 border-zinc-300 text-zinc-800'
+            }`}
+          >
+            <Sparkles className="size-3 text-[#B08D57] animate-pulse" />
+          </div>
+          <div
+            className={`rounded-2xl rounded-tl-sm px-3.5 py-2.5 border shadow-sm flex items-center gap-2.5 text-xs transition-colors ${
+              isDark
+                ? 'bg-[#151518] border-zinc-800 text-zinc-300'
+                : 'bg-white border-zinc-200 text-zinc-700'
+            }`}
+          >
+            <span className="inline-flex gap-1 items-center">
+              <span className="size-1.5 rounded-full bg-[#B08D57] animate-bounce [animation-delay:-0.3s]" />
+              <span className="size-1.5 rounded-full bg-[#B08D57] animate-bounce [animation-delay:-0.15s]" />
+              <span className="size-1.5 rounded-full bg-[#B08D57] animate-bounce" />
+            </span>
+            <span className="font-medium text-[11px] text-zinc-400">
+              {agentStatus === 'thinking'
+                ? 'Editor-Chefe e Conselho Editorial articulando diretrizes...'
+                : 'Sintetizando parecer executivo e calibrando prancheta...'}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div ref={bottomRef} />
     </div>

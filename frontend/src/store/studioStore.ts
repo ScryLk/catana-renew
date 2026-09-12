@@ -2160,19 +2160,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     };
 
-    // 2. Mensagem do assistente pronta para streaming
-    const assistantMsgId = `msg-agent-${Date.now()}`;
-    const assistantMsg: ChatMessage = {
-      id: assistantMsgId,
-      role: 'assistant',
-      content: '',
-      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    };
-
     set((s) => {
       const activeThread = s.threads.find((t) => t.id === s.activeThreadId);
       if (!activeThread) return s;
-      const updatedMessages = [...activeThread.messages, userMsg, assistantMsg];
+      const updatedMessages = [...activeThread.messages, userMsg];
       return {
         agentStatus: 'thinking',
         threads: s.threads.map((t) =>
@@ -2184,7 +2175,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       };
     });
 
-    // 3. Monta o contexto para o backend
+    // 2. Monta o contexto para o backend
     const [leftPageNum, rightPageNum] = state.currentSpread;
     const leftPage = state.pages.find((p) => p.pageNumber === leftPageNum);
     const rightPage = state.pages.find((p) => p.pageNumber === rightPageNum);
@@ -2277,86 +2268,61 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       let accumulatedContent = '';
       let appliedPatch: any = null;
 
-      const syncMessageMetadata = (patchObj: any) => {
-        if (!patchObj) return;
+      const resolveActionSummaries = (patchObj: any): string[] => {
+        if (!patchObj) return [];
+        if (Array.isArray(patchObj.actions)) {
+          return patchObj.actions.map((act: any) => {
+            const actType = act.type || act.action;
+            const pageNum = act.page || (typeof act.target === 'string' && act.target.startsWith('page:') ? parseInt(act.target.split(':')[1], 10) : undefined);
+            const params = act.params || {};
+            const layout = act.layout || params.layout;
+            const percentage = act.percentage ?? params.percentage ?? act.percent ?? params.percent;
+            const prefix = act.prefix || params.prefix;
+            const field = act.field || params.field;
+            const title = act.title || act.name || params.title || params.name;
 
-        const actionSummaries = Array.isArray(patchObj.actions)
-          ? patchObj.actions.map((act: any) => {
-              const actType = act.type || act.action;
-              const pageNum = act.page || (typeof act.target === 'string' && act.target.startsWith('page:') ? parseInt(act.target.split(':')[1], 10) : undefined);
-              const params = act.params || {};
-              const layout = act.layout || params.layout;
-              const percentage = act.percentage ?? params.percentage ?? act.percent ?? params.percent;
-              const prefix = act.prefix || params.prefix;
-              const field = act.field || params.field;
-              const title = act.title || act.name || params.title || params.name;
-
-              if (actType === 'remove_product') return `Produto removido da Página ${pageNum || 'visível'} e retornado ao acervo`;
-              if (actType === 'assign_product') return `Produto alocado na Página ${pageNum || 1}`;
-              if (actType === 'swap_product') return `Substituição de produto na Página ${pageNum || 1}`;
-              if (actType === 'create_product') return `Produto "${title || 'Novo'}" cadastrado e alocado`;
-              if (actType === 'change_layout') return `Layout da Página ${pageNum || 1} convertido para ${(layout || 'hero').toUpperCase()}`;
-              if (actType === 'adjust_pricing') return `Reajuste de ${percentage || 10}% aplicado à tabela de preços`;
-              if (actType === 'generate_skus') return `Códigos SKU padronizados com prefixo ${prefix || 'CAT'}`;
-              if (actType === 'set_palette') return 'Paleta cromática do catálogo atualizada';
-              if (actType === 'brand_lock') return (act.locked ?? params.locked) ? 'Trava de Marca (Brand Lock) ativada' : 'Trava de Marca desativada';
-              if (actType === 'remove_background') return 'Isolamento de silhueta e recorte de fundo executados';
-              if (actType === 'remove_image' || actType === 'clear_image') return `Imagem do produto na Página ${pageNum || 'visível'} removida`;
-              if (actType === 'generate_photo') return 'Fotografia de estúdio em alta resolução gerada com IA';
-              if (actType === 'update_text') return `Texto da Página ${pageNum || 1} (${field || 'conteúdo'}) atualizado`;
-              return actType;
-            })
-          : patchObj.summary
-          ? [patchObj.summary]
-          : [];
-
-        const mappedDelegations: ChatDelegation[] | undefined = Array.isArray(patchObj.delegations)
-          ? patchObj.delegations.map((d: any) => {
-              const role = d.roleId || d.role;
-              let roleName = d.roleName;
-              let badge = d.badge;
-              if (!roleName) {
-                if (role === 'director') { roleName = 'Diretor de Arte'; badge = 'Design'; }
-                else if (role === 'copywriter') { roleName = 'Redator Publicitário'; badge = 'Redação'; }
-                else if (role === 'commercial') { roleName = 'Tabela Comercial / B2B'; badge = 'Comercial'; }
-                else if (role === 'branding') { roleName = 'Auditor de Branding'; badge = 'Auditoria'; }
-                else { roleName = role; badge = 'Conselho'; }
-              }
-              return {
-                roleId: role,
-                roleName: roleName || role,
-                badge: badge || 'Agente',
-                action: d.action || d.opinion || '',
-              };
-            })
-          : undefined;
-
-        if (mappedDelegations || patchObj.reasoning || actionSummaries.length > 0) {
-          set((s) => {
-            const updatedThreads = s.threads.map((t) =>
-              t.id === s.activeThreadId
-                ? {
-                    ...t,
-                    messages: t.messages.map((m) =>
-                      m.id === assistantMsgId
-                        ? {
-                            ...m,
-                            reasoning: patchObj.reasoning || m.reasoning,
-                            delegations: mappedDelegations || m.delegations,
-                            actions: actionSummaries.length > 0 ? actionSummaries : m.actions,
-                          }
-                        : m
-                    ),
-                  }
-                : t
-            );
-            const activeThread = updatedThreads.find((t) => t.id === s.activeThreadId);
-            return {
-              threads: updatedThreads,
-              messages: activeThread ? activeThread.messages : s.messages,
-            };
+            if (actType === 'remove_product') return `Produto removido da Página ${pageNum || 'visível'} e retornado ao acervo`;
+            if (actType === 'assign_product') return `Produto alocado na Página ${pageNum || 1}`;
+            if (actType === 'swap_product') return `Substituição de produto na Página ${pageNum || 1}`;
+            if (actType === 'create_product') return `Produto "${title || 'Novo'}" cadastrado e alocado`;
+            if (actType === 'change_layout') return `Layout da Página ${pageNum || 1} convertido para ${(layout || 'hero').toUpperCase()}`;
+            if (actType === 'adjust_pricing') return `Reajuste de ${percentage || 10}% aplicado à tabela de preços`;
+            if (actType === 'generate_skus') return `Códigos SKU padronizados com prefixo ${prefix || 'CAT'}`;
+            if (actType === 'set_palette') return 'Paleta cromática do catálogo atualizada';
+            if (actType === 'brand_lock') return (act.locked ?? params.locked) ? 'Trava de Marca (Brand Lock) ativada' : 'Trava de Marca desativada';
+            if (actType === 'remove_background') return 'Isolamento de silhueta e recorte de fundo executados';
+            if (actType === 'remove_image' || actType === 'clear_image') return `Imagem do produto na Página ${pageNum || 'visível'} removida`;
+            if (actType === 'generate_photo') return 'Fotografia de estúdio em alta resolução gerada com IA';
+            if (actType === 'update_text') return `Texto da Página ${pageNum || 1} (${field || 'conteúdo'}) atualizado`;
+            return actType;
           });
         }
+        if (patchObj.summary) {
+          return [patchObj.summary];
+        }
+        return [];
+      };
+
+      const resolveDelegations = (patchObj: any): ChatDelegation[] | undefined => {
+        if (!patchObj || !Array.isArray(patchObj.delegations)) return undefined;
+        return patchObj.delegations.map((d: any) => {
+          const role = d.roleId || d.role;
+          let roleName = d.roleName;
+          let badge = d.badge;
+          if (!roleName) {
+            if (role === 'director') { roleName = 'Diretor de Arte'; badge = 'Design'; }
+            else if (role === 'copywriter') { roleName = 'Redator Publicitário'; badge = 'Redação'; }
+            else if (role === 'commercial') { roleName = 'Tabela Comercial / B2B'; badge = 'Comercial'; }
+            else if (role === 'branding') { roleName = 'Auditor de Branding'; badge = 'Auditoria'; }
+            else { roleName = role; badge = 'Conselho'; }
+          }
+          return {
+            roleId: role,
+            roleName: roleName || role,
+            badge: badge || 'Agente',
+            action: d.action || d.opinion || '',
+          };
+        });
       };
 
       while (true) {
@@ -2377,33 +2343,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           try {
             const data = JSON.parse(jsonStr);
 
+            // Acumula os tokens silenciosamente na memoria sem fragmentar o estado do React
             if (data.event === 'token' && data.text) {
               accumulatedContent += data.text;
-              set((s) => {
-                const updatedThreads = s.threads.map((t) =>
-                  t.id === s.activeThreadId
-                    ? {
-                        ...t,
-                        messages: t.messages.map((m) =>
-                          m.id === assistantMsgId
-                            ? { ...m, content: accumulatedContent }
-                            : m
-                        ),
-                      }
-                    : t
-                );
-                const activeThread = updatedThreads.find((t) => t.id === s.activeThreadId);
-                return {
-                  threads: updatedThreads,
-                  messages: activeThread ? activeThread.messages : s.messages,
-                };
-              });
             }
 
             if (data.event === 'patch' && data.patch && !appliedPatch) {
               appliedPatch = data.patch;
               get().applySpreadPatch(data.patch);
-              syncMessageMetadata(data.patch);
               toast.success('Prancheta Sincronizada', {
                 description: data.patch.summary || 'Alterações aplicadas com sucesso pelo Conselho Editorial.',
               });
@@ -2413,7 +2360,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
               if (data.patch && !appliedPatch) {
                 appliedPatch = data.patch;
                 get().applySpreadPatch(data.patch);
-                syncMessageMetadata(data.patch);
                 toast.success('Prancheta Sincronizada', {
                   description: data.patch.summary || 'Alterações aplicadas com sucesso pelo Conselho Editorial.',
                 });
@@ -2433,7 +2379,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             const parsed = JSON.parse(match[1]);
             appliedPatch = parsed;
             get().applySpreadPatch(parsed);
-            syncMessageMetadata(parsed);
             toast.success('Prancheta Sincronizada', {
               description: parsed.summary || 'Alterações aplicadas com sucesso pelo Conselho Editorial.',
             });
@@ -2441,7 +2386,49 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         }
       }
 
-      set({ agentStatus: 'idle' });
+      // Extrai açoes e delegaçoes para a mensagem formada
+      const actionSummaries = appliedPatch ? resolveActionSummaries(appliedPatch) : [];
+      const mappedDelegations = appliedPatch ? resolveDelegations(appliedPatch) : undefined;
+
+      // Limpa blocos de patch e tags tecnicas do conteudo apresentado ao usuario
+      let cleanContent = accumulatedContent
+        .replace(/```(?:json:patch|json)?[\s\S]*?```/g, '')
+        .replace(/\[CONTEXTO DO PROJETO\][\s\S]*?(?=\n\n|$)/gi, '')
+        .trim();
+
+      if (!cleanContent && appliedPatch?.summary) {
+        cleanContent = appliedPatch.summary;
+      }
+      if (!cleanContent) {
+        cleanContent = 'Ajuste executado com sucesso pelo Conselho Editorial.';
+      }
+
+      const assistantMsgId = `msg-agent-${Date.now()}`;
+      const assistantMsg: ChatMessage = {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: cleanContent,
+        timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        reasoning: appliedPatch?.reasoning,
+        actions: actionSummaries.length > 0 ? actionSummaries : undefined,
+        delegations: mappedDelegations,
+      };
+
+      set((s) => {
+        const activeThread = s.threads.find((t) => t.id === s.activeThreadId);
+        if (!activeThread) return { agentStatus: 'idle' };
+        const updatedMessages = [...activeThread.messages, assistantMsg];
+        return {
+          agentStatus: 'idle',
+          threads: s.threads.map((t) =>
+            t.id === s.activeThreadId
+              ? { ...t, messages: updatedMessages }
+              : t
+          ),
+          messages: updatedMessages,
+        };
+      });
+
       await get().flushSaveSpread();
 
     } catch (err) {

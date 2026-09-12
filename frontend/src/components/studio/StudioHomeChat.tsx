@@ -8,6 +8,7 @@ import {
   FileImage,
   File,
   FileUp,
+  Loader2,
 } from 'lucide-react';
 import { useStudioStore, ChatAttachment } from '../../store/studioStore';
 import { ImportCatalogModal } from './ImportCatalogModal';
@@ -32,6 +33,7 @@ export const StudioHomeChat: React.FC = () => {
     triggerCatalogGeneration,
     openExcelImportModal,
     theme,
+    isGeneratingCatalog,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -330,16 +332,26 @@ export const StudioHomeChat: React.FC = () => {
 
               <button
                 type="button"
+                disabled={isGeneratingCatalog || (!prompt.trim() && attachments.length === 0)}
                 onClick={() => handleStart()}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
                   isDark
                     ? 'bg-zinc-100 hover:bg-white text-zinc-950'
                     : 'bg-zinc-900 hover:bg-zinc-800 text-white'
                 }`}
                 aria-label="Gerar catálogo"
               >
-                <span>Gerar Catálogo</span>
-                <ArrowRight className="size-3.5" />
+                {isGeneratingCatalog ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin text-[#B08D57]" />
+                    <span>Sintetizando...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Gerar Catálogo</span>
+                    <ArrowRight className="size-3.5" />
+                  </>
+                )}
               </button>
             </div>
           </div>

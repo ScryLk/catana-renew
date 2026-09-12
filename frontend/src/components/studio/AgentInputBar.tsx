@@ -9,6 +9,7 @@ import {
   FileSpreadsheet,
   FileImage,
   Upload,
+  Loader2,
 } from 'lucide-react';
 import { useStudioStore, ChatAttachment } from '../../store/studioStore';
 import { STUDIO_SKILLS, StudioSkill } from '../../data/studioSkills';
@@ -37,8 +38,10 @@ export const AgentInputBar: React.FC = () => {
     setIsSkillsModalOpen,
     pendingInputPrompt,
     setPendingInputPrompt,
+    agentStatus,
   } = useStudioStore();
   const isDark = theme === 'dark';
+  const isWorking = agentStatus === 'thinking' || agentStatus === 'generating';
 
   // Inserção automática de prompt via catálogo de skills
   useEffect(() => {
@@ -152,6 +155,7 @@ export const AgentInputBar: React.FC = () => {
   };
 
   const handleSend = () => {
+    if (isWorking) return;
     if (!inputText.trim() && attachments.length === 0) return;
 
     const currentAttachments = [...attachments];
@@ -194,7 +198,9 @@ export const AgentInputBar: React.FC = () => {
 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      if (!isWorking) {
+        handleSend();
+      }
     }
   };
 
@@ -514,16 +520,24 @@ export const AgentInputBar: React.FC = () => {
           <button
             type="button"
             onClick={handleSend}
-            disabled={!inputText.trim() && attachments.length === 0}
-            className={`size-7 rounded-full disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center font-semibold shadow-sm transition-all cursor-pointer ${
-              isDark
+            disabled={isWorking || (!inputText.trim() && attachments.length === 0)}
+            className={`size-7 rounded-full disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center font-semibold shadow-sm transition-all cursor-pointer ${
+              isWorking
+                ? isDark
+                  ? 'bg-zinc-800 text-[#B08D57] border border-[#B08D57]/40'
+                  : 'bg-zinc-100 text-[#B08D57] border border-[#B08D57]/40 shadow-xs'
+                : isDark
                 ? 'bg-zinc-100 hover:bg-white text-zinc-950'
                 : 'bg-zinc-900 hover:bg-zinc-800 text-white'
             }`}
-            title="Enviar instrução"
-            aria-label="Enviar instrução"
+            title={isWorking ? 'Agente trabalhando na instrução...' : 'Enviar instrução'}
+            aria-label={isWorking ? 'Agente trabalhando' : 'Enviar instrução'}
           >
-            <ArrowUp className="size-3.5" />
+            {isWorking ? (
+              <Loader2 className="size-3.5 animate-spin text-[#B08D57]" />
+            ) : (
+              <ArrowUp className="size-3.5" />
+            )}
           </button>
         </div>
       </div>
