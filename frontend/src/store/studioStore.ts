@@ -210,6 +210,9 @@ export interface Brand {
   segment?: string;
   logoUrl?: string;
   paletteName?: string;
+  customPalette?: StudioPalette;
+  brandMarkdown?: string;
+  toneOfVoice?: string;
   commercialContact?: {
     whatsapp?: string;
     email?: string;
@@ -734,7 +737,12 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   createBlankCatalog: (title, pagesCount = 6, paletteName) => {
     const catalogTitle = title?.trim() || 'Novo Catálogo';
     const catalogId = `cat-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    const palette = STUDIO_PALETTE_PRESETS.find((p) => p.name === paletteName) || STUDIO_PALETTE_PRESETS[0];
+    const activeBrand = get().brands.find((b) => b.id === get().activeBrandId);
+    const palette =
+      (paletteName && STUDIO_PALETTE_PRESETS.find((p) => p.name === paletteName)) ||
+      activeBrand?.customPalette ||
+      STUDIO_PALETTE_PRESETS.find((p) => p.name === activeBrand?.paletteName) ||
+      STUDIO_PALETTE_PRESETS[0];
 
     const pages: CatalogPageData[] = [];
     // Capa
@@ -743,7 +751,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       pageNumber: 1,
       type: 'cover',
       title: catalogTitle.toUpperCase(),
-      subtitle: 'COLEÇÃO EDITORIAL 2026',
+      subtitle: activeBrand ? `COLEÇÃO EDITORIAL · ${activeBrand.name.toUpperCase()}` : 'COLEÇÃO EDITORIAL 2026',
       label: 'NOVO CATÁLOGO',
       backgroundColor: palette.primary,
       textColor: palette.background,
@@ -760,7 +768,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         title: pageType === 'manifesto' ? 'Manifesto Editorial' : undefined,
         label: pageType === 'manifesto' ? 'MANIFESTO' : `LÂMINA ${String(i).padStart(2, '0')}`,
         folio: `${String(i).padStart(2, '0')} · ${catalogTitle.toUpperCase()}`,
-        content: pageType === 'manifesto' ? 'Espaço reservado para o manifesto da marca e diretrizes conceituais.' : undefined,
+        content:
+          pageType === 'manifesto'
+            ? activeBrand?.toneOfVoice || 'Espaço reservado para o manifesto da marca e diretrizes conceituais.'
+            : undefined,
         products: [],
         backgroundColor: palette.background,
         textColor: palette.primary,
@@ -769,13 +780,25 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
 
     // Contracapa
+    const backTitle = activeBrand?.name || 'KATANA STUDIO';
+    const contactInfo = activeBrand?.commercialContact
+      ? [
+          activeBrand.commercialContact.whatsapp ? `WhatsApp: ${activeBrand.commercialContact.whatsapp}` : '',
+          activeBrand.commercialContact.email ? `E-mail: ${activeBrand.commercialContact.email}` : '',
+          activeBrand.commercialContact.website ? `Site: ${activeBrand.commercialContact.website}` : '',
+          activeBrand.commercialContact.instagram ? `Instagram: ${activeBrand.commercialContact.instagram}` : '',
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : '';
+
     pages.push({
       id: `${catalogId}-p${pagesCount}`,
       pageNumber: pagesCount,
       type: 'backcover',
-      title: 'KATANA STUDIO',
+      title: backTitle.toUpperCase(),
       label: 'CONTATO COMERCIAL',
-      content: 'Canal direto de vendas, pedidos e atendimento corporativo.',
+      content: contactInfo || 'Canal direto de vendas, pedidos e atendimento corporativo.',
       folio: `${String(pagesCount).padStart(2, '0')} · CONTRA-CAPA`,
       backgroundColor: palette.primary,
       textColor: palette.background,

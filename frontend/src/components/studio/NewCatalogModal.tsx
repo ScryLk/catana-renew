@@ -22,9 +22,13 @@ export const NewCatalogModal: React.FC = () => {
     openExcelImportModal,
     isGeneratingCatalog,
     theme,
+    brands,
+    activeBrandId,
+    openBrandModal,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
+  const activeBrand = brands.find((b) => b.id === activeBrandId);
 
   const [prompt, setPrompt] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
@@ -156,6 +160,21 @@ export const NewCatalogModal: React.FC = () => {
               >
                 2.0
               </span>
+              {activeBrand && (
+                <button
+                  type="button"
+                  onClick={() => openBrandModal(activeBrand.id)}
+                  className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium transition-colors cursor-pointer ${
+                    isDark
+                      ? 'bg-zinc-900/60 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-white'
+                      : 'bg-zinc-100 border-zinc-200 text-zinc-700 hover:border-zinc-300'
+                  }`}
+                  title="Marca ativa para este catálogo. Clique para gerenciar."
+                >
+                  <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span className="truncate max-w-[120px]">{activeBrand.name}</span>
+                </button>
+              )}
             </div>
 
             {/* Botão de Fechar sem o texto Esc */}
