@@ -10,16 +10,15 @@ import {
   Phone,
   Instagram,
   Trash2,
-  Sparkles,
   FileText,
   Download,
   Eye,
-  Loader2,
+  Crop,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useStudioStore } from '../../store/studioStore';
 import { StudioPalette, STUDIO_PALETTE_PRESETS } from '../../data/aureaCatalog.mock';
-import { extractColorsFromImage } from '../../utils/colorExtractor';
+import { LogoAreaSelectorModal } from './LogoAreaSelectorModal';
 import { parseBrandMarkdown, generateBrandTemplateMarkdown } from '../../utils/brandMarkdownParser';
 import {
   Select,
@@ -73,7 +72,7 @@ export const BrandModal: React.FC = () => {
   const [toneOfVoice, setToneOfVoice] = useState('');
   const [brandMarkdown, setBrandMarkdown] = useState('');
   const [showMarkdownPreview, setShowMarkdownPreview] = useState(false);
-  const [isExtractingColors, setIsExtractingColors] = useState(false);
+  const [isAreaSelectorOpen, setIsAreaSelectorOpen] = useState(false);
 
   // 3 Cores da Paleta da Marca
   const [primaryColor, setPrimaryColor] = useState('#18181B');
@@ -137,20 +136,25 @@ export const BrandModal: React.FC = () => {
 
   if (!isBrandModalOpen) return null;
 
-  const handleExtractColors = async (imageUrl: string) => {
-    if (!imageUrl) return;
-    setIsExtractingColors(true);
-    try {
-      const palette = await extractColorsFromImage(imageUrl);
-      setPrimaryColor(palette.primary);
-      setSecondaryColor(palette.secondary || '#52525B');
-      setTertiaryColor(palette.accent);
-      toast.success('Cores extraídas da logo com sucesso!');
-    } catch {
-      toast.error('Não foi possível extrair as cores do logotipo.');
-    } finally {
-      setIsExtractingColors(false);
+  const handleApplyAreaSelection = (
+    palette: { primary: string; secondary: string; accent: string },
+    croppedDataUrl?: string
+  ) => {
+    setPrimaryColor(palette.primary);
+    setSecondaryColor(palette.secondary);
+    setTertiaryColor(palette.accent);
+    if (croppedDataUrl) {
+      setLogoUrl(croppedDataUrl);
     }
+  };
+
+  const handleExtractColors = (imageUrl?: string) => {
+    const targetUrl = imageUrl || logoUrl;
+    if (!targetUrl) {
+      toast.info('Nenhum logotipo disponível para seleção.');
+      return;
+    }
+    setIsAreaSelectorOpen(true);
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,12 +167,12 @@ export const BrandModal: React.FC = () => {
     }
 
     const reader = new FileReader();
-    reader.onload = async () => {
+    reader.onload = () => {
       if (typeof reader.result === 'string') {
         const dataUrl = reader.result;
         setLogoUrl(dataUrl);
         toast.success('Logotipo carregado com sucesso!');
-        await handleExtractColors(dataUrl);
+        setIsAreaSelectorOpen(true);
       }
     };
     reader.readAsDataURL(file);
@@ -512,21 +516,16 @@ export const BrandModal: React.FC = () => {
                   <>
                     <button
                       type="button"
-                      disabled={isExtractingColors}
                       onClick={() => handleExtractColors(logoUrl)}
-                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
                         isDark
                           ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-700 text-amber-300 hover:text-amber-200'
                           : 'bg-white hover:bg-zinc-50 border-zinc-200 text-amber-700'
                       }`}
-                      title="Extrair paleta cromática da imagem do logotipo"
+                      title="Selecionar área e extrair paleta cromática da logo"
                     >
-                      {isExtractingColors ? (
-                        <Loader2 className="size-3 animate-spin" />
-                      ) : (
-                        <Sparkles className="size-3" />
-                      )}
-                      <span>{isExtractingColors ? 'Extraindo...' : 'Extrair Cores'}</span>
+                      <Crop className="size-3" />
+                      <span>Extrair Cores</span>
                     </button>
                     <button
                       type="button"
@@ -840,6 +839,21 @@ export const BrandModal: React.FC = () => {
           </div>
         </form>
       </div>
+
+      {logoUrl && (
+        <LogoAreaSelectorModal
+          isOpen={isAreaSelectorOpen}
+          onClose={() => setIsAreaSelectorOpen(false)}
+          imageSrc={logoUrl}
+          initialPalette={{
+            primary: primaryColor,
+            secondary: secondaryColor,
+            accent: tertiaryColor,
+          }}
+          onApply={handleApplyAreaSelection}
+          isDark={isDark}
+        />
+      )}
     </div>
   );
 };
