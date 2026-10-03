@@ -1,3 +1,5 @@
+import { adjustSuppliedPrice } from '../../utils/commercialProduct';
+import { SafeImage } from './SafeImage';
 import React, { useState, useRef } from 'react';
 import {
   Sparkles,
@@ -79,7 +81,7 @@ export const SpreadViewport: React.FC = () => {
 
 
   // Handler para selecionar elemento
-  const handleSelect = (elementId: string, e: React.MouseEvent, defaultName?: string, defaultPrice?: string | null) => {
+  const handleSelect = (elementId: string, e: React.MouseEvent, defaultName?: string | null, defaultPrice?: string | null) => {
     e.stopPropagation();
     if (selectedElementId === elementId) {
       setSelectedElementId(null);
@@ -144,8 +146,11 @@ export const SpreadViewport: React.FC = () => {
       if (lower.includes('+10%') && targetProductId) {
         const prod = pages.flatMap((p) => p.products || []).find((p) => p.id === targetProductId);
         if (prod) {
-          const num = prod.price ? (parseInt(prod.price.replace(/[^0-9]/g, ''), 10) || 1000) : 1000;
-          const newPrice = `R$ ${(num * 1.1).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`;
+          const newPrice = adjustSuppliedPrice(prod.price, 10);
+          if (newPrice == null) {
+            toast.error('Defina um preço antes de aplicar reajuste.');
+            return;
+          }
           updateProduct(targetProductId, { price: newPrice });
           addMessage({
             role: 'assistant',
@@ -408,7 +413,7 @@ export const SpreadViewport: React.FC = () => {
     const accent = page.accentColor || activePalette.accent;
     const isDarkPage = isDarkPageBg(page.backgroundColor);
 
-    if (page.renderMode === 'generative' && page.blocks && page.blocks.length > 0) {
+    if (page.renderMode === 'generative') {
       return (
         <GenerativePageRenderer
           page={page}
@@ -421,7 +426,7 @@ export const SpreadViewport: React.FC = () => {
                 openProductDrawer({
                   pageNumber: page.pageNumber,
                   slotIndex: slotIndex >= 0 ? slotIndex : 0,
-                  slotLabel: prod.name,
+                  slotLabel: prod.name || 'Produto',
                   pageType: page.type,
                 });
               }
@@ -456,7 +461,7 @@ export const SpreadViewport: React.FC = () => {
                 >
                   {page.editorialImage ? (
                     <>
-                      <img
+                      <SafeImage
                         src={page.editorialImage}
                         alt={page.title || 'Capa'}
                         className="w-full h-full object-contain"
@@ -596,7 +601,7 @@ export const SpreadViewport: React.FC = () => {
           <div className="h-full relative overflow-hidden flex flex-col justify-center items-center text-center p-8 select-none">
             {/* Background Editorial Photo */}
             {page.editorialImage && (
-              <img
+              <SafeImage
                 src={page.editorialImage}
                 alt={page.title || 'Divisória de Categoria'}
                 className="absolute inset-0 w-full h-full object-cover object-center"
@@ -772,9 +777,9 @@ export const SpreadViewport: React.FC = () => {
               onClick={(e) => handleSelect(prod.id, e, prod.name, prod.price)}
             >
               {prod.image ? (
-                <img
+                <SafeImage
                   src={prod.image}
-                  alt={prod.name}
+                  alt={prod.name || ''}
                   className="w-full h-full object-cover object-center group-hover:scale-[1.02] transition-transform duration-500"
                 />
               ) : (
@@ -852,9 +857,9 @@ export const SpreadViewport: React.FC = () => {
                   onClick={(e) => handleSelect(prod.id, e, prod.name, prod.price)}
                 >
                   {prod.image ? (
-                    <img
+                    <SafeImage
                       src={prod.image}
-                      alt={prod.name}
+                      alt={prod.name || ''}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
@@ -1129,9 +1134,9 @@ export const SpreadViewport: React.FC = () => {
                 onClick={(e) => handleSelect(prod.id, e, prod.name, prod.price)}
               >
                 {prod.image ? (
-                  <img
+                  <SafeImage
                     src={prod.image}
-                    alt={prod.name}
+                    alt={prod.name || ''}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 ) : (
@@ -1222,9 +1227,9 @@ export const SpreadViewport: React.FC = () => {
                         style={{ backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.08)' : '#F5F5F4' }}
                       >
                         {prod.image ? (
-                          <img
+                          <SafeImage
                             src={prod.image}
-                            alt={prod.name}
+                            alt={prod.name || ''}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         ) : (

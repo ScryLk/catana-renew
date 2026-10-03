@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from .requirement_contract import RequirementContract
+from .design_grammar import validate_runtime_block
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,21 @@ class GenerationValidator:
         """Executa a bateria completa de validações determinísticas e semânticas."""
         res = ValidationResult()
 
-        pages = document.get("pages", [])
+        pages = []
+        for raw_page in document.get("pages", []):
+            if not isinstance(raw_page, dict):
+                res.add_error('INVALID_RUNTIME_PAGE')
+                continue
+            page = dict(raw_page)
+            page['blocks'] = []
+            for raw in raw_page.get('blocks', []):
+                valid, errors = validate_runtime_block(raw)
+                if not valid:
+                    for error in errors:
+                        res.add_error(f"INVALID_RUNTIME_BLOCK: pageNumber={raw_page.get('pageNumber')} blockId={raw.get('id') if isinstance(raw, dict) else None} reason={error}")
+                else:
+                    page['blocks'].append(raw)
+            pages.append(page)
         actual_page_count = len(pages)
 
         # 1. VALIDAÇÃO DE CONTAGEM DE PÁGINAS (P1 - Hard Constraint)
@@ -93,6 +108,20 @@ class GenerationValidator:
         for idx, p in enumerate(pages):
             p_num = idx + 1
             blocks = p.get("blocks", [])
+            valid_blocks = []
+            for block in blocks:
+                valid, reasons = validate_runtime_block(block)
+                if not valid:
+                    for reason in reasons:
+                        res.add_error(f"INVALID_RUNTIME_BLOCK: pageNumber={p_num} blockId={block.get('id') if isinstance(block, dict) else None} reason={reason}")
+                else:
+                    valid_blocks.append(block)
+            blocks = valid_blocks
+            if "NO_DIAGONALS" in negatives:
+                if "diagonal" in str((p.get("composition") or {}).get("axis", "")).lower():
+                    res.add_error(f"FORBIDDEN_COMPOSITION_AXIS: NO_DIAGONALS pageNumber={p_num}")
+                if any(float(b.get("rotation", 0)) % 90 != 0 for b in blocks):
+                    res.add_error(f"FORBIDDEN_COMPOSITION_AXIS: NO_DIAGONALS rotation pageNumber={p_num}")
 
             # 2.1 Proibição de Cards
             if "NO_CARDS" in negatives or "no_cards" in contract.design.layout_behavior:
@@ -198,6 +227,20 @@ class GenerationValidator:
         for idx, p in enumerate(pages):
             p_num = idx + 1
             blocks = p.get("blocks", [])
+            valid_blocks = []
+            for block in blocks:
+                valid, reasons = validate_runtime_block(block)
+                if not valid:
+                    for reason in reasons:
+                        res.add_error(f"INVALID_RUNTIME_BLOCK: pageNumber={p_num} blockId={block.get('id') if isinstance(block, dict) else None} reason={reason}")
+                else:
+                    valid_blocks.append(block)
+            blocks = valid_blocks
+            if "NO_DIAGONALS" in negatives:
+                if "diagonal" in str((p.get("composition") or {}).get("axis", "")).lower():
+                    res.add_error(f"FORBIDDEN_COMPOSITION_AXIS: NO_DIAGONALS pageNumber={p_num}")
+                if any(float(b.get("rotation", 0)) % 90 != 0 for b in blocks):
+                    res.add_error(f"FORBIDDEN_COMPOSITION_AXIS: NO_DIAGONALS rotation pageNumber={p_num}")
             if not blocks:
                 continue
 
@@ -295,7 +338,7 @@ class GenerationValidator:
             "actual_pages": actual_page_count,
             "expected_pages": req_pages,
             "mode": mode,
-            "negatives_checked": list(negatives),
+            "negatives_checked": sorted(negatives),
         }
 
         return res

@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const registry=JSON.parse(fs.readFileSync(path.join(root,'shared/font_registry.json'),'utf8'));
+if (registry.fonts.length!==17 || new Set(registry.fonts.map(f=>f.family)).size!==17) throw new Error('Expected exactly 17 unique fonts');
+for(const f of registry.fonts) if(!f.category || !f.roles.length || !f.weights.length || f.provider!=='google') throw new Error('Invalid font metadata');
+for(const family of Object.values(registry.fallbacks)) if(!registry.fonts.some(f=>f.family===family)) throw new Error('Unregistered fallback');
+execFileSync(process.execPath,[path.join(root,'scripts/generate_font_registry.mjs'),'--check'],{stdio:'inherit'});
+console.log('Font registry: passed');

@@ -176,8 +176,8 @@ Retorne EXCLUSIVAMENTE um objeto JSON valido (sem tags markdown, apenas o JSON p
       "index": "01",
       "name": "Nome da peca",
       "category": "Categoria ou Linha",
-      "sku": "SKU-001",
-      "price": "R$ 0,00",
+      "sku": null,
+      "price": null,
       "description": "Descricao sensorial e comercial minuciosa do produto (1 a 2 frases)",
       "tag": "Selo editorial (ex: Obra Prima, Destaque, Mais Vendido, Linha Pro, Essencial)"
     }
@@ -208,7 +208,7 @@ def _run_gemini_or_contingency_synthesis(prompt: str, clean_products: List[Dict[
 
             if clean_products:
                 prods_summary = "\n".join([
-                    f"- [{p['index']}] {p['name']} | Categoria: {p['category']} | Preco: {p['price']} | SKU: {p['sku']} | Descricao previa: {p['description'][:60]}"
+                    f"- [{p['index']}] {p['name']} | Categoria: {p.get('category') or ''} | Preco: {p['price']} | SKU: {p['sku']} | Descricao previa: {str(p.get('description') or '')[:60]}"
                     for p in clean_products
                 ])
                 user_contents = (
@@ -217,7 +217,7 @@ def _run_gemini_or_contingency_synthesis(prompt: str, clean_products: List[Dict[
                     f"{page_instruction}\n"
                     f"PRODUTOS CADASTRADOS:\n{prods_summary}\n\n"
                     "INSTRUCAO: Sintetize o titulo da colecao, a paleta de cores nobre com contraste AAA, "
-                    "o selo de capa (cover_label), o manifesto e enriqueça a lista de produtos com descricoes sensoriais e tags comerciais."
+                    "o selo de capa (cover_label) e o manifesto institucional. Nunca altere nem invente campos comerciais."
                 )
             elif has_text_products:
                 user_contents = (
@@ -282,7 +282,7 @@ def _run_gemini_or_contingency_synthesis(prompt: str, clean_products: List[Dict[
     return synthesis_data
 
 
-def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, Any]]] = None, creative_seed: Optional[int] = None) -> Dict[str, Any]:
     """
     Gera um catalogo editorial desacoplado e governado por restricoes via EditorialGenerationPipeline.
     Executa o fluxo completo de 12 camadas:
@@ -292,45 +292,23 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
     from api.services.template_rag import TemplateRAGService
     from api.ai.pipeline import EditorialGenerationPipeline
 
-    # 1. Higienizacao inicial de produtos reais
-    clean_products = []
-    if products:
-        for idx, p in enumerate(products[:40]):
-            clean_products.append({
-                "index": f"{idx + 1:02d}",
-                "name": str(p.get("name", "")).strip() or f"Produto {idx + 1:02d}",
-                "price": str(p.get("price", "R$ 0,00")).strip(),
-                "sku": str(p.get("sku", "")).strip() or f"SKU-{idx + 1:03d}",
-                "category": str(p.get("category", "")).strip() or "Colecao",
-                "description": str(p.get("description", "")).strip(),
-                "image": str(p.get("image", "")).strip(),
-                "tag": str(p.get("tag", "")).strip(),
-            })
-
+    from api.ai.commercial_guard import CommercialIntegrityGuard
+    # Only supplied structured product data crosses the commercial boundary.
+    clean_products = [CommercialIntegrityGuard.sanitize_supplied_product(p) for p in (products or [])]
+    for idx, product in enumerate(clean_products):
+        product.setdefault('index', f'{idx + 1:02d}')
+        if product['id'] is None:
+            product['id'] = f'input-product-{idx + 1}'
     detected_industry = TemplateRAGService.detect_industry(prompt, clean_products)
-
-    # 2. Execucao da sintese criativa para enriquecer textos e paleta
-    synthesis_data = _run_gemini_or_contingency_synthesis(prompt, clean_products, detected_industry)
-
-    # Se a sintese extraiu produtos do texto e nao havia produtos previamente, aproveita
-    if not clean_products and synthesis_data.get("products"):
-        for idx, gp in enumerate(synthesis_data["products"][:40]):
-            clean_products.append({
-                "index": f"{idx + 1:02d}",
-                "name": str(gp.get("name", "")).strip() or f"Peca {idx + 1:02d}",
-                "price": str(gp.get("price", "R$ 0,00")).strip(),
-                "sku": str(gp.get("sku", "")).strip() or f"SKU-{idx + 1:03d}",
-                "category": str(gp.get("category", "")).strip() or synthesis_data.get("category", "Colecao"),
-                "description": str(gp.get("description", "")).strip(),
-                "image": str(gp.get("image", "")).strip(),
-                "tag": str(gp.get("tag", "")).strip(),
-            })
+    # Layout and its metadata are deterministic. Remote creative proposals cannot
+    # become commercial truth or silently change the same input/seed document.
 
     # 3. Execucao pelo EditorialGenerationPipeline (12 etapas desacopladas)
     doc = EditorialGenerationPipeline.execute(
         prompt=prompt,
         products=clean_products,
-        synthesis_generator_func=lambda _: synthesis_data,
+        synthesis_generator_func=None,
+        creative_seed=creative_seed,
     )
 
     # 4. Enriquecimento dos metadados de conselho editorial e contingencia para compatibilidade total

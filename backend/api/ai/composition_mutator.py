@@ -9,6 +9,7 @@ import random
 import logging
 from typing import Dict, Any, List, Optional, Tuple
 from .seed_utils import derive_mutation_seed
+from .design_grammar import validate_runtime_block
 from .generation_validator import SAFE_AREA_EXEMPT_ROLES
 
 logger = logging.getLogger(__name__)
@@ -41,8 +42,8 @@ def fit_block_to_safe_area(
         # Sangria intencional: permite estender até 0 ou 1
         block["x"] = round(max(-0.02, min(0.95, float(block.get("x", 0.0)))), 3)
         block["y"] = round(max(-0.02, min(0.95, float(block.get("y", 0.0)))), 3)
-        block["width"] = round(max(min_w, min(1.05, float(block.get("width", 0.5)))), 3)
-        block["height"] = round(max(min_h, min(1.05, float(block.get("height", 0.2)))), 3)
+        block["width"] = round(max(min_w, min(1.05 - block["x"], float(block.get("width", 0.5)))), 3)
+        block["height"] = round(max(min_h, min(1.05 - block["y"], float(block.get("height", 0.2)))), 3)
         return block
 
     if is_exempt:
@@ -85,6 +86,11 @@ class CompositionMutator:
     Garante integridade absoluta de dados comerciais do usuário enquanto explora variações espaciais.
     """
 
+    VISUAL_MUTABLE_FIELDS = frozenset({
+        'x', 'y', 'width', 'height', 'rotation', 'alignment', 'fontSize', 'fontWeight',
+        'letterSpacing', 'lineHeight', 'cropMode', 'zIndex', 'opacity',
+    })
+
     AVAILABLE_MUTATIONS = [
         "increase_asymmetry",
         "break_grid",
@@ -121,7 +127,13 @@ class CompositionMutator:
         mut_seed = derive_mutation_seed(creative_seed, page_num, attempt, mutation_type or "auto")
         rng = random.Random(mut_seed)
 
-        chosen_mutation = mutation_type or rng.choice(cls.AVAILABLE_MUTATIONS)
+        no_diagonals = 'NO_DIAGONALS' in mutated_page.get('negativeConstraints', [])
+        allowed = [m for m in cls.AVAILABLE_MUTATIONS if not (no_diagonals and m == 'rotate_visual_axis')]
+        chosen_mutation = mutation_type or rng.choice(allowed)
+        if no_diagonals and chosen_mutation == 'rotate_visual_axis':
+            chosen_mutation = 'switch_alignment'
+        if chosen_mutation not in cls.AVAILABLE_MUTATIONS:
+            raise ValueError('UNKNOWN_MUTATION')
 
         logger.info(f"[CompositionMutator] Pág {page_num}: Aplicando mutação '{chosen_mutation}' (seed={mut_seed}, strength={strength})...")
 
@@ -146,8 +158,24 @@ class CompositionMutator:
         for b in blocks:
             fit_block_to_safe_area(b, safe_area)
 
+        if no_diagonals:
+            for block in blocks:
+                block['rotation'] = 0
+        for before, after in zip(page_dict.get('blocks', []), blocks):
+            for key in set(before) | set(after):
+                if key not in cls.VISUAL_MUTABLE_FIELDS and before.get(key) != after.get(key):
+                    raise ValueError('MUTATION_COMMERCIAL_FIELD_VIOLATION: ' + key)
+        if len(blocks) != len(page_dict.get('blocks', [])) or mutated_page.get('products') != page_dict.get('products'):
+            raise ValueError('MUTATION_COMMERCIAL_FIELD_VIOLATION')
+
         # Atualiza metadata da composição
         comp = mutated_page.get("composition", {})
+        if no_diagonals and 'diagonal' in str(comp.get('axis','')).lower():
+            comp['axis'] = 'asymmetric_left'
+        for block in blocks:
+            valid, errors = validate_runtime_block(block)
+            if not valid:
+                raise ValueError('INVALID_RUNTIME_BLOCK: ' + ';'.join(errors))
         comp["balance"] = "asymmetric"
         comp["lastMutation"] = chosen_mutation
         comp["mutationSeed"] = mut_seed

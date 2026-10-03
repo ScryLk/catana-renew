@@ -28,6 +28,9 @@ from .visual_critic import VisualCritic, VisualCriticReport, GenerationQualityRe
 from .composition_mutator import CompositionMutator
 from .seed_utils import derive_creative_seed, compute_generation_fingerprint
 from .commercial_guard import CommercialIntegrityGuard
+from .design_grammar import validate_runtime_block
+import hashlib
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +49,43 @@ class EditorialGenerationPipeline:
     """
 
     @classmethod
-    def execute(
+    def execute(cls, prompt, products=None, attachments=None, synthesis_generator_func=None,
+                creative_seed=None, creativity_level=0.5):
+        try:
+            return cls._execute(prompt, products, attachments, synthesis_generator_func,
+                                creative_seed, creativity_level)
+        except Exception as exc:
+            # A failed subsystem cannot turn a safe renderer fallback into approval.
+            logger.error('[EditorialPipeline] Controlled failure: %s', type(exc).__name__)
+            clean = [CommercialIntegrityGuard.sanitize_supplied_product(p) for p in (products or [])]
+            for idx, product in enumerate(clean):
+                if product['id'] is None:
+                    product['id'] = f'input-product-{idx + 1}'
+            contract = RequirementParser.parse(prompt=prompt, products=clean, attachments=attachments)
+            slots = PageBudgetEngine.calculate_and_allocate_slots(contract, clean)
+            pages = [{'id': f'fallback-p{i+1}', 'pageNumber':i+1, 'type':'single',
+                      'renderMode':'legacy', 'blocks':[], 'products':copy.deepcopy(slot.allocated_products),
+                      'backgroundColor':'#FFFFFF', 'textColor':'#141416', 'accentColor':'#141416',
+                      'title':'CATÁLOGO', 'generativeDraft':{'blocks':[], 'composition':{}, 'safeArea':{}},
+                      'negativeConstraints':list(contract.constraints.negative)} for i, slot in enumerate(slots)]
+            if 'NO_IMAGES' in contract.constraints.negative:
+                for page in pages:
+                    for product in page['products']:
+                        product['image'] = None
+            seed = creative_seed if isinstance(creative_seed, int) else derive_creative_seed(prompt=prompt, products=clean)
+            fingerprint = compute_generation_fingerprint(prompt=prompt, products=clean, seed=seed)
+            return {'catalogId':'cat-' + fingerprint[:12], 'generationFingerprint':fingerprint,
+                    'title':'CATÁLOGO', 'category':'EDITORIAL', 'summary':'', 'reasoning':'Generation requires review.',
+                    'initialPrompt':prompt, 'councilDelegations':[],
+                    'palette':{'name':'Safe legacy', 'primary':'#141416','background':'#FFFFFF','accent':'#141416'},
+                    'pages':pages, 'totalPages':len(pages), 'renderMode':'legacy',
+                    'qualityGate':{'passed':False, 'publishable':False, 'status':'blocked',
+                                   'reasons':['GENERATION_SUBSYSTEM_FAILURE:' + type(exc).__name__]},
+                    'observability':{'fallbackUsed':True, 'fallbackPages':list(range(1,len(pages)+1)),
+                                     'qualityGateStatus':'blocked', 'runtimeSecurityPass':False}}
+
+    @classmethod
+    def _execute(
         cls,
         prompt: str,
         products: Optional[List[Dict[str, Any]]] = None,
@@ -60,7 +99,7 @@ class EditorialGenerationPipeline:
         """
         start_time = time.time()
         timings: Dict[str, int] = {}
-        logger.info(f"[EditorialPipeline] Iniciando geração para prompt: '{prompt[:60]}...'")
+        logger.info("[EditorialPipeline] Starting generation")
 
         # ETAPA 1 & 2: INTENT PARSER & REQUIREMENT CONTRACT
         t0 = time.time()
@@ -87,6 +126,14 @@ class EditorialGenerationPipeline:
         if products:
             for idx, p in enumerate(products):
                 clean_products.append(CommercialIntegrityGuard.sanitize_supplied_product(p, default_index=idx + 1))
+
+        # Internal IDs are technical, never SKU/name fallbacks. Preserve supplied IDs exactly.
+        for idx, product in enumerate(clean_products):
+            if product['id'] is None:
+                product['id'] = f"input-product-{idx + 1}"
+        commercial_originals = copy.deepcopy(clean_products)
+        commercial_snapshot = CommercialIntegrityGuard.create_snapshot(commercial_originals)
+        snapshot_hash = hashlib.sha256(json.dumps(commercial_snapshot, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
         # Derivação de Creative Seed Criptograficamente Determinístico (Item 2)
         if creative_seed is None:
@@ -214,9 +261,25 @@ class EditorialGenerationPipeline:
 
         # ETAPA 13: AUDITORIA DE INTEGRIDADE COMERCIAL (Item 11 & 12)
         comm_passed, comm_violations = CommercialIntegrityGuard.verify_document_commercial_integrity(
-            original_products=clean_products,
+            original_products=commercial_originals,
             document_pages=final_doc.get("pages", []),
+            allocated_products=[p for slot in page_slots for p in slot.allocated_products],
         )
+
+        # Final mandatory boundary, including repaired blocks.
+        final_val = GenerationValidator.validate(contract=contract, document=final_doc)
+        runtime_passed = all(validate_runtime_block(b)[0] for p in final_doc.get('pages', []) for b in p.get('blocks', []))
+        gate_passed = final_val.passed and critic_report.passed and comm_passed and runtime_passed
+        reasons = final_val.errors + comm_violations
+        if not critic_report.passed:
+            reasons.append('VISUAL_CRITIC_FAILED')
+        if not runtime_passed:
+            reasons.append('RUNTIME_SECURITY_FAILED')
+        final_doc['qualityGate'] = {
+            'passed': gate_passed, 'publishable': gate_passed,
+            'status': 'passed' if gate_passed else ('blocked' if not comm_passed or not runtime_passed or not final_val.passed else 'needs_review'),
+            'reasons': reasons,
+        }
 
         # ETAPA 14: CÁLCULO DE NOVIDADE FINAL E DETERMINAÇÃO DO MODO EFETIVO
         novelty_eval = NoveltyEngine.evaluate_catalog_novelty(
@@ -265,6 +328,13 @@ class EditorialGenerationPipeline:
 
         # Telemetria e Observabilidade Completa (Items 45, 46, 53)
         final_doc["observability"] = {
+            "commercialSnapshotHash": snapshot_hash,
+            "validatorPass": final_val.passed,
+            "criticPass": critic_report.passed,
+            "commercialIntegrityPass": comm_passed,
+            "runtimeSecurityPass": runtime_passed,
+            "qualityGateStatus": final_doc["qualityGate"]["status"],
+            "candidateCount": sum(p.get("composition", {}).get("candidateCount", 0) for p in final_doc.get("pages", [])),
             "elapsed_ms": elapsed_ms,
             "timings_ms": timings,
             "creativeSeed": seed,
@@ -282,7 +352,9 @@ class EditorialGenerationPipeline:
                 "violations": comm_violations,
             },
             "qualityReport": quality_report.to_dict(),
-            "parsed_requirements": contract.to_dict(),
+            "contractVersion": 1,
+            "parsed_requirements": {"output": contract.output.__dict__,
+                                    "design": contract.design.__dict__, "constraints": contract.constraints.__dict__},
             "hard_constraints": contract.constraints.hard,
             "negative_constraints": contract.constraints.negative,
             "soft_preferences": contract.constraints.soft,
@@ -405,6 +477,8 @@ class EditorialGenerationPipeline:
                 "useCards": "no_cards" not in contract.design.layout_behavior,
                 "containerStyle": "none" if "no_cards" in contract.design.layout_behavior else "card",
                 "products": [],
+                "blocks": [],
+                "negativeConstraints": list(contract.constraints.negative),
             }
 
             # Se houver textos verbatim do usuário
@@ -420,17 +494,10 @@ class EditorialGenerationPipeline:
                 for p_idx, pr in enumerate(prods):
                     sanitized_p = CommercialIntegrityGuard.sanitize_supplied_product(pr, default_index=p_idx + 1)
                     formatted_prods.append({
-                        "id": f"prod-{catalog_id}-{p_num}-{p_idx + 1:02d}",
-                        "name": sanitized_p["name"],
-                        "category": sanitized_p.get("category", category),
+                        **sanitized_p,
+                        "category": sanitized_p.get("category") or category,
                         "index": f"{p_idx + 1:02d}",
-                        "sku": sanitized_p["sku"],
-                        "price": sanitized_p["price"],
-                        "description": sanitized_p["description"],
                         "image": None if "NO_IMAGES" in contract.constraints.negative else sanitized_p.get("image"),
-                        "tag": sanitized_p["tag"],
-                        "quantity": sanitized_p.get("quantity"),
-                        "technical_specs": sanitized_p.get("technical_specs"),
                     })
                 page_obj["products"] = formatted_prods
 
@@ -444,6 +511,7 @@ class EditorialGenerationPipeline:
                     page_dict=page_obj,
                     palette=palette,
                     creative_seed=creative_seed,
+                    previous_pages=assembled_pages,
                 )
                 page_obj["composition"] = comp_result["composition"]
                 page_obj["safeArea"] = comp_result["safeArea"]

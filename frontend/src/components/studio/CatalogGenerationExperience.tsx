@@ -539,7 +539,7 @@ export const CatalogGenerationExperience: React.FC = () => {
                       {generationStage >= 4 && innerPage?.products?.[0]?.image ? (
                         <img
                           src={innerPage.products[0].image}
-                          alt={innerPage.products[0].name}
+                          alt={innerPage.products[0].name || ''}
                           className="w-full h-full object-contain p-1"
                         />
                       ) : (

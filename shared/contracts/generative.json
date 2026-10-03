@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "blockTypes": [
+    "text",
+    "headline",
+    "title",
+    "image",
+    "product_image",
+    "metadata",
+    "price",
+    "sku",
+    "caption",
+    "line",
+    "shape",
+    "folio",
+    "badge",
+    "quote",
+    "logo",
+    "table",
+    "color_field"
+  ],
+  "renderModes": [
+    "legacy",
+    "generative"
+  ],
+  "commercialProtectedFields": [
+    "id",
+    "sku",
+    "price",
+    "name",
+    "description",
+    "quantity",
+    "technical_specs",
+    "availability",
+    "inventory",
+    "discount",
+    "tag"
+  ],
+  "nullableProductFields": [
+    "name",
+    "sku",
+    "price",
+    "description",
+    "quantity",
+    "technical_specs",
+    "availability",
+    "inventory",
+    "discount",
+    "tag",
+    "image"
+  ],
+  "fontRegistryVersion": 1
+}

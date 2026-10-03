@@ -38,6 +38,8 @@ class RepairEngine:
         ou atingir o limite de tentativas. Retorna (repaired_document, final_validation, repair_log).
         """
         repaired_doc = copy.deepcopy(document)
+        from .commercial_guard import CommercialIntegrityGuard
+        commercial_originals = copy.deepcopy([p for page in document.get('pages', []) for p in page.get('products', [])])
         current_val = initial_validation
         current_critic = critic_report or VisualCritic.critique(repaired_doc, contract)
         repair_log: List[str] = []
@@ -53,6 +55,8 @@ class RepairEngine:
             actions_taken = []
 
             pages = repaired_doc.get("pages", [])
+            for page in pages:
+                page['negativeConstraints'] = list(contract.constraints.negative)
             req_pages = contract.output.page_count
             mode = contract.output.page_count_mode
 
@@ -184,6 +188,11 @@ class RepairEngine:
 
             # Revalidação profunda de ambos os motores
             current_val = GenerationValidator.validate(contract, repaired_doc)
+            integrity, violations = CommercialIntegrityGuard.verify_document_commercial_integrity(
+                commercial_originals, repaired_doc.get('pages', []), commercial_originals)
+            if not integrity:
+                for violation in violations:
+                    current_val.add_error(violation)
             current_critic = VisualCritic.critique(repaired_doc, contract)
 
             if current_val.passed and current_critic.passed:
@@ -195,20 +204,29 @@ class RepairEngine:
         fallback_pages = []
         fallback_reason = ""
 
-        if not current_val.passed:
+        if not current_val.passed or not current_critic.passed:
             fallback_used = True
-            fallback_reason = "; ".join(current_val.errors)
+            fallback_reason = "; ".join(current_val.errors + ([] if current_critic.passed else ["VISUAL_CRITIC_FAILED"]))
             logger.warning(
                 f"[RepairEngine] Documento permaneceu com erros após {attempt} tentativas. "
                 f"Ativando fallback seguro: {fallback_reason}"
             )
+            metrics = current_critic.to_dict().get('diagnostics', {}).get('pages', [])
+            targeted = {m['pageNumber'] for m in metrics if m.get('contrastRatio', 21) < 4.5 or m.get('legibility', 1) < .5}
             for idx, p in enumerate(repaired_doc.get("pages", [])):
                 p_num = idx + 1
+                if current_val.passed and targeted and p_num not in targeted:
+                    continue
                 fallback_pages.append(p_num)
                 cls.fallback_page_to_legacy(p, reason=fallback_reason)
 
             repair_log.append("Fallback seguro: pranchetas convertidas para modo legado compatível.")
             current_val = GenerationValidator.validate(contract, repaired_doc)
+            integrity, violations = CommercialIntegrityGuard.verify_document_commercial_integrity(
+                commercial_originals, repaired_doc.get('pages', []), commercial_originals)
+            if not integrity:
+                for violation in violations:
+                    current_val.add_error(violation)
             current_critic = VisualCritic.critique(repaired_doc, contract)
 
         # Atualiza a contagem final e metadados de observabilidade
@@ -318,10 +336,13 @@ class RepairEngine:
         Converte uma prancheta generativa para modo legado seguro,
         preservando todos os blocos originais sob 'generativeDraft' sem deixar estado fantasma.
         """
+        if page.get('renderMode') != 'legacy' or page.get('blocks') or 'generativeDraft' not in page:
+            page["generativeDraft"] = {
+                "blocks": page.pop("blocks", []),
+                "composition": page.pop("composition", {}),
+                "safeArea": page.pop("safeArea", {}),
+            }
         page["renderMode"] = "legacy"
-        page["generativeDraft"] = page.pop("blocks", [])
-        page["generativeCompositionDraft"] = page.pop("composition", {})
-        page["generativeSafeAreaDraft"] = page.pop("safeArea", {})
         page["fallbackReason"] = reason
         page["blocks"] = []
         return page

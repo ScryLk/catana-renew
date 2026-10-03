@@ -1,3 +1,5 @@
+import { manualProduct } from '../../utils/commercialProduct';
+import { SafeImage } from './SafeImage';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   X,
@@ -65,8 +67,8 @@ export const ProductDrawer: React.FC = () => {
   // Modal / Subpainel de Novo Produto
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newProductName, setNewProductName] = useState('');
-  const [newProductCategory, setNewProductCategory] = useState('GERAL');
-  const [newProductPrice, setNewProductPrice] = useState('R$ 490');
+  const [newProductCategory, setNewProductCategory] = useState('');
+  const [newProductPrice, setNewProductPrice] = useState('');
   const [newProductSku, setNewProductSku] = useState('');
   const [newProductTag, setNewProductTag] = useState('');
   const [newProductDescription, setNewProductDescription] = useState('');
@@ -176,7 +178,7 @@ export const ProductDrawer: React.FC = () => {
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchName = prod.name.toLowerCase().includes(q);
+        const matchName = (prod.name || '').toLowerCase().includes(q);
         const matchSku = prod.sku?.toLowerCase().includes(q);
         const matchCat = prod.category?.toLowerCase().includes(q);
         if (!matchName && !matchSku && !matchCat) return false;
@@ -228,7 +230,7 @@ export const ProductDrawer: React.FC = () => {
   const handleGenerateAIPhoto = async (prod: typeof allProducts[0]) => {
     try {
       setIsGeneratingAIPhoto(prod.id);
-      await generateAIProductImage(prod.id, prod.name, prod.category, prod.description || undefined);
+      await generateAIProductImage(prod.id, prod.name || 'Produto', prod.category, prod.description || undefined);
     } finally {
       setIsGeneratingAIPhoto(null);
     }
@@ -243,18 +245,12 @@ export const ProductDrawer: React.FC = () => {
     }
 
     const nextIndex = String(allProducts.length + 1).padStart(2, '0');
-    const defaultSku = newProductSku.trim() || `ART-${nextIndex}`;
-
-    addProductToRepository({
-      name: newProductName.trim(),
-      category: newProductCategory.trim() || 'COLEÇÃO 2026',
-      price: newProductPrice.trim() || 'R$ 1.000',
-      sku: defaultSku,
-      tag: newProductTag.trim() || 'Novo',
-      description: newProductDescription.trim() || 'Peça confeccionada com acabamento artesanal de alto padrão.',
-      image: newProductImage.trim() || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80',
-      index: nextIndex,
-    });
+    addProductToRepository(manualProduct({
+      name: newProductName.trim(), category: newProductCategory.trim(),
+      price: newProductPrice.trim() || null, sku: newProductSku.trim() || null,
+      tag: newProductTag.trim() || null, description: newProductDescription.trim() || null,
+      image: newProductImage.trim() || null, index: nextIndex,
+    }));
 
     // Limpar formulário
     setNewProductName('');
@@ -729,9 +725,9 @@ export const ProductDrawer: React.FC = () => {
                   <div className="flex gap-3 items-start">
                     {/* Thumbnail with AI overlay */}
                     <div className="relative size-18 rounded-xl bg-stone-100 overflow-hidden border border-inherit shrink-0 group">
-                      <img
+                      <SafeImage
                         src={prod.image || ''}
-                        alt={prod.name}
+                        alt={prod.name || ''}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
 
@@ -895,7 +891,7 @@ export const ProductDrawer: React.FC = () => {
                                   type="button"
                                   onClick={() => {
                                     setEditingProductId(prod.id);
-                                    setEditNameValue(prod.name);
+                                    setEditNameValue(prod.name || '');
                                     setEditPriceValue(prod.price || '');
                                   }}
                                   className={`p-1 rounded transition-colors cursor-pointer ${

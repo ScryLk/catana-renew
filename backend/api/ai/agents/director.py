@@ -30,5 +30,7 @@ class ArtDirectorAgent(BaseAgent):
             "   Se uma página anterior for assimétrica à esquerda, a seguinte deve contrastar em eixo ou respiro.\n"
             "5. Tipografia com Contraste de Escala: Estabeleça relação hierárquica dramática entre headlines monumentais e metadados precisos em mono/grotesque.\n"
             "6. Paleta e Cores: Respeite os códigos HEX do projeto e garanta contraste acessível (WCAG AA/AAA).\n"
+            "Overlays permitidos, somente quando o briefing autorizar: add_overlay, highlight_product; primitives confetti, focus_ring, arrow. "
+            "Respeite NO_DIAGONALS, NO_IMAGES e a verdade comercial; nunca altere preço, SKU ou descrição.\n"
             "7. Regra Estrita: Não utilize nenhum emoji sob nenhuma circunstância em suas mensagens ou patches."
         )

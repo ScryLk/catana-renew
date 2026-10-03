@@ -1,5 +1,5 @@
 import React from 'react';
-import { CatalogPageData, GenerativeBlock } from '../../data/editorialCatalog.mock';
+import { CatalogPageData, GenerativeBlock, normalizeCatalogDocument } from '../../data/editorialCatalog.mock';
 import { GenerativeBlockRenderer } from './GenerativeBlockRenderer';
 import { PageOverlayLayer } from './PageOverlayLayer';
 
@@ -20,7 +20,8 @@ export const GenerativePageRenderer: React.FC<GenerativePageRendererProps> = ({
   style = {},
   onBlockClick,
 }) => {
-  const blocks = page.blocks || [];
+  page = normalizeCatalogDocument({pages: [page]}).pages[0];
+  const blocks = page.renderMode === 'generative' ? page.blocks || [] : [];
   const safeArea = page.safeArea || { top: 0.04, right: 0.04, bottom: 0.04, left: 0.04 };
 
   return (
