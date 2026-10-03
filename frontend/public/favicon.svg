@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Dark Obsidian Background -->
+    <linearGradient id="catanaBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#18181C"/>
+      <stop offset="50%" stop-color="#121215"/>
+      <stop offset="100%" stop-color="#0A0A0C"/>
+    </linearGradient>
+
+    <!-- Metallic Warm Gold -->
+    <linearGradient id="catanaGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F7E5C1"/>
+      <stop offset="25%" stop-color="#D4AF37"/>
+      <stop offset="60%" stop-color="#B08D57"/>
+      <stop offset="100%" stop-color="#785B28"/>
+    </linearGradient>
+
+    <!-- Katana Steel Blade -->
+    <linearGradient id="catanaBlade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="40%" stop-color="#F4EFE6"/>
+      <stop offset="75%" stop-color="#D5CEBF"/>
+      <stop offset="100%" stop-color="#A8A090"/>
+    </linearGradient>
+
+    <radialGradient id="catanaCoreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#B08D57" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#B08D57" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Squircle Base -->
+  <rect width="512" height="512" rx="128" fill="url(#catanaBg)"/>
+  <!-- Gold Hairline Rim -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="url(#catanaGold)" stroke-width="4" opacity="0.55"/>
+
+  <!-- Subtle Core Glow -->
+  <circle cx="256" cy="256" r="210" fill="url(#catanaCoreGlow)"/>
+
+  <!-- Crescent Katana Blade Monogram (C) -->
+  <path d="M 368 152 
+           C 310 92 215 92 155 152 
+           C 95 212 95 300 155 360 
+           C 215 420 310 420 368 360 
+           C 375 353 370 342 360 344 
+           C 316 392 236 392 188 344 
+           C 140 296 140 216 188 168 
+           C 236 120 316 120 360 168 
+           C 370 170 375 159 368 152 Z" 
+        fill="url(#catanaBlade)"/>
+
+  <!-- Hamon Temper Line (Gold Arc) -->
+  <path d="M 330 185
+           C 285 145 220 145 180 185
+           C 140 225 140 287 180 327
+           C 220 367 285 367 330 327"
+        fill="none" stroke="url(#catanaGold)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
+
+  <!-- Editorial Diamond Spark (✦) -->
+  <path d="M 360 256 
+           C 360 238 376 222 394 222 
+           C 376 222 360 206 360 188 
+           C 360 206 344 222 326 222 
+           C 344 222 360 238 360 256 Z" 
+        fill="url(#catanaGold)" 
+        transform="translate(0, 34)"/>
+</svg>
