@@ -1,0 +1,92 @@
+name: Generative quality gates
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_call:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-only-nonproduction-key-for-isolated-tests
+      DEBUG: 'True'
+      ENVIRONMENT: development
+      DATABASE_URL: sqlite:////tmp/catana-ci.sqlite3
+      GEMINI_API_KEY: ''
+      ABACATEPAY_API_KEY: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install -r backend/requirements.txt
+      - run: bash scripts/run_backend_checks.sh
+  frontend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend
+      - run: npm test --prefix frontend
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend
+      - run: npm run build --prefix frontend
+  contract-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install -r backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python scripts/check_contract_parity.py
+      - run: node scripts/check_font_registry.mjs
+  determinism-checks:
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-only-nonproduction-key-for-isolated-tests
+      DEBUG: 'True'
+      ENVIRONMENT: development
+      DATABASE_URL: sqlite:////tmp/catana-ci.sqlite3
+      GEMINI_API_KEY: ''
+      ABACATEPAY_API_KEY: ''
+    strategy:
+      fail-fast: false
+      matrix:
+        hashseed: ['1', '42', '999']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install -r backend/requirements.txt
+      - run: python scripts/check_generative_invariants.py
+        env:
+          PYTHONHASHSEED: ${{ matrix.hashseed }}
