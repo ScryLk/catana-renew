@@ -1,7 +1,8 @@
 """
 Creative Director - Diretor Criativo e de Arte Editorial Autônomo.
-Produz regras compositivas concretas, diretrizes fotográficas e tipográficas,
-e proibições estilísticas explícitas baseadas no VisualDNA e no briefing.
+Produz regras compositivas concretas, diretrizes fotográficas e tipográficas através de
+composição combinatória ortogonal (ritmo, eixo, tipografia, fotografia, ornamento, malha),
+governada pelo VisualDNA e princípios do RAG, eliminando presets fechados.
 """
 from dataclasses import dataclass, field, asdict
 from typing import Dict, Any, List, Optional
@@ -10,19 +11,13 @@ import logging
 from .requirement_contract import RequirementContract
 from .visual_dna import VisualDNA
 from .content_planner import DocumentContentPlan
+from .font_registry import ALL_VERIFIED_FONTS, DEFAULT_FONT_REGISTRY
+from .rag_principle_extractor import RAGPrincipleExtractor
 
 logger = logging.getLogger(__name__)
 
-
-# Font Registry seguro mapeado para fontes existentes e seguras no frontend
-FONT_REGISTRY = {
-    "high_contrast_serif": ["Playfair Display", "Cinzel", "Prata"],
-    "editorial_serif": ["Cormorant Garamond", "EB Garamond", "Instrument Serif"],
-    "neo_grotesque": ["Inter", "Plus Jakarta Sans", "Jost"],
-    "geometric_sans": ["Space Grotesk", "Outfit", "Syne"],
-    "condensed_display": ["Oswald", "Anton", "Bebas Neue"],
-    "mono": ["JetBrains Mono", "Space Mono", "IBM Plex Mono"],
-}
+# Backward-compatibility alias
+FONT_REGISTRY = DEFAULT_FONT_REGISTRY
 
 
 @dataclass
@@ -30,11 +25,14 @@ class CreativeDirection:
     """Diretrizes concretas de direção de arte geradas para o catálogo."""
     concept_name: str
     concept_statement: str
-    visual_narrative: str                  # "slow-fast-slow", "crescendo", "minimal_pause", "monumental_contrast"
-    photographic_behavior: str             # "cropped_editorial", "monumental_bleed", "floating_detail", "spec_framing"
-    typographic_behavior: str              # "oversized_off_axis_serif", "disciplined_grotesque", "scale_jump_didone"
+    visual_narrative: str                  # "slow-fast-slow", "crescendo", "minimal_pause", "monumental_contrast", "dense_flow"
+    photographic_behavior: str             # "cropped_editorial", "monumental_bleed", "floating_detail", "spec_framing", "typography_only"
+    typographic_behavior: str              # "oversized_off_axis_serif", "disciplined_grotesque", "scale_jump_didone", "heavy_sans_against_mono"
     composition_behavior: str              # "asymmetric_controlled_tension", "stark_negative_space", "modular_discipline"
     graphic_language: str                  # "hairlines_plus_oversized_folios", "pure_typography_zero_rules", "technical_brackets"
+    axis_strategy: str = "asymmetric_left" # "asymmetric_left", "asymmetric_right", "diagonal_dynamic", "stark_horizontal"
+    grid_strategy: str = "modular_loose"   # "broken_12_column", "modular_loose", "strict_12_column"
+    scale_strategy: str = "high_contrast"  # "extreme_scale_contrast", "harmonic_progression", "monumental_focal"
     avoid: List[str] = field(default_factory=list)
     font_pairing: Dict[str, str] = field(default_factory=dict)
     palette_behavior: Dict[str, str] = field(default_factory=dict)
@@ -45,29 +43,53 @@ class CreativeDirection:
 
 class CreativeDirector:
     """
-    Diretor de Arte Autônomo.
-    Transforma intenção estética em instruções compositivas operacionais.
+    Diretor de Arte Autônomo com Composição Combinatória.
+    Evita templates Python fixos ao compor dimensões independentes parametrizadas pelo VisualDNA.
     """
 
-    CONCEPTS_BY_ARCHETYPE = {
-        "luxury_editorial": [
-            ("Monumental Silence", "O espaço negativo atua como luxo primordial; tipografia nobre em assimetria tensa e fotografia em corte macro.", "slow-fast-slow", "cropped_editorial", "oversized_off_axis_serif", "asymmetric_controlled_tension", "hairlines_plus_oversized_folios"),
-            ("Atelier Archive", "Documentação rigorosa e despojada de ateliê com alinhamentos periféricos e respiro contemplativo.", "monumental_contrast", "floating_detail", "editorial_serif_tight", "stark_negative_space", "hairlines_plus_whisper_folios"),
-            ("Fragmented Haute", "Tensão visual entre escala monumental e detalhes microscópicos de costura.", "crescendo", "monumental_bleed", "scale_jump_didone", "asymmetric_controlled_tension", "bold_folios_and_stark_contrasts"),
-        ],
-        "contemporary_minimalist": [
-            ("Pure Volume", "Supressão total de adornos supérfluos; pureza estrutural e legibilidade arquitetônica.", "slow-fast-slow", "monumental_bleed", "disciplined_grotesque", "stark_negative_space", "pure_typography_zero_rules"),
-            ("Architectural Rhythm", "Pausas ópticas generosas com grids geométricos desobstruídos e blocos esculturais.", "minimal_pause", "floating_detail", "geometric_sans_spaced", "modular_discipline", "monospaced_coordinates"),
-        ],
-        "brutalist_editorial": [
-            ("Raw Cadence", "Grid exposto com tipografia massiva que desafia as bordas e contrastes mecânicos.", "crescendo", "cropped_editorial", "condensed_heavy_grotesque", "asymmetric_controlled_tension", "exposed_grid_markers"),
-            ("Structural Tension", "Blocos tipográficos densos justapostos a campos cromáticos planos e frios.", "monumental_contrast", "spec_framing", "heavy_sans_against_mono", "modular_discipline", "thick_rules_and_stamps"),
-        ],
-        "commercial_technical": [
-            ("Precision Matrix", "Clareza absoluta para produtos e especificações técnicas sem abrir mão de dignidade editorial.", "information_flow", "spec_framing", "disciplined_grotesque", "modular_discipline", "technical_brackets_and_tables"),
-            ("Executive Clarity", "Hierarquia imediata entre SKU, preço e atributos de engenharia comercial.", "balanced_cadence", "floating_detail", "neo_grotesque_tabular", "modular_discipline", "clean_hairlines_and_badges"),
-        ],
-    }
+    RHYTHM_STRATEGIES = [
+        "slow-fast-slow",
+        "crescendo",
+        "minimal_pause",
+        "monumental_contrast",
+        "dense_flow",
+    ]
+
+    TYPOGRAPHIC_STRATEGIES = [
+        "oversized_off_axis_serif",
+        "disciplined_grotesque",
+        "scale_jump_didone",
+        "geometric_sans_spaced",
+        "heavy_sans_against_mono",
+    ]
+
+    PHOTOGRAPHIC_STRATEGIES = [
+        "cropped_editorial",
+        "monumental_bleed",
+        "floating_detail",
+        "spec_framing",
+    ]
+
+    GRID_STRATEGIES = [
+        "broken_12_column",
+        "modular_loose",
+        "strict_12_column",
+        "single_axis_asymmetric",
+    ]
+
+    AXIS_STRATEGIES = [
+        "asymmetric_left",
+        "asymmetric_right",
+        "diagonal_dynamic",
+        "stark_horizontal",
+    ]
+
+    ORNAMENT_STRATEGIES = [
+        "hairlines_plus_oversized_folios",
+        "pure_typography_zero_rules",
+        "technical_brackets",
+        "whisper_folios_clean",
+    ]
 
     @classmethod
     def direct(
@@ -78,89 +100,150 @@ class CreativeDirector:
         rag_context: Optional[Dict[str, Any]] = None,
         creative_seed: int = 42,
     ) -> CreativeDirection:
-        """Elabora a direção criativa completa para a geração."""
+        """Elabora a direção criativa combinatória para o catálogo."""
         rng = random.Random(creative_seed)
-        style_keywords = [k.lower() for k in contract.design.style_keywords]
-        raw_prompt = contract.raw_prompt.lower()
         negatives = set(contract.constraints.negative)
 
-        # 1. Determina o arquétipo estético dominante
-        if any(k in style_keywords or k in raw_prompt for k in ["luxury", "luxo", "alta costura", "haute", "joias", "couture"]):
-            archetype = "luxury_editorial"
-        elif any(k in style_keywords or k in raw_prompt for k in ["brutalist", "brutalista", "raw"]):
-            archetype = "brutalist_editorial"
-        elif any(k in style_keywords or k in raw_prompt for k in ["technical", "tecnico", "b2b", "especificacao", "industrial"]):
-            archetype = "commercial_technical"
+        # 1. Extração de princípios via RAGPrincipleExtractor
+        rag_principles = RAGPrincipleExtractor.extract_principles(rag_context)
+
+        # 2. Seleção Combinatória Independente de Dimensões Artísticas
+
+        # 2.1 Ritmo Narrativo (Influenciado pelo target de whitespace do VisualDNA)
+        if visual_dna.whitespace_ratio > 0.50:
+            rhythm_pool = ["slow-fast-slow", "minimal_pause", "monumental_contrast"]
+        elif visual_dna.whitespace_ratio < 0.35:
+            rhythm_pool = ["dense_flow", "crescendo"]
         else:
-            archetype = "contemporary_minimalist"
+            rhythm_pool = cls.RHYTHM_STRATEGIES
+        visual_narrative = rng.choice(rhythm_pool)
 
-        # 2. Seleciona conceito determinístico via creative_seed
-        concepts = cls.CONCEPTS_BY_ARCHETYPE[archetype]
-        concept_idx = rng.randint(0, len(concepts) - 1)
-        name, statement, narrative, photo_beh, typo_beh, comp_beh, graphic_lang = concepts[concept_idx]
+        # 2.2 Estratégia de Eixo (Governada por Simetria e Tensão Visual)
+        if visual_dna.symmetry < 0.40:
+            axis_pool = ["asymmetric_left", "asymmetric_right", "diagonal_dynamic"]
+        elif visual_dna.symmetry > 0.70:
+            axis_pool = ["stark_horizontal"]
+        else:
+            axis_pool = cls.AXIS_STRATEGIES
+        axis_strat = rng.choice(axis_pool)
 
-        # 3. Lista de proibições criativas (Anti-Generic & Anti-Cliche)
+        # 2.3 Estratégia de Malha / Grid
+        if visual_dna.grid_rigidity > 0.65:
+            grid_strat = "strict_12_column"
+        elif visual_dna.experimentalism > 0.60:
+            grid_strat = "broken_12_column"
+        else:
+            grid_strat = rag_principles.get("grid_behavior", "modular_loose")
+
+        # 2.4 Estratégia Fotográfica (Com proteção de NO_IMAGES)
+        if "NO_IMAGES" in negatives:
+            photo_beh = "typography_only"
+        else:
+            photo_beh = rag_principles.get("image_behavior") or rng.choice(cls.PHOTOGRAPHIC_STRATEGIES)
+
+        # 2.5 Estratégia Tipográfica (Governada por contraste e experimentalismo)
+        if visual_dna.contrast_ratio > 0.70:
+            typo_pool = ["scale_jump_didone", "oversized_off_axis_serif"]
+        elif visual_dna.grid_rigidity > 0.60:
+            typo_pool = ["disciplined_grotesque", "heavy_sans_against_mono"]
+        else:
+            typo_pool = cls.TYPOGRAPHIC_STRATEGIES
+        typo_beh = rng.choice(typo_pool)
+
+        # 2.6 Linguagem Gráfica e Ornamentos
+        if "no_cards" in contract.design.layout_behavior or "NO_CARDS" in negatives:
+            ornament_pool = ["hairlines_plus_oversized_folios", "pure_typography_zero_rules", "whisper_folios_clean"]
+        else:
+            ornament_pool = cls.ORNAMENT_STRATEGIES
+        graphic_lang = rng.choice(ornament_pool)
+
+        # 3. Composição de Conceito e Declaração de Arte
+        style_keywords = [k.lower() for k in contract.design.style_keywords]
+        raw_prompt = contract.raw_prompt.lower()
+        
+        is_luxury = any(k in style_keywords or k in raw_prompt for k in ["luxury", "luxo", "alta costura", "haute", "couture", "joias"])
+        is_tech = any(k in style_keywords or k in raw_prompt for k in ["technical", "tecnico", "b2b", "industrial", "engenharia"])
+        
+        if is_luxury:
+            concept_name = "Haute Disruption" if visual_dna.experimentalism > 0.5 else "Monumental Silence"
+            statement = "Espaço negativo e tensão tipográfica articulados com precisão de alta-costura."
+        elif is_tech:
+            concept_name = "Precision Matrix"
+            statement = "Estrutura modular de máxima densidade informacional e legibilidade analítica."
+        else:
+            concept_name = "Architectural Cadence"
+            statement = "Composição contemporânea com malha fluida e respiro óptico escultural."
+
+        # 4. Proibições Críticas
         avoid = [
             "centered hero on consecutive pages",
             "uniform cards across all items",
             "redundant decorative horizontal line below every heading",
-            "generic purple gradient SaaS treatment",
             "monogram inside circle on every single cover",
         ]
-
         if "NO_CARDS" in negatives:
             avoid.append("cards and boxed containers")
         if "NO_IMAGES" in negatives:
             avoid.append("photography and editorial background images")
-            photo_beh = "typography_only"
         if "NO_GRADIENTS" in negatives:
             avoid.append("color gradients")
         if visual_dna.symmetry < 0.4:
             avoid.append("symmetrical central axes")
 
-        # 4. Seleção segura de Font Pairing a partir do FONT_REGISTRY
-        if archetype == "luxury_editorial":
-            # Não usar sempre a mesma fonte: variar entre as famílias editoriais seguras
-            display_family = rng.choice(FONT_REGISTRY["editorial_serif"] if visual_dna.experimentalism < 0.6 else FONT_REGISTRY["high_contrast_serif"])
-            body_family = rng.choice(FONT_REGISTRY["neo_grotesque"])
-            mono_family = FONT_REGISTRY["mono"][0]
-        elif archetype == "brutalist_editorial":
-            display_family = rng.choice(FONT_REGISTRY["condensed_display"] + FONT_REGISTRY["geometric_sans"])
-            body_family = rng.choice(FONT_REGISTRY["neo_grotesque"])
-            mono_family = FONT_REGISTRY["mono"][1]
-        elif archetype == "commercial_technical":
-            display_family = FONT_REGISTRY["neo_grotesque"][0]
-            body_family = FONT_REGISTRY["neo_grotesque"][1]
-            mono_family = FONT_REGISTRY["mono"][2]
+        # 5. Seleção Determinística e Verificada de Fontes (FONT REGISTRY)
+        serif_options = DEFAULT_FONT_REGISTRY["editorial_serif"] + DEFAULT_FONT_REGISTRY["high_contrast_serif"]
+        sans_options = DEFAULT_FONT_REGISTRY["geometric_sans"] + DEFAULT_FONT_REGISTRY["neo_grotesque"]
+        mono_options = DEFAULT_FONT_REGISTRY["mono"]
+
+        if is_luxury or "serif" in typo_beh:
+            display_font = rng.choice(serif_options)
+            body_font = rng.choice(DEFAULT_FONT_REGISTRY["neo_grotesque"])
+        elif is_tech or "mono" in typo_beh:
+            display_font = rng.choice(DEFAULT_FONT_REGISTRY["condensed_display"] + sans_options)
+            body_font = DEFAULT_FONT_REGISTRY["neo_grotesque"][0]
         else:
-            display_family = rng.choice(FONT_REGISTRY["geometric_sans"])
-            body_family = rng.choice(FONT_REGISTRY["neo_grotesque"])
-            mono_family = FONT_REGISTRY["mono"][0]
+            display_font = rng.choice(sans_options)
+            body_font = rng.choice(DEFAULT_FONT_REGISTRY["neo_grotesque"])
+
+        metadata_font = rng.choice(mono_options)
 
         font_pairing = {
-            "display": display_family,
-            "body": body_family,
-            "metadata": mono_family,
-            "displayRole": "high_contrast_serif" if "Serif" in display_family or "Cinzel" in display_family or "Playfair" in display_family else "geometric_sans",
+            "display": display_font,
+            "body": body_font,
+            "metadata": metadata_font,
+            "displayRole": "serif" if "Serif" in display_font or "Cinzel" in display_font or "Prata" in display_font or "Playfair" in display_font else "sans",
             "bodyRole": "neo_grotesque",
             "metadataRole": "mono",
         }
 
-        # 5. Comportamento cromático
+        # 6. Comportamento Cromático Sem Viés Estrito Noir+Ivory
+        # Deriva a temperatura cromática com base no segmento e brief
+        if "NO_COLORS" in negatives or contract.design.allowed_color_space == "monochrome":
+            dominant_tone = "pure_monochrome"
+        elif "warm" in raw_prompt or is_luxury:
+            dominant_tone = rng.choice(["warm_terracotta_cream", "noir_and_gold", "mineral_sage_linen"])
+        elif is_tech:
+            dominant_tone = rng.choice(["deep_slate_cyan", "monochrome_steel", "pure_graphite"])
+        else:
+            dominant_tone = rng.choice(["organic_stone", "editorial_alabaster", "graphite_linen"])
+
         palette_behavior = {
-            "contrast_strategy": "high_contrast_editorial",
+            "contrast_strategy": "high_contrast_editorial" if visual_dna.contrast_ratio > 0.6 else "harmonious_soft",
             "accent_usage": "restrained_focal_points",
-            "dominant_tone": "noir_and_ivory" if "NO_COLORS" not in negatives else "pure_monochrome",
+            "dominant_tone": dominant_tone,
         }
 
         return CreativeDirection(
-            concept_name=name,
+            concept_name=concept_name,
             concept_statement=statement,
-            visual_narrative=narrative,
+            visual_narrative=visual_narrative,
             photographic_behavior=photo_beh,
             typographic_behavior=typo_beh,
-            composition_behavior=comp_beh,
+            composition_behavior="asymmetric_controlled_tension" if "asymmetric" in axis_strat else "modular_discipline",
             graphic_language=graphic_lang,
+            axis_strategy=axis_strat,
+            grid_strategy=grid_strat,
+            scale_strategy="extreme_scale_contrast" if visual_dna.contrast_ratio > 0.6 else "harmonic_progression",
             avoid=avoid,
             font_pairing=font_pairing,
             palette_behavior=palette_behavior,

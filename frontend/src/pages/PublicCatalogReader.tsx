@@ -739,11 +739,13 @@ export const PublicCatalogReader: React.FC = () => {
           >
             {/* Imagem do Produto */}
             <div className="relative aspect-video w-full bg-stone-100 overflow-hidden">
-              <img
-                src={selectedProduct.image}
-                alt={selectedProduct.name}
-                className="w-full h-full object-cover"
-              />
+              {selectedProduct.image && (
+                <img
+                  src={selectedProduct.image}
+                  alt={selectedProduct.name}
+                  className="w-full h-full object-cover"
+                />
+              )}
               {selectedProduct.tag && (
                 <div className="absolute top-3 left-3 px-2.5 py-0.5 rounded bg-black/80 text-white text-[10px] font-mono uppercase tracking-wider">
                   {selectedProduct.tag}

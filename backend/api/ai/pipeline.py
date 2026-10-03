@@ -10,6 +10,7 @@ import logging
 import os
 import time
 from typing import Dict, Any, Optional, List
+from django.conf import settings
 from .requirement_contract import RequirementContract
 from .requirement_parser import RequirementParser
 from .constraint_engine import ConstraintEngine
@@ -23,13 +24,20 @@ from .creative_director import CreativeDirector, CreativeDirection
 from .narrative_planner import NarrativePlanner, PageNarrativePlan
 from .composition_planner import CompositionPlanner
 from .novelty_engine import NoveltyEngine
-from .visual_critic import VisualCritic, VisualCriticReport
+from .visual_critic import VisualCritic, VisualCriticReport, GenerationQualityReport
 from .composition_mutator import CompositionMutator
+from .seed_utils import derive_creative_seed, compute_generation_fingerprint
+from .commercial_guard import CommercialIntegrityGuard
 
 logger = logging.getLogger(__name__)
 
-# Feature Flag Oficial da Arquitetura Generativa
-GENERATIVE_COMPOSITION_ENGINE = os.getenv("GENERATIVE_COMPOSITION_ENGINE", "true").lower() in ["true", "1", "yes"]
+# Feature Flag Oficial da Arquitetura Generativa (Item 43)
+# Por padrão é True; pode ser desativado via GENERATIVE_COMPOSITION_ENGINE=false em caso de rollback
+_env_flag = os.getenv("GENERATIVE_COMPOSITION_ENGINE")
+if _env_flag is not None:
+    GENERATIVE_COMPOSITION_ENGINE = _env_flag.lower() not in ["false", "0", "no", "off"]
+else:
+    GENERATIVE_COMPOSITION_ENGINE = True
 
 
 class EditorialGenerationPipeline:
@@ -51,12 +59,16 @@ class EditorialGenerationPipeline:
         Executa as etapas completas do pipeline generativo com validação, crítica e auto-reparo.
         """
         start_time = time.time()
+        timings: Dict[str, int] = {}
         logger.info(f"[EditorialPipeline] Iniciando geração para prompt: '{prompt[:60]}...'")
 
         # ETAPA 1 & 2: INTENT PARSER & REQUIREMENT CONTRACT
+        t0 = time.time()
         contract = RequirementParser.parse(prompt=prompt, products=products, attachments=attachments)
+        timings["requirement_parser_ms"] = int((time.time() - t0) * 1000)
 
         # ETAPA 3: CONSTRAINT ENGINE & FEASIBILITY CHECK
+        t0 = time.time()
         total_prods = len(products) if products else 0
         is_feasible, conflict_msg = ConstraintEngine.evaluate_feasibility(
             contract=contract,
@@ -68,30 +80,51 @@ class EditorialGenerationPipeline:
 
         # Arbitragem de conflitos entre preferências estéticas e restrições rígidas
         contract = ConstraintEngine.arbitrate_style_vs_constraints(contract, product_count=total_prods)
+        timings["feasibility_ms"] = int((time.time() - t0) * 1000)
 
-        # Resolve Creative Seed determinístico
+        # Normalização rigorosa de dados comerciais (Item 10 & 11)
+        clean_products = []
+        if products:
+            for idx, p in enumerate(products):
+                clean_products.append(CommercialIntegrityGuard.sanitize_supplied_product(p, default_index=idx + 1))
+
+        # Derivação de Creative Seed Criptograficamente Determinístico (Item 2)
         if creative_seed is None:
-            # Seed estável baseado no prompt e produtos
-            seed = (abs(hash(prompt.strip().lower() + f":{total_prods}")) % 900000) + 100000
+            seed = derive_creative_seed(prompt=prompt, products=clean_products)
         else:
             seed = int(creative_seed)
 
+        # Cálculo da Assinatura Determinística da Geração (Item 3)
+        gen_fingerprint = compute_generation_fingerprint(
+            prompt=prompt,
+            products=clean_products,
+            seed=seed,
+            constraints=contract.constraints.__dict__ if hasattr(contract.constraints, "__dict__") else {},
+        )
+
         # ETAPA 4: PAGE BUDGET ENGINE (Criação de N slots com orçamentos espaciais)
-        page_slots = PageBudgetEngine.calculate_and_allocate_slots(contract=contract, products=products)
+        t0 = time.time()
+        page_slots = PageBudgetEngine.calculate_and_allocate_slots(contract=contract, products=clean_products)
+        timings["page_budget_ms"] = int((time.time() - t0) * 1000)
 
         # ETAPA 5: RAG RETRIEVAL CONSCIENTE DE RESTRIÇÕES (Inspiração e princípios, não cópia)
+        t0 = time.time()
         from api.services.template_rag import TemplateRAGService
         rag_context = TemplateRAGService.retrieve_context_for_contract(contract)
+        timings["rag_ms"] = int((time.time() - t0) * 1000)
 
         # ETAPA 6: CONTENT PLANNER (WHAT TO SAY)
+        t0 = time.time()
         content_plan = ContentPlanner.plan(
             contract=contract,
             slots=page_slots,
-            products=products,
+            products=clean_products,
             synthesis_data=rag_context.get("synthesis_data"),
         )
+        timings["content_planner_ms"] = int((time.time() - t0) * 1000)
 
         # ETAPA 7: CREATIVE DIRECTOR & VISUAL DNA (HOW TO SHOW IT — PARAMÉTRICO)
+        t0 = time.time()
         visual_dna = VisualDNABuilder.derive(
             contract=contract,
             creative_seed=seed,
@@ -105,8 +138,10 @@ class EditorialGenerationPipeline:
             rag_context=rag_context,
             creative_seed=seed,
         )
+        timings["creative_director_ms"] = int((time.time() - t0) * 1000)
 
         # ETAPA 8: NARRATIVE PLANNER (RITMO EDITORIAL ENTRE PRANCHETAS)
+        t0 = time.time()
         narrative_sequence = NarrativePlanner.plan_sequence(
             contract=contract,
             content_plan=content_plan,
@@ -114,6 +149,7 @@ class EditorialGenerationPipeline:
             direction=creative_direction,
             creative_seed=seed,
         )
+        timings["narrative_planner_ms"] = int((time.time() - t0) * 1000)
 
         # Design plan clássico mantido para compatibilidade e paleta
         design_plan = DesignPlanner.plan(
@@ -123,6 +159,7 @@ class EditorialGenerationPipeline:
         )
 
         # ETAPA 9: GENERATION PLAN & COMPOSITION PLANNER (MONTAGEM DE BLOCOS NORMALIZADOS)
+        t0 = time.time()
         raw_document = cls._generate_document(
             contract=contract,
             content_plan=content_plan,
@@ -134,55 +171,117 @@ class EditorialGenerationPipeline:
             creative_direction=creative_direction,
             narrative_sequence=narrative_sequence,
             creative_seed=seed,
+            generation_fingerprint=gen_fingerprint,
+            clean_products=clean_products,
         )
+        timings["composition_planner_ms"] = int((time.time() - t0) * 1000)
 
         # ETAPA 10: VALIDATOR (DETERMINÍSTICO, SEMÂNTICO E GEOMÉTRICO)
+        t0 = time.time()
         initial_val = GenerationValidator.validate(contract=contract, document=raw_document)
+        timings["validation_ms"] = int((time.time() - t0) * 1000)
 
-        # ETAPA 11: VISUAL CRITIC (AVALIAÇÃO DE RISCO GENÉRICO E CLICHÊS)
-        critic_report = VisualCritic.critique(document=raw_document, contract=contract)
+        # ETAPA 11: VISUAL CRITIC (AVALIAÇÃO DE RISCO GENÉRICO E CLICHÊS COM MÉTRICAS REAIS)
+        t0 = time.time()
+        critic_report = VisualCritic.critique(document=raw_document, contract=contract, visual_dna=visual_dna)
+        timings["critic_ms"] = int((time.time() - t0) * 1000)
 
         final_doc = raw_document
         final_val = initial_val
         repair_log = []
 
-        # Se falhou na validação geométrica ou crítica
+        # ETAPA 12: AUTO-REPARO & MUTAÇÃO CRIATIVA (Item 5: Critic FAIL dispara Mutation mesmo se Validator passar)
+        t0 = time.time()
         if not initial_val.passed or not critic_report.passed:
             logger.info(
-                f"[EditorialPipeline] Falhas/Avisos detectados (Val: {initial_val.errors}, Crítica: {critic_report.cliches_detected}). "
-                f"Acionando RepairEngine & Mutation..."
+                f"[EditorialPipeline] Intervenção necessária (Val Errors: {len(initial_val.errors)}, "
+                f"Crítica Passed: {critic_report.passed}, Clichês: {critic_report.cliches_detected}). "
+                f"Acionando RepairEngine & Targeted Mutation..."
             )
             final_doc, final_val, repair_log = RepairEngine.repair_document(
                 contract=contract,
                 document=raw_document,
                 initial_validation=initial_val,
+                critic_report=critic_report,
+                creative_seed=seed,
             )
-            # Reavalia com o crítico após reparo
-            critic_report = VisualCritic.critique(document=final_doc, contract=contract)
+            # Reavalia com o crítico após mutações
+            critic_report = VisualCritic.critique(document=final_doc, contract=contract, visual_dna=visual_dna)
+        timings["repair_ms"] = int((time.time() - t0) * 1000)
 
         elapsed_ms = int((time.time() - start_time) * 1000)
+        timings["total_elapsed_ms"] = elapsed_ms
 
-        # Metadados de novidade e DNA salvos diretamente no documento
-        novelty_eval = NoveltyEngine.evaluate_catalog_novelty(final_doc.get("pages", []))
+        # ETAPA 13: AUDITORIA DE INTEGRIDADE COMERCIAL (Item 11 & 12)
+        comm_passed, comm_violations = CommercialIntegrityGuard.verify_document_commercial_integrity(
+            original_products=clean_products,
+            document_pages=final_doc.get("pages", []),
+        )
+
+        # ETAPA 14: CÁLCULO DE NOVIDADE FINAL E DETERMINAÇÃO DO MODO EFETIVO
+        novelty_eval = NoveltyEngine.evaluate_catalog_novelty(
+            [p for p in final_doc.get("pages", []) if p.get("renderMode") == "generative"]
+        )
+
+        # Modo efetivo de renderização baseado no estado real das pranchetas (Item 45)
+        page_render_modes = [p.get("renderMode") for p in final_doc.get("pages", [])]
+        if all(m == "generative" for m in page_render_modes):
+            effective_render_mode = "generative"
+        elif all(m == "legacy" for m in page_render_modes):
+            effective_render_mode = "legacy"
+        else:
+            effective_render_mode = "mixed"
+
+        repair_meta = final_doc.get("repair_metadata", {})
+        fallback_used = repair_meta.get("fallbackUsed", False)
+
+        # Relatório Unificado de Qualidade (Item 6)
+        quality_report = GenerationQualityReport(
+            structural_valid=final_val.deterministic_passed,
+            semantic_valid=final_val.semantic_passed,
+            commercial_data_valid=comm_passed,
+            novelty_valid=novelty_eval.get("passed", True),
+            visual_critic_valid=critic_report.passed,
+            passed=(final_val.passed and critic_report.passed and comm_passed and novelty_eval.get("passed", True)),
+            errors=final_val.errors + comm_violations + ([f"GENERIC_RISK_EXCEEDED: {critic_report.generic_risk}"] if not critic_report.passed else []),
+            warnings=final_val.warnings,
+            generic_risk=critic_report.generic_risk,
+            novelty_score=novelty_eval.get("overall_novelty", 0.80),
+            recommendations=critic_report.recommendations,
+        )
 
         final_doc["designSystem"] = {
             "visualDNA": visual_dna.to_dict(),
             "creativeDirection": creative_direction.to_dict(),
             "creativeSeed": seed,
-            "renderMode": "generative" if GENERATIVE_COMPOSITION_ENGINE else "legacy",
-            "noveltyScore": novelty_eval.get("overall_novelty", 0.8),
+            "generationFingerprint": gen_fingerprint,
+            "renderMode": effective_render_mode,
+            "noveltyScore": novelty_eval.get("overall_novelty", 0.80),
         }
         final_doc["criticReport"] = critic_report.to_dict()
+        final_doc["qualityReport"] = quality_report.to_dict()
+        final_doc["generationFingerprint"] = gen_fingerprint
+        final_doc["renderMode"] = effective_render_mode
 
-        # Telemetria e Observabilidade Completa
+        # Telemetria e Observabilidade Completa (Items 45, 46, 53)
         final_doc["observability"] = {
             "elapsed_ms": elapsed_ms,
+            "timings_ms": timings,
             "creativeSeed": seed,
-            "renderMode": "generative" if GENERATIVE_COMPOSITION_ENGINE else "legacy",
+            "generationFingerprint": gen_fingerprint,
+            "renderMode": effective_render_mode,
+            "fallbackUsed": fallback_used,
+            "fallbackReason": repair_meta.get("fallbackReason", ""),
+            "fallbackPages": repair_meta.get("fallbackPages", []),
             "visualDNA": visual_dna.to_dict(),
             "creativeDirection": creative_direction.to_dict(),
-            "noveltyScore": novelty_eval.get("overall_novelty", 0.8),
+            "noveltyScore": novelty_eval.get("overall_novelty", 0.80),
             "genericRisk": critic_report.generic_risk,
+            "commercialIntegrity": {
+                "passed": comm_passed,
+                "violations": comm_violations,
+            },
+            "qualityReport": quality_report.to_dict(),
             "parsed_requirements": contract.to_dict(),
             "hard_constraints": contract.constraints.hard,
             "negative_constraints": contract.constraints.negative,
@@ -208,7 +307,8 @@ class EditorialGenerationPipeline:
 
         logger.info(
             f"[EditorialPipeline] Geração concluída em {elapsed_ms}ms com {len(final_doc.get('pages', []))} páginas "
-            f"(Mode={final_doc['designSystem']['renderMode']}, Seed={seed}, Novelty={final_doc['designSystem']['noveltyScore']:.2f})."
+            f"(EffectiveMode={effective_render_mode}, Seed={seed}, Novelty={final_doc['designSystem']['noveltyScore']:.2f}, "
+            f"QualityPassed={quality_report.passed})."
         )
 
         return final_doc
@@ -226,9 +326,12 @@ class EditorialGenerationPipeline:
         creative_direction: Optional[CreativeDirection] = None,
         narrative_sequence: Optional[List[PageNarrativePlan]] = None,
         creative_seed: int = 42,
+        generation_fingerprint: str = "",
+        clean_products: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """Executa a montagem dos blocos generativos e retrocompatibilidade com páginas legadas."""
-        catalog_id = f"cat-{int(time.time())}"
+        # catalog_id determinístico derivado da impressão digital (Item 3)
+        catalog_id = f"cat-{generation_fingerprint[:12]}" if generation_fingerprint else f"cat-s{creative_seed}"
         title = content_plan.title
         category = content_plan.category
         summary = content_plan.summary
@@ -277,6 +380,12 @@ class EditorialGenerationPipeline:
             else:
                 page_type = "hero"
 
+            raw_title = title if p_num == 1 else p_map.purpose
+            clean_title = str(raw_title or "CATÁLOGO").upper()
+            raw_sub = summary if p_num == 1 else f"SEÇÃO {p_num:02d}"
+            clean_sub = str(raw_sub or f"SEÇÃO {p_num:02d}").upper()
+            clean_cat = str(category or "EDITORIAL").upper()
+
             # Constrói o objeto da prancheta
             page_obj = {
                 "id": f"{catalog_id}-p{p_num}",
@@ -286,9 +395,9 @@ class EditorialGenerationPipeline:
                 "renderMode": "generative" if GENERATIVE_COMPOSITION_ENGINE else "legacy",
                 "layoutStrategy": p_design.layout_strategy,
                 "slotCapacity": slot.target_capacity if slot else 1,
-                "title": (title if p_num == 1 else p_map.purpose).upper(),
-                "subtitle": summary.upper() if p_num == 1 else f"SEÇÃO {p_num:02d}",
-                "label": "CATÁLOGO DE PÁGINA ÚNICA" if is_one_pager else f"LAMINA {p_num:02d} · {category.upper()}",
+                "title": clean_title,
+                "subtitle": clean_sub,
+                "label": "CATÁLOGO DE PÁGINA ÚNICA" if is_one_pager else f"LAMINA {p_num:02d} · {clean_cat}",
                 "folio": f"{p_num:02d} · ONE-PAGER" if is_one_pager else f"{p_num:02d}",
                 "backgroundColor": bg_color,
                 "textColor": text_color,
@@ -305,20 +414,23 @@ class EditorialGenerationPipeline:
                 page_obj["content"] = summary
                 page_obj["quote"] = "Apresentação comercial e técnica estruturada em página única."
 
-            # Produtos estruturados
+            # Produtos estruturados: Inviolabilidade de Dados Comerciais (Item 10)
             if prods:
                 formatted_prods = []
                 for p_idx, pr in enumerate(prods):
+                    sanitized_p = CommercialIntegrityGuard.sanitize_supplied_product(pr, default_index=p_idx + 1)
                     formatted_prods.append({
                         "id": f"prod-{catalog_id}-{p_num}-{p_idx + 1:02d}",
-                        "name": pr.get("name", f"Produto {p_idx + 1:02d}"),
-                        "category": pr.get("category", category),
+                        "name": sanitized_p["name"],
+                        "category": sanitized_p.get("category", category),
                         "index": f"{p_idx + 1:02d}",
-                        "sku": pr.get("sku", f"SKU-{p_idx + 1:03d}"),
-                        "price": pr.get("price", "R$ 0,00"),
-                        "description": pr.get("description", "Apresentação comercial de alta precisão."),
-                        "image": None if "NO_IMAGES" in contract.constraints.negative else pr.get("image"),
-                        "tag": pr.get("tag", "Disponível"),
+                        "sku": sanitized_p["sku"],
+                        "price": sanitized_p["price"],
+                        "description": sanitized_p["description"],
+                        "image": None if "NO_IMAGES" in contract.constraints.negative else sanitized_p.get("image"),
+                        "tag": sanitized_p["tag"],
+                        "quantity": sanitized_p.get("quantity"),
+                        "technical_specs": sanitized_p.get("technical_specs"),
                     })
                 page_obj["products"] = formatted_prods
 
@@ -345,6 +457,7 @@ class EditorialGenerationPipeline:
 
         return {
             "catalogId": catalog_id,
+            "generationFingerprint": generation_fingerprint,
             "title": title,
             "category": category,
             "summary": summary,

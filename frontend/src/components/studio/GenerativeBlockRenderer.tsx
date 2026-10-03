@@ -1,5 +1,6 @@
 import React from 'react';
 import { CatalogPageData, GenerativeBlock } from '../../data/editorialCatalog.mock';
+import { resolveSafeFontFamily } from '../../utils/fontRegistry';
 
 interface GenerativeBlockRendererProps {
   block: GenerativeBlock;
@@ -7,6 +8,21 @@ interface GenerativeBlockRendererProps {
   interactive?: boolean;
   onBlockClick?: (block: GenerativeBlock) => void;
 }
+
+const isSafeImageUrl = (url?: string): boolean => {
+  if (!url) return false;
+  const lower = url.trim().toLowerCase();
+  if (lower.startsWith('javascript:') || lower.startsWith('vbscript:') || lower.startsWith('file:') || lower.startsWith('data:text')) {
+    return false;
+  }
+  return (
+    lower.startsWith('https://') ||
+    lower.startsWith('http://') ||
+    lower.startsWith('/') ||
+    lower.startsWith('data:image/') ||
+    lower.startsWith('blob:')
+  );
+};
 
 export const GenerativeBlockRenderer: React.FC<GenerativeBlockRendererProps> = ({
   block,
@@ -34,18 +50,6 @@ export const GenerativeBlockRenderer: React.FC<GenerativeBlockRendererProps> = (
     }
   };
 
-  // Resolução de fonte
-  const resolveFontFamily = (): string => {
-    if (block.fontFamily) return `"${block.fontFamily}", serif, sans-serif`;
-    if (block.fontRole === 'display') {
-      return "'Playfair Display', 'Cormorant Garamond', Georgia, serif";
-    }
-    if (block.fontRole === 'metadata') {
-      return "'JetBrains Mono', 'Space Mono', monospace";
-    }
-    return "'Inter', 'Plus Jakarta Sans', system-ui, sans-serif";
-  };
-
   const style: React.CSSProperties = {
     position: 'absolute',
     left: `${Math.max(0, block.x) * 100}%`,
@@ -56,7 +60,7 @@ export const GenerativeBlockRenderer: React.FC<GenerativeBlockRendererProps> = (
     opacity: block.opacity ?? 1,
     transform: block.rotation ? `rotate(${block.rotation}deg)` : undefined,
     color: resolveColor(block.colorToken, page.textColor),
-    fontFamily: resolveFontFamily(),
+    fontFamily: resolveSafeFontFamily(block.fontFamily, block.fontRole),
     textAlign: block.alignment || 'left',
     textTransform: block.textTransform || 'none',
     letterSpacing: block.letterSpacing,
@@ -72,9 +76,11 @@ export const GenerativeBlockRenderer: React.FC<GenerativeBlockRendererProps> = (
     }
   };
 
-  // 1. Bloco de Imagem de Produto / Fotografia
+  // 1. Bloco de Imagem de Produto / Fotografia com URL Sanitizada (Item 50)
   if (block.type === 'product_image' || block.type === 'image') {
     const objectFit = block.cropMode === 'contain' ? 'contain' : 'cover';
+    const hasValidImage = isSafeImageUrl(block.imageUrl);
+
     return (
       <div
         id={block.id}
@@ -86,7 +92,7 @@ export const GenerativeBlockRenderer: React.FC<GenerativeBlockRendererProps> = (
           interactive ? 'cursor-pointer hover:ring-1 hover:ring-zinc-400' : ''
         }`}
       >
-        {block.imageUrl ? (
+        {hasValidImage ? (
           <img
             src={block.imageUrl}
             alt={block.content || 'Editorial element'}
@@ -105,8 +111,10 @@ export const GenerativeBlockRenderer: React.FC<GenerativeBlockRendererProps> = (
     );
   }
 
-  // 2. Bloco de Preço
+  // 2. Bloco de Preço (Item 10: Sem fabricação de R$ 0,00)
   if (block.type === 'price') {
+    if (!block.content) return null;
+
     return (
       <div
         id={block.id}
@@ -122,7 +130,7 @@ export const GenerativeBlockRenderer: React.FC<GenerativeBlockRendererProps> = (
             color: resolveColor(block.colorToken, page.textColor),
           }}
         >
-          {block.content || 'R$ 0,00'}
+          {block.content}
         </span>
       </div>
     );

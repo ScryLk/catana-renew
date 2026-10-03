@@ -1,0 +1,58 @@
+{
+  "categories": {
+    "high_contrast_serif": {
+      "name": "High-Contrast Serif",
+      "fonts": ["Playfair Display", "Cinzel", "Prata"],
+      "default": "Playfair Display"
+    },
+    "editorial_serif": {
+      "name": "Editorial Serif",
+      "fonts": ["Cormorant Garamond", "Instrument Serif"],
+      "default": "Cormorant Garamond"
+    },
+    "neo_grotesque": {
+      "name": "Neo-Grotesque",
+      "fonts": ["Inter", "Plus Jakarta Sans", "Jost"],
+      "default": "Inter"
+    },
+    "geometric_sans": {
+      "name": "Geometric Sans",
+      "fonts": ["Space Grotesk", "Outfit", "Syne"],
+      "default": "Space Grotesk"
+    },
+    "condensed_display": {
+      "name": "Condensed Display",
+      "fonts": ["Oswald", "Anton", "Bebas Neue"],
+      "default": "Oswald"
+    },
+    "mono": {
+      "name": "Monospaced",
+      "fonts": ["JetBrains Mono", "Space Mono", "IBM Plex Mono"],
+      "default": "JetBrains Mono"
+    }
+  },
+  "roles": {
+    "display": ["Cormorant Garamond", "Playfair Display", "Cinzel", "Prata", "Instrument Serif", "Space Grotesk", "Syne", "Oswald", "Anton", "Bebas Neue"],
+    "body": ["Inter", "Plus Jakarta Sans", "Jost"],
+    "metadata": ["JetBrains Mono", "Space Mono", "IBM Plex Mono"]
+  },
+  "all_fonts": [
+    "Cormorant Garamond",
+    "Playfair Display",
+    "Cinzel",
+    "Prata",
+    "Instrument Serif",
+    "Inter",
+    "Plus Jakarta Sans",
+    "Jost",
+    "Space Grotesk",
+    "Outfit",
+    "Syne",
+    "Oswald",
+    "Anton",
+    "Bebas Neue",
+    "JetBrains Mono",
+    "Space Mono",
+    "IBM Plex Mono"
+  ]
+}

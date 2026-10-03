@@ -79,7 +79,7 @@ export const SpreadViewport: React.FC = () => {
 
 
   // Handler para selecionar elemento
-  const handleSelect = (elementId: string, e: React.MouseEvent, defaultName?: string, defaultPrice?: string) => {
+  const handleSelect = (elementId: string, e: React.MouseEvent, defaultName?: string, defaultPrice?: string | null) => {
     e.stopPropagation();
     if (selectedElementId === elementId) {
       setSelectedElementId(null);
@@ -144,7 +144,7 @@ export const SpreadViewport: React.FC = () => {
       if (lower.includes('+10%') && targetProductId) {
         const prod = pages.flatMap((p) => p.products || []).find((p) => p.id === targetProductId);
         if (prod) {
-          const num = parseInt(prod.price.replace(/[^0-9]/g, ''), 10) || 1000;
+          const num = prod.price ? (parseInt(prod.price.replace(/[^0-9]/g, ''), 10) || 1000) : 1000;
           const newPrice = `R$ ${(num * 1.1).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`;
           updateProduct(targetProductId, { price: newPrice });
           addMessage({
@@ -417,9 +417,10 @@ export const SpreadViewport: React.FC = () => {
             if (block.productId) {
               const prod = page.products?.find((p) => p.id === block.productId);
               if (prod) {
+                const slotIndex = page.products ? page.products.findIndex((p) => p.id === block.productId) : 0;
                 openProductDrawer({
                   pageNumber: page.pageNumber,
-                  slotIndex: 0,
+                  slotIndex: slotIndex >= 0 ? slotIndex : 0,
                   slotLabel: prod.name,
                   pageType: page.type,
                 });
@@ -770,11 +771,17 @@ export const SpreadViewport: React.FC = () => {
               }`}
               onClick={(e) => handleSelect(prod.id, e, prod.name, prod.price)}
             >
-              <img
-                src={prod.image}
-                alt={prod.name}
-                className="w-full h-full object-cover object-center group-hover:scale-[1.02] transition-transform duration-500"
-              />
+              {prod.image ? (
+                <img
+                  src={prod.image}
+                  alt={prod.name}
+                  className="w-full h-full object-cover object-center group-hover:scale-[1.02] transition-transform duration-500"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-stone-100 text-stone-400 font-mono text-xs">
+                  {prod.name}
+                </div>
+              )}
               {prod.tag && (
                 <div className="absolute top-3 left-3 bg-[#1A1817] text-[#F5F1EA] text-[9px] font-mono tracking-wider px-2.5 py-0.5 uppercase">
                   {prod.tag}
@@ -844,11 +851,17 @@ export const SpreadViewport: React.FC = () => {
                   }`}
                   onClick={(e) => handleSelect(prod.id, e, prod.name, prod.price)}
                 >
-                  <img
-                    src={prod.image}
-                    alt={prod.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
+                  {prod.image ? (
+                    <img
+                      src={prod.image}
+                      alt={prod.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-stone-100 text-stone-400 font-mono text-[10px]">
+                      {prod.name}
+                    </div>
+                  )}
                 </div>
                 <div
                   className={`p-1.5 rounded transition-all cursor-pointer ${
@@ -1115,11 +1128,17 @@ export const SpreadViewport: React.FC = () => {
                 }`}
                 onClick={(e) => handleSelect(prod.id, e, prod.name, prod.price)}
               >
-                <img
-                  src={prod.image}
-                  alt={prod.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
+                {prod.image ? (
+                  <img
+                    src={prod.image}
+                    alt={prod.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-stone-100 text-stone-400 font-mono text-xs">
+                    {prod.name}
+                  </div>
+                )}
               </div>
 
               <div
@@ -1202,11 +1221,17 @@ export const SpreadViewport: React.FC = () => {
                         className="w-full h-28 overflow-hidden rounded-xs relative mb-2"
                         style={{ backgroundColor: isDarkPage ? 'rgba(255, 255, 255, 0.08)' : '#F5F5F4' }}
                       >
-                        <img
-                          src={prod.image}
-                          alt={prod.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
+                        {prod.image ? (
+                          <img
+                            src={prod.image}
+                            alt={prod.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-stone-100 text-stone-400 font-mono text-[10px]">
+                            {prod.name}
+                          </div>
+                        )}
                         {prod.tag && (
                           <div className="absolute top-1.5 left-1.5 bg-[#1A1817] text-[#F5F1EA] text-[7px] font-mono tracking-wider px-1.5 py-0.2 uppercase">
                             {prod.tag}

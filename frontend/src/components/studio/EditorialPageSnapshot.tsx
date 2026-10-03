@@ -201,7 +201,7 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
           <div className="h-full flex flex-col justify-between py-9 px-9 select-none">
             <div className="w-full h-[360px] bg-stone-100 overflow-hidden relative rounded-sm">
               <img
-                src={prod.image}
+                src={prod.image || ''}
                 alt={prod.name}
                 className="w-full h-full object-cover object-center"
               />
@@ -261,7 +261,7 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
               <div className={`flex flex-col gap-2.5 transition-transform ${offsetClass}`}>
                 <div className="w-full h-44 bg-stone-100 overflow-hidden rounded-sm">
                   <img
-                    src={prod.image}
+                    src={prod.image || ''}
                     alt={prod.name}
                     className="w-full h-full object-cover"
                   />
@@ -385,7 +385,7 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
             <div className="flex flex-col items-center text-center mt-4">
               <div className="w-64 h-72 bg-stone-100 overflow-hidden rounded-sm mb-6">
                 <img
-                  src={prod.image}
+                  src={prod.image || ''}
                   alt={prod.name}
                   className="w-full h-full object-cover"
                 />
@@ -445,7 +445,7 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
                     <div key={prod.id || slotIdx} className="flex flex-col justify-between p-2.5 rounded-sm border border-stone-200 bg-white/40">
                       <div className="w-full h-28 bg-stone-100 overflow-hidden rounded-xs relative mb-2">
                         <img
-                          src={prod.image}
+                          src={prod.image || ''}
                           alt={prod.name}
                           className="w-full h-full object-cover"
                         />

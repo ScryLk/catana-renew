@@ -1,15 +1,82 @@
 """
 Composition Mutator - Motor de Mutação Compositiva e Exploração Espacial.
-Aplica variações estruturais controladas a pranchetas para romper repetições,
-aumentar assimetria ou responder a comandos do usuário no chat (ex: 'quebre a grade', 'deixe mais assimétrico').
-NUNCA altera dados comerciais (SKU, preço, nome, descrição).
+Aplica variações estruturais controladas a pranchetas para romper repetições e responder a alertas do crítico.
+Garante inviolabilidade absoluta dos dados comerciais e conformidade imediata com a Safe Area via fit_block_to_safe_area.
+Utiliza sementes de mutação determinísticas derivadas do creative_seed do catálogo.
 """
 import copy
 import random
 import logging
 from typing import Dict, Any, List, Optional, Tuple
+from .seed_utils import derive_mutation_seed
+from .generation_validator import SAFE_AREA_EXEMPT_ROLES
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_SAFE_AREA = {"top": 0.04, "right": 0.04, "bottom": 0.04, "left": 0.04}
+
+
+def fit_block_to_safe_area(
+    block: Dict[str, Any],
+    safe_area: Optional[Dict[str, float]] = None,
+) -> Dict[str, Any]:
+    """
+    Ajusta imediatamente a geometria de um bloco para respeitar as margens de corte (Safe Area).
+    Elementos isentos (como folios nas margens ou imagens em sangria) são mantidos dentro da prancheta física.
+    """
+    safe = safe_area or DEFAULT_SAFE_AREA
+    s_top = float(safe.get("top", 0.04))
+    s_right = float(safe.get("right", 0.04))
+    s_bottom = float(safe.get("bottom", 0.04))
+    s_left = float(safe.get("left", 0.04))
+
+    is_bleed = block.get("bleed", False)
+    role = block.get("role", "element")
+    is_exempt = role in SAFE_AREA_EXEMPT_ROLES or block.get("marginExempt", False)
+
+    min_w = 0.04
+    min_h = 0.02
+
+    if is_bleed:
+        # Sangria intencional: permite estender até 0 ou 1
+        block["x"] = round(max(-0.02, min(0.95, float(block.get("x", 0.0)))), 3)
+        block["y"] = round(max(-0.02, min(0.95, float(block.get("y", 0.0)))), 3)
+        block["width"] = round(max(min_w, min(1.05, float(block.get("width", 0.5)))), 3)
+        block["height"] = round(max(min_h, min(1.05, float(block.get("height", 0.2)))), 3)
+        return block
+
+    if is_exempt:
+        # Folios e marcas marginais: mantidos rigorosamente dentro dos limites físicos da prancheta [0, 1]
+        x = round(max(0.01, min(0.95, float(block.get("x", 0.0)))), 3)
+        y = round(max(0.01, min(0.98, float(block.get("y", 0.0)))), 3)
+        w = round(max(min_w, min(1.0 - x, float(block.get("width", 0.1)))), 3)
+        h = round(max(min_h, min(1.0 - y, float(block.get("height", 0.03)))), 3)
+        block["x"], block["y"], block["width"], block["height"] = x, y, w, h
+        return block
+
+    # Blocos de conteúdo padrão: NUNCA invadem a safe area
+    x = float(block.get("x", s_left))
+    y = float(block.get("y", s_top))
+    w = float(block.get("width", 0.5))
+    h = float(block.get("height", 0.2))
+
+    max_right = 1.0 - s_right
+    max_bottom = 1.0 - s_bottom
+
+    # Clampa largura e altura razoáveis
+    w = max(min_w, min(max_right - s_left, w))
+    h = max(min_h, min(max_bottom - s_top, h))
+
+    # Clampa coordenadas X e Y
+    x = max(s_left, min(max_right - w, x))
+    y = max(s_top, min(max_bottom - h, y))
+
+    block["x"] = round(x, 3)
+    block["y"] = round(y, 3)
+    block["width"] = round(w, 3)
+    block["height"] = round(h, 3)
+
+    return block
 
 
 class CompositionMutator:
@@ -26,7 +93,6 @@ class CompositionMutator:
         "move_focal_point",
         "rotate_visual_axis",
         "increase_typographic_scale",
-        "increase_whitespace",
         "switch_alignment",
     ]
 
@@ -37,33 +103,38 @@ class CompositionMutator:
         mutation_type: Optional[str] = None,
         strength: float = 0.5,
         creative_seed: int = 42,
+        attempt: int = 1,
     ) -> Tuple[Dict[str, Any], str]:
         """
         Aplica mutação geométrica segura aos blocos da prancheta.
-        Retorna (mutated_page, mutation_description).
+        Garante determinismo via creative_seed do documento e conformidade imediata com Safe Area.
         """
         mutated_page = copy.deepcopy(page_dict)
         blocks = mutated_page.get("blocks", [])
+        page_num = mutated_page.get("pageNumber", 1)
+        safe_area = mutated_page.get("safeArea") or DEFAULT_SAFE_AREA
 
         if not blocks:
-            # Não há blocos generativos para mutar
             return mutated_page, "NO_OP: Prancheta sem blocos generativos."
 
-        rng = random.Random(creative_seed)
+        # Deriva semente estável a partir do seed criativo do catálogo
+        mut_seed = derive_mutation_seed(creative_seed, page_num, attempt, mutation_type or "auto")
+        rng = random.Random(mut_seed)
+
         chosen_mutation = mutation_type or rng.choice(cls.AVAILABLE_MUTATIONS)
 
-        logger.info(f"[CompositionMutator] Aplicando mutação '{chosen_mutation}' (strength={strength})...")
+        logger.info(f"[CompositionMutator] Pág {page_num}: Aplicando mutação '{chosen_mutation}' (seed={mut_seed}, strength={strength})...")
 
         if chosen_mutation == "increase_asymmetry":
             desc = cls._mutate_increase_asymmetry(blocks, strength, rng)
         elif chosen_mutation == "move_focal_point":
             desc = cls._mutate_move_focal_point(blocks, rng)
         elif chosen_mutation == "increase_image_scale":
-            desc = cls._mutate_image_scale(blocks, scale_factor=1.0 + (strength * 0.35))
+            desc = cls._mutate_image_scale(blocks, scale_factor=1.0 + (strength * 0.25))
         elif chosen_mutation == "reduce_image_scale":
-            desc = cls._mutate_image_scale(blocks, scale_factor=1.0 - (strength * 0.30))
+            desc = cls._mutate_image_scale(blocks, scale_factor=1.0 - (strength * 0.20))
         elif chosen_mutation == "increase_typographic_scale":
-            desc = cls._mutate_typography_scale(blocks, scale_factor=1.0 + (strength * 0.40))
+            desc = cls._mutate_typography_scale(blocks, scale_factor=1.0 + (strength * 0.30))
         elif chosen_mutation == "switch_alignment":
             desc = cls._mutate_switch_alignment(blocks)
         elif chosen_mutation == "break_grid":
@@ -71,42 +142,45 @@ class CompositionMutator:
         else:
             desc = cls._mutate_rotate_axis(mutated_page, blocks, rng)
 
+        # Regra de Ouro (Item 38): Todo bloco mutado passa imediatamente pelo ajuste de Safe Area
+        for b in blocks:
+            fit_block_to_safe_area(b, safe_area)
+
         # Atualiza metadata da composição
         comp = mutated_page.get("composition", {})
         comp["balance"] = "asymmetric"
         comp["lastMutation"] = chosen_mutation
+        comp["mutationSeed"] = mut_seed
         mutated_page["composition"] = comp
 
         return mutated_page, desc
 
     @classmethod
     def _mutate_increase_asymmetry(cls, blocks: List[Dict[str, Any]], strength: float, rng: random.Random) -> str:
-        """Desloca elementos centrais para o eixo periférico esquerdo com respiro ampliado."""
+        """Desloca elementos centrais para o eixo periférico esquerdo."""
         count = 0
         for b in blocks:
-            if b.get("alignment") == "center":
+            if b.get("alignment") == "center" and b.get("role") != "folio":
                 b["alignment"] = "left"
                 b["x"] = round(max(0.06, min(0.35, float(b.get("x", 0.1)) - 0.15)), 3)
                 count += 1
             elif b.get("role") == "headline":
-                # Deslocamento sutil no eixo X
-                delta = rng.uniform(-0.08, 0.08) * strength
+                delta = rng.uniform(-0.06, 0.06) * strength
                 b["x"] = round(max(0.04, min(0.30, float(b.get("x", 0.06)) + delta)), 3)
                 count += 1
 
-        return f"Aumento de assimetria aplicado em {count} blocos (alinhamentos e eixos descentralizados)."
+        return f"Aumento de assimetria aplicado em {count} blocos."
 
     @classmethod
     def _mutate_move_focal_point(cls, blocks: List[Dict[str, Any]], rng: random.Random) -> str:
-        """Inverte o foco espacial (ex: foto da direita vai para a esquerda e texto vai para a direita)."""
+        """Alterna o quadrante da foto e dos blocos textuais."""
         photo_blocks = [b for b in blocks if "image" in b.get("type", "") or b.get("role") in ["hero_image", "primary_photo"]]
         text_blocks = [b for b in blocks if b.get("type") in ["text", "price", "metadata", "quote"] and b.get("role") != "folio"]
 
         if photo_blocks and text_blocks:
             for pb in photo_blocks:
                 curr_x = float(pb.get("x", 0.0))
-                # Se estava na direita (>0.4), vai para a esquerda (0.06); se estava na esquerda, vai para 0.44
-                new_x = 0.06 if curr_x > 0.35 else 0.44
+                new_x = 0.06 if curr_x > 0.35 else 0.46
                 pb["x"] = new_x
 
             for tb in text_blocks:
@@ -116,33 +190,31 @@ class CompositionMutator:
 
             return "Inversão de ponto focal: fotografia e massas de texto alternadas de quadrante."
 
-        return "Variação de ponto focal executada com sucesso."
+        return "Variação de ponto focal executada."
 
     @classmethod
     def _mutate_image_scale(cls, blocks: List[Dict[str, Any]], scale_factor: float) -> str:
-        """Ajusta proporcionalmente a escala de fotografias sem vazar os limites seguros."""
+        """Ajusta proporcionalmente a escala de fotografias."""
         count = 0
         for b in blocks:
             if "image" in b.get("type", "") or b.get("role") in ["hero_image", "primary_photo"]:
                 w = float(b.get("width", 0.5))
                 h = float(b.get("height", 0.5))
-                new_w = round(max(0.20, min(0.92, w * scale_factor)), 3)
-                new_h = round(max(0.15, min(0.85, h * scale_factor)), 3)
-                b["width"] = new_w
-                b["height"] = new_h
+                b["width"] = round(w * scale_factor, 3)
+                b["height"] = round(h * scale_factor, 3)
                 count += 1
 
         return f"Escala fotográfica ajustada por fator {scale_factor:.2f} em {count} bloco(s)."
 
     @classmethod
     def _mutate_typography_scale(cls, blocks: List[Dict[str, Any]], scale_factor: float) -> str:
-        """Aumenta a escala do título e o contraste tipográfico."""
+        """Aumenta o contraste tipográfico do headline."""
         count = 0
         for b in blocks:
             if b.get("role") == "headline":
                 curr_size = float(b.get("fontSize", 24))
-                b["fontSize"] = round(min(72.0, curr_size * scale_factor), 1)
-                b["height"] = round(min(0.35, float(b.get("height", 0.2)) * 1.2), 3)
+                b["fontSize"] = round(min(64.0, curr_size * scale_factor), 1)
+                b["height"] = round(min(0.30, float(b.get("height", 0.15)) * 1.15), 3)
                 count += 1
 
         return f"Contraste tipográfico ampliado em {count} headline(s)."
@@ -159,15 +231,14 @@ class CompositionMutator:
 
     @classmethod
     def _mutate_break_grid(cls, blocks: List[Dict[str, Any]], strength: float, rng: random.Random) -> str:
-        """Quebra a rigidez da malha introduzindo micro-deslocamentos e pequenas rotações controladas."""
+        """Quebra a rigidez da malha introduzindo micro-deslocamentos controlados."""
         for b in blocks:
-            if b.get("role") != "folio":
-                # Pequena rotação angular de tensão (-2 a +2 graus)
-                b["rotation"] = round(rng.uniform(-2.5, 2.5) * strength, 1)
-                delta_y = rng.uniform(-0.03, 0.03) * strength
-                b["y"] = round(max(0.04, min(0.88, float(b.get("y", 0.1)) + delta_y)), 3)
+            if b.get("role") not in ["folio", "price_tag", "sku_tag"]:
+                b["rotation"] = round(rng.uniform(-2.0, 2.0) * strength, 1)
+                delta_y = rng.uniform(-0.02, 0.02) * strength
+                b["y"] = round(float(b.get("y", 0.1)) + delta_y, 3)
 
-        return "Quebra de malha paramétrica aplicada com micro-rotação e tensão diagonal."
+        return "Quebra de malha paramétrica aplicada com micro-rotação e tensão controlada."
 
     @classmethod
     def _mutate_rotate_axis(cls, page_dict: Dict[str, Any], blocks: List[Dict[str, Any]], rng: random.Random) -> str:

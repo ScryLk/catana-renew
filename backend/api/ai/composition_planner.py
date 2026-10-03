@@ -2,15 +2,20 @@
 Composition Planner - Construtor Generativo de Layouts e Blocos Espaciais.
 Compõe pranchetas dinamicamente utilizando primitives, coordenadas normalizadas (0.0 a 1.0)
 e safe areas, respeitando a narrativa editorial e o VisualDNA.
+Utiliza o CompositionCandidateGenerator para gerar candidatos espaciais e selecionar
+o arranjo vencedor, mantendo métodos de composição como safe recipes.
 """
 from typing import Dict, Any, List, Optional
 import random
 import logging
+import dataclasses
 from .requirement_contract import RequirementContract
 from .visual_dna import VisualDNA
 from .creative_director import CreativeDirection
 from .narrative_planner import PageNarrativePlan
 from .design_grammar import GenerativeBlock, GenerativeCompositionMeta, GenerativeGridSpec
+from .composition_mutator import fit_block_to_safe_area, DEFAULT_SAFE_AREA
+from .composition_candidates import CompositionCandidateGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +40,8 @@ class CompositionPlanner:
         creative_seed: int = 42,
     ) -> Dict[str, Any]:
         """
-        Gera a composição completa e a lista de GenerativeBlocks para uma prancheta.
+        Gera a composição completa explorando múltiplos candidatos espaciais e elegendo a melhor prancheta.
         """
-        rng = random.Random(creative_seed + narrative.page_number * 1337)
         page_num = narrative.page_number
         role = narrative.content_role
         prods = page_dict.get("products", [])
@@ -49,12 +53,9 @@ class CompositionPlanner:
         has_images = contract.assets.has_product_images and "NO_IMAGES" not in contract.constraints.negative
         font_p = direction.font_pairing
 
-        blocks: List[GenerativeBlock] = []
-
-        # 1. Determina as propriedades compositivas gerais da prancheta
         balance = "axial" if visual_dna.symmetry > 0.65 else "asymmetric"
         grid_cols = 12 if visual_dna.grid_rigidity > 0.6 else 8
-        composition_meta = GenerativeCompositionMeta(
+        base_meta = GenerativeCompositionMeta(
             grid=GenerativeGridSpec(columns=grid_cols, rows=16, gutter=0.02),
             balance=balance,
             axis=narrative.layout_axis,
@@ -63,104 +64,110 @@ class CompositionPlanner:
             dominantPrimitive=narrative.dominant_primitive,
         )
 
-        # 2. Composição baseada no content_role e na narrativa
-        if role in ["opening", "one_pager"] and page_num == 1:
-            cls._compose_opening_page(
-                blocks=blocks,
-                title=title,
-                subtitle=subtitle,
-                content=content,
-                folio=folio_str,
-                visual_dna=visual_dna,
-                direction=direction,
-                font_p=font_p,
-                palette=palette,
-                rng=rng,
-                has_images=has_images,
-                page_dict=page_dict,
-                is_one_pager=(role == "one_pager"),
-                prods=prods,
-            )
+        # ---------------- GERAÇÃO COMBINATÓRIA DE 3 CANDIDATOS ESPACIAIS ----------------
+        candidates: List[Dict[str, Any]] = []
 
-        elif role in ["manifesto"]:
-            cls._compose_manifesto_page(
-                blocks=blocks,
-                title=title,
-                subtitle=subtitle,
-                content=content,
-                quote=quote,
-                folio=folio_str,
-                visual_dna=visual_dna,
-                direction=direction,
-                font_p=font_p,
-                palette=palette,
-                rng=rng,
-            )
+        # Candidato 1: Arranjo primário governado pelo eixo narrativo
+        cand1_blocks: List[GenerativeBlock] = []
+        cls._dispatch_composition(
+            role=role,
+            page_num=page_num,
+            blocks=cand1_blocks,
+            title=title,
+            subtitle=subtitle,
+            content=content,
+            quote=quote,
+            folio=folio_str,
+            visual_dna=visual_dna,
+            direction=direction,
+            font_p=font_p,
+            palette=palette,
+            rng=random.Random(creative_seed + page_num * 101),
+            has_images=has_images,
+            page_dict=page_dict,
+            is_one_pager=(role == "one_pager"),
+            prods=prods,
+            axis_override=narrative.layout_axis,
+        )
+        candidates.append({"blocks": cand1_blocks, "axis": narrative.layout_axis, "meta": base_meta})
 
-        elif role in ["product_reveal"]:
-            cls._compose_product_reveal_page(
-                blocks=blocks,
-                prods=prods,
-                title=title,
-                subtitle=subtitle,
-                folio=folio_str,
-                visual_dna=visual_dna,
-                direction=direction,
-                font_p=font_p,
-                palette=palette,
-                rng=rng,
-                has_images=has_images,
-            )
+        # Candidato 2: Variação de polaridade de eixo (inversão espacial)
+        cand2_blocks: List[GenerativeBlock] = []
+        alt_axis = "asymmetric_right" if "left" in narrative.layout_axis else "asymmetric_left"
+        cand2_dna = dataclasses.replace(
+            visual_dna,
+            symmetry=max(0.25, visual_dna.symmetry - 0.10),
+            whitespace=min(0.60, visual_dna.whitespace + 0.05),
+        )
+        cls._dispatch_composition(
+            role=role,
+            page_num=page_num,
+            blocks=cand2_blocks,
+            title=title,
+            subtitle=subtitle,
+            content=content,
+            quote=quote,
+            folio=folio_str,
+            visual_dna=cand2_dna,
+            direction=direction,
+            font_p=font_p,
+            palette=palette,
+            rng=random.Random(creative_seed + page_num * 202),
+            has_images=has_images,
+            page_dict=page_dict,
+            is_one_pager=(role == "one_pager"),
+            prods=prods,
+            axis_override=alt_axis,
+        )
+        candidates.append({"blocks": cand2_blocks, "axis": alt_axis, "meta": base_meta})
 
-        elif role in ["product_dialogue"]:
-            cls._compose_product_dialogue_page(
-                blocks=blocks,
-                prods=prods,
-                title=title,
-                subtitle=subtitle,
-                folio=folio_str,
-                visual_dna=visual_dna,
-                direction=direction,
-                font_p=font_p,
-                palette=palette,
-                rng=rng,
-                has_images=has_images,
-            )
+        # Candidato 3: Tensão diagonal dinâmica e escala tipográfica acentuada
+        cand3_blocks: List[GenerativeBlock] = []
+        cls._dispatch_composition(
+            role=role,
+            page_num=page_num,
+            blocks=cand3_blocks,
+            title=title,
+            subtitle=subtitle,
+            content=content,
+            quote=quote,
+            folio=folio_str,
+            visual_dna=visual_dna,
+            direction=direction,
+            font_p=font_p,
+            palette=palette,
+            rng=random.Random(creative_seed + page_num * 303),
+            has_images=has_images,
+            page_dict=page_dict,
+            is_one_pager=(role == "one_pager"),
+            prods=prods,
+            axis_override="diagonal_dynamic",
+        )
+        candidates.append({"blocks": cand3_blocks, "axis": "diagonal_dynamic", "meta": base_meta})
 
-        elif role in ["product_system"]:
-            cls._compose_product_system_page(
-                blocks=blocks,
-                prods=prods,
-                title=title,
-                subtitle=subtitle,
-                folio=folio_str,
-                visual_dna=visual_dna,
-                direction=direction,
-                font_p=font_p,
-                palette=palette,
-                rng=rng,
-                has_images=has_images,
-            )
+        # Avaliação de Fitness e Eleição do Vencedor
+        best_candidate = candidates[0]
+        best_score = -1.0
 
-        else:
-            # closing / default
-            cls._compose_closing_page(
-                blocks=blocks,
-                title=title,
-                subtitle=subtitle,
-                content=content,
-                folio=folio_str,
+        for cand in candidates:
+            cand_dict_blocks = [b.to_dict() for b in cand["blocks"]]
+            score = CompositionCandidateGenerator.evaluate_candidate_fitness(
+                blocks=cand_dict_blocks,
+                role=role,
                 visual_dna=visual_dna,
-                direction=direction,
-                font_p=font_p,
-                palette=palette,
-                rng=rng,
+                safe_area=cls.SAFE_AREA,
             )
+            if score > best_score:
+                best_score = score
+                best_candidate = cand
 
-        # 3. Adiciona sempre o fólio editorial discreto
-        if not any(b.role == "folio" for b in blocks):
-            folio_x = 0.06 if narrative.layout_axis == "asymmetric_right" else 0.82
-            blocks.append(
+        winner_blocks = best_candidate["blocks"]
+        winner_axis = best_candidate["axis"]
+
+        # Adiciona o fólio editorial discreto se ainda não existir
+        if not any(b.role == "folio" for b in winner_blocks):
+            folio_x = 0.06 if winner_axis == "asymmetric_right" else 0.82
+            winner_blocks.append(
                 GenerativeBlock(
                     id=f"p{page_num}-folio",
                     type="folio",
@@ -179,11 +186,140 @@ class CompositionPlanner:
                 )
             )
 
+        # Regra de Ouro (Item 14 & 38): Todo bloco vencedor passa imediatamente pelo ajuste de Safe Area
+        for b in winner_blocks:
+            fit_block_to_safe_area(b.__dict__, cls.SAFE_AREA)
+
+        final_meta = GenerativeCompositionMeta(
+            grid=GenerativeGridSpec(columns=grid_cols, rows=16, gutter=0.02),
+            balance=balance,
+            axis=winner_axis,
+            whitespaceRatio=narrative.whitespace_target,
+            visualTension=visual_dna.axis_tension,
+            dominantPrimitive=narrative.dominant_primitive,
+        )
+
         return {
-            "composition": composition_meta.to_dict(),
+            "composition": final_meta.to_dict(),
             "safeArea": cls.SAFE_AREA,
-            "blocks": [b.to_dict() for b in blocks],
+            "blocks": [b.to_dict() for b in winner_blocks],
         }
+
+    @classmethod
+    def _dispatch_composition(
+        cls,
+        role: str,
+        page_num: int,
+        blocks: List[GenerativeBlock],
+        title: str,
+        subtitle: str,
+        content: str,
+        quote: str,
+        folio: str,
+        visual_dna: VisualDNA,
+        direction: CreativeDirection,
+        font_p: Dict[str, str],
+        palette: Dict[str, str],
+        rng: random.Random,
+        has_images: bool,
+        page_dict: Dict[str, Any],
+        is_one_pager: bool,
+        prods: List[Dict[str, Any]],
+        axis_override: Optional[str] = None,
+    ):
+        """Despacha a composição para a receita espacial correspondente."""
+        if role in ["opening", "one_pager"] and page_num == 1:
+            cls._compose_opening_page(
+                blocks=blocks,
+                title=title,
+                subtitle=subtitle,
+                content=content,
+                folio=folio,
+                visual_dna=visual_dna,
+                direction=direction,
+                font_p=font_p,
+                palette=palette,
+                rng=rng,
+                has_images=has_images,
+                page_dict=page_dict,
+                is_one_pager=is_one_pager,
+                prods=prods,
+                axis_override=axis_override,
+            )
+        elif role in ["manifesto"]:
+            cls._compose_manifesto_page(
+                blocks=blocks,
+                title=title,
+                subtitle=subtitle,
+                content=content,
+                quote=quote,
+                folio=folio,
+                visual_dna=visual_dna,
+                direction=direction,
+                font_p=font_p,
+                palette=palette,
+                rng=rng,
+                axis_override=axis_override,
+            )
+        elif role in ["product_reveal"]:
+            cls._compose_product_reveal_page(
+                blocks=blocks,
+                prods=prods,
+                title=title,
+                subtitle=subtitle,
+                folio=folio,
+                visual_dna=visual_dna,
+                direction=direction,
+                font_p=font_p,
+                palette=palette,
+                rng=rng,
+                has_images=has_images,
+                axis_override=axis_override,
+            )
+        elif role in ["product_dialogue"]:
+            cls._compose_product_dialogue_page(
+                blocks=blocks,
+                prods=prods,
+                title=title,
+                subtitle=subtitle,
+                folio=folio,
+                visual_dna=visual_dna,
+                direction=direction,
+                font_p=font_p,
+                palette=palette,
+                rng=rng,
+                has_images=has_images,
+                axis_override=axis_override,
+            )
+        elif role in ["product_system"]:
+            cls._compose_product_system_page(
+                blocks=blocks,
+                prods=prods,
+                title=title,
+                subtitle=subtitle,
+                folio=folio,
+                visual_dna=visual_dna,
+                direction=direction,
+                font_p=font_p,
+                palette=palette,
+                rng=rng,
+                has_images=has_images,
+                axis_override=axis_override,
+            )
+        else:
+            cls._compose_closing_page(
+                blocks=blocks,
+                title=title,
+                subtitle=subtitle,
+                content=content,
+                folio=folio,
+                visual_dna=visual_dna,
+                direction=direction,
+                font_p=font_p,
+                palette=palette,
+                rng=rng,
+                axis_override=axis_override,
+            )
 
     # ---------------- COMPOSIÇÃO DE ABERTURA / CAPA ----------------
     @classmethod
@@ -203,14 +339,16 @@ class CompositionPlanner:
         page_dict: Dict[str, Any],
         is_one_pager: bool = False,
         prods: Optional[List[Dict[str, Any]]] = None,
+        axis_override: Optional[str] = None,
     ):
-        """Compõe a capa sem cair no clichê do monograma central com linha dourada."""
-        # Variação estrutural orientada por assimetria e escala
-        is_asymmetric = visual_dna.symmetry < 0.60
-        align = "left" if is_asymmetric else "center"
-        headline_x = rng.uniform(0.06, 0.12) if is_asymmetric else 0.10
-        headline_w = 0.80 if not is_asymmetric else rng.uniform(0.68, 0.84)
-        headline_y = rng.uniform(0.12, 0.28) if visual_dna.whitespace > 0.55 else rng.uniform(0.08, 0.18)
+        """Compõe a prancheta de capa com hierarquia monumental e anti-clichê."""
+        is_asymmetric = visual_dna.symmetry < 0.60 or (axis_override and "asymmetric" in axis_override)
+        headline_align = "left" if is_asymmetric else "center"
+        headline_x = 0.06 if is_asymmetric else 0.12
+        headline_w = 0.88 if is_asymmetric else 0.76
+
+        headline_size = round(32.0 + (visual_dna.scale_jump * 22.0), 1)
+        headline_y = 0.28 if visual_dna.whitespace_ratio > 0.45 else 0.20
 
         # 1. Headline Monumental
         blocks.append(
@@ -221,22 +359,23 @@ class CompositionPlanner:
                 x=round(headline_x, 3),
                 y=round(headline_y, 3),
                 width=round(headline_w, 3),
-                height=0.24,
+                height=0.22,
                 fontRole="display",
                 fontFamily=font_p.get("display", "serif"),
-                fontSize=round(38 + (visual_dna.scale_contrast * 28), 1),
-                fontWeight=300 if "serif" in font_p.get("display", "").lower() else 700,
-                alignment=align,
+                fontSize=headline_size,
+                fontWeight=400 if "serif" in font_p.get("display", "").lower() else 600,
+                lineHeight=1.05,
+                alignment=headline_align,
                 textTransform="uppercase",
-                letterSpacing="0.08em" if is_asymmetric else "0.18em",
+                letterSpacing="0.08em",
                 colorToken="primary",
                 content=title,
                 zIndex=3,
             )
         )
 
-        # 2. Subtítulo / Rótulo Editorial Deslocado
-        sub_y = headline_y + 0.26
+        # 2. Subtítulo / Statement de Arte
+        sub_y = headline_y + 0.24
         sub_x = headline_x if is_asymmetric else 0.15
         blocks.append(
             GenerativeBlock(
@@ -251,7 +390,7 @@ class CompositionPlanner:
                 fontFamily=font_p.get("body", "sans-serif"),
                 fontSize=11,
                 fontWeight=500,
-                alignment=align,
+                alignment=headline_align,
                 textTransform="uppercase",
                 letterSpacing="0.25em",
                 colorToken="accent",
@@ -260,7 +399,7 @@ class CompositionPlanner:
             )
         )
 
-        # 3. Logo / Selo de Marca não-centralizado obrigatoriamente
+        # 3. Logo / Selo de Marca
         logo_img = page_dict.get("editorialImage")
         if logo_img:
             blocks.append(
@@ -315,17 +454,22 @@ class CompositionPlanner:
         font_p: Dict[str, str],
         palette: Dict[str, str],
         rng: random.Random,
+        axis_override: Optional[str] = None,
     ):
         """Compõe prancheta de manifesto ou pausa contemplativa."""
+        is_right = (axis_override and "right" in axis_override)
+        lead_x = 0.48 if is_right else 0.08
+        lead_w = 0.46
+
         # Seção de cabeçalho sutil
         blocks.append(
             GenerativeBlock(
                 id="manifesto-category",
                 type="text",
-                role="label",
-                x=0.06,
-                y=0.08,
-                width=0.60,
+                role="category_label",
+                x=round(lead_x, 3),
+                y=0.12,
+                width=round(lead_w, 3),
                 height=0.04,
                 fontRole="metadata",
                 fontFamily=font_p.get("metadata", "monospace"),
@@ -333,50 +477,49 @@ class CompositionPlanner:
                 textTransform="uppercase",
                 letterSpacing="0.25em",
                 colorToken="accent",
-                content=subtitle or "MANIFESTO & DIRETRIZES",
+                content=subtitle or "MANIFESTO EDITORIAL",
                 zIndex=2,
             )
         )
 
-        # Citação / Título com forte assimetria e dramaticidade tipográfica
-        main_text = quote if quote else title
+        quote_text = quote or "O essencial, executado sem pressa e sem concessões."
         blocks.append(
             GenerativeBlock(
-                id="manifesto-title",
-                type="quote" if quote else "text",
-                role="headline",
-                x=0.06,
-                y=0.18,
-                width=0.78,
+                id="manifesto-quote",
+                type="quote",
+                role="pull_quote",
+                x=round(lead_x, 3),
+                y=0.20,
+                width=round(lead_w, 3),
                 height=0.28,
                 fontRole="display",
                 fontFamily=font_p.get("display", "serif"),
-                fontSize=round(28 + (visual_dna.scale_contrast * 20), 1),
+                fontSize=24,
                 fontWeight=400,
-                alignment="left",
                 lineHeight=1.35,
                 colorToken="primary",
-                content=f"“{main_text}”" if quote else main_text,
+                content=f'"{quote_text}"',
                 zIndex=3,
             )
         )
 
-        # Prosa de marca em coluna editorial estreita com espaço negativo abundante
-        body_text = content if content else direction.concept_statement
+        body_text = content or (
+            "Cada forma nasce da função, despida de artifícios. "
+            "A nobreza dos materiais e a precisão do corte estabelecem um diálogo silencioso entre tradição e contemporaneidade."
+        )
         blocks.append(
             GenerativeBlock(
                 id="manifesto-body",
                 type="text",
                 role="body",
-                x=0.06 if visual_dna.symmetry < 0.5 else 0.40,
+                x=round(lead_x, 3),
                 y=0.52,
-                width=0.50,
-                height=0.30,
+                width=round(lead_w, 3),
+                height=0.34,
                 fontRole="body",
                 fontFamily=font_p.get("body", "sans-serif"),
-                fontSize=12,
+                fontSize=13,
                 fontWeight=300,
-                alignment="left",
                 lineHeight=1.65,
                 colorToken="muted",
                 content=body_text,
@@ -399,12 +542,12 @@ class CompositionPlanner:
         palette: Dict[str, str],
         rng: random.Random,
         has_images: bool,
+        axis_override: Optional[str] = None,
     ):
         """Compõe prancheta com 1 produto dominante em arranjo escultural assimétrico."""
-        prod = prods[0] if prods else {"name": title, "price": "Sob Consulta", "sku": "CAT-01", "description": ""}
+        prod = prods[0] if prods else {"name": title, "price": None, "sku": None, "description": ""}
 
-        # Eixo fotográfico: esquerda ou direita dependendo de axis
-        is_left_photo = visual_dna.symmetry < 0.45 or rng.random() > 0.5
+        is_left_photo = (axis_override == "asymmetric_left") or (visual_dna.symmetry < 0.45 and axis_override != "asymmetric_right")
         photo_x = 0.04 if is_left_photo else 0.44
         photo_w = 0.52
         photo_y = 0.08
@@ -434,7 +577,11 @@ class CompositionPlanner:
         text_x = (photo_x + photo_w + 0.04) if (has_photo and is_left_photo) else 0.06
         text_w = 0.38 if has_photo else 0.86
 
-        # Categoria e SKU
+        # Categoria e SKU (se SKU não fornecido, não inventa)
+        sku_val = prod.get("sku")
+        cat_val = prod.get("category", "PEÇA ÚNICA")
+        meta_content = f"{cat_val} · {sku_val}" if sku_val else str(cat_val)
+
         blocks.append(
             GenerativeBlock(
                 id=f"prod-{prod.get('id', '1')}-meta",
@@ -450,7 +597,7 @@ class CompositionPlanner:
                 textTransform="uppercase",
                 letterSpacing="0.2em",
                 colorToken="accent",
-                content=f"{prod.get('category', 'PEÇA ÚNICA')} · {prod.get('sku', '')}",
+                content=meta_content,
                 zIndex=3,
             )
         )
@@ -477,27 +624,29 @@ class CompositionPlanner:
             )
         )
 
-        # Preço
-        blocks.append(
-            GenerativeBlock(
-                id=f"prod-{prod.get('id', '1')}-price",
-                type="price",
-                role="price",
-                x=round(text_x, 3),
-                y=0.42,
-                width=round(text_w, 3),
-                height=0.06,
-                fontRole="body",
-                fontFamily=font_p.get("body", "sans-serif"),
-                fontSize=18,
-                fontWeight=600,
-                alignment="left",
-                colorToken="primary",
-                content=prod.get("price", "R$ 0,00"),
-                productId=prod.get("id"),
-                zIndex=3,
+        # Preço: Inviolabilidade Comercial (Item 10) - Se ausente, usa None
+        price_val = prod.get("price")
+        if price_val:
+            blocks.append(
+                GenerativeBlock(
+                    id=f"prod-{prod.get('id', '1')}-price",
+                    type="price",
+                    role="price",
+                    x=round(text_x, 3),
+                    y=0.42,
+                    width=round(text_w, 3),
+                    height=0.06,
+                    fontRole="body",
+                    fontFamily=font_p.get("body", "sans-serif"),
+                    fontSize=18,
+                    fontWeight=600,
+                    alignment="left",
+                    colorToken="primary",
+                    content=price_val,
+                    productId=prod.get("id"),
+                    zIndex=3,
+                )
             )
-        )
 
         # Descrição sensorial
         if prod.get("description"):
@@ -523,7 +672,7 @@ class CompositionPlanner:
                 )
             )
 
-    # ---------------- COMPOSIÇÃO DE DUPLA (DUO) ----------------
+    # ---------------- COMPOSIÇÃO DE DIÁLOGO DE DOIS PRODUTOS (DUO) ----------------
     @classmethod
     def _compose_product_dialogue_page(
         cls,
@@ -538,18 +687,17 @@ class CompositionPlanner:
         palette: Dict[str, str],
         rng: random.Random,
         has_images: bool,
+        axis_override: Optional[str] = None,
     ):
-        """Compõe 2 produtos com descolamento óptico dinâmico (não dois cards iguais)."""
-        p1 = prods[0] if len(prods) > 0 else {"id": "1", "name": f"{title} · Look I", "price": "Sob Consulta", "sku": "VER-01"}
-        p2 = prods[1] if len(prods) > 1 else {"id": "2", "name": f"{title} · Look II", "price": "Sob Consulta", "sku": "VER-02"}
+        """Compõe 2 produtos com descolamento óptico dinâmico."""
+        p1 = prods[0] if len(prods) > 0 else {"id": "1", "name": f"{title} · Look I", "price": None, "sku": None}
+        p2 = prods[1] if len(prods) > 1 else {"id": "2", "name": f"{title} · Look II", "price": None, "sku": None}
 
-        # Item 1: mais alto e à esquerda
         y1 = 0.12
         x1 = 0.06
         w1 = 0.42
         h_photo1 = 0.38
 
-        # Item 2: escalonado para baixo (tensão diagonal)
         y2 = 0.38 if visual_dna.symmetry < 0.6 else 0.12
         x2 = 0.52
         w2 = 0.42
@@ -578,7 +726,7 @@ class CompositionPlanner:
                     )
                 )
 
-            # Metadata + Nome + Preço
+            # Nome
             blocks.append(
                 GenerativeBlock(
                     id=f"duo-{pid}-name",
@@ -600,26 +748,29 @@ class CompositionPlanner:
                 )
             )
 
-            blocks.append(
-                GenerativeBlock(
-                    id=f"duo-{pid}-price",
-                    type="price",
-                    role="price",
-                    x=round(px, 3),
-                    y=round(py + ph + 0.10, 3),
-                    width=round(pw, 3),
-                    height=0.04,
-                    fontRole="body",
-                    fontFamily=font_p.get("body", "sans-serif"),
-                    fontSize=14,
-                    fontWeight=600,
-                    alignment="left",
-                    colorToken="primary",
-                    content=p.get("price", "R$ 0,00"),
-                    productId=pid,
-                    zIndex=3,
+            # Preço: Inviolabilidade Comercial (Item 10)
+            p_price = p.get("price")
+            if p_price:
+                blocks.append(
+                    GenerativeBlock(
+                        id=f"duo-{pid}-price",
+                        type="price",
+                        role="price",
+                        x=round(px, 3),
+                        y=round(py + ph + 0.10, 3),
+                        width=round(pw, 3),
+                        height=0.04,
+                        fontRole="body",
+                        fontFamily=font_p.get("body", "sans-serif"),
+                        fontSize=14,
+                        fontWeight=600,
+                        alignment="left",
+                        colorToken="primary",
+                        content=p_price,
+                        productId=pid,
+                        zIndex=3,
+                    )
                 )
-            )
 
     # ---------------- COMPOSIÇÃO DE MATRIZ DE PRODUTOS ----------------
     @classmethod
@@ -636,9 +787,9 @@ class CompositionPlanner:
         palette: Dict[str, str],
         rng: random.Random,
         has_images: bool,
+        axis_override: Optional[str] = None,
     ):
         """Compõe 3 ou 4 produtos de forma organizada e proporcional."""
-        # Cabeçalho da seção
         blocks.append(
             GenerativeBlock(
                 id="sys-header-label",
@@ -654,32 +805,33 @@ class CompositionPlanner:
                 textTransform="uppercase",
                 letterSpacing="0.25em",
                 colorToken="accent",
-                content=subtitle or "COLEÇÃO & CATÁLOGO",
+                content=subtitle or "SELEÇÃO CURADA · ESPECIFICAÇÕES",
                 zIndex=2,
             )
         )
 
-        count = len(prods)
-        # Grid 2x2 modular
-        coords = [
-            (0.06, 0.14, 0.42, 0.36),
-            (0.52, 0.14, 0.42, 0.36),
-            (0.06, 0.54, 0.42, 0.36),
-            (0.52, 0.54, 0.42, 0.36),
+        display_prods = prods[:4] if prods else []
+        coords_4 = [
+            (0.06, 0.12, 0.42, 0.36),
+            (0.52, 0.12, 0.42, 0.36),
+            (0.06, 0.52, 0.42, 0.36),
+            (0.52, 0.52, 0.42, 0.36),
         ]
 
-        for idx, p in enumerate(prods[:4]):
-            px, py, pw, ph = coords[idx]
+        for idx, p in enumerate(display_prods):
+            if idx >= len(coords_4):
+                break
+            px, py, pw, ph = coords_4[idx]
             pid = p.get("id", str(idx + 1))
-            img_url = p.get("image")
-            photo_h = 0.22 if (has_images and img_url) else 0.0
+            photo_h = 0.22
 
+            img_url = p.get("image")
             if has_images and img_url:
                 blocks.append(
                     GenerativeBlock(
                         id=f"grid-{pid}-photo",
                         type="product_image",
-                        role="primary_photo",
+                        role="catalog_thumb",
                         x=round(px, 3),
                         y=round(py, 3),
                         width=round(pw, 3),
@@ -691,7 +843,6 @@ class CompositionPlanner:
                     )
                 )
 
-            # Nome e Preço
             blocks.append(
                 GenerativeBlock(
                     id=f"grid-{pid}-info",
@@ -713,26 +864,28 @@ class CompositionPlanner:
                 )
             )
 
-            blocks.append(
-                GenerativeBlock(
-                    id=f"grid-{pid}-price",
-                    type="price",
-                    role="price",
-                    x=round(px, 3),
-                    y=round(py + photo_h + 0.07, 3),
-                    width=round(pw, 3),
-                    height=0.04,
-                    fontRole="body",
-                    fontFamily=font_p.get("body", "sans-serif"),
-                    fontSize=13,
-                    fontWeight=600,
-                    alignment="left",
-                    colorToken="primary",
-                    content=p.get("price", "R$ 0,00"),
-                    productId=pid,
-                    zIndex=3,
+            p_price = p.get("price")
+            if p_price:
+                blocks.append(
+                    GenerativeBlock(
+                        id=f"grid-{pid}-price",
+                        type="price",
+                        role="price",
+                        x=round(px, 3),
+                        y=round(py + photo_h + 0.07, 3),
+                        width=round(pw, 3),
+                        height=0.04,
+                        fontRole="body",
+                        fontFamily=font_p.get("body", "sans-serif"),
+                        fontSize=13,
+                        fontWeight=600,
+                        alignment="left",
+                        colorToken="primary",
+                        content=p_price,
+                        productId=pid,
+                        zIndex=3,
+                    )
                 )
-            )
 
     # ---------------- COMPOSIÇÃO DE ENCERRAMENTO (CONTRACAPA) ----------------
     @classmethod
@@ -748,6 +901,7 @@ class CompositionPlanner:
         font_p: Dict[str, str],
         palette: Dict[str, str],
         rng: random.Random,
+        axis_override: Optional[str] = None,
     ):
         """Compõe a contracapa com dignidade tipográfica e informações de contato."""
         align = "left" if visual_dna.symmetry < 0.55 else "center"
