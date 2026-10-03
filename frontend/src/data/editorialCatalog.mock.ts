@@ -72,10 +72,77 @@ export interface PageOverlayElement {
   zIndex?: number;
 }
 
+export type PageRenderMode = 'legacy' | 'generative';
+
+export type GenerativeBlockType =
+  | 'text'
+  | 'image'
+  | 'product_image'
+  | 'metadata'
+  | 'price'
+  | 'sku'
+  | 'caption'
+  | 'line'
+  | 'shape'
+  | 'folio'
+  | 'badge'
+  | 'quote'
+  | 'logo'
+  | 'table'
+  | 'color_field';
+
+export interface GenerativeBlock {
+  id: string;
+  type: GenerativeBlockType | string;
+  role?: string;
+  x: number; // 0.0 a 1.0 (coordenada horizontal normalizada)
+  y: number; // 0.0 a 1.0 (coordenada vertical normalizada)
+  width: number; // 0.0 a 1.0
+  height: number; // 0.0 a 1.0
+  rotation?: number; // Graus
+  opacity?: number; // 0.0 a 1.0
+  zIndex?: number;
+  alignment?: 'left' | 'center' | 'right';
+  fontRole?: 'display' | 'body' | 'metadata';
+  fontFamily?: string;
+  fontSize?: number;
+  fontWeight?: number;
+  letterSpacing?: string;
+  lineHeight?: number;
+  textTransform?: 'none' | 'uppercase' | 'lowercase';
+  colorToken?: string;
+  content?: string;
+  productId?: string;
+  imageUrl?: string;
+  cropMode?: 'cover' | 'contain' | 'editorial';
+  bleed?: boolean;
+  allowOverlap?: boolean;
+  intentionalCrop?: boolean;
+}
+
+export interface GenerativeCompositionMeta {
+  grid?: {
+    columns: number;
+    rows: number;
+    gutter: number;
+  };
+  balance?: 'asymmetric' | 'axial' | 'diagonal';
+  axis?: string;
+  whitespaceRatio?: number;
+  visualTension?: number;
+  dominantPrimitive?: string;
+}
+
 export interface CatalogPageData {
   id: string;
   pageNumber: number;
   type: PageLayoutType;
+  renderMode?: PageRenderMode;
+  composition?: GenerativeCompositionMeta;
+  safeArea?: { top: number; right: number; bottom: number; left: number };
+  blocks?: GenerativeBlock[];
+  visualDNA?: Record<string, number>;
+  creativeDirection?: Record<string, any>;
   title?: string;
   subtitle?: string;
   label?: string;

@@ -47,7 +47,46 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
       )}
 
       {/* Internal Mini Visual Content */}
-      {page.type === 'cover' && (
+      {page.renderMode === 'generative' && page.blocks && page.blocks.length > 0 && (
+        <div className="relative w-full h-full overflow-hidden select-none pointer-events-none">
+          {page.blocks.map((b) => {
+            const isImg = b.type === 'product_image' || b.type === 'image';
+            return (
+              <div
+                key={b.id}
+                className="absolute overflow-hidden"
+                style={{
+                  left: `${b.x * 100}%`,
+                  top: `${b.y * 100}%`,
+                  width: `${b.width * 100}%`,
+                  height: `${b.height * 100}%`,
+                  opacity: b.opacity ?? 1,
+                  backgroundColor: isImg ? (b.imageUrl ? undefined : 'rgba(0,0,0,0.08)') : undefined,
+                }}
+              >
+                {isImg && b.imageUrl ? (
+                  <img src={b.imageUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div
+                    className="w-full h-full overflow-hidden"
+                    style={{
+                      fontSize: '3px',
+                      lineHeight: '4px',
+                      color: b.colorToken === 'accent' ? (page.accentColor || '#C5A059') : (page.textColor || '#141416'),
+                      fontWeight: b.fontWeight || 400,
+                    }}
+                  >
+                    {b.content}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Internal Mini Visual Content (Legacy Fallback) */}
+      {page.renderMode !== 'generative' && page.type === 'cover' && (
         <div className="h-full flex flex-col items-center justify-center text-center gap-1.5 pt-3">
           <div
             className="size-6 rounded-full border flex items-center justify-center p-0.5 bg-black/20"
