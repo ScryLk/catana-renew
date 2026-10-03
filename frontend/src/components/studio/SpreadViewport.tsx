@@ -17,6 +17,7 @@ import { CatalogPageData } from '../../data/editorialCatalog.mock';
 import { MiniPageThumbnail } from './MiniPageThumbnail';
 import { AgentCursorLayer } from './AgentCursorLayer';
 import { PageOverlayLayer } from './PageOverlayLayer';
+import { GenerativePageRenderer } from './GenerativePageRenderer';
 import { Tooltip } from '../ui/Tooltip';
 import { toast } from 'sonner';
 
@@ -406,6 +407,28 @@ export const SpreadViewport: React.FC = () => {
   const renderPageContent = (page: CatalogPageData) => {
     const accent = page.accentColor || activePalette.accent;
     const isDarkPage = isDarkPageBg(page.backgroundColor);
+
+    if (page.renderMode === 'generative' && page.blocks && page.blocks.length > 0) {
+      return (
+        <GenerativePageRenderer
+          page={page}
+          interactive={true}
+          onBlockClick={(block) => {
+            if (block.productId) {
+              const prod = page.products?.find((p) => p.id === block.productId);
+              if (prod) {
+                openProductDrawer({
+                  pageNumber: page.pageNumber,
+                  slotIndex: 0,
+                  slotLabel: prod.name,
+                  pageType: page.type,
+                });
+              }
+            }
+          }}
+        />
+      );
+    }
 
     switch (page.type) {
       // ---------------- PÁGINA 01: CAPA ----------------

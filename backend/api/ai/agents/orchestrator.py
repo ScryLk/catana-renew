@@ -43,7 +43,7 @@ class OrchestratorAgent(BaseAgent):
             "  \"spread_index\": <indice_zero_based_da_lamina_afetada>,\n"
             "  \"actions\": [\n"
             "    {\n"
-            "      \"action\": \"add_page\" | \"remove_page\" | \"reconfigure_catalog\" | \"summarize_content\" | \"remove_product\" | \"assign_product\" | \"swap_product\" | \"create_product\" | \"change_layout\" | \"update_text\" | \"set_page_color\" | \"adjust_pricing\" | \"generate_skus\" | \"set_palette\" | \"brand_lock\" | \"remove_background\" | \"generate_photo\" | \"navigate\" | \"export_pdf\" | \"add_overlay\" | \"highlight_product\" | \"remove_overlay\" | \"clear_overlays\" | \"update_overlay\",\n"
+            "      \"action\": \"add_page\" | \"remove_page\" | \"reconfigure_catalog\" | \"summarize_content\" | \"remove_product\" | \"assign_product\" | \"swap_product\" | \"create_product\" | \"change_layout\" | \"update_text\" | \"set_page_color\" | \"adjust_pricing\" | \"generate_skus\" | \"set_palette\" | \"brand_lock\" | \"remove_background\" | \"generate_photo\" | \"navigate\" | \"export_pdf\" | \"add_overlay\" | \"highlight_product\" | \"remove_overlay\" | \"clear_overlays\" | \"update_overlay\" | \"mutate_layout\" | \"regenerate_composition\" | \"increase_creativity\" | \"decrease_creativity\" | \"change_visual_direction\",\n"
             "      \"target\": \"page:<numero>\" | \"product:<id>\" | \"catalog:theme\" | \"catalog:products\" | \"global\",\n"
             "      \"params\": { <parametros_da_acao> }\n"
             "    }\n"

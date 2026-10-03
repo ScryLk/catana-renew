@@ -100,6 +100,29 @@ class RepairEngine:
                     p["accentColor"] = neutral_accent
                 actions_taken.append("Substituição de cores proibidas por tokens neutros aprovados.")
 
+            # 2.6 Reparo de Limites Geométricos de Blocos (VALID_BLOCK_BOUNDS)
+            for p in repaired_doc.get("pages", []):
+                for b in p.get("blocks", []):
+                    if not b.get("bleed", False):
+                        b["x"] = round(max(0.02, min(0.90, float(b.get("x", 0.0)))), 3)
+                        b["y"] = round(max(0.02, min(0.90, float(b.get("y", 0.0)))), 3)
+                        b["width"] = round(max(0.05, min(1.0 - float(b["x"]), float(b.get("width", 0.5)))), 3)
+                        b["height"] = round(max(0.02, min(1.0 - float(b["y"]), float(b.get("height", 0.2)))), 3)
+
+            # 2.7 Reparo de Repetição e Similaridade Crítica (COMPOSITION_TOO_SIMILAR)
+            has_similarity_issue = any("COMPOSITION_TOO_SIMILAR" in err for err in current_val.errors)
+            if has_similarity_issue:
+                from .composition_mutator import CompositionMutator
+                for idx in range(1, len(repaired_doc.get("pages", []))):
+                    target_p = repaired_doc["pages"][idx]
+                    if target_p.get("renderMode") == "generative" or target_p.get("blocks"):
+                        repaired_doc["pages"][idx], mut_desc = CompositionMutator.mutate(
+                            target_p,
+                            strength=0.6,
+                            creative_seed=42 + idx * 7,
+                        )
+                        actions_taken.append(f"Mutação na pág {idx+1}: {mut_desc}")
+
             # 3. Reparo de Placeholders Inválidos
             cls._clean_placeholders(repaired_doc, contract)
 
@@ -111,10 +134,15 @@ class RepairEngine:
                 logger.info(f"[RepairEngine] Documento corrigido com sucesso na tentativa {attempt}!")
                 break
 
+        # Se após MAX_REPAIR_ATTEMPTS ainda falhar, aciona Fallback Seguro para Legacy Renderer
         if not current_val.passed:
             logger.warning(
-                f"[RepairEngine] Documento permaneceu com avisos após {attempt} tentativas: {current_val.errors}"
+                f"[RepairEngine] Documento permaneceu com avisos após {attempt} tentativas. Ativando fallback legacy: {current_val.errors}"
             )
+            for p in repaired_doc.get("pages", []):
+                p["renderMode"] = "legacy"
+            repair_log.append("Fallback seguro: páginas convertidas para modo legado compatível.")
+            current_val = GenerationValidator.validate(contract, repaired_doc)
 
         # Atualiza a contagem final
         repaired_doc["totalPages"] = len(repaired_doc.get("pages", []))

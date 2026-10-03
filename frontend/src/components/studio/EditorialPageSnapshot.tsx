@@ -1,6 +1,7 @@
 import React from 'react';
 import { CatalogPageData, StudioPalette } from '../../data/editorialCatalog.mock';
 import { PageOverlayLayer } from './PageOverlayLayer';
+import { GenerativePageRenderer } from './GenerativePageRenderer';
 
 interface EditorialPageSnapshotProps {
   page: CatalogPageData;
@@ -558,18 +559,27 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
     }
   };
 
+  const isGenerative = page.renderMode === 'generative' && page.blocks && page.blocks.length > 0;
+
   const pageInner = (
     <div
       className={`pdf-page-content w-[490px] h-[693px] relative overflow-hidden select-none ${className}`}
       data-page-id={page.id}
+      data-render-mode={isGenerative ? 'generative' : 'legacy'}
       style={{
         backgroundColor: page.backgroundColor,
         color: page.textColor,
         ...style,
       }}
     >
-      {renderContent()}
-      <PageOverlayLayer page={page} interactive={false} />
+      {isGenerative ? (
+        <GenerativePageRenderer page={page} interactive={false} />
+      ) : (
+        <>
+          {renderContent()}
+          <PageOverlayLayer page={page} interactive={false} />
+        </>
+      )}
     </div>
   );
 

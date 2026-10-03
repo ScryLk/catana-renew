@@ -156,11 +156,15 @@ class TemplateRAGService:
             qs = qs.filter(industry=industry)
 
         # Se apos filtros rigorosos o conjunto estiver vazio, relaxa os filtros para manter robustez
-        candidates = list(qs)
-        if not candidates and category:
-            candidates = list(CatalogTemplate.objects.filter(category=category))
-        if not candidates:
-            candidates = list(CatalogTemplate.objects.all())
+        try:
+            candidates = list(qs)
+            if not candidates and category:
+                candidates = list(CatalogTemplate.objects.filter(category=category))
+            if not candidates:
+                candidates = list(CatalogTemplate.objects.all())
+        except Exception as e:
+            logger.warning(f"[TemplateRAGService] Falha ao consultar templates no banco ({e}). Utilizando fallback semântico.")
+            return []
 
         if not candidates:
             return []

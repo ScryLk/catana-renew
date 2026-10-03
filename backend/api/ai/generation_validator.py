@@ -163,6 +163,58 @@ class GenerationValidator:
                 if p1_str == p2_str and len(p1_str.strip()) > 10:
                     res.add_warning(f"DUPLICATE_PAGES: Páginas {i+1} e {i+2} são idênticas.")
 
+        # 7. VALIDAÇÃO GEOMÉTRICA DE BLOCOS GENERATIVOS (VALID_BLOCK_BOUNDS & COLLISIONS)
+        for idx, p in enumerate(pages):
+            blocks = p.get("blocks", [])
+            if not blocks:
+                continue
+
+            # 7.1 Limites Geométricos (Bounds)
+            for b in blocks:
+                bid = b.get("id", "block")
+                bx = float(b.get("x", 0.0))
+                by = float(b.get("y", 0.0))
+                bw = float(b.get("width", 0.0))
+                bh = float(b.get("height", 0.0))
+                is_bleed = b.get("bleed", False)
+
+                if bw <= 0.0 or bh <= 0.0:
+                    res.add_error(f"INVALID_BLOCK_DIMENSIONS: Bloco '{bid}' na pág {idx+1} possui largura/altura <= 0.")
+
+                if not is_bleed:
+                    if bx < -0.01 or by < -0.01:
+                        res.add_error(f"VALID_BLOCK_BOUNDS: Bloco '{bid}' na pág {idx+1} possui coordenada negativa (x={bx}, y={by}).")
+                    if (bx + bw) > 1.02 or (by + bh) > 1.02:
+                        res.add_error(f"VALID_BLOCK_BOUNDS: Bloco '{bid}' na pág {idx+1} ultrapassa borda da prancheta (x+w={bx+bw:.2f}, y+h={by+bh:.2f}).")
+
+            # 7.2 Colisões Acidentais Graves
+            text_blocks = [b for b in blocks if b.get("type") in ["text", "price", "metadata"] and not b.get("allowOverlap", False)]
+            for i in range(len(text_blocks)):
+                for j in range(i + 1, len(text_blocks)):
+                    b1 = text_blocks[i]
+                    b2 = text_blocks[j]
+                    # Calcula interseção
+                    ix1 = max(float(b1.get("x", 0)), float(b2.get("x", 0)))
+                    iy1 = max(float(b1.get("y", 0)), float(b2.get("y", 0)))
+                    ix2 = min(float(b1.get("x", 0)) + float(b1.get("width", 0)), float(b2.get("x", 0)) + float(b2.get("width", 0)))
+                    iy2 = min(float(b1.get("y", 0)) + float(b1.get("height", 0)), float(b2.get("y", 0)) + float(b2.get("height", 0)))
+
+                    if ix2 > ix1 and iy2 > iy1:
+                        overlap_area = (ix2 - ix1) * (iy2 - iy1)
+                        b1_area = float(b1.get("width", 1)) * float(b1.get("height", 1))
+                        # Se overlap > 50% de um dos blocos de texto
+                        if b1_area > 0 and (overlap_area / b1_area) > 0.50:
+                            res.add_warning(f"ACCIDENTAL_COLLISION: Sobreposição grave detectada entre '{b1.get('id')}' e '{b2.get('id')}' na pág {idx+1}.")
+
+        # 8. VALIDAÇÃO DE NOVIDADE E CADÊNCIA (NOVELTY & ANTI-REPETITION)
+        has_generative_pages = any(p.get("renderMode") == "generative" or p.get("blocks") for p in pages)
+        if has_generative_pages and len(pages) > 1:
+            from .novelty_engine import NoveltyEngine
+            novelty_eval = NoveltyEngine.evaluate_catalog_novelty(pages)
+            for issue in novelty_eval.get("issues", []):
+                # Repetição crítica dispara erro para acionar mutation/repair
+                res.add_error(issue)
+
         if res.errors:
             res.deterministic_passed = False
             res.passed = False
