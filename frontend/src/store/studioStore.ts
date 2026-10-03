@@ -3722,8 +3722,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             get().pushHistorySnapshot();
             set((s) => {
               const updateProdPrice = (prod: ProductItem) => {
+                const priceStr = prod.price || '100';
                 const currentNumeric =
-                  parseFloat(prod.price.replace(/[^\d.,]/g, '').replace(',', '.')) || 100;
+                  parseFloat(priceStr.replace(/[^\d.,]/g, '').replace(',', '.')) || 100;
                 let newNumeric = currentNumeric;
                 if (mode === 'set' && targetVal > 0) {
                   newNumeric = targetVal;
@@ -4940,7 +4941,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           ...p,
           products: p.products.map((prod, idx) => ({
             ...prod,
-            description: prod.description.includes('SKU') ? prod.description : `${prod.description} · SKU-AUR-0${idx + 1}`,
+            description: (prod.description && prod.description.includes('SKU'))
+              ? prod.description
+              : prod.description
+                ? `${prod.description} · SKU-AUR-0${idx + 1}`
+                : `SKU-AUR-0${idx + 1}`,
           })),
         };
       });

@@ -150,7 +150,8 @@ export const ProductDrawer: React.FC = () => {
     const unassignedCount = unassignedProducts.length;
 
     const prices = allProducts
-      .map((p) => parseInt(p.price.replace(/[^0-9]/g, ''), 10))
+      .filter((p) => p.price && typeof p.price === 'string')
+      .map((p) => parseInt(p.price!.replace(/[^0-9]/g, ''), 10))
       .filter((v) => !isNaN(v) && v > 0);
 
     const avgPriceNum = prices.length > 0
@@ -227,7 +228,7 @@ export const ProductDrawer: React.FC = () => {
   const handleGenerateAIPhoto = async (prod: typeof allProducts[0]) => {
     try {
       setIsGeneratingAIPhoto(prod.id);
-      await generateAIProductImage(prod.id, prod.name, prod.category, prod.description);
+      await generateAIProductImage(prod.id, prod.name, prod.category, prod.description || undefined);
     } finally {
       setIsGeneratingAIPhoto(null);
     }
@@ -729,7 +730,7 @@ export const ProductDrawer: React.FC = () => {
                     {/* Thumbnail with AI overlay */}
                     <div className="relative size-18 rounded-xl bg-stone-100 overflow-hidden border border-inherit shrink-0 group">
                       <img
-                        src={prod.image}
+                        src={prod.image || ''}
                         alt={prod.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
@@ -895,7 +896,7 @@ export const ProductDrawer: React.FC = () => {
                                   onClick={() => {
                                     setEditingProductId(prod.id);
                                     setEditNameValue(prod.name);
-                                    setEditPriceValue(prod.price);
+                                    setEditPriceValue(prod.price || '');
                                   }}
                                   className={`p-1 rounded transition-colors cursor-pointer ${
                                     isDark ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-[#F5F1EA] text-[#736E65] hover:text-zinc-900'

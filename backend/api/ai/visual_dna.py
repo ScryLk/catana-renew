@@ -33,6 +33,18 @@ class VisualDNA:
     axis_tension: float = 0.3              # 0.0 = alinhamento ortogonal tranquilo, 1.0 = diagonais e tensões ópticas
     creativity_level: float = 0.5          # 0.0 = conservador, 0.5 = editorial refinado, 1.0 = experimental
 
+    @property
+    def whitespace_ratio(self) -> float:
+        return self.whitespace
+
+    @property
+    def contrast_ratio(self) -> float:
+        return self.scale_contrast
+
+    @property
+    def scale_jump(self) -> float:
+        return self.scale_contrast
+
     def to_dict(self) -> Dict[str, float]:
         """Serializa os parâmetros para dicionário serializável em JSON."""
         return asdict(self)

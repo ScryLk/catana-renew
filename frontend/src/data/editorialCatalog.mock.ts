@@ -13,13 +13,15 @@ export interface ProductItem {
   category: string;
   index: string;
   name: string;
-  sku: string;
-  price: string;
-  description: string;
-  image: string;
-  tag?: string;
+  sku?: string | null;
+  price?: string | null;
+  description?: string | null;
+  image?: string | null;
+  tag?: string | null;
   details?: string[];
   source?: 'sheet' | 'system' | 'catalog';
+  quantity?: number | null;
+  technical_specs?: Record<string, any> | null;
 }
 
 export type PageLayoutType = 
@@ -31,6 +33,15 @@ export type PageLayoutType =
   | 'single'
   | 'grid_4'
   | 'backcover';
+
+export type PageContentRole =
+  | 'opening'
+  | 'manifesto'
+  | 'product_reveal'
+  | 'product_dialogue'
+  | 'product_system'
+  | 'closing'
+  | 'one_pager';
 
 export type OverlayElementType =
   | 'sprite'
@@ -91,9 +102,27 @@ export type GenerativeBlockType =
   | 'table'
   | 'color_field';
 
+export const VALID_GENERATIVE_BLOCK_TYPES: GenerativeBlockType[] = [
+  'text',
+  'image',
+  'product_image',
+  'metadata',
+  'price',
+  'sku',
+  'caption',
+  'line',
+  'shape',
+  'folio',
+  'badge',
+  'quote',
+  'logo',
+  'table',
+  'color_field',
+];
+
 export interface GenerativeBlock {
   id: string;
-  type: GenerativeBlockType | string;
+  type: GenerativeBlockType;
   role?: string;
   x: number; // 0.0 a 1.0 (coordenada horizontal normalizada)
   y: number; // 0.0 a 1.0 (coordenada vertical normalizada)
@@ -118,6 +147,33 @@ export interface GenerativeBlock {
   bleed?: boolean;
   allowOverlap?: boolean;
   intentionalCrop?: boolean;
+  marginExempt?: boolean;
+}
+
+/**
+ * Validação em tempo de execução para blocos recebidos da API (Item 20)
+ * Garante que o frontend Studio nunca quebre por blocos malformados.
+ */
+export function validateGenerativeBlock(block: any): GenerativeBlock | null {
+  if (!block || typeof block !== 'object') return null;
+  if (!block.id || typeof block.id !== 'string') return null;
+  if (!VALID_GENERATIVE_BLOCK_TYPES.includes(block.type)) return null;
+
+  const x = Number(block.x);
+  const y = Number(block.y);
+  const width = Number(block.width);
+  const height = Number(block.height);
+
+  if (isNaN(x) || isNaN(y) || isNaN(width) || isNaN(height)) return null;
+  if (width <= 0 || height <= 0) return null;
+
+  return {
+    ...block,
+    x: Math.max(-0.1, Math.min(1.2, x)),
+    y: Math.max(-0.1, Math.min(1.2, y)),
+    width: Math.min(1.2, width),
+    height: Math.min(1.2, height),
+  };
 }
 
 export interface GenerativeCompositionMeta {
@@ -131,16 +187,24 @@ export interface GenerativeCompositionMeta {
   whitespaceRatio?: number;
   visualTension?: number;
   dominantPrimitive?: string;
+  lastMutation?: string;
+  mutationSeed?: number;
 }
 
 export interface CatalogPageData {
   id: string;
   pageNumber: number;
   type: PageLayoutType;
+  contentRole?: PageContentRole | string;
   renderMode?: PageRenderMode;
   composition?: GenerativeCompositionMeta;
   safeArea?: { top: number; right: number; bottom: number; left: number };
   blocks?: GenerativeBlock[];
+  generativeDraft?: {
+    blocks?: GenerativeBlock[];
+    composition?: GenerativeCompositionMeta;
+    safeArea?: { top: number; right: number; bottom: number; left: number };
+  };
   visualDNA?: Record<string, number>;
   creativeDirection?: Record<string, any>;
   title?: string;

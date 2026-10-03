@@ -28,7 +28,7 @@ export const GenerativePageRenderer: React.FC<GenerativePageRendererProps> = ({
       className={`generative-page-content relative w-full h-full overflow-hidden select-none ${className}`}
       data-page-id={page.id}
       data-render-mode="generative"
-      data-content-role={page.type}
+      data-content-role={page.contentRole || page.type}
       style={{
         backgroundColor: page.backgroundColor,
         color: page.textColor,
