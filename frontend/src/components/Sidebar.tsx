@@ -24,7 +24,7 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/' },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
   { id: 'explorar', label: 'Explorar', icon: Globe, path: '/explore' },
   { id: 'produtos', label: 'Produtos', icon: Package, path: '/products' },
   { id: 'catalogos', label: 'Catálogos', icon: BookOpen, path: '/catalogs' },

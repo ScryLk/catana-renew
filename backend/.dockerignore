@@ -10,7 +10,6 @@ ENV/
 *.log
 *.pot
 *.pyc
-db.sqlite3
 .DS_Store
 .git
 .gitignore

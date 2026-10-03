@@ -17,6 +17,7 @@ import {
 import { useStudioStore } from '../../store/studioStore';
 import { EditorialPageSnapshot } from './EditorialPageSnapshot';
 import { pdfExportService } from '../../services/pdfExportService';
+import api from '../../services/api';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 
@@ -31,6 +32,7 @@ export const ExportCatalogModal: React.FC = () => {
     currentSpread,
     activePalette,
     theme,
+    openAccountSettings,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -82,9 +84,10 @@ export const ExportCatalogModal: React.FC = () => {
 
   // Calculo de URLs públicas
   const slug = (catalogTitle || 'catalogo').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  const publicTarget = activeCatalogId || slug || 'catalogo-2026';
   const publicUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/c/${slug || 'catalogo-2026'}`
-    : `https://usecatana.com.br/c/${slug || 'catalogo-2026'}`;
+    ? `${window.location.origin}/view/${publicTarget}`
+    : `https://usecatana.com.br/view/${publicTarget}`;
 
   // Copiar link público
   const handleCopyLink = () => {
@@ -143,10 +146,42 @@ export const ExportCatalogModal: React.FC = () => {
       }
 
       const isPrint = pdfQuality === 'print';
+      const dpi = isPrint ? 300 : 150;
+
+      // Validar cota/permissao de exportacao em 300 DPI (Grafica) via backend guard
+      if (isPrint) {
+        setPdfStage('Validando permissão de exportação gráfica (300 DPI)...');
+        try {
+          await api.post('/api/v2/studio/export/check-guard/', { dpi: 300 });
+        } catch (guardErr: any) {
+          if (
+            guardErr?.response?.status === 403 &&
+            guardErr?.response?.data?.code === 'export_dpi_restricted'
+          ) {
+            toast.error('A exportação em 300 DPI (alta definição gráfica) é exclusiva do Plano Pro.', {
+              description: 'Exporte em 150 DPI (Digital) ou faça upgrade para liberar o perfil gráfico.',
+              action: {
+                label: 'Conhecer Pro',
+                onClick: () => {
+                  closeExportModal();
+                  openAccountSettings();
+                },
+              },
+            });
+            setIsExportingPDF(false);
+            setPdfProgress(0);
+            setPdfStage('');
+            return;
+          }
+          console.warn('Falha na validação do guard de exportação:', guardErr);
+        }
+      }
+
       const fileName = `${slug || 'catalogo'}-${isPrint ? 'grafica-300dpi' : 'digital-150dpi'}.pdf`;
 
       await pdfExportService.generatePDF('katana-offscreen-export-container', {
         fileName,
+        dpi,
         scale: isPrint ? 3 : 1.8,
         quality: isPrint ? 1.0 : 0.85,
         compress: true,

@@ -12,11 +12,26 @@ import {
   Loader2,
   FileSpreadsheet,
   Sparkles,
+  MessageSquare,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
 import { ProductItem } from '../../data/editorialCatalog.mock';
 import { Tooltip } from '../ui/Tooltip';
 import { toast } from 'sonner';
+
+export const isSheetProduct = (p: ProductItem): boolean => {
+  return (
+    p.source === 'sheet' ||
+    p.id.startsWith('sheet-') ||
+    p.id.startsWith('prod-sheet') ||
+    Boolean(p.tag?.toLowerCase().includes('import')) ||
+    Boolean(p.tag?.toLowerCase().includes('planilha'))
+  );
+};
+
+export const isSystemProduct = (p: ProductItem): boolean => !isSheetProduct(p);
+
+export type ProductOriginFilter = 'all' | 'sheet' | 'system' | 'unassigned' | 'assigned';
 
 export const ProductDrawer: React.FC = () => {
   const {
@@ -35,6 +50,8 @@ export const ProductDrawer: React.FC = () => {
     removeProductBackground,
     openExcelImportModal,
     generateAIProductImage,
+    setIsCoPilotOpen,
+    setPendingInputPrompt,
     theme,
   } = useStudioStore();
 
@@ -42,7 +59,7 @@ export const ProductDrawer: React.FC = () => {
 
   // Filtros locais
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'assigned' | 'unassigned'>('all');
+  const [statusFilter, setStatusFilter] = useState<ProductOriginFilter>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   // Modal / Subpainel de Novo Produto
@@ -127,6 +144,8 @@ export const ProductDrawer: React.FC = () => {
   // Cálculo de Métricas da Coleção
   const metrics = useMemo(() => {
     const total = allProducts.length;
+    const sheetCount = allProducts.filter(isSheetProduct).length;
+    const systemCount = allProducts.filter(isSystemProduct).length;
     const allocatedCount = allocatedProducts.length;
     const unassignedCount = unassignedProducts.length;
 
@@ -142,7 +161,7 @@ export const ProductDrawer: React.FC = () => {
       ? `R$ ${avgPriceNum.toLocaleString('pt-BR')}`
       : 'R$ 0';
 
-    return { total, allocatedCount, unassignedCount, avgTicket };
+    return { total, sheetCount, systemCount, allocatedCount, unassignedCount, avgTicket };
   }, [allProducts, allocatedProducts, unassignedProducts]);
 
   // Produtos filtrados para exibição
@@ -150,6 +169,8 @@ export const ProductDrawer: React.FC = () => {
     return allProducts.filter((prod) => {
       if (statusFilter === 'assigned' && !prod.isAssigned) return false;
       if (statusFilter === 'unassigned' && prod.isAssigned) return false;
+      if (statusFilter === 'sheet' && !isSheetProduct(prod)) return false;
+      if (statusFilter === 'system' && !isSystemProduct(prod)) return false;
       if (selectedCategory !== 'all' && prod.category !== selectedCategory) return false;
 
       if (searchQuery.trim()) {
@@ -163,6 +184,14 @@ export const ProductDrawer: React.FC = () => {
       return true;
     });
   }, [allProducts, statusFilter, selectedCategory, searchQuery]);
+
+  // Ação: Enviar instrução com o produto para o Co-Pilot diagramar
+  const handleSendToCoPilot = (prod: ProductItem) => {
+    setIsCoPilotOpen(true);
+    setPendingInputPrompt(`Diagramar o produto "${prod.name}" (SKU: ${prod.sku}, Preço: ${prod.price}) na lâmina atual.`);
+    closeProductDrawer();
+    toast.success(`Instrução do produto "${prod.name}" enviada para o Co-Pilot!`);
+  };
 
   // Ação: Navegar para o spread da página onde o produto está alocado
   const handleJumpToPage = (pageNumber?: number) => {
@@ -429,28 +458,43 @@ export const ProductDrawer: React.FC = () => {
 
         {/* Metrics Overview Bar */}
         <div
-          className={`grid grid-cols-3 gap-2 px-5 py-3 border-b shrink-0 ${
+          className={`grid grid-cols-2 sm:grid-cols-4 gap-2 px-5 py-3 border-b shrink-0 ${
             isDark ? 'border-zinc-800/60 bg-[#0e0e12]' : 'border-[#E4E0D6] bg-[#F7F4EE]'
           }`}
         >
           <div className="flex flex-col">
-            <span className={`text-[10px] font-mono uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>Alocados</span>
+            <span className={`text-[10px] font-mono uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>
+              Da Planilha
+            </span>
+            <span className={`text-xs font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+              {metrics.sheetCount} itens
+            </span>
+          </div>
+
+          <div className="flex flex-col">
+            <span className={`text-[10px] font-mono uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>
+              Cadastrados
+            </span>
+            <span className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-zinc-900'}`}>
+              {metrics.systemCount} itens
+            </span>
+          </div>
+
+          <div className="flex flex-col">
+            <span className={`text-[10px] font-mono uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>
+              Alocados
+            </span>
             <span className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-zinc-900'}`}>
               {metrics.allocatedCount} no catálogo
             </span>
           </div>
 
           <div className="flex flex-col">
-            <span className={`text-[10px] font-mono uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>Disponíveis</span>
-            <span className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-              {metrics.unassignedCount} no acervo
+            <span className={`text-[10px] font-mono uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>
+              Pendentes
             </span>
-          </div>
-
-          <div className="flex flex-col">
-            <span className={`text-[10px] font-mono uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#736E65]'}`}>Ticket Médio</span>
-            <span className={`text-xs font-semibold font-mono ${isDark ? 'text-zinc-200' : 'text-zinc-900'}`}>
-              {metrics.avgTicket}
+            <span className={`text-xs font-semibold ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
+              {metrics.unassignedCount} livres
             </span>
           </div>
         </div>
@@ -535,76 +579,113 @@ export const ProductDrawer: React.FC = () => {
           </div>
 
           {/* Filter Tabs & Category Filter */}
-          <div className="flex items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setStatusFilter('all')}
-                className={`px-2.5 py-1 rounded-lg font-medium text-[11px] transition-colors cursor-pointer ${
-                  statusFilter === 'all'
-                    ? isDark
-                      ? 'bg-zinc-100 text-zinc-950 font-bold'
-                      : 'bg-zinc-900 text-white font-bold'
-                    : isDark
-                    ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-                    : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
-                }`}
-              >
-                Todos ({allProducts.length})
-              </button>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              {/* Filter Tabs Pill Group */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar text-xs flex-1">
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('all')}
+                  className={`px-2.5 py-1 rounded-lg font-medium text-[11px] whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                    statusFilter === 'all'
+                      ? isDark
+                        ? 'bg-zinc-100 text-zinc-950 font-bold'
+                        : 'bg-zinc-900 text-white font-bold'
+                      : isDark
+                      ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                      : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
+                  }`}
+                >
+                  Todos ({allProducts.length})
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setStatusFilter('assigned')}
-                className={`px-2.5 py-1 rounded-lg font-medium text-[11px] transition-colors cursor-pointer ${
-                  statusFilter === 'assigned'
-                    ? isDark
-                      ? 'bg-zinc-100 text-zinc-950 font-bold'
-                      : 'bg-zinc-900 text-white font-bold'
-                    : isDark
-                    ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-                    : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
-                }`}
-              >
-                Alocados ({metrics.allocatedCount})
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('sheet')}
+                  className={`px-2.5 py-1 rounded-lg font-medium text-[11px] whitespace-nowrap transition-colors cursor-pointer shrink-0 flex items-center gap-1 ${
+                    statusFilter === 'sheet'
+                      ? isDark
+                        ? 'bg-zinc-100 text-zinc-950 font-bold'
+                        : 'bg-zinc-900 text-white font-bold'
+                      : isDark
+                      ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                      : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
+                  }`}
+                >
+                  <FileSpreadsheet className="size-3" />
+                  <span>Planilha ({metrics.sheetCount})</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setStatusFilter('unassigned')}
-                className={`px-2.5 py-1 rounded-lg font-medium text-[11px] transition-colors cursor-pointer ${
-                  statusFilter === 'unassigned'
-                    ? isDark
-                      ? 'bg-zinc-100 text-zinc-950 font-bold'
-                      : 'bg-zinc-900 text-white font-bold'
-                    : isDark
-                    ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-                    : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
-                }`}
-              >
-                Disponíveis ({metrics.unassignedCount})
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('system')}
+                  className={`px-2.5 py-1 rounded-lg font-medium text-[11px] whitespace-nowrap transition-colors cursor-pointer shrink-0 flex items-center gap-1 ${
+                    statusFilter === 'system'
+                      ? isDark
+                        ? 'bg-zinc-100 text-zinc-950 font-bold'
+                        : 'bg-zinc-900 text-white font-bold'
+                      : isDark
+                      ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                      : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
+                  }`}
+                >
+                  <Package className="size-3" />
+                  <span>Cadastrados ({metrics.systemCount})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('unassigned')}
+                  className={`px-2.5 py-1 rounded-lg font-medium text-[11px] whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                    statusFilter === 'unassigned'
+                      ? isDark
+                        ? 'bg-zinc-100 text-zinc-950 font-bold'
+                        : 'bg-zinc-900 text-white font-bold'
+                      : isDark
+                      ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                      : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
+                  }`}
+                >
+                  Pendentes ({metrics.unassignedCount})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('assigned')}
+                  className={`px-2.5 py-1 rounded-lg font-medium text-[11px] whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                    statusFilter === 'assigned'
+                      ? isDark
+                        ? 'bg-zinc-100 text-zinc-950 font-bold'
+                        : 'bg-zinc-900 text-white font-bold'
+                      : isDark
+                      ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                      : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
+                  }`}
+                >
+                  Alocados ({metrics.allocatedCount})
+                </button>
+              </div>
+
+              {/* Category Dropdown */}
+              {categories.length > 0 && (
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className={`text-[11px] px-2 py-1 rounded-lg border outline-none cursor-pointer shrink-0 max-w-[110px] truncate ${
+                    isDark
+                      ? 'bg-zinc-900 border-zinc-800 text-zinc-300'
+                      : 'bg-white border-[#E4E0D6] text-zinc-800'
+                  }`}
+                >
+                  <option value="all">Todas</option>
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
-
-            {/* Category Dropdown */}
-            {categories.length > 0 && (
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className={`text-[11px] px-2 py-1 rounded-lg border outline-none cursor-pointer max-w-[120px] truncate ${
-                  isDark
-                    ? 'bg-zinc-900 border-zinc-800 text-zinc-300'
-                    : 'bg-white border-[#E4E0D6] text-zinc-800'
-                }`}
-              >
-                <option value="all">Todas</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            )}
           </div>
         </div>
 
@@ -717,11 +798,40 @@ export const ProductDrawer: React.FC = () => {
                         <>
                           {/* Category & Status Badge */}
                           <div className="flex items-center justify-between gap-1 mb-1">
-                            <span className={`text-[9px] font-mono uppercase tracking-wider truncate ${
-                              isDark ? 'text-zinc-400' : 'text-[#736E65]'
-                            }`}>
-                              {prod.category} {prod.sku ? `· ${prod.sku}` : ''}
-                            </span>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {/* Origin Badge */}
+                              {isSheetProduct(prod) ? (
+                                <span
+                                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium border shrink-0 ${
+                                    isDark
+                                      ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50'
+                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  }`}
+                                >
+                                  <FileSpreadsheet className="size-2.5" />
+                                  <span>Planilha</span>
+                                </span>
+                              ) : (
+                                <span
+                                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium border shrink-0 ${
+                                    isDark
+                                      ? 'bg-zinc-800/80 text-zinc-300 border-zinc-700/60'
+                                      : 'bg-zinc-100 text-zinc-700 border-zinc-300/80'
+                                  }`}
+                                >
+                                  <Package className="size-2.5" />
+                                  <span>Acervo</span>
+                                </span>
+                              )}
+
+                              <span
+                                className={`text-[9px] font-mono uppercase tracking-wider truncate ${
+                                  isDark ? 'text-zinc-400' : 'text-[#736E65]'
+                                }`}
+                              >
+                                {prod.category} {prod.sku ? `· ${prod.sku}` : ''}
+                              </span>
+                            </div>
 
                             {prod.isAssigned ? (
                               <Tooltip
@@ -731,7 +841,7 @@ export const ProductDrawer: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleJumpToPage(prod.pageNumber)}
-                                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold cursor-pointer transition-colors border ${
+                                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold cursor-pointer transition-colors border shrink-0 ${
                                     isDark
                                       ? 'bg-zinc-800 text-zinc-300 border-zinc-700/80 hover:bg-zinc-700/80'
                                       : 'bg-[#F5F1EA] text-zinc-800 border-[#E4E0D6] hover:bg-zinc-200/70'
@@ -742,12 +852,14 @@ export const ProductDrawer: React.FC = () => {
                                 </button>
                               </Tooltip>
                             ) : (
-                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-medium border ${
-                                isDark
-                                  ? 'bg-zinc-800/70 text-zinc-400 border-zinc-700/60'
-                                  : 'bg-[#F5F1EA] text-[#736E65] border-[#E4E0D6]'
-                              }`}>
-                                Disponível
+                              <span
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-medium border shrink-0 ${
+                                  isDark
+                                    ? 'bg-amber-950/30 text-amber-400 border-amber-800/40'
+                                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                                }`}
+                              >
+                                Pendente
                               </span>
                             )}
                           </div>
@@ -812,6 +924,22 @@ export const ProductDrawer: React.FC = () => {
                                   ) : (
                                     <Sparkles className="size-3" />
                                   )}
+                                </button>
+                              </Tooltip>
+
+                              {/* Send to Co-Pilot Button */}
+                              <Tooltip text="Enviar para o Co-Pilot diagramar" position="bottom">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendToCoPilot(prod)}
+                                  className={`p-1 rounded transition-colors cursor-pointer ${
+                                    isDark
+                                      ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                                      : 'hover:bg-[#F5F1EA] text-[#736E65] hover:text-zinc-900'
+                                  }`}
+                                  aria-label="Enviar para o Co-Pilot"
+                                >
+                                  <MessageSquare className="size-3" />
                                 </button>
                               </Tooltip>
 

@@ -274,7 +274,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'name', 'avatar', 'position', 'role', 'last_login', 'date_joined', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'username', 'email', 'last_login', 'date_joined']
+        read_only_fields = ['id', 'username', 'email', 'role', 'last_login', 'date_joined']
 
     def get_avatar(self, obj):
         if obj.avatar:

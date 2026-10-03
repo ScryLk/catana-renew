@@ -13,7 +13,8 @@ from .views import (
     public_profile_search, public_profile_suggested, public_profile_featured,
     public_profile_check_username, public_profile_by_username, public_profile_detail,
     public_profile_catalogs, public_profile_follow, public_profile_save, public_profile_block,
-    public_catalogs_featured, public_catalog_like, public_catalog_view, public_catalog_share
+    public_catalogs_featured, public_catalog_like, public_catalog_view, public_catalog_share,
+    request_account_anonymization
 )
 from .views_auth import (
     CatanaTokenObtainPairView,
@@ -24,6 +25,7 @@ from .views_auth import (
     PasswordResetRequestView,
     PasswordResetConfirmView,
 )
+from .views_clerk_webhook import ClerkWebhookView
 from .views_studio import (
     StudioAgentsListView,
     StudioQuotaStatusView,
@@ -31,6 +33,7 @@ from .views_studio import (
     StudioCatalogListView,
     StudioCatalogDetailView,
     StudioSpreadManageView,
+    StudioSpreadBulkSyncView,
     StudioThreadMessagesView,
     StudioTemplateListView,
     StudioTemplateSaveFromSpreadView,
@@ -38,12 +41,22 @@ from .views_studio import (
     StudioMediaRemoveBackgroundView,
     StudioCatalogGenerateView,
     StudioProductImageGenerateView,
+    StudioSpriteGenerateView,
+    StudioExportGuardCheckView,
+    StudioProductSheetImportView,
+    StudioDemoTemplatesListView,
+    StudioDemoCatalogLoadView,
+    StudioPublicCatalogView,
 )
 from .views_billing import (
     StudioBillingPlansView,
     StudioSubscriptionView,
     StudioCheckoutView,
     StudioCancelSubscriptionView,
+    StudioReactivateSubscriptionView,
+    StudioBillingSandboxConfirmView,
+    StudioBillingSyncView,
+    AbacatePayWebhookView,
 )
 from .views_transparency import (
     StudioDataExportView,
@@ -86,6 +99,7 @@ urlpatterns = [
     path('auth/google/', GoogleAuthView.as_view(), name='google_auth'),
     path('auth/password-reset/', PasswordResetRequestView.as_view(), name='password_reset_request'),
     path('auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    path('auth/clerk-webhook/', ClerkWebhookView.as_view(), name='clerk_webhook'),
     path('register/', register_user, name='register'),
     path('dashboard/stats/', dashboard_stats, name='dashboard_stats'),
 
@@ -96,6 +110,8 @@ urlpatterns = [
     path('profile/preferences/', preferences_view, name='preferences'),
     path('profile/activity/', recent_activity, name='recent_activity'),
     path('profile/logout-all/', CatanaLogoutAllView.as_view(), name='logout_all_sessions'),
+    path('profile/anonymize/', request_account_anonymization, name='request_account_anonymization'),
+    path('profile/delete-account/', request_account_anonymization, name='request_account_deletion'),
 
     # Search endpoints
     path('search/global/', global_search, name='global_search'),
@@ -141,16 +157,28 @@ urlpatterns = [
     path('v2/studio/catalogs/generate/', StudioCatalogGenerateView.as_view(), name='studio_catalog_generate'),
     path('v2/studio/catalogs/<int:pk>/', StudioCatalogDetailView.as_view(), name='studio_catalog_detail'),
     path('v2/studio/catalogs/<int:catalog_id>/spreads/', StudioSpreadManageView.as_view(), name='studio_spread_manage'),
+    path('v2/studio/catalogs/<int:catalog_id>/spreads/bulk/', StudioSpreadBulkSyncView.as_view(), name='studio_spread_bulk_sync'),
     path('v2/studio/threads/<int:thread_id>/messages/', StudioThreadMessagesView.as_view(), name='studio_thread_messages'),
     path('v2/studio/templates/', StudioTemplateListView.as_view(), name='studio_templates_list'),
     path('v2/studio/templates/save-from-spread/', StudioTemplateSaveFromSpreadView.as_view(), name='studio_templates_save_from_spread'),
     path('v2/studio/catalogs/import-document/', StudioCatalogImportDocumentView.as_view(), name='studio_catalog_import_document'),
     path('v2/studio/media/remove-background/', StudioMediaRemoveBackgroundView.as_view(), name='studio_media_remove_background'),
     path('v2/studio/products/generate-image/', StudioProductImageGenerateView.as_view(), name='studio_product_image_generate'),
+    path('v2/studio/sprites/generate/', StudioSpriteGenerateView.as_view(), name='studio_sprite_generate'),
+    path('v2/studio/export/check-guard/', StudioExportGuardCheckView.as_view(), name='studio_export_check_guard'),
+    path('v2/studio/products/import-sheet/', StudioProductSheetImportView.as_view(), name='studio_product_sheet_import'),
+    path('v2/studio/catalogs/<int:catalog_id>/products/import-sheet/', StudioProductSheetImportView.as_view(), name='studio_catalog_product_sheet_import'),
+    path('v2/studio/demo/templates/', StudioDemoTemplatesListView.as_view(), name='studio_demo_templates_list'),
+    path('v2/studio/demo/load-template/', StudioDemoCatalogLoadView.as_view(), name='studio_demo_catalog_load'),
+    path('v2/studio/public/catalogs/<str:catalog_id>/', StudioPublicCatalogView.as_view(), name='studio_public_catalog_detail'),
     path('v2/studio/billing/plans/', StudioBillingPlansView.as_view(), name='studio_billing_plans'),
     path('v2/studio/billing/subscription/', StudioSubscriptionView.as_view(), name='studio_billing_subscription'),
     path('v2/studio/billing/checkout/', StudioCheckoutView.as_view(), name='studio_billing_checkout'),
+    path('v2/studio/billing/sync/', StudioBillingSyncView.as_view(), name='studio_billing_sync'),
     path('v2/studio/billing/cancel/', StudioCancelSubscriptionView.as_view(), name='studio_billing_cancel'),
+    path('v2/studio/billing/reactivate/', StudioReactivateSubscriptionView.as_view(), name='studio_billing_reactivate'),
+    path('v2/studio/billing/sandbox-confirm/', StudioBillingSandboxConfirmView.as_view(), name='studio_billing_sandbox_confirm'),
+    path('v2/billing/webhook/abacatepay/', AbacatePayWebhookView.as_view(), name='abacatepay_webhook'),
     path('v2/studio/transparency/export-data/', StudioDataExportView.as_view(), name='studio_data_export'),
     path('v2/studio/system-design/', StudioSystemDesignView.as_view(), name='studio_system_design'),
     path('v2/studio/system-design/users/', StudioUsersListView.as_view(), name='studio_system_design_users'),

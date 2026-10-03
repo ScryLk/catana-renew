@@ -24,6 +24,9 @@ dist-ssr
 *.sw?
 
 .env
+.env.*
+!.env.example
+!.env.*.example
 
 # DIV-02: binarios pesados / planilhas de exemplo (fora do repo; usar storage)
 *.pdf

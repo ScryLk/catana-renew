@@ -184,9 +184,11 @@ export const CanvasTopToolbar: React.FC = () => {
               <ChevronLeft className="size-3.5" />
             </button>
           </Tooltip>
-          <Tooltip text={`Lâmina ativa: Páginas ${currentSpread[0]} e ${currentSpread[1]} de ${totalPages}`} position="bottom">
+          <Tooltip text={totalPages === 1 ? `Página única (One-Pager)` : `Lâmina ativa: Páginas ${currentSpread[0]} e ${currentSpread[1]} de ${totalPages}`} position="bottom">
             <span className="px-1.5 font-mono text-[10px] tracking-tight font-medium text-inherit cursor-default">
-              {String(currentSpread[0]).padStart(2, '0')}-{String(currentSpread[1]).padStart(2, '0')} / {totalPages}
+              {totalPages === 1
+                ? `01 / 1`
+                : `${String(currentSpread[0]).padStart(2, '0')}-${String(currentSpread[1]).padStart(2, '0')} / ${totalPages}`}
             </span>
           </Tooltip>
           <Tooltip text="Próximo spread" position="bottom">

@@ -13,6 +13,7 @@ import {
 import { toast } from 'sonner';
 import { useStudioStore, ChatAttachment } from '../../store/studioStore';
 import { ImportCatalogModal } from './ImportCatalogModal';
+import { BrandSelectorPill } from './BrandSelectorPill';
 
 export const NewCatalogModal: React.FC = () => {
   const {
@@ -22,13 +23,9 @@ export const NewCatalogModal: React.FC = () => {
     openExcelImportModal,
     isGeneratingCatalog,
     theme,
-    brands,
-    activeBrandId,
-    openBrandModal,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
-  const activeBrand = brands.find((b) => b.id === activeBrandId);
 
   const [prompt, setPrompt] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
@@ -160,21 +157,6 @@ export const NewCatalogModal: React.FC = () => {
               >
                 2.0
               </span>
-              {activeBrand && (
-                <button
-                  type="button"
-                  onClick={() => openBrandModal(activeBrand.id)}
-                  className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium transition-colors cursor-pointer ${
-                    isDark
-                      ? 'bg-zinc-900/60 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-white'
-                      : 'bg-zinc-100 border-zinc-200 text-zinc-700 hover:border-zinc-300'
-                  }`}
-                  title="Marca ativa para este catálogo. Clique para gerenciar."
-                >
-                  <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
-                  <span className="truncate max-w-[120px]">{activeBrand.name}</span>
-                </button>
-              )}
             </div>
 
             {/* Botão de Fechar sem o texto Esc */}
@@ -195,7 +177,7 @@ export const NewCatalogModal: React.FC = () => {
 
           {/* Input Box Card (exato como na imagem) */}
           <div
-            className={`w-full rounded-2xl border shadow-2xl overflow-hidden transition-all ${
+            className={`w-full rounded-2xl border shadow-2xl relative transition-all ${
               isDark
                 ? 'bg-[#121215] border-zinc-800 text-zinc-100'
                 : 'bg-white border-zinc-200 text-zinc-900'
@@ -231,7 +213,7 @@ export const NewCatalogModal: React.FC = () => {
             {/* Attached Files Chips Strip */}
             {attachments.length > 0 && (
               <div
-                className={`px-3.5 pb-2.5 pt-0.5 flex flex-wrap gap-1.5 border-t ${
+                className={`px-4 pb-2 pt-0.5 flex flex-wrap gap-1.5 border-t ${
                   isDark ? 'border-zinc-800/60' : 'border-zinc-100'
                 }`}
               >
@@ -268,13 +250,13 @@ export const NewCatalogModal: React.FC = () => {
               </div>
             )}
 
-            {/* Bottom Action Bar */}
+            {/* Action Bar (Attachments & Submit) */}
             <div
-              className={`flex items-center justify-between px-3.5 py-2.5 border-t ${
+              className={`flex items-center justify-between px-3.5 py-2.5 border-t rounded-b-2xl ${
                 isDark ? 'border-zinc-800/80 bg-zinc-900/20' : 'border-zinc-100 bg-zinc-50/50'
               }`}
             >
-              {/* Left Buttons: Anexar arquivos, Importar Catálogo, Importar Produtos */}
+              {/* Left Buttons: Anexar arquivos, Importar Catálogo, Importar Produtos, Marca */}
               <div className="flex items-center gap-1 sm:gap-2">
                 <button
                   type="button"
@@ -326,6 +308,8 @@ export const NewCatalogModal: React.FC = () => {
                   <FileSpreadsheet className="size-3.5 text-zinc-400" />
                   <span>Importar Produtos</span>
                 </button>
+
+                <BrandSelectorPill direction="up" />
               </div>
 
               {/* Right Button: Gerar Catálogo -> */}

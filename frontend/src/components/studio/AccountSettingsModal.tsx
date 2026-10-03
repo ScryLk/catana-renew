@@ -8,10 +8,8 @@ import {
   Check,
   ArrowLeft,
   Receipt,
-  Copy,
   CheckCircle2,
   ShieldCheck,
-  QrCode,
   FileDown,
   ExternalLink,
   Upload,
@@ -21,8 +19,8 @@ import {
   Layers,
   Clock,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -75,21 +73,13 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState<BillingPlan | null>(null);
-  const [checkoutPaymentType, setCheckoutPaymentType] = useState<'credit_card' | 'pix'>('credit_card');
   const [isViewingInvoices, setIsViewingInvoices] = useState(false);
   const [isSubmittingCheckout, setIsSubmittingCheckout] = useState(false);
-  const [pixCopied, setPixCopied] = useState(false);
+  const [isSyncingBilling, setIsSyncingBilling] = useState(false);
 
   // Estados de Transparencia & LGPD
   const [includeAiMetadata, setIncludeAiMetadata] = useState(true);
   const [isExportingData, setIsExportingData] = useState(false);
-
-  const [cardData, setCardData] = useState({
-    number: '•••• •••• •••• 4242',
-    name: '',
-    expiry: '12/28',
-    cvv: '888',
-  });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -104,6 +94,83 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
     confirm_password: '',
   });
 
+  const handleSyncBilling = async (showToast: boolean = true) => {
+    try {
+      setIsSyncingBilling(true);
+      const res = await billingService.syncBilling();
+      const [newSub, newQuota] = await Promise.all([
+        billingService.getSubscription().catch(() => null),
+        api.get('/api/v2/studio/quotas/').then(r => r.data).catch(() => null),
+      ]);
+      if (newSub) setSubscription(newSub);
+      if (newQuota) setQuota(newQuota);
+      billingService.notifySubscriptionUpdated();
+
+      if (showToast) {
+        if (res.synced) {
+          toast.success(`Assinatura sincronizada com sucesso! Plano ${res.plan_name} ativado.`);
+        } else {
+          toast.info(res.message || 'Assinatura atualizada.');
+        }
+      }
+    } catch {
+      if (showToast) {
+        toast.error('Nao foi possivel sincronizar com o gateway no momento.');
+      }
+    } finally {
+      setIsSyncingBilling(false);
+    }
+  };
+
+  const [isCancelingSubscription, setIsCancelingSubscription] = useState(false);
+  const [isReactivatingSubscription, setIsReactivatingSubscription] = useState(false);
+  const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
+
+  const handleCancelSubscription = async (immediate: boolean = false) => {
+    try {
+      setIsCancelingSubscription(true);
+      const res = await billingService.cancelSubscription(immediate);
+      setShowCancelConfirmModal(false);
+      toast.success(res.message);
+      const [newSub, newQuota] = await Promise.all([
+        billingService.getSubscription().catch(() => null),
+        api.get('/api/v2/studio/quotas/').then((r) => r.data).catch(() => null),
+      ]);
+      if (newSub) setSubscription(newSub);
+      if (newQuota) setQuota(newQuota);
+      billingService.notifySubscriptionUpdated();
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        'Erro ao cancelar assinatura.';
+      toast.error(errorMsg);
+    } finally {
+      setIsCancelingSubscription(false);
+    }
+  };
+
+  const handleReactivateSubscription = async () => {
+    try {
+      setIsReactivatingSubscription(true);
+      const res = await billingService.reactivateSubscription();
+      toast.success(res.message);
+      const [newSub, newQuota] = await Promise.all([
+        billingService.getSubscription().catch(() => null),
+        api.get('/api/v2/studio/quotas/').then((r) => r.data).catch(() => null),
+      ]);
+      if (newSub) setSubscription(newSub);
+      if (newQuota) setQuota(newQuota);
+      billingService.notifySubscriptionUpdated();
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        'Erro ao reativar renovacao automatica.';
+      toast.error(errorMsg);
+    } finally {
+      setIsReactivatingSubscription(false);
+    }
+  };
+
   // Fechar com Escape
   useEffect(() => {
     if (!isOpen) return;
@@ -116,6 +183,36 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  // Listener para abertura remota da aba de faturamento (ex: cota estourada)
+  useEffect(() => {
+    const handleOpenBilling = () => {
+      setActiveTab('plan');
+    };
+    window.addEventListener('catana:open-billing-modal', handleOpenBilling);
+    return () => window.removeEventListener('catana:open-billing-modal', handleOpenBilling);
+  }, []);
+
+  // Listener para recarregamento automatico quando a assinatura mudar
+  useEffect(() => {
+    const handleSubUpdated = () => {
+      if (isOpen) {
+        Promise.all([
+          billingService.getSubscription().then(setSubscription).catch(() => null),
+          api.get('/api/v2/studio/quotas/').then(r => r.data && setQuota(r.data)).catch(() => null),
+        ]);
+      }
+    };
+    window.addEventListener('catana:subscription-updated', handleSubUpdated);
+    return () => window.removeEventListener('catana:subscription-updated', handleSubUpdated);
+  }, [isOpen]);
+
+  // Auto-sincronizacao se houver cobranca pendente ao navegar para planos ou faturamento
+  useEffect(() => {
+    if (isOpen && (activeTab === 'plan' || activeTab === 'billing') && subscription?.tier === 'free' && subscription?.abacatepay_billing_id) {
+      handleSyncBilling(false);
+    }
+  }, [isOpen, activeTab, subscription?.tier, subscription?.abacatepay_billing_id]);
 
   // Carregar dados quando o modal abre
   useEffect(() => {
@@ -275,40 +372,60 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
       const res = await billingService.checkout({
         tier: selectedPlanForCheckout.tier,
         interval: billingInterval,
-        payment_method_type: checkoutPaymentType,
-        payment_details: {
-          last4: cardData.number.replace(/\D/g, '').slice(-4) || '4242',
-          brand: 'mastercard',
-          holder_name: cardData.name || formData.name || 'Assinante Catana',
-        },
       });
 
-      toast.success(res.message || 'Plano atualizado com sucesso');
-
-      const [updatedSub, quotaRes] = await Promise.all([
-        billingService.getSubscription(),
-        api.get('/api/v2/studio/quotas/').catch(() => null),
-      ]);
-      setSubscription(updatedSub);
-      if (quotaRes?.data) {
-        setQuota(quotaRes.data);
+      if (res.is_free) {
+        toast.success(res.message || 'Plano Gratuito ativado com sucesso.');
+        const [updatedSub, quotaRes] = await Promise.all([
+          billingService.getSubscription(),
+          api.get('/api/v2/studio/quotas/').catch(() => null),
+        ]);
+        setSubscription(updatedSub);
+        if (quotaRes?.data) {
+          setQuota(quotaRes.data);
+        }
+        billingService.notifySubscriptionUpdated();
+        setSelectedPlanForCheckout(null);
+        return;
       }
 
-      setSelectedPlanForCheckout(null);
+      if (res.is_sandbox) {
+        toast.info('Modo Sandbox Ativo', {
+          description: 'Confirmando cobranca e ativando plano em ambiente de desenvolvimento...',
+        });
+
+        const confirmRes = await billingService.confirmSandbox({
+          tier: selectedPlanForCheckout.tier,
+          interval: billingInterval,
+          billing_id: res.billing_id,
+        });
+
+        toast.success(confirmRes.message || 'Assinatura ativada com sucesso no modo Sandbox!');
+        const [updatedSub, quotaRes] = await Promise.all([
+          billingService.getSubscription(),
+          api.get('/api/v2/studio/quotas/').catch(() => null),
+        ]);
+        setSubscription(updatedSub);
+        if (quotaRes?.data) {
+          setQuota(quotaRes.data);
+        }
+        billingService.notifySubscriptionUpdated();
+        setSelectedPlanForCheckout(null);
+        return;
+      }
+
+      if (res.checkout_url) {
+        toast.info('Redirecionando para o gateway...', {
+          description: 'Conclua seu pagamento no checkout seguro do AbacatePay.',
+        });
+        window.location.href = res.checkout_url;
+      }
     } catch (error: any) {
       const msg = error.response?.data?.error || 'Erro ao processar assinatura.';
       toast.error(msg);
     } finally {
       setIsSubmittingCheckout(false);
     }
-  };
-
-  const handleCopyPix = () => {
-    const pixCode = '00020126580014br.gov.bcb.pix0136342c1290-7cb2-4a0b-9df2-catana20265204000053039865802BR5920Catana Studio Ltda6009Sao Paulo62070503***6304E8A2';
-    navigator.clipboard.writeText(pixCode);
-    setPixCopied(true);
-    toast.success('Chave PIX copiada para a area de transferencia');
-    setTimeout(() => setPixCopied(false), 2500);
   };
 
   const handleExportData = async () => {
@@ -351,7 +468,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-xl h-[530px] rounded-2xl border shadow-2xl overflow-hidden flex flex-col transition-colors duration-200 animate-in zoom-in-95 duration-150 ${
+        className={`w-full max-w-xl h-[530px] rounded-2xl border shadow-2xl overflow-hidden flex flex-col relative transition-colors duration-200 animate-in zoom-in-95 duration-150 ${
           isDark
             ? 'bg-[#0f0f13] border-zinc-800 text-zinc-100 shadow-[0_30px_70px_rgba(0,0,0,0.95)]'
             : 'bg-white border-zinc-200 text-zinc-900 shadow-[0_20px_50px_rgba(0,0,0,0.15)]'
@@ -753,116 +870,35 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                         </p>
                       </div>
 
-                      {/* Seletor de Forma de Pagamento */}
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Forma de Pagamento</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setCheckoutPaymentType('credit_card')}
-                            className={`flex items-center justify-center gap-2 p-2 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
-                              checkoutPaymentType === 'credit_card'
-                                ? isDark
-                                  ? 'bg-zinc-800 border-zinc-600 text-white shadow-xs'
-                                  : 'bg-zinc-900 border-zinc-900 text-white shadow-xs'
-                                : isDark
-                                ? 'bg-zinc-900/30 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                                : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:text-zinc-900'
-                            }`}
-                          >
-                            <CreditCard className="w-3.5 h-3.5" />
-                            <span>Cartão de Crédito</span>
-                          </button>
+                      {/* Gateway e Forma de Pagamento */}
+                      <div className="p-3.5 rounded-xl border border-inherit bg-zinc-500/5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold">Gateway Seguro</span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700">
+                            AbacatePay
+                          </span>
+                        </div>
 
-                          <button
-                            type="button"
-                            onClick={() => setCheckoutPaymentType('pix')}
-                            className={`flex items-center justify-center gap-2 p-2 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
-                              checkoutPaymentType === 'pix'
-                                ? isDark
-                                  ? 'bg-zinc-800 border-zinc-600 text-white shadow-xs'
-                                  : 'bg-zinc-900 border-zinc-900 text-white shadow-xs'
-                                : isDark
-                                ? 'bg-zinc-900/30 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                                : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:text-zinc-900'
-                            }`}
-                          >
-                            <QrCode className="w-3.5 h-3.5" />
-                            <span>PIX Instantâneo</span>
-                          </button>
+                        <div className="space-y-2 text-[11px] text-zinc-400 leading-relaxed">
+                          <div className="flex items-center gap-2 text-zinc-300">
+                            <Check className="size-3.5 text-zinc-400 shrink-0" />
+                            <span>Pagamento instantâneo via PIX (QR Code e Copia e Cola dinâmico)</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-zinc-300">
+                            <Check className="size-3.5 text-zinc-400 shrink-0" />
+                            <span>Cartão de Crédito nacional sem taxas de conversão ou IOF</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-zinc-300">
+                            <Check className="size-3.5 text-zinc-400 shrink-0" />
+                            <span>Provisionamento e liberação imediata de cotas e agentes de IA</span>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-inherit flex items-center justify-between text-[10.5px] text-zinc-500">
+                          <span>Criptografia ponta a ponta</span>
+                          <span>Ambiente 100% Protegido</span>
                         </div>
                       </div>
-
-                      {/* Campos do Meio de Pagamento */}
-                      {checkoutPaymentType === 'credit_card' ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="col-span-2 space-y-1">
-                            <Label className="text-[11px] text-zinc-400">Número do Cartão</Label>
-                            <Input
-                              value={cardData.number}
-                              onChange={(e) => setCardData({ ...cardData, number: e.target.value })}
-                              placeholder="4242 4242 4242 4242"
-                              className="h-8 text-xs font-mono"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <Label className="text-[11px] text-zinc-400">Nome do Titular</Label>
-                            <Input
-                              value={cardData.name}
-                              onChange={(e) => setCardData({ ...cardData, name: e.target.value })}
-                              placeholder="Como gravado no cartão"
-                              className="h-8 text-xs"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-1.5">
-                            <div className="space-y-1">
-                              <Label className="text-[11px] text-zinc-400">Validade</Label>
-                              <Input
-                                value={cardData.expiry}
-                                onChange={(e) => setCardData({ ...cardData, expiry: e.target.value })}
-                                placeholder="MM/AA"
-                                className="h-8 text-xs font-mono"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-[11px] text-zinc-400">CVV</Label>
-                              <Input
-                                value={cardData.cvv}
-                                onChange={(e) => setCardData({ ...cardData, cvv: e.target.value })}
-                                placeholder="123"
-                                className="h-8 text-xs font-mono"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-3 rounded-xl border border-inherit bg-zinc-500/5 flex items-center gap-3">
-                          <div className="p-1.5 rounded-lg bg-white shrink-0">
-                            <QRCodeSVG
-                              value="00020126580014br.gov.bcb.pix0136342c1290-7cb2-4a0b-9df2-catana20265204000053039865802BR5920Catana Studio Ltda6009Sao Paulo62070503***6304E8A2"
-                              size={68}
-                            />
-                          </div>
-                          <div className="space-y-1.5 flex-1 min-w-0">
-                            <p className="text-xs font-medium">QR Code PIX com Aprovação Instantânea</p>
-                            <p className="text-[10.5px] text-zinc-400 leading-tight">
-                              Escaneie ou copie o código. A liberação de tokens e novos limites ocorre na hora.
-                            </p>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleCopyPix}
-                              className="h-7 px-2.5 text-[11px] cursor-pointer gap-1.5"
-                            >
-                              <Copy className="w-3 h-3" />
-                              <span>{pixCopied ? 'Chave Copiada' : 'Copiar Chave PIX'}</span>
-                            </Button>
-                          </div>
-                        </div>
-                      )}
 
                       <Button
                         type="button"
@@ -882,7 +918,11 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                         ) : (
                           <>
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Confirmar e Ativar {selectedPlanForCheckout.name}</span>
+                            <span>
+                              {selectedPlanForCheckout.tier === 'free'
+                                ? `Confirmar Downgrade para ${selectedPlanForCheckout.name}`
+                                : `Ir para Checkout Seguro AbacatePay (${selectedPlanForCheckout.name})`}
+                            </span>
                           </>
                         )}
                       </Button>
@@ -901,9 +941,22 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                           <ArrowLeft className="w-3.5 h-3.5" />
                           <span>Voltar aos planos</span>
                         </button>
-                        <span className="text-xs font-semibold">
-                          Histórico de Faturas ({subscription?.invoices?.length || 0})
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold">
+                            Histórico de Faturas ({subscription?.invoices?.length || 0})
+                          </span>
+                          <button
+                            type="button"
+                            disabled={isSyncingBilling}
+                            onClick={() => handleSyncBilling(true)}
+                            title="Sincronizar faturas com AbacatePay"
+                            className={`p-1 rounded-md transition-colors cursor-pointer text-zinc-400 hover:text-zinc-200 ${
+                              isDark ? 'hover:bg-zinc-800' : 'hover:bg-zinc-200'
+                            } ${isSyncingBilling ? 'opacity-50' : ''}`}
+                          >
+                            <RefreshCw className={`w-3 h-3 ${isSyncingBilling ? 'animate-spin' : ''}`} />
+                          </button>
+                        </div>
                       </div>
 
                       {!subscription?.invoices || subscription.invoices.length === 0 ? (
@@ -964,6 +1017,17 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                           >
                             {subscription?.plan_name || quota?.plan_name || 'Plano Gratuito'}
                           </Badge>
+                          <button
+                            type="button"
+                            disabled={isSyncingBilling}
+                            onClick={() => handleSyncBilling(true)}
+                            title="Sincronizar status do pagamento com AbacatePay"
+                            className={`p-1 rounded-md transition-colors cursor-pointer text-zinc-400 hover:text-zinc-200 ${
+                              isDark ? 'hover:bg-zinc-800' : 'hover:bg-zinc-200'
+                            } ${isSyncingBilling ? 'opacity-50' : ''}`}
+                          >
+                            <RefreshCw className={`w-3 h-3 ${isSyncingBilling ? 'animate-spin' : ''}`} />
+                          </button>
                         </div>
 
                         {/* Toggle Ciclo Mensal / Anual */}
@@ -1098,37 +1162,93 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                         })}
                       </div>
 
-                      {/* Barra de Status e Link de Faturas */}
-                      <div className="p-2.5 rounded-xl border border-inherit flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                          <span className="text-[11px] text-zinc-400">
+                      {/* Barra de Status e Link de Faturas / Cancelamento */}
+                      <div
+                        className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-3 ${
+                          subscription?.cancel_at_period_end
+                            ? isDark
+                              ? 'border-amber-500/30 bg-amber-500/5 text-amber-200'
+                              : 'border-amber-200 bg-amber-50/60 text-amber-900'
+                            : 'border-inherit bg-zinc-500/5'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {subscription?.cancel_at_period_end ? (
+                            <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          ) : (
+                            <ShieldCheck className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          )}
+                          <span
+                            className={`text-[11px] truncate ${
+                              subscription?.cancel_at_period_end
+                                ? isDark
+                                  ? 'text-amber-200/90'
+                                  : 'text-amber-800'
+                                : 'text-zinc-400'
+                            }`}
+                          >
                             {subscription?.tier && subscription.tier !== 'free'
-                              ? `Renovação automática via ${
-                                  subscription.payment_method_type === 'pix'
-                                    ? 'PIX'
-                                    : subscription.payment_method_details?.last4
-                                    ? `Cartão final ${subscription.payment_method_details.last4}`
-                                    : 'Cartão'
-                                } em ${
-                                  subscription.current_period_end
-                                    ? new Date(subscription.current_period_end).toLocaleDateString('pt-BR')
-                                    : 'breve'
-                                }`
+                              ? subscription.cancel_at_period_end
+                                ? `Cancelamento agendado. Acesso ao ${subscription.plan_name} ativo até ${
+                                    subscription.current_period_end
+                                      ? new Date(subscription.current_period_end).toLocaleDateString('pt-BR')
+                                      : 'o final do ciclo'
+                                  }.`
+                                : `Renovação automática via ${
+                                    subscription.payment_method_type === 'pix'
+                                      ? 'PIX'
+                                      : subscription.payment_method_details?.last4
+                                      ? `Cartão final ${subscription.payment_method_details.last4}`
+                                      : 'Cartão'
+                                  } em ${
+                                    subscription.current_period_end
+                                      ? new Date(subscription.current_period_end).toLocaleDateString('pt-BR')
+                                      : 'breve'
+                                  }`
                               : 'Plano gratuito sem cobrança recorrente ativa.'}
                           </span>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => setIsViewingInvoices(true)}
-                          className={`text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                            isDark ? 'text-zinc-300 hover:text-white' : 'text-zinc-700 hover:text-zinc-950'
-                          }`}
-                        >
-                          <Receipt className="w-3 h-3" />
-                          <span>Faturas ({subscription?.invoices?.length || 0})</span>
-                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {subscription?.tier && subscription.tier !== 'free' && (
+                            subscription.cancel_at_period_end ? (
+                              <button
+                                type="button"
+                                disabled={isReactivatingSubscription}
+                                onClick={handleReactivateSubscription}
+                                className={`text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                                  isDark ? 'text-amber-300 hover:text-amber-100' : 'text-amber-700 hover:text-amber-900'
+                                } ${isReactivatingSubscription ? 'opacity-50' : ''}`}
+                              >
+                                {isReactivatingSubscription && <Loader2 className="w-3 h-3 animate-spin" />}
+                                <span>Reativar renovação</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setShowCancelConfirmModal(true)}
+                                className="text-[11px] font-normal transition-colors cursor-pointer text-zinc-400 hover:text-red-400"
+                              >
+                                Cancelar plano
+                              </button>
+                            )
+                          )}
+
+                          {subscription?.tier && subscription.tier !== 'free' && (
+                            <span className="text-zinc-600 select-none">·</span>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setIsViewingInvoices(true)}
+                            className={`text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                              isDark ? 'text-zinc-300 hover:text-white' : 'text-zinc-700 hover:text-zinc-950'
+                            }`}
+                          >
+                            <Receipt className="w-3 h-3" />
+                            <span>Faturas ({subscription?.invoices?.length || 0})</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1416,6 +1536,83 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
             </>
           )}
         </div>
+
+        {/* Modal de Confirmacao de Cancelamento de Assinatura */}
+        {showCancelConfirmModal && (
+          <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in-50 duration-150 rounded-2xl">
+            <div
+              className={`w-full max-w-sm rounded-xl border p-4.5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-150 ${
+                isDark ? 'bg-[#121217] border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+              }`}
+            >
+              <div className="space-y-1">
+                <h4 className="text-xs font-semibold">
+                  Cancelar renovação do {subscription?.plan_name || 'Plano Pro'}?
+                </h4>
+                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                  Ao cancelar, nenhuma nova cobrança será realizada e seu acesso aos recursos contratados continuará garantido até o fim do período.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-lg border border-inherit bg-zinc-500/5 space-y-2 text-[11px]">
+                <div className="flex items-start gap-1.5 text-zinc-300">
+                  <Check className="w-3.5 h-3.5 text-zinc-400 shrink-0 mt-0.5" />
+                  <span>
+                    Seus tokens de IA e o Conselho Editorial permanecem ativos até{' '}
+                    <strong>
+                      {subscription?.current_period_end
+                        ? new Date(subscription.current_period_end).toLocaleDateString('pt-BR')
+                        : 'o final do ciclo'}
+                    </strong>.
+                  </span>
+                </div>
+                <div className="flex items-start gap-1.5 text-zinc-300">
+                  <Check className="w-3.5 h-3.5 text-zinc-400 shrink-0 mt-0.5" />
+                  <span>Nenhuma cobrança automática será efetuada no próximo ciclo.</span>
+                </div>
+                <div className="flex items-start gap-1.5 text-zinc-400">
+                  <Check className="w-3.5 h-3.5 text-zinc-500 shrink-0 mt-0.5" />
+                  <span>
+                    Após essa data, sua conta retornará suavemente ao Plano Gratuito (100.000 tokens e até 5 catálogos).
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCancelingSubscription}
+                  onClick={() => setShowCancelConfirmModal(false)}
+                  className="h-7.5 px-3 text-[11px] cursor-pointer"
+                >
+                  Manter Assinatura
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={isCancelingSubscription}
+                  onClick={() => handleCancelSubscription(false)}
+                  className={`h-7.5 px-3 text-[11px] cursor-pointer font-medium transition-colors ${
+                    isDark
+                      ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/30'
+                      : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+                  }`}
+                >
+                  {isCancelingSubscription ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>Cancelando...</span>
+                    </>
+                  ) : (
+                    <span>Confirmar Cancelamento</span>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

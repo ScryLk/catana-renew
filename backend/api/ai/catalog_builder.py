@@ -188,46 +188,23 @@ SYSTEM_CATALOG_WITH_PRODUCTS_PROMPT = SYSTEM_CREATIVE_SYNTHESIS_PROMPT
 SYSTEM_CATALOG_PROMPT = SYSTEM_CREATIVE_SYNTHESIS_PROMPT
 
 
-def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
-    """
-    Gera um catalogo editorial dinamico via RAG-First Engine com micro-prompting do Google Gemini.
-    O Gemini sintetiza a identidade de marca, a paleta de cores nobre, o manifesto e os produtos (extraidos
-    do briefing ou gerados tematicamente). O Katana RAG planeja o mix dinamico de laminas (Hero, Duo, Grid 4,
-    Divisores) e o Fusion Engine monta pranchetas com fidelidade cromatica total.
-    """
-    from api.services.template_rag import TemplateRAGService
-
+def _run_gemini_or_contingency_synthesis(prompt: str, clean_products: List[Dict[str, Any]], detected_industry: str) -> Dict[str, Any]:
+    """Executa a síntese criativa via Gemini SDK ou fallback de contingência."""
     provider = get_ai_provider()
-    catalog_id = f"cat-{int(time.time())}"
-    has_real_products = products is not None and len(products) > 0
-
-    # 1. Higienizacao de produtos reais fornecidos via upload
-    clean_products = []
-    if has_real_products:
-        for idx, p in enumerate(products[:16]):
-            clean_products.append({
-                "index": f"{idx + 1:02d}",
-                "name": str(p.get("name", "")).strip() or f"Produto {idx + 1:02d}",
-                "price": str(p.get("price", "R$ 0,00")).strip(),
-                "sku": str(p.get("sku", "")).strip() or f"SKU-{idx + 1:03d}",
-                "category": str(p.get("category", "")).strip() or "Colecao",
-                "description": str(p.get("description", "")).strip(),
-                "image": str(p.get("image", "")).strip(),
-                "tag": str(p.get("tag", "")).strip(),
-            })
-
-    detected_industry = TemplateRAGService.detect_industry(prompt, clean_products)
-
-    # 2. Micro-Prompting Gemini para sintese editorial criativa E extracao/geracao de produtos
     synthesis_data = None
+
     if provider.client:
         try:
             from google.genai import types
+            from api.services.template_rag import TemplateRAGService
 
             has_text_products = bool(
                 re.search(r'(R\$|\$\s*\d|\b\d+[\.,]\d{2}\b|\bSKU\b|\bdimens|\bcm\b|\bmm\b|\bpeso\b|\bpreco\b|\bpreço\b)', prompt, re.IGNORECASE) or
                 re.search(r'^\s*(\d+[\.\)-]|[-*•])\s+[A-Za-z]', prompt, re.MULTILINE)
             )
+
+            requested_pages = TemplateRAGService.extract_requested_page_count(prompt)
+            page_instruction = f"ATENÇÃO: O usuário solicitou expressamente um catálogo de {requested_pages} página(s).\n" if requested_pages else ""
 
             if clean_products:
                 prods_summary = "\n".join([
@@ -236,7 +213,8 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
                 ])
                 user_contents = (
                     f"Briefing do Catalogo: {prompt}\n"
-                    f"Segmento Identificado: {detected_industry}\n\n"
+                    f"Segmento Identificado: {detected_industry}\n"
+                    f"{page_instruction}\n"
                     f"PRODUTOS CADASTRADOS:\n{prods_summary}\n\n"
                     "INSTRUCAO: Sintetize o titulo da colecao, a paleta de cores nobre com contraste AAA, "
                     "o selo de capa (cover_label), o manifesto e enriqueça a lista de produtos com descricoes sensoriais e tags comerciais."
@@ -244,7 +222,8 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
             elif has_text_products:
                 user_contents = (
                     f"Briefing do Catalogo: {prompt}\n"
-                    f"Segmento Identificado: {detected_industry}\n\n"
+                    f"Segmento Identificado: {detected_industry}\n"
+                    f"{page_instruction}\n"
                     "INSTRUCAO: Analise minuciosamente o briefing. O usuario descreveu produtos no texto. "
                     "Extraia integralmente cada um dos produtos no array 'products' com nome, categoria, SKU, preco e especificacoes tecnicas.\n"
                     "Crie tambem o titulo da colecao, paleta cromatica refinada com contraste AAA, selo de capa (cover_label) e manifesto poetico da marca."
@@ -252,7 +231,8 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
             else:
                 user_contents = (
                     f"Briefing do Catalogo: {prompt}\n"
-                    f"Segmento Identificado: {detected_industry}\n\n"
+                    f"Segmento Identificado: {detected_industry}\n"
+                    f"{page_instruction}\n"
                     "INSTRUCAO: Analise o briefing conceitual. Crie a identidade da colecao (titulo, categoria, summary, reasoning), "
                     "paleta cromatica refinada com contraste AAA, selo de capa (cover_label) e manifesto poetico da marca.\n"
                     "PRODUTOS: Como este briefing e puramente conceitual e nao detalha produtos individuais, retorne 'products' obrigatoriamente como um array vazio []."
@@ -296,15 +276,45 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
         except Exception as exc:
             logger.warning(f"[CatalogBuilder] Gemini indisponivel ou cota zerada ({exc}). Acionando sintese de contingencia.")
 
-    # 3. Fallback de Sintese Criativa caso Gemini nao responda ou ocorra erro
     if not synthesis_data or not isinstance(synthesis_data, dict):
         synthesis_data = _get_contingency_synthesis(prompt, clean_products, detected_industry)
 
-    # 4. Consolidacao Dinamica dos Produtos
-    # Se nao houver upload previo, aproveita integralmente os produtos extraidos/sintetizados pela IA
-    gemini_products = synthesis_data.get("products", [])
-    if not clean_products and gemini_products:
-        for idx, gp in enumerate(gemini_products[:16]):
+    return synthesis_data
+
+
+def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """
+    Gera um catalogo editorial desacoplado e governado por restricoes via EditorialGenerationPipeline.
+    Executa o fluxo completo de 12 camadas:
+    Prompt -> Intent Parser -> Contract -> Constraint Engine -> RAG -> Content Planner -> Design Planner -> Generation -> Validator -> Auto-Repair -> Output.
+    Preserva total compatibilidade com o retorno esperado pelo frontend e endpoints do Catana 2.0.
+    """
+    from api.services.template_rag import TemplateRAGService
+    from api.ai.pipeline import EditorialGenerationPipeline
+
+    # 1. Higienizacao inicial de produtos reais
+    clean_products = []
+    if products:
+        for idx, p in enumerate(products[:40]):
+            clean_products.append({
+                "index": f"{idx + 1:02d}",
+                "name": str(p.get("name", "")).strip() or f"Produto {idx + 1:02d}",
+                "price": str(p.get("price", "R$ 0,00")).strip(),
+                "sku": str(p.get("sku", "")).strip() or f"SKU-{idx + 1:03d}",
+                "category": str(p.get("category", "")).strip() or "Colecao",
+                "description": str(p.get("description", "")).strip(),
+                "image": str(p.get("image", "")).strip(),
+                "tag": str(p.get("tag", "")).strip(),
+            })
+
+    detected_industry = TemplateRAGService.detect_industry(prompt, clean_products)
+
+    # 2. Execucao da sintese criativa para enriquecer textos e paleta
+    synthesis_data = _run_gemini_or_contingency_synthesis(prompt, clean_products, detected_industry)
+
+    # Se a sintese extraiu produtos do texto e nao havia produtos previamente, aproveita
+    if not clean_products and synthesis_data.get("products"):
+        for idx, gp in enumerate(synthesis_data["products"][:40]):
             clean_products.append({
                 "index": f"{idx + 1:02d}",
                 "name": str(gp.get("name", "")).strip() or f"Peca {idx + 1:02d}",
@@ -316,172 +326,54 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
                 "tag": str(gp.get("tag", "")).strip(),
             })
 
-    # 5. RAG Layout Planning Dinamico com os produtos reais/sintetizados
-    planned_pages = TemplateRAGService.plan_dynamic_catalog_structure(
+    # 3. Execucao pelo EditorialGenerationPipeline (12 etapas desacopladas)
+    doc = EditorialGenerationPipeline.execute(
         prompt=prompt,
         products=clean_products,
+        synthesis_generator_func=lambda _: synthesis_data,
     )
 
-    # 6. Fusion Engine: Funde os Blueprints RAG com a Sintese Criativa e Paleta Oficial
-    stock = resolve_images_for_prompt(prompt if not clean_products else f"{prompt} {clean_products[0]['name']} {clean_products[0]['category']}")
-    palette = synthesis_data.get("palette", {})
-    if not palette or not isinstance(palette, dict):
-        palette = {
-            "name": "Noir & Ivory",
-            "primary": "#1A1817",
-            "background": "#F5F1EA",
-            "accent": "#B08D57",
-            "secondary": "#4A4846",
-            "surface": "#FDFBF7",
-            "contrastRatio": "9.2:1 (AAA)",
-            "locked": False,
-        }
+    # 4. Enriquecimento dos metadados de conselho editorial e contingencia para compatibilidade total
+    is_one_pager = len(doc.get("pages", [])) == 1
+    doc_title = doc.get("title", "Coleção Editorial")
+    palette = doc.get("palette", {})
 
-    catalog_title = synthesis_data.get("title") or (clean_products[0]["category"] if clean_products else "Colecao Editorial")
-    catalog_category = synthesis_data.get("category") or (clean_products[0]["category"] if clean_products else "Geral")
-    catalog_summary = synthesis_data.get("summary") or "Catalogo comercial diagramado com proporcao visual e harmonia editorial."
-    catalog_reasoning = synthesis_data.get("reasoning") or "Composicao balanceada com contraste certificado e alocacao sob medida via RAG."
-    manifesto_data = synthesis_data.get("manifesto", {})
-
-    assembled_pages = []
-    prod_img_idx = 0
-    div_img_idx = 0
-
-    for plan in planned_pages:
-        page_num = plan["pageNumber"]
-        p_type = plan["type"]
-        blueprint = plan.get("blueprint_data", {})
-        assigned = plan.get("assigned_products", [])
-
-        # Paleta soberana: fundo escuro em capas, divisores e contracapas; fundo claro nas paginas internas
-        is_dark_page = p_type in ["cover", "backcover", "divider"]
-        page_bg = palette.get("primary", "#1A1817") if is_dark_page else palette.get("background", "#F5F1EA")
-        page_text = palette.get("background", "#F5F1EA") if is_dark_page else palette.get("primary", "#1A1817")
-        page_accent = palette.get("accent", "#B08D57")
-
-        page_obj = {
-            "id": f"{catalog_id}-p{page_num}",
-            "pageNumber": page_num,
-            "type": p_type,
-            "backgroundColor": page_bg,
-            "textColor": page_text,
-            "accentColor": page_accent,
-        }
-
-        if p_type == "cover":
-            page_obj["title"] = catalog_title.upper()
-            page_obj["subtitle"] = catalog_summary.upper()
-            page_obj["label"] = synthesis_data.get("cover_label") or f"COLECAO EXCLUSIVA · {catalog_category.upper()}"
-            page_obj["folio"] = "01"
-            # Deixar editorialImage = None permite ao Studio renderizar o monograma dinamico com a inicial da marca.
-            page_obj["editorialImage"] = None
-
-        elif p_type == "manifesto":
-            page_obj["title"] = manifesto_data.get("title") or "Manifesto da Marca"
-            page_obj["quote"] = manifesto_data.get("quote") or "O valor real de um produto comeca na atencao aos detalhes."
-            page_obj["content"] = manifesto_data.get("content") or "Nossas solucoes unem design funcional, precisao tecnica e apresentacao impecavel."
-            page_obj["label"] = "MANIFESTO EDITORIAL"
-            page_obj["folio"] = f"{page_num:02d} · MANIFESTO"
-
-        elif p_type == "divider":
-            div_img = stock["dividers"][div_img_idx % len(stock["dividers"])]
-            div_img_idx += 1
-            page_obj["editorialImage"] = div_img
-            page_obj["title"] = blueprint.get("title") or "SELECAO ESPECIAL"
-            page_obj["subtitle"] = blueprint.get("subtitle") or "Destaques e aplicacoes praticas"
-            page_obj["label"] = "SECAO EDITORIAL"
-            page_obj["folio"] = f"{page_num:02d} · DIVISAO"
-
-        elif p_type in ["hero", "duo", "single", "grid_4"]:
-            page_obj["label"] = (
-                "DESTAQUE EXCLUSIVO" if p_type == "hero" else
-                "DUO EDITORIAL" if p_type == "duo" else
-                "MATRIZ COMERCIAL" if p_type == "grid_4" else "EDICAO LIMITADA"
-            )
-            page_obj["folio"] = f"{page_num:02d} · {catalog_category.upper()}"
-            page_obj["slotCapacity"] = plan.get("capacity", 1)
-
-            # Monta a lista de produtos da lamina
-            page_products = []
-            if assigned:
-                for p_idx, prod_item in enumerate(assigned):
-                    # Imagem: preserva a do produto ou busca no acervo tematico do nicho
-                    final_img = prod_item.get("image", "").strip()
-                    if not final_img:
-                        item_stock = resolve_images_for_prompt(f"{prod_item['name']} {prod_item['category']}")
-                        avail_imgs = item_stock.get("products", stock["products"])
-                        final_img = avail_imgs[prod_img_idx % len(avail_imgs)]
-                        prod_img_idx += 1
-
-                    page_products.append({
-                        "id": f"prod-{catalog_id}-{prod_item['index']}",
-                        "name": prod_item["name"],
-                        "category": prod_item["category"],
-                        "index": prod_item["index"],
-                        "sku": prod_item["sku"],
-                        "price": prod_item["price"],
-                        "description": prod_item["description"] or "Acabamento premium com alta resistencia e apresentacao comercial refinada.",
-                        "image": final_img,
-                        "tag": prod_item.get("tag") or ("Obra Prima" if p_idx == 0 and p_type == "hero" else "Destaque" if p_idx == 0 else "Disponivel"),
-                    })
-
-            page_obj["products"] = page_products
-
-        elif p_type == "backcover":
-            page_obj["title"] = catalog_title.upper()
-            page_obj["label"] = "ATENDIMENTO COMERCIAL & DISTRIBUICAO"
-            clean_slug = catalog_title.lower().replace(' ', '').replace('—', '').replace('-', '')[:15]
-            page_obj["content"] = f"CENTRAL DE ATENDIMENTO · {catalog_title.upper()}\\nCONTATO: COMERCIAL@{clean_slug}.COM.BR\\nGARANTIA & ATENDIMENTO EXCLUSIVO"
-            page_obj["folio"] = f"{catalog_title.upper()} · 2026"
-
-        assembled_pages.append(page_obj)
-
-    return {
-        "catalogId": catalog_id,
-        "title": catalog_title,
-        "category": catalog_category,
-        "summary": catalog_summary,
-        "reasoning": catalog_reasoning,
-        "palette": palette,
-        "pages": assembled_pages,
-        "totalPages": len(assembled_pages),
-        "initialPrompt": prompt,
-        "rag_metadata": {
-            "dynamic_pages": len(assembled_pages),
-            "industry": detected_industry,
-            "tokens_saved_pct": 85,
+    doc["councilDelegations"] = [
+        {
+            "roleId": "orchestrator",
+            "roleName": "Editor-Chefe",
+            "badge": "Orquestrador",
+            "action": (
+                f"Estruturou catálogo dinâmico de página única (One-Pager) para '{doc_title}'."
+                if is_one_pager else
+                f"Estruturou catálogo dinâmico com {len(doc.get('pages', []))} lâminas via Pipeline Editorial para '{doc_title}'."
+            ),
         },
-        "councilDelegations": [
-            {
-                "roleId": "orchestrator",
-                "roleName": "Editor-Chefe",
-                "badge": "Orquestrador",
-                "action": f"Estruturou catalogo dinamico com {len(assembled_pages)} laminas via RAG para '{catalog_title}'.",
-            },
-            {
-                "roleId": "director",
-                "roleName": "Diretor de Arte",
-                "badge": "Design",
-                "action": f"Definiu paleta '{palette.get('name')}' e composicao visual de alta fidelidade.",
-            },
-            {
-                "roleId": "copywriter",
-                "roleName": "Redator Sênior",
-                "badge": "Redação",
-                "action": "Elaborou manifesto e descricoes persuasivas com economia otimizada de tokens.",
-            },
-            {
-                "roleId": "commercial",
-                "roleName": "Diretor Comercial",
-                "badge": "Comercial",
-                "action": (
-                    f"Alocou {len(clean_products)} produtos com precificacao e SKUs validados."
-                    if clean_products else
-                    "Preparou pranchetas com wireframes de diagramacao aguardando alocacao de produtos pelo usuario."
-                ),
-            },
-        ],
-    }
+        {
+            "roleId": "director",
+            "roleName": "Diretor de Arte",
+            "badge": "Design",
+            "action": f"Definiu paleta '{palette.get('name', 'Personalizada')}' e composição visual com contraste verificado.",
+        },
+        {
+            "roleId": "copywriter",
+            "roleName": "Redator Sênior",
+            "badge": "Redação",
+            "action": "Elaborou manifesto e chamadas persuasivas preservando dados e regras de conteúdo.",
+        },
+        {
+            "roleId": "commercial",
+            "roleName": "Diretor Comercial",
+            "badge": "Comercial",
+            "action": (
+                f"Alocou {len(clean_products)} produtos com precificação e SKUs validados."
+                if clean_products else
+                "Preparou pranchetas com wireframes de diagramação aguardando alocação de produtos pelo usuário."
+            ),
+        },
+    ]
+
+    return doc
 
 
 def _get_contingency_synthesis(prompt: str, products: List[Dict[str, Any]], industry: str) -> Dict[str, Any]:

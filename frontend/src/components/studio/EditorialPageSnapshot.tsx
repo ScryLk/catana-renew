@@ -1,5 +1,6 @@
 import React from 'react';
 import { CatalogPageData, StudioPalette } from '../../data/editorialCatalog.mock';
+import { PageOverlayLayer } from './PageOverlayLayer';
 
 interface EditorialPageSnapshotProps {
   page: CatalogPageData;
@@ -568,6 +569,7 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
       }}
     >
       {renderContent()}
+      <PageOverlayLayer page={page} interactive={false} />
     </div>
   );
 

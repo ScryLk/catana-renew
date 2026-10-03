@@ -193,8 +193,8 @@ class TemplateRAGService:
     @classmethod
     def format_template_for_prompt(cls, template: CatalogTemplate) -> str:
         """
-        Converte o blueprint do template em uma referencia Few-Shot concisa e estruturada
-        para injecao no prompt do agente de IA.
+        Converte o blueprint do template em uma referencia de conhecimento (RAG)
+        declarada explicitamente como NAO-VINCULANTE (NON-BINDING).
         """
         category_name = dict(CatalogTemplate.CATEGORY_CHOICES).get(template.category, template.category)
         
@@ -202,19 +202,65 @@ class TemplateRAGService:
         blueprint_clean_str = json.dumps(blueprint_summary, ensure_ascii=False, indent=2)
 
         return (
-            f"[REFERENCIA EDITORIAL DE TEMPLATE (RAG)]:\n"
+            f"[CONHECIMENTO EDITORIAL E REFERENCIA (RAG - NON-BINDING)]:\n"
+            f"- Tipo de Chunk: EXAMPLE (NON-BINDING)\n"
             f"- Nome: {template.title}\n"
-            f"- Categoria: {category_name} (Capacidade recomendada: {template.product_capacity} produto(s))\n"
-            f"- Segmento Recomendado: {template.industry} | Preset: {template.style_preset}\n"
+            f"- Categoria: {category_name} (Capacidade sugerida: {template.product_capacity} produto(s))\n"
+            f"- Segmento Sugerido: {template.industry} | Preset: {template.style_preset}\n"
             f"- Raciocinio de Direcao de Arte:\n"
             f"  {template.editorial_reasoning}\n"
             f"- Blueprint Estrutural de Referencia (JSON):\n"
             f"```json\n"
             f"{blueprint_clean_str}\n"
             f"```\n"
-            f"Utilize este blueprint como guia de composicao, adaptando os dados (textos, precos e imagens) "
-            f"para o contexto especifico do usuario."
+            f"NOTA NORMATIVA: EXAMPLES ARE NON-BINDING. Um exemplo recuperado NUNCA define "
+            f"page_count, estrutura, paleta, quantidade de elementos, ordem ou layout final. "
+            f"As restrições do briefing do usuário (Hard Constraints) têm precedência absoluta."
         )
+
+    @classmethod
+    def retrieve_context_for_contract(cls, contract: Any) -> Dict[str, Any]:
+        """
+        Executa retrieval consciente de restrições para alimentar o Content e Design Planner.
+        Filtra candidatos incompatíveis com restrições negativas (ex: NO_CARDS).
+        """
+        from api.ai.constraint_engine import ConstraintEngine
+
+        prompt = contract.raw_prompt
+        industry = contract.detected_industry
+        negatives = set(contract.constraints.negative)
+
+        # Busca referências de templates
+        raw_templates = cls.search_templates(
+            query=f"{prompt} {industry}",
+            industry=industry,
+            limit=4,
+        )
+
+        template_dicts = []
+        for t in raw_templates:
+            template_dicts.append({
+                "slug": t.slug,
+                "title": t.title,
+                "category": t.category,
+                "description": t.description,
+                "blueprint_data": t.blueprint_data,
+                "product_capacity": t.product_capacity,
+                "is_one_pager_compatible": t.product_capacity <= 4,
+            })
+
+        # Filtra pelo ConstraintEngine
+        valid_templates = ConstraintEngine.filter_retrieved_knowledge(contract, template_dicts)
+
+        return {
+            "retrieved_templates": valid_templates,
+            "industry": industry,
+            "non_binding": True,
+            "rag_rules": [
+                "EXAMPLES_ARE_NON_BINDING",
+                "PRESERVE_USER_HARD_CONSTRAINTS",
+            ],
+        }
 
     @classmethod
     def retrieve_best_template_prompt(
@@ -268,6 +314,52 @@ class TemplateRAGService:
         return "general_retail"
 
     @classmethod
+    def extract_requested_page_count(cls, prompt: str) -> Optional[int]:
+        """
+        Extrai a quantidade de páginas solicitada expressamente pelo usuário no prompt.
+        Suporta termos como 'uma página', '1 página', 'single page', 'one page',
+        '2 páginas', '4 páginas', 'duas páginas', etc.
+        """
+        if not prompt:
+            return None
+        import re
+        p_lower = prompt.lower()
+
+        # 1 página (expressões comuns em português e inglês)
+        if re.search(r'\b(?:1|uma|um|single|one)\s*(?:p[aá]gina|pag\b|p[aá]g\b|folha|l[aâ]mina|prancheta|spread|one[- ]?page|onepager|single[- ]?page)\b', p_lower):
+            return 1
+        if re.search(r'\b(?:one[- ]?page|onepager|single[- ]?page|folha\s*[uú]nica|l[aâ]mina\s*[uú]nica|p[aá]gina\s*[uú]nica)\b', p_lower):
+            return 1
+
+        word_to_num = {
+            'duas': 2, 'dois': 2, 'two': 2,
+            'tres': 3, 'três': 3, 'three': 3,
+            'quatro': 4, 'four': 4,
+            'cinco': 5, 'five': 5,
+            'seis': 6, 'six': 6,
+            'sete': 7, 'seven': 7,
+            'oito': 8, 'eight': 8,
+            'nove': 9, 'nine': 9,
+            'dez': 10, 'ten': 10,
+            'doze': 12, 'twelve': 12,
+            'dezesseis': 16, 'sixteen': 16,
+        }
+
+        # Dígitos numéricos (ex: 1 a 32 páginas)
+        match_digit = re.search(r'\b(\d+)\s*(?:p[aá]ginas?|pags?\b|p[aá]gs?\b|folhas?|l[aâ]minas?|pranchetas?)\b', p_lower)
+        if match_digit:
+            val = int(match_digit.group(1))
+            if 1 <= val <= 32:
+                return val
+
+        # Palavras por extenso
+        for word, num in word_to_num.items():
+            if re.search(rf'\b{word}\s*(?:p[aá]ginas?|pags?\b|p[aá]gs?\b|folhas?|l[aâ]minas?|pranchetas?)\b', p_lower):
+                return num
+
+        return None
+
+    @classmethod
     def plan_dynamic_catalog_structure(
         cls,
         prompt: str,
@@ -275,123 +367,41 @@ class TemplateRAGService:
         organization_id: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Calcula dinamicamente a estrutura de paginas do catalogo com base no volume
-        e natureza dos produtos, recuperando via RAG os templates mais aderentes.
+        Calcula dinamicamente a estrutura de paginas do catalogo integrando o
+        RequirementParser e o PageBudgetEngine, respeitando rigorosamente hard constraints
+        (como contagem exata, máxima e mínima de páginas).
         """
-        industry = cls.detect_industry(prompt, products)
-        n_prods = len(products) if products else 0
+        from api.ai.requirement_parser import RequirementParser
+        from api.ai.page_budget import PageBudgetEngine
 
-        # Define a sequencia dinamica de laminas (page_type, capacity)
-        page_specs = []
+        contract = RequirementParser.parse(prompt=prompt, products=products)
+        slots = PageBudgetEngine.calculate_and_allocate_slots(contract=contract, products=products)
+        industry = contract.detected_industry
 
-        # 1. Capa sempre presente
-        page_specs.append({"type": "cover", "capacity": 0})
-
-        # 2. Abertura: Manifesto ou Divisor
-        page_specs.append({"type": "manifesto", "capacity": 0})
-
-        # 3. Laminas de produtos planejadas conforme volume real
-        if n_prods == 0:
-            # Sem produtos: estrutura conceitual equilibrada de 6 paginas
-            page_specs.append({"type": "hero", "capacity": 1})
-            page_specs.append({"type": "duo", "capacity": 2})
-            page_specs.append({"type": "single", "capacity": 1})
-        elif n_prods == 1:
-            page_specs.append({"type": "hero", "capacity": 1})
-        elif n_prods == 2:
-            page_specs.append({"type": "duo", "capacity": 2})
-        elif n_prods in [3, 4]:
-            page_specs.append({"type": "hero", "capacity": 1})
-            page_specs.append({"type": "duo", "capacity": 2})
-            if n_prods == 4:
-                page_specs.append({"type": "single", "capacity": 1})
-        elif industry == "packaging_food_service":
-            # Catalogo tecnico B2B com matrizes comerciais (grid_4)
-            if n_prods in [5, 6]:
-                page_specs.append({"type": "grid_4", "capacity": 4})
-                page_specs.append({"type": "duo", "capacity": 2})
-            elif n_prods in [7, 8]:
-                page_specs.append({"type": "grid_4", "capacity": 4})
-                page_specs.append({"type": "grid_4", "capacity": 4})
-            else:
-                page_specs.append({"type": "grid_4", "capacity": 4})
-                page_specs.append({"type": "grid_4", "capacity": 4})
-                rem = n_prods - 8
-                while rem > 0:
-                    if rem >= 4:
-                        page_specs.append({"type": "grid_4", "capacity": 4})
-                        rem -= 4
-                    elif rem >= 2:
-                        page_specs.append({"type": "duo", "capacity": 2})
-                        rem -= 2
-                    else:
-                        page_specs.append({"type": "single", "capacity": 1})
-                        rem -= 1
-        elif n_prods in [5, 6]:
-            page_specs.append({"type": "hero", "capacity": 1})
-            page_specs.append({"type": "duo", "capacity": 2})
-            if n_prods == 6:
-                page_specs.append({"type": "divider", "capacity": 0})
-            page_specs.append({"type": "grid_4", "capacity": 4 if n_prods == 6 else 2})
-        elif n_prods in [7, 8]:
-            page_specs.append({"type": "hero", "capacity": 1})
-            page_specs.append({"type": "duo", "capacity": 2})
-            page_specs.append({"type": "divider", "capacity": 0})
-            page_specs.append({"type": "grid_4", "capacity": 4})
-            if n_prods == 8:
-                page_specs.append({"type": "single", "capacity": 1})
-        else:
-            # n_prods >= 9
-            page_specs.append({"type": "hero", "capacity": 1})
-            page_specs.append({"type": "duo", "capacity": 2})
-            page_specs.append({"type": "divider", "capacity": 0})
-            page_specs.append({"type": "grid_4", "capacity": 4})
-            rem = n_prods - 7
-            while rem > 0:
-                if rem >= 4:
-                    page_specs.append({"type": "grid_4", "capacity": 4})
-                    rem -= 4
-                elif rem >= 2:
-                    page_specs.append({"type": "duo", "capacity": 2})
-                    rem -= 2
-                else:
-                    page_specs.append({"type": "single", "capacity": 1})
-                    rem -= 1
-
-        # 4. Contracapa sempre presente
-        page_specs.append({"type": "backcover", "capacity": 0})
-
-        # Recupera os melhores blueprints via RAG para cada lamina planejada
         planned_pages = []
-        prod_pointer = 0
+        for slot in slots:
+            p_type = "single" if slot.role == "one_pager" else slot.role
+            cap = slot.target_capacity
 
-        for p_idx, spec in enumerate(page_specs):
-            p_type = spec["type"]
-            cap = spec["capacity"]
-
-            # Busca no RAG o template mais relevante para o tipo e industria
+            # Busca no RAG o template mais relevante como referencia consultiva
             matches = cls.search_templates(
                 query=f"{prompt} {p_type} {industry}",
-                category=p_type,
+                category=p_type if p_type in ["cover", "manifesto", "hero", "duo", "grid_4", "divider", "backcover"] else None,
                 industry=industry,
                 limit=1,
                 organization_id=organization_id,
             )
-
             matched_tpl = matches[0] if matches else None
-            assigned_prods = []
-            if cap > 0 and products:
-                assigned_prods = products[prod_pointer : prod_pointer + cap]
-                prod_pointer += len(assigned_prods)
 
             planned_pages.append({
-                "pageNumber": p_idx + 1,
+                "pageNumber": slot.page_number,
                 "type": p_type,
                 "capacity": cap,
                 "template_slug": matched_tpl.slug if matched_tpl else f"generic-{p_type}",
                 "template_title": matched_tpl.title if matched_tpl else f"Lamina {p_type.capitalize()}",
                 "blueprint_data": matched_tpl.blueprint_data if matched_tpl else {},
-                "assigned_products": assigned_prods,
+                "assigned_products": slot.allocated_products,
             })
 
         return planned_pages
+

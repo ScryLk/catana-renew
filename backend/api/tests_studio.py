@@ -17,10 +17,12 @@ from api.models import (
     OrganizationQuota,
     TokenUsageLog,
     CatalogTemplate,
+    Product,
 )
 from api.ai.agents.registry import get_agent, list_agents
 from api.guards.quota_guard import (
     get_or_create_default_plan,
+    get_user_quota,
     rate_limiter,
     RateLimitExceededException,
     QuotaExceededException,
@@ -86,6 +88,134 @@ class StudioBackendTests(TestCase):
         self.assertEqual(len(detail_resp.data["spreads"]), 1)
         self.assertEqual(detail_resp.data["page_width"], 794)
         self.assertEqual(detail_resp.data["page_height"], 1123)
+
+    def test_create_catalog_with_palette_and_brand_lock(self):
+        """Verifica criacao e persistencia de catalogo com paleta e brand lock"""
+        url = reverse('studio_catalog_list')
+        palette = {
+            "name": "Luxe Noir & Or",
+            "primary": "#1A1817",
+            "background": "#F5F1EA",
+            "accent": "#B08D57",
+        }
+        payload = {
+            "title": "Catalogo Paleta Teste",
+            "brand_name": "Atelier Luxo",
+            "style_preset": "editorial_clean",
+            "brand_lock": True,
+            "total_pages": 8,
+            "palette_data": palette,
+        }
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["brand_lock"])
+        self.assertEqual(response.data["total_pages"], 8)
+        self.assertEqual(response.data["palette_data"]["name"], "Luxe Noir & Or")
+
+        cat_id = response.data["id"]
+        detail_url = reverse('studio_catalog_detail', kwargs={"pk": cat_id})
+        detail_resp = self.client.get(detail_url)
+        self.assertEqual(detail_resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(detail_resp.data["brand_lock"])
+        self.assertEqual(detail_resp.data["total_pages"], 8)
+        self.assertEqual(detail_resp.data["palette_data"]["accent"], "#B08D57")
+
+    def test_save_spread_atomic_with_overlays(self):
+        """Verifica salvamento e recuperacao de spread contendo overlays e produtos"""
+        cat = StudioCatalog.objects.create(
+            title="Catalogo Spreads Teste",
+            created_by=self.user,
+        )
+        url = reverse('studio_spread_manage', kwargs={"catalog_id": cat.id})
+        left_page = {
+            "id": "p-1",
+            "pageNumber": 1,
+            "type": "cover",
+            "title": "CAPA EDITORIAL",
+            "backgroundColor": "#1A1817",
+            "textColor": "#F5F1EA",
+            "accentColor": "#B08D57",
+            "overlays": [
+                {
+                    "id": "ov-1",
+                    "type": "badge",
+                    "text": "NOVA COLEÇÃO",
+                    "x": 50,
+                    "y": 20,
+                }
+            ]
+        }
+        right_page = {
+            "id": "p-2",
+            "pageNumber": 2,
+            "type": "hero",
+            "title": "DESTAQUE HERO",
+            "backgroundColor": "#F5F1EA",
+            "textColor": "#1A1817",
+            "accentColor": "#B08D57",
+            "products": [
+                {
+                    "id": "prod-1",
+                    "name": "Bolsa de Couro",
+                    "price": "R$ 1.200",
+                }
+            ],
+            "overlays": []
+        }
+        payload = {
+            "spread_index": 0,
+            "title": "Spread 1-2",
+            "left_page": left_page,
+            "right_page": right_page,
+        }
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["spread_index"], 0)
+
+        detail_url = reverse('studio_catalog_detail', kwargs={"pk": cat.id})
+        detail_resp = self.client.get(detail_url)
+        self.assertEqual(detail_resp.status_code, status.HTTP_200_OK)
+        spreads = detail_resp.data["spreads"]
+        self.assertEqual(len(spreads), 1)
+        self.assertEqual(spreads[0]["left_page"]["title"], "CAPA EDITORIAL")
+        self.assertEqual(len(spreads[0]["left_page"]["overlays"]), 1)
+        self.assertEqual(spreads[0]["left_page"]["overlays"][0]["text"], "NOVA COLEÇÃO")
+        self.assertEqual(spreads[0]["right_page"]["products"][0]["name"], "Bolsa de Couro")
+
+    def test_bulk_sync_spreads(self):
+        """Verifica sincronizacao em lote de múltiplos spreads em uma transacao atomica"""
+        cat = StudioCatalog.objects.create(
+            title="Catalogo Bulk Teste",
+            created_by=self.user,
+        )
+        url = reverse('studio_spread_bulk_sync', kwargs={"catalog_id": cat.id})
+        payload = {
+            "total_pages": 4,
+            "spreads": [
+                {
+                    "spread_index": 0,
+                    "title": "Spread 1-2",
+                    "left_page": {"id": "p-1", "pageNumber": 1, "type": "cover"},
+                    "right_page": {"id": "p-2", "pageNumber": 2, "type": "manifesto"},
+                },
+                {
+                    "spread_index": 1,
+                    "title": "Spread 3-4",
+                    "left_page": {"id": "p-3", "pageNumber": 3, "type": "hero"},
+                    "right_page": {"id": "p-4", "pageNumber": 4, "type": "backcover"},
+                }
+            ]
+        }
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "success")
+        self.assertEqual(response.data["count"], 2)
+
+        detail_url = reverse('studio_catalog_detail', kwargs={"pk": cat.id})
+        detail_resp = self.client.get(detail_url)
+        self.assertEqual(len(detail_resp.data["spreads"]), 2)
+        self.assertEqual(detail_resp.data["total_pages"], 4)
+        self.assertEqual(detail_resp.data["spreads"][1]["right_page"]["type"], "backcover")
 
     def test_chat_stream_mock_sse(self):
         """Verifica o endpoint de streaming SSE com o provedor Mock inteligente"""
@@ -426,6 +556,228 @@ class StudioBackendTests(TestCase):
         self.assertEqual(data["user_profile"]["username"], "test_studio_user")
         self.assertIn("catalogs", data)
         self.assertIn("ai_quota", data)
+
+    def test_export_guard_check(self):
+        """Verifica validacao de cotas para exportacao de PDF em 150 DPI vs 300 DPI"""
+        url = reverse('studio_export_check_guard')
+
+        # 1. 150 DPI (Web/Digital) e liberado para todos
+        res_150 = self.client.post(url, {"dpi": 150}, format='json')
+        self.assertEqual(res_150.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_150.data["allowed"])
+
+        # 2. 300 DPI (Grafica) e bloqueado para plano Free
+        res_300_free = self.client.post(url, {"dpi": 300}, format='json')
+        self.assertEqual(res_300_free.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(res_300_free.data["allowed"])
+        self.assertEqual(res_300_free.data["code"], "export_dpi_restricted")
+
+        # 3. Upgrade para plano Pro libera 300 DPI
+        pro_plan = get_or_create_default_plan("pro")
+        quota, _ = get_user_quota(self.user)
+        quota.plan = pro_plan
+        quota.save()
+
+        res_300_pro = self.client.post(url, {"dpi": 300}, format='json')
+        self.assertEqual(res_300_pro.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_300_pro.data["allowed"])
+
+    def test_import_sheet_products_json(self):
+        """Verifica a importacao de produtos via JSON com sanitizacao de precos e persistencia"""
+        cat = StudioCatalog.objects.create(
+            title="Catalogo Teste Importacao",
+            created_by=self.user,
+        )
+        url = reverse('studio_catalog_product_sheet_import', kwargs={"catalog_id": cat.id})
+        payload = {
+            "products": [
+                {
+                    "name": "Bolsa Couro Legítimo",
+                    "price": "R$ 1.450,00",
+                    "sku": "BLS-001",
+                    "category": "Acessórios",
+                    "description": "Acabamento premium artesanal.",
+                },
+                {
+                    "name": "Carteira Slim",
+                    "price": "289.90",
+                    "sku": "",
+                    "category": "Couros",
+                }
+            ]
+        }
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        prods = response.data["products"]
+        self.assertEqual(prods[0]["name"], "Bolsa Couro Legítimo")
+        self.assertEqual(prods[0]["price"], "R$ 1.450,00")
+        self.assertEqual(prods[0]["numeric_price"], 1450.0)
+        self.assertEqual(prods[1]["price"], "R$ 289,90")
+        self.assertTrue(prods[1]["sku"].startswith("SKU-"))
+
+        # Verifica persistencia no StudioCatalog
+        cat.refresh_from_db()
+        self.assertEqual(len(cat.unassigned_products), 2)
+        self.assertEqual(cat.unassigned_products[0]["sku"], "BLS-001")
+
+        # Verifica sincronizacao no modelo Product
+        synced_prod = Product.objects.filter(sku="BLS-001").first()
+        self.assertIsNotNone(synced_prod)
+        self.assertEqual(synced_prod.name, "Bolsa Couro Legítimo")
+
+    def test_import_sheet_products_csv_file(self):
+        """Verifica a importacao direta de arquivo CSV com delimitador e headers comerciais"""
+        cat = StudioCatalog.objects.create(
+            title="Catalogo CSV Teste",
+            created_by=self.user,
+        )
+        url = reverse('studio_catalog_product_sheet_import', kwargs={"catalog_id": cat.id})
+        csv_content = (
+            "Nome do Produto;Preço de Venda;Código SKU;Categoria;Descrição\n"
+            "Vinho Tinto Reserva;189,50;VNH-778;Bebidas Finas;Safra especial 2020\n"
+            "Azeite Extravirgem;75,00;AZT-102;Empório;Acidez máxima 0,2%\n"
+        )
+        upload = SimpleUploadedFile("tabela_produtos.csv", csv_content.encode("utf-8-sig"), content_type="text/csv")
+        response = self.client.post(url, {"file": upload}, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+
+        cat.refresh_from_db()
+        self.assertEqual(len(cat.unassigned_products), 2)
+        self.assertEqual(cat.unassigned_products[0]["name"], "Vinho Tinto Reserva")
+        self.assertEqual(cat.unassigned_products[0]["price"], "R$ 189,50")
+        self.assertEqual(cat.unassigned_products[1]["sku"], "AZT-102")
+
+    def test_catalog_detail_with_unassigned_products(self):
+        """Verifica serializacao e atualizacao de unassigned_products no GET/PUT de catalogo"""
+        cat = StudioCatalog.objects.create(
+            title="Catalogo Acervo Teste",
+            created_by=self.user,
+            unassigned_products=[{"id": "p1", "name": "Item 1", "price": "R$ 50,00"}]
+        )
+        url = reverse('studio_catalog_detail', kwargs={"pk": cat.id})
+        res_get = self.client.get(url)
+        self.assertEqual(res_get.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res_get.data["unassigned_products"]), 1)
+        self.assertEqual(res_get.data["unassigned_products"][0]["name"], "Item 1")
+
+        # Atualiza via PUT
+        payload = {
+            "unassigned_products": [
+                {"id": "p1", "name": "Item 1", "price": "R$ 50,00"},
+                {"id": "p2", "name": "Item 2", "price": "R$ 120,00"},
+            ]
+        }
+        res_put = self.client.put(url, payload, format="json")
+        self.assertEqual(res_put.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res_put.data["unassigned_products"]), 2)
+
+        cat.refresh_from_db()
+        self.assertEqual(len(cat.unassigned_products), 2)
+
+    def test_demo_templates_list(self):
+        """Verifica listagem dos templates canonicos de demonstracao (Prioridade 4)"""
+        url = reverse('studio_demo_templates_list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        templates = response.data.get("templates", [])
+        self.assertEqual(len(templates), 4)
+        keys = [t["key"] for t in templates]
+        self.assertIn("maison_verdana", keys)
+        self.assertIn("vektron_systems", keys)
+        self.assertIn("atelier_sucre", keys)
+        self.assertIn("cristallo_joias", keys)
+
+    def test_demo_catalog_load_authenticated(self):
+        """Verifica clonagem e persistencia de catalogo demo no PostgreSQL para usuario autenticado"""
+        url = reverse('studio_demo_catalog_load')
+        response = self.client.post(url, {"template_key": "vektron_systems"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data.get("persisted"))
+
+        cat_data = response.data.get("catalog", {})
+        self.assertIn("VEKTRON", cat_data.get("title", ""))
+        self.assertEqual(cat_data.get("total_pages"), 6)
+        self.assertEqual(len(cat_data.get("spreads", [])), 3)
+        self.assertTrue(len(cat_data.get("unassigned_products", [])) > 0)
+
+        # Verifica persistencia real no banco
+        db_cat = StudioCatalog.objects.get(id=cat_data["id"])
+        self.assertEqual(db_cat.created_by, self.user)
+        self.assertEqual(db_cat.spreads.count(), 3)
+        self.assertTrue(db_cat.brand_lock)
+
+    def test_demo_catalog_load_anonymous(self):
+        """Verifica carregamento de catalogo demo para usuario anonimo sem quebrar sessao"""
+        self.client.force_authenticate(user=None)
+        url = reverse('studio_demo_catalog_load')
+        response = self.client.post(url, {"template_key": "maison_verdana"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data.get("persisted"))
+        cat_data = response.data.get("catalog", {})
+        self.assertEqual(cat_data.get("id"), "demo-maison_verdana")
+        self.assertEqual(len(cat_data.get("spreads", [])), 3)
+
+    def test_public_catalog_detail_db(self):
+        """Verifica acesso publico anonimo a catalogo persistido no PostgreSQL (Prioridade 5)"""
+        self.client.force_authenticate(user=None)
+        cat = StudioCatalog.objects.create(
+            title="Catálogo Público Primavera 2026",
+            brand_name="Primavera Haute",
+            created_by=self.user,
+            total_pages=2,
+            primary_color="#18181B",
+            accent_color="#B08D57",
+        )
+        CatalogSpread.objects.create(
+            catalog=cat,
+            spread_index=0,
+            title="Lâmina 1",
+            left_page_elements=[{"id": "p1", "type": "cover", "title": "Capa"}],
+            right_page_elements=[{"id": "p2", "type": "manifesto", "title": "Manifesto"}],
+        )
+
+        url = reverse('studio_public_catalog_detail', kwargs={"catalog_id": cat.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("id"), str(cat.id))
+        self.assertEqual(response.data.get("title"), "Catálogo Público Primavera 2026")
+        self.assertEqual(response.data.get("brand_name"), "Primavera Haute")
+        self.assertEqual(len(response.data.get("spreads", [])), 1)
+        self.assertFalse(response.data.get("is_demo"))
+        # Verifica que dados sensiveis nao foram vazados
+        self.assertNotIn("created_by", response.data)
+        self.assertNotIn("organization", response.data)
+
+    def test_public_catalog_detail_demo(self):
+        """Verifica acesso publico anonimo a catalogo demo canônico (Prioridade 5)"""
+        self.client.force_authenticate(user=None)
+        # Teste com chave canônica pura
+        url = reverse('studio_public_catalog_detail', kwargs={"catalog_id": "maison_verdana"})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("id"), "maison_verdana")
+        self.assertEqual(response.data.get("brand_name"), "Maison Verdana")
+        self.assertTrue(response.data.get("is_demo"))
+        self.assertEqual(len(response.data.get("spreads", [])), 3)
+
+        # Teste com prefixo demo-
+        url_prefixed = reverse('studio_public_catalog_detail', kwargs={"catalog_id": "demo-vektron_systems"})
+        res_prefixed = self.client.get(url_prefixed)
+        self.assertEqual(res_prefixed.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_prefixed.data.get("id"), "vektron_systems")
+
+    def test_public_catalog_detail_not_found(self):
+        """Verifica resposta 404 para ID inexistente no endpoint publico (Prioridade 5)"""
+        self.client.force_authenticate(user=None)
+        url = reverse('studio_public_catalog_detail', kwargs={"catalog_id": "99999999"})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn("error", response.data)
+
+
+
 
 
 

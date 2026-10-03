@@ -21,8 +21,12 @@ import { PublicProfilePage } from './pages/PublicProfile';
 import { ResetPassword } from './pages/ResetPassword';
 import { Transparency } from './pages/Transparency';
 import { SystemDesignPage } from './pages/SystemDesignPage';
+import { PublicCatalogReader } from './pages/PublicCatalogReader';
+import { LandingPage } from './pages/LandingPage';
 import { Toaster } from 'sonner';
 import { useStudioStore } from './store/studioStore';
+import { ClerkAuthSync } from './components/auth/ClerkAuthSync';
+import { isClerkConfigured } from './store/authStore';
 
 function App() {
   const { checkAuth } = useAuthStore();
@@ -58,6 +62,7 @@ function App() {
 
   return (
     <>
+      {isClerkConfigured && <ClerkAuthSync />}
       <Toaster
         position="top-right"
         theme={theme}
@@ -77,7 +82,14 @@ function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/showcase/:id" element={<CatalogShowcase />} />
 
-          {/* Katana 2.0 AI Studio: Primary Experience */}
+          {/* Public Catalog Reader (Digital Flipbook - Prioridade 5) */}
+          <Route path="/view/:id" element={<PublicCatalogReader />} />
+          <Route path="/c/:id" element={<PublicCatalogReader />} />
+
+          {/* Landing Page & Showcase Experience (Arquivada / Acessível em /landing) */}
+          <Route path="/landing" element={<LandingPage />} />
+
+          {/* Katana 2.0 AI Studio: Conversa com o Assistente como Página Inicial */}
           <Route path="/" element={<KatanaStudio />} />
           <Route path="/studio" element={<KatanaStudio />} />
           <Route path="/studio-demo" element={<KatanaStudio />} />
@@ -203,6 +215,9 @@ function App() {
               </PrivateRoute>
             }
           />
+
+          {/* Wildcard Fallback Route */}
+          <Route path="*" element={<KatanaStudio />} />
         </Routes>
       </Router>
 

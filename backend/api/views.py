@@ -1,8 +1,10 @@
-from rest_framework import viewsets, permissions, status, filters
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework import viewsets, permissions, status, filters, exceptions
+from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.pagination import PageNumberPagination
+from .services.image_validator import validate_image_file
+from .throttling import RegisterRateThrottle
 from django.db.models import Count, Sum, Q
 from django.contrib.auth import update_session_auth_hash
 from .models import (
@@ -80,9 +82,20 @@ class SedeSharingViewSet(viewsets.ModelViewSet):
         serializer.save()
 
 
-class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
+class UserViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = User.objects.none()
     serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return User.objects.none()
+        if user.is_superuser:
+            return User.objects.all().order_by('id')
+        if getattr(user, 'role', None) == 'admin' and getattr(user, 'organization', None):
+            return User.objects.filter(organization=user.organization).order_by('id')
+        return User.objects.filter(id=user.id).order_by('id')
 
 class OrganizationViewSet(viewsets.ModelViewSet):
     queryset = Organization.objects.all()
@@ -99,8 +112,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         # OR organizations they own
         user = self.request.user
         if not user.is_authenticated:
-            # Fallback for dev: show all, or act as superuser
-            return Organization.objects.all()
+            return Organization.objects.none()
         
         if user.is_superuser:
             return Organization.objects.all()
@@ -168,6 +180,11 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return queryset.none()
+        if not user.is_superuser:
+            queryset = queryset.filter(Q(organization__in=user.organizations.all()) | Q(created_by=user))
         org_id = self.request.query_params.get('organization')
         sede_id = self.request.query_params.get('sede')
 
@@ -598,6 +615,11 @@ class ThemeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return queryset.none()
+        if not user.is_superuser:
+            queryset = queryset.filter(Q(organization__in=user.organizations.all()) | Q(created_by=user))
         org_id = self.request.query_params.get('organization')
         sede_id = self.request.query_params.get('sede')
 
@@ -672,20 +694,53 @@ class CatalogViewSet(viewsets.ModelViewSet):
             sede=catalog.sede
         )
 
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if request.method in ['PUT', 'PATCH', 'DELETE']:
+            user = request.user
+            if not user or not user.is_authenticated:
+                raise exceptions.NotAuthenticated("Autenticação necessária.")
+            if user.is_superuser:
+                return
+            if getattr(obj, 'is_demo', False):
+                raise exceptions.PermissionDenied("Catálogos de demonstração não podem ser alterados ou excluídos.")
+            user_orgs = user.organizations.all()
+            if obj.organization and obj.organization not in user_orgs and obj.created_by != user:
+                raise exceptions.PermissionDenied("Acesso negado: Você não tem permissão para alterar catálogos de outra organização.")
+
     def perform_update(self, serializer):
         user = self.request.user
+        catalog = serializer.instance
 
-        catalog = serializer.save()
+        if getattr(catalog, 'is_demo', False) and not user.is_superuser:
+            raise exceptions.PermissionDenied("Catálogos de demonstração não podem ser alterados.")
+
+        user_orgs = user.organizations.all()
+        if catalog.organization and catalog.organization not in user_orgs and catalog.created_by != user and not user.is_superuser:
+            raise exceptions.PermissionDenied("Acesso negado: Você não tem permissão para alterar catálogos de outra organização.")
+
+        updated_catalog = serializer.save()
 
         # Criar atividade
         Activity.objects.create(
             user=user,
             action='Catálogo editado',
-            description=f'Editou o catálogo "{catalog.title}"',
-            catalog=catalog,
-            organization=catalog.organization,
-            sede=catalog.sede
+            description=f'Editou o catálogo "{updated_catalog.title}"',
+            catalog=updated_catalog,
+            organization=updated_catalog.organization,
+            sede=updated_catalog.sede
         )
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+        if getattr(instance, 'is_demo', False) and not user.is_superuser:
+            raise exceptions.PermissionDenied("Catálogos de demonstração não podem ser excluídos.")
+
+        user_orgs = user.organizations.all()
+        if instance.organization and instance.organization not in user_orgs and instance.created_by != user and not user.is_superuser:
+            raise exceptions.PermissionDenied("Acesso negado: Você não tem permissão para excluir catálogos de outra organização.")
+
+        instance.delete()
 
     @action(detail=False, methods=['get'], permission_classes=[permissions.AllowAny])
     def explore(self, request):
@@ -891,13 +946,11 @@ class CatalogViewSet(viewsets.ModelViewSet):
             mode = (body.get('mode') if isinstance(body, dict) else None) or 'new'
             catalog_id = body.get('catalog_id') if isinstance(body, dict) else None
 
-        # Usuário/escopo: autenticado se houver; senão fallback de dev.
-        user = request.user if getattr(request.user, 'is_authenticated', False) else (
-            User.objects.filter(is_superuser=True).first() or User.objects.first()
-        )
-        if user is None:
-            return Response({'error': 'Nenhum usuário disponível para atribuir o catálogo.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+        # Usuário/escopo: autenticação obrigatória (princípio fail-closed)
+        user = request.user
+        if not user or not getattr(user, 'is_authenticated', False):
+            return Response({'error': 'Autenticação obrigatória para importar catálogos.'},
+                            status=status.HTTP_401_UNAUTHORIZED)
         organization = user.organizations.first() or user.owned_organizations.first()
         sede = None
         if organization:
@@ -930,6 +983,13 @@ class PageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return queryset.none()
+        if not user.is_superuser:
+            queryset = queryset.filter(
+                Q(catalog__organization__in=user.organizations.all()) | Q(catalog__created_by=user)
+            )
         catalog_id = self.request.query_params.get('catalog')
         if catalog_id:
             queryset = queryset.filter(catalog_id=catalog_id)
@@ -941,6 +1001,13 @@ class ComponentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return queryset.none()
+        if not user.is_superuser:
+            queryset = queryset.filter(
+                Q(created_by=user) | Q(catalog__organization__in=user.organizations.all()) | Q(catalog__created_by=user)
+            )
         org_id = self.request.query_params.get('organization')
         sede_id = self.request.query_params.get('sede')
 
@@ -964,6 +1031,13 @@ class PageComponentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return queryset.none()
+        if not user.is_superuser:
+            queryset = queryset.filter(
+                Q(page__catalog__organization__in=user.organizations.all()) | Q(page__catalog__created_by=user)
+            )
         page_id = self.request.query_params.get('page')
         if page_id:
             queryset = queryset.filter(page_id=page_id)
@@ -972,6 +1046,16 @@ class PageComponentViewSet(viewsets.ModelViewSet):
 class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return Comment.objects.none()
+        if user.is_superuser:
+            return Comment.objects.all()
+        return Comment.objects.filter(
+            Q(user=user) | Q(catalog__organization__in=user.organizations.all()) | Q(catalog__created_by=user)
+        )
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -983,6 +1067,13 @@ class ActivityViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return queryset.none()
+        if not user.is_superuser:
+            queryset = queryset.filter(
+                Q(user=user) | Q(organization__in=user.organizations.all())
+            )
         org_id = self.request.query_params.get('organization')
         sede_id = self.request.query_params.get('sede')
 
@@ -1054,14 +1145,9 @@ def upload_avatar(request):
         return Response({'error': 'Nenhum arquivo foi enviado'}, status=status.HTTP_400_BAD_REQUEST)
 
     avatar_file = request.FILES['avatar']
-
-    # Validar tamanho (2MB)
-    if avatar_file.size > 2 * 1024 * 1024:
-        return Response({'error': 'Arquivo muito grande. Máximo: 2MB'}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Validar tipo
-    if not avatar_file.content_type in ['image/png', 'image/jpeg', 'image/jpg']:
-        return Response({'error': 'Formato inválido. Use PNG ou JPG'}, status=status.HTTP_400_BAD_REQUEST)
+    is_valid, fmt, err_msg = validate_image_file(avatar_file, max_size=2 * 1024 * 1024)
+    if not is_valid:
+        return Response({'error': err_msg}, status=status.HTTP_400_BAD_REQUEST)
 
     user.avatar = avatar_file
     user.save()
@@ -1083,6 +1169,13 @@ def change_password(request):
         # Verificar senha antiga
         if not user.check_password(serializer.validated_data['old_password']):
             return Response({'error': 'Senha atual incorreta'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validar complexidade da nova senha segundo as regras do Django
+        from django.contrib.auth.password_validation import validate_password
+        try:
+            validate_password(serializer.validated_data['new_password'], user=user)
+        except Exception as err:
+            return Response({'error': list(err.messages)}, status=status.HTTP_400_BAD_REQUEST)
 
         # Definir nova senha
         user.set_password(serializer.validated_data['new_password'])
@@ -1143,30 +1236,53 @@ def logout_all_sessions(request):
     return Response({'message': 'Todas as sessões foram encerradas'})
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([RegisterRateThrottle])
 def register_user(request):
     try:
-        data = request.data
-        username = data.get('username')
-        email = data.get('email')
-        password = data.get('password')
-        role = data.get('role', 'editor')
+        data = request.data or {}
+
+        # Previne Mass Assignment de atributos privilegiados e internos
+        PROHIBITED_REGISTRATION_FIELDS = {
+            'role', 'is_admin', 'is_staff', 'is_superuser', 'permissions',
+            'groups', 'tenant', 'tenant_id', 'organization_id', 'organization',
+            'owner_id', 'access_level', 'scopes', 'is_active'
+        }
+        attempted_privileges = PROHIBITED_REGISTRATION_FIELDS.intersection(set(data.keys()))
+        if attempted_privileges:
+            return Response({
+                'error': f'Atributos privilegiados ou internos não são permitidos no registro público: {", ".join(sorted(attempted_privileges))}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        username = str(data.get('username') or '').strip()
+        email = str(data.get('email') or '').strip().lower()
+        password = str(data.get('password') or '')
 
         if not username or not email or not password:
             return Response({'error': 'Please provide username, email and password'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if User.objects.filter(username=username).exists():
+        if User.objects.filter(username__iexact=username).exists():
             return Response({'error': 'Username already exists'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if User.objects.filter(email=email).exists():
+        if User.objects.filter(email__iexact=email).exists():
             return Response({'error': 'Email already exists'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Validar complexidade da senha via regras nativas do Django
+        from django.contrib.auth.password_validation import validate_password
+        try:
+            validate_password(password, user=User(username=username, email=email))
+        except Exception as err:
+            return Response({'error': list(err.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        DEFAULT_USER_ROLE = 'editor'
         from django.db import transaction
         with transaction.atomic():
             user = User.objects.create_user(
                 username=username,
                 email=email,
                 password=password,
-                role=role
+                role=DEFAULT_USER_ROLE,
+                is_staff=False,
+                is_superuser=False
             )
 
             # FRG-05: provisiona organização + sede padrão para o novo usuário,
@@ -1187,15 +1303,19 @@ def register_user(request):
 
         # Generate tokens immediately for auto-login
         from rest_framework_simplejwt.tokens import RefreshToken
+        from .views_auth import set_refresh_cookie
         refresh = RefreshToken.for_user(user)
 
-        return Response({
+        response = Response({
             'user': UserSerializer(user).data,
             'refresh': str(refresh),
             'access': str(refresh.access_token),
             'organization': OrganizationSerializer(organization).data,
             'default_sede': SedeSerializer(default_sede).data,
         }, status=status.HTTP_201_CREATED)
+
+        set_refresh_cookie(response, str(refresh))
+        return response
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 @api_view(['GET'])
@@ -1676,7 +1796,13 @@ def public_profile_me_avatar(request):
         return Response({'detail': 'Perfil não encontrado'}, status=status.HTTP_404_NOT_FOUND)
     if 'avatar' not in request.FILES:
         return Response({'error': 'Nenhum arquivo enviado'}, status=status.HTTP_400_BAD_REQUEST)
-    profile.avatar = request.FILES['avatar']
+
+    avatar_file = request.FILES['avatar']
+    is_valid, fmt, err_msg = validate_image_file(avatar_file, max_size=2 * 1024 * 1024)
+    if not is_valid:
+        return Response({'error': err_msg}, status=status.HTTP_400_BAD_REQUEST)
+
+    profile.avatar = avatar_file
     profile.save(update_fields=['avatar'])
     url = request.build_absolute_uri(profile.avatar.url) if profile.avatar else None
     return Response({'avatarUrl': url})
@@ -1691,7 +1817,13 @@ def public_profile_me_cover(request):
         return Response({'detail': 'Perfil não encontrado'}, status=status.HTTP_404_NOT_FOUND)
     if 'cover' not in request.FILES:
         return Response({'error': 'Nenhum arquivo enviado'}, status=status.HTTP_400_BAD_REQUEST)
-    profile.cover_image = request.FILES['cover']
+
+    cover_file = request.FILES['cover']
+    is_valid, fmt, err_msg = validate_image_file(cover_file, max_size=5 * 1024 * 1024)
+    if not is_valid:
+        return Response({'error': err_msg}, status=status.HTTP_400_BAD_REQUEST)
+
+    profile.cover_image = cover_file
     profile.save(update_fields=['cover_image'])
     url = request.build_absolute_uri(profile.cover_image.url) if profile.cover_image else None
     return Response({'coverImageUrl': url})
@@ -1891,6 +2023,13 @@ def public_profile_by_username(request, username):
         profile = PublicProfile.objects.get(username=username)
     except PublicProfile.DoesNotExist:
         return Response({'detail': 'Perfil não encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Salvaguarda LGPD / Privacidade: Perfis privados sao restritos ao proprio titular
+    if profile.visibility == 'privado':
+        user = request.user
+        if not user or not user.is_authenticated or (user != profile.user and not user.is_superuser):
+            return Response({'detail': 'Este perfil é privado.'}, status=status.HTTP_403_FORBIDDEN)
+
     serializer = PublicProfileSerializer(profile, context={'request': request})
     return Response(serializer.data)
 
@@ -1902,6 +2041,13 @@ def public_profile_detail(request, pk):
         profile = PublicProfile.objects.get(pk=pk)
     except PublicProfile.DoesNotExist:
         return Response({'detail': 'Perfil não encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Salvaguarda LGPD / Privacidade: Perfis privados sao restritos ao proprio titular
+    if profile.visibility == 'privado':
+        user = request.user
+        if not user or not user.is_authenticated or (user != profile.user and not user.is_superuser):
+            return Response({'detail': 'Este perfil é privado.'}, status=status.HTTP_403_FORBIDDEN)
+
     serializer = PublicProfileSerializer(profile, context={'request': request})
     return Response(serializer.data)
 
@@ -2068,3 +2214,82 @@ def public_catalog_share(request, pk):
         sede=catalog.sede,
     )
     return Response({'success': True})
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def request_account_anonymization(request):
+    """
+    Atende ao exercicio dos direitos do titular de dados pessoais segundo a LGPD
+    (Art. 18, incisos V e VI da Lei 13.709/2018 - eliminacao/anonimizacao).
+    Executa a anonimizacao irreversivel de dados cadastrais (email, nome, username, avatar)
+    preservando a integridade referencial fiscal e historica sob pseudonimizacao estrita.
+    Revoga imediatamente todos os tokens JWT ativos do titular.
+    """
+    user = request.user
+    user_id = user.id
+
+    from django.conf import settings
+    from django.db import transaction
+    from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+
+    with transaction.atomic():
+        # 1. Anonimizacao irreversivel no modelo User
+        anon_identifier = f"anon_{user_id}"
+        user.username = f"user_{user_id}_deleted"
+        user.email = f"{anon_identifier}@deleted.catana.dev"
+        user.first_name = ""
+        user.last_name = ""
+        user.avatar = None
+        user.position = ""
+        user.is_active = False
+        user.set_unusable_password()
+        user.save()
+
+        # 2. Anonimizacao no PublicProfile (se existir)
+        try:
+            profile = user.public_profile
+            profile.display_name = "Usuario Anonimizado"
+            profile.bio = ""
+            profile.city = ""
+            profile.state = ""
+            profile.website = ""
+            profile.instagram = ""
+            profile.linkedin = ""
+            profile.avatar = None
+            profile.cover_image = None
+            profile.visibility = 'privado'
+            profile.show_in_search = False
+            profile.save()
+        except Exception:
+            pass
+
+        # 3. Revogacao de todas as sessoes ativas na blacklist
+        try:
+            tokens = OutstandingToken.objects.filter(user=user)
+            for t in tokens:
+                try:
+                    BlacklistedToken.objects.get_or_create(token=t)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # 4. Registro de auditoria em Activity
+        Activity.objects.create(
+            user=user,
+            action='Conta anonimizada (LGPD)',
+            description=f'Titular exerceu direito de eliminacao/anonimizacao de dados sob a LGPD (Art. 18). Identificador {user_id}.'
+        )
+
+    response = Response({
+        'success': True,
+        'message': 'Sua conta e dados pessoais foram anonimizados com sucesso em conformidade com a LGPD.'
+    }, status=status.HTTP_200_OK)
+
+    # Exclui cookie de refresh token
+    cookie_name = getattr(settings, 'JWT_AUTH_COOKIE_REFRESH', 'catana_refresh_token')
+    path = getattr(settings, 'JWT_AUTH_COOKIE_PATH', '/api/auth/')
+    response.delete_cookie(cookie_name, path=path)
+
+    return response

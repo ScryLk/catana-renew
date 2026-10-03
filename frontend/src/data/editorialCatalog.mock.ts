@@ -19,6 +19,7 @@ export interface ProductItem {
   image: string;
   tag?: string;
   details?: string[];
+  source?: 'sheet' | 'system' | 'catalog';
 }
 
 export type PageLayoutType = 
@@ -30,6 +31,46 @@ export type PageLayoutType =
   | 'single'
   | 'grid_4'
   | 'backcover';
+
+export type OverlayElementType =
+  | 'sprite'
+  | 'confetti'
+  | 'sparkles'
+  | 'particles'
+  | 'stars'
+  | 'meteors'
+  | 'focus_ring'
+  | 'arrow'
+  | 'shape'
+  | 'badge'
+  | 'stamp'
+  | 'divider_rule';
+
+export interface PageOverlayElement {
+  id: string;
+  type: OverlayElementType;
+  subType?: string;
+  imageUrl?: string; // URL do sprite gerado por IA com fundo transparente
+  prompt?: string; // Prompt original utilizado na geracao do asset
+  x: number; // 0-100% horizontal
+  y: number; // 0-100% vertical
+  width?: number;
+  height?: number;
+  rotation?: number; // graus (-180 a 180)
+  scale?: number;
+  color?: string;
+  strokeColor?: string;
+  fillColor?: string;
+  strokeWidth?: number;
+  opacity?: number;
+  text?: string;
+  subText?: string;
+  targetSlotIndex?: number; // slot do produto (0, 1, 2, 3)
+  targetProductId?: string;
+  arrowDirection?: string;
+  density?: 'low' | 'medium' | 'high';
+  zIndex?: number;
+}
 
 export interface CatalogPageData {
   id: string;
@@ -47,6 +88,7 @@ export interface CatalogPageData {
   folio?: string;
   products?: ProductItem[];
   mirrored?: boolean;
+  overlays?: PageOverlayElement[];
 }
 
 export interface StudioPalette {

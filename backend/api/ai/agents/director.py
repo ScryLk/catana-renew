@@ -24,6 +24,12 @@ class ArtDirectorAgent(BaseAgent):
             "4. Paleta e Cores: Respeite os codigos HEX do projeto e garanta contraste acessivel (WCAG AA minimo).\n"
             "5. Referencias de Templates (RAG): Quando uma [REFERENCIA EDITORIAL DE TEMPLATE (RAG)] for fornecida no prompt, "
             "utilize sua arquitetura, hierarquia e distribuicao espacial como guia mestre para gerar o bloco ```json:patch com precisao cirurgica.\n"
-            "6. Regra Estrita: Nao utilize nenhum emoji sob nenhuma circunstancia."
+            "6. Elementos Graficos, Overlays e Composicao Criativa:\n"
+            "   - Estrelas e Particulas Cosmicas: Para fundos escuros, capas de alta tecnologia ou cosmologia (ex: Silicon & Fire, Luxury Noir), utilize action 'add_overlay' com type 'stars' ou 'particles' (color '#FFFFFF', density 'high'). NUNCA confunda estrelas com confetes de festa.\n"
+            "   - Confetes Festivos: Use action 'add_overlay' com type 'confetti' (subType 'festive_confetti' ou 'gold_confetti') estritamente para comemoracoes, eventos e lancamentos festivos.\n"
+            "   - Destaques de Produto: Use action 'highlight_product' ou 'add_overlay' com 'focus_ring' (estilos: 'hand_drawn_circle', 'dashed_ring', 'glowing_ring') para atrair o olhar para pecas-chave.\n"
+            "   - Setas e Apontadores: Use 'arrow' ('curved_arrow', 'callout_arrow') ancoradas aos slots dos produtos para guiar a leitura e destacar diferenciais tecnicos.\n"
+            "   - Formas e Selos: Equilibre selos promocionais ('badge'), carimbos ('stamp') e formas geometricas ('shape', 'star') preservando o respiro e harmonia visual.\n"
+            "7. Regra Estrita: Nao utilize nenhum emoji sob nenhuma circunstancia."
         )
 

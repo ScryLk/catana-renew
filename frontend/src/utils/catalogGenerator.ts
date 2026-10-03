@@ -19,12 +19,54 @@ export interface GeneratedCatalogResult {
   }>;
 }
 
+export function extractRequestedPageCount(prompt: string): number | null {
+  if (!prompt) return null;
+  const pLower = prompt.toLowerCase();
+
+  // 1 página (expressões comuns em português e inglês)
+  if (/\b(?:1|uma|um|single|one)\s*(?:p[aá]gina|pag\b|p[aá]g\b|folha|l[aâ]mina|prancheta|spread|one[- ]?page|onepager|single[- ]?page)\b/i.test(pLower)) {
+    return 1;
+  }
+  if (/\b(?:one[- ]?page|onepager|single[- ]?page|folha\s*[uú]nica|l[aâ]mina\s*[uú]nica|p[aá]gina\s*[uú]nica)\b/i.test(pLower)) {
+    return 1;
+  }
+
+  const wordMap: Record<string, number> = {
+    duas: 2, dois: 2, two: 2,
+    tres: 3, três: 3, three: 3,
+    quatro: 4, four: 4,
+    cinco: 5, five: 5,
+    seis: 6, six: 6,
+    sete: 7, seven: 7,
+    oito: 8, eight: 8,
+    nove: 9, nine: 9,
+    dez: 10, ten: 10,
+    doze: 12, twelve: 12,
+    dezesseis: 16, sixteen: 16,
+  };
+
+  const matchDigit = pLower.match(/\b(\d+)\s*(?:p[aá]ginas?|pags?\b|p[aá]gs?\b|folhas?|l[aâ]minas?|pranchetas?)\b/i);
+  if (matchDigit && matchDigit[1]) {
+    const val = parseInt(matchDigit[1], 10);
+    if (val >= 1 && val <= 32) return val;
+  }
+
+  for (const [word, num] of Object.entries(wordMap)) {
+    if (new RegExp(`\\b${word}\\s*(?:p[aá]ginas?|pags?\\b|p[aá]gs?\\b|folhas?|l[aâ]minas?|pranchetas?)\\b`, 'i').test(pLower)) {
+      return num;
+    }
+  }
+
+  return null;
+}
+
 export function generateCatalogFromPrompt(
   prompt: string,
   attachments?: ChatAttachment[]
 ): GeneratedCatalogResult {
   const pLower = (prompt || '').toLowerCase();
   const catalogId = `cat-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const requestedPages = extractRequestedPageCount(prompt);
 
   // 1. Deteccao de Dominio / Niche
   const isConfeitaria = /confeit|doce|bolo|p[aâ]tisserie|padaria|sobremesa|pote|torta|gastronom|chocolate/i.test(pLower);
@@ -32,6 +74,64 @@ export function generateCatalogFromPrompt(
   const isJoias = /joia|joalher|ouro|prata|diamante|gema|colar|anel|brinco|cristal|relog/i.test(pLower);
   const isModa = /moda|lookbook|roupa|vestu[aá]rio|inverno|ver[aã]o|alfaiat|couture|estilo|acess[oó]rio/i.test(pLower);
   const isPlantas = /planta|botan|jardim|flor|verde|paisagismo/i.test(pLower);
+
+  // CASO ESPECIAL: 1 Página Solicitada (One-Pager Editorial / Ficha de Apresentação)
+  if (requestedPages === 1) {
+    const palette = isConfeitaria
+      ? (STUDIO_PALETTE_PRESETS.find((p) => p.name.includes('Terracotta')) || STUDIO_PALETTE_PRESETS[3])
+      : isTech
+      ? (STUDIO_PALETTE_PRESETS.find((p) => p.name.includes('Slate')) || STUDIO_PALETTE_PRESETS[4])
+      : isJoias
+      ? (STUDIO_PALETTE_PRESETS.find((p) => p.name.includes('Argent')) || STUDIO_PALETTE_PRESETS[1])
+      : isPlantas
+      ? (STUDIO_PALETTE_PRESETS.find((p) => p.name.includes('Emerald')) || STUDIO_PALETTE_PRESETS[5])
+      : STUDIO_PALETTE_PRESETS[0];
+
+    const inferredTitle = prompt
+      ? prompt.slice(0, 40).replace(/^(crie|criar|fa[cç]a|gerar|um|uma|cat[aá]logo|de|sobre)\s+/i, '').trim()
+      : 'Catálogo Editorial';
+    const cleanTitle = inferredTitle
+      ? inferredTitle.charAt(0).toUpperCase() + inferredTitle.slice(1)
+      : 'Coleção Editorial 2026';
+
+    const logoAttachment = attachments?.find((a) => a.type === 'image');
+
+    const pages: CatalogPageData[] = [
+      {
+        id: `${catalogId}-p1`,
+        pageNumber: 1,
+        type: 'cover',
+        title: cleanTitle.toUpperCase(),
+        subtitle: 'LOOKBOOK & EDIÇÃO ÚNICA · 2026',
+        label: 'CATÁLOGO DE PÁGINA ÚNICA',
+        content: `Síntese editorial calibrada a partir do briefing: "${prompt}".\nDiagramação em proporção harmônica A4 com respiro equilibrado e direção de arte sob medida.`,
+        quote: 'A simplicidade depurada é a mais alta expressão de excelência editorial.',
+        backgroundColor: palette.primary,
+        textColor: palette.background,
+        accentColor: palette.accent,
+        editorialImage: logoAttachment ? (logoAttachment.previewUrl || logoAttachment.url) : undefined,
+        folio: '01 · EDIÇÃO ÚNICA',
+      },
+    ];
+
+    return {
+      catalogId,
+      title: cleanTitle,
+      category: isConfeitaria ? 'Gastronomia & Confeitaria' : isTech ? 'Tecnologia & Hardware' : isJoias ? 'Alta Joalheria & Luxo' : 'Moda & Editorial',
+      palette,
+      pages,
+      totalPages: 1,
+      initialPrompt: prompt,
+      summary: `Catálogo editorial de página única diagramado com sucesso para "${cleanTitle}".`,
+      reasoning: 'Racional do Orquestrador: Estrutura calibrada para apresentação sintética em página única (One-Pager), integrando monograma da marca, tipografia nobre e proporção áurea.',
+      councilDelegations: [
+        { roleId: 'director', roleName: 'Diretor de Arte', badge: 'Design', action: `Definiu prancheta única A4 com a paleta ${palette.name}.` },
+        { roleId: 'copywriter', roleName: 'Redator Publicitário', badge: 'Redação', action: 'Sintetizou manifesto e chamadas de alto impacto em espaço condensado.' },
+        { roleId: 'commercial', roleName: 'Especialista B2B', badge: 'Comercial', action: 'Estruturou apresentação direta com foco em valor perceptual.' },
+        { roleId: 'branding', roleName: 'Auditor de Branding', badge: 'Auditoria', action: 'Homologou o contraste cromático AAA e margens de proteção do logotipo.' },
+      ],
+    };
+  }
 
   if (isConfeitaria) {
     const palette = STUDIO_PALETTE_PRESETS.find((p) => p.name.includes('Terracotta')) || STUDIO_PALETTE_PRESETS[3];
@@ -620,15 +720,51 @@ export function generateCatalogFromPrompt(
     },
   ];
 
+  // Se o usuário solicitou uma contagem específica de páginas:
+  let finalPages = pages;
+  if (requestedPages && requestedPages > 1 && requestedPages !== pages.length) {
+    if (requestedPages < pages.length) {
+      const keepPages = [pages[0]];
+      const middleNeeded = Math.max(0, requestedPages - 2);
+      const middlePages = pages.slice(1, -1);
+      keepPages.push(...middlePages.slice(0, middleNeeded));
+      if (requestedPages > 1) {
+        keepPages.push(pages[pages.length - 1]);
+      }
+      finalPages = keepPages.map((p, idx) => ({
+        ...p,
+        pageNumber: idx + 1,
+        folio: `${String(idx + 1).padStart(2, '0')}`,
+      }));
+    } else if (requestedPages > pages.length) {
+      finalPages = [...pages];
+      while (finalPages.length < requestedPages) {
+        const nextNum = finalPages.length + 1;
+        finalPages.push({
+          id: `${catalogId}-p${nextNum}`,
+          pageNumber: nextNum,
+          type: nextNum % 2 === 1 ? 'hero' : 'duo',
+          title: `Destaque Editorial · Seção ${String(nextNum).padStart(2, '0')}`,
+          subtitle: 'Apresentação e diferenciais',
+          label: 'EXPANSÃO EDITORIAL',
+          folio: `${String(nextNum).padStart(2, '0')}`,
+          backgroundColor: defaultPalette.background,
+          textColor: defaultPalette.primary,
+          accentColor: defaultPalette.accent,
+        });
+      }
+    }
+  }
+
   return {
     catalogId,
     title: cleanTitle,
     category: 'Geral & Editorial',
     palette: defaultPalette,
-    pages,
-    totalPages: pages.length,
+    pages: finalPages,
+    totalPages: finalPages.length,
     initialPrompt: prompt,
-    summary: `Catálogo editorial diagramado com sucesso para "${cleanTitle}" com 6 páginas balanceadas.`,
+    summary: `Catálogo editorial diagramado com sucesso para "${cleanTitle}" com ${finalPages.length} página(s).`,
     reasoning: 'Racional do Orquestrador: Diagramação equilibrada com base nas diretrizes do briefing, organizando capas, spreads de produtos e contracapa.',
     councilDelegations: [
       { roleId: 'director', roleName: 'Diretor de Arte', badge: 'Design', action: `Definiu a paleta ${defaultPalette.name} e proporções A4.` },

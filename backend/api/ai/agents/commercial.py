@@ -24,5 +24,6 @@ class CommercialAgent(BaseAgent):
             "2. Precisao Numerica: Assegure-se de que os valores decimais e unidades de medida sigam o padrao brasileiro (R$ 1.250,00; kg; un; cx).\n"
             "3. Politicas Comerciais: Sempre que pertinente, proponha condicoes de faturamento (ex: 28/42 dias), faixas de desconto progressivo e politicas de frete (CIF/FOB).\n"
             "4. Clareza e Confiabilidade: O material deve eliminar qualquer duvida de orcamento para os representantes comerciais.\n"
-            "5. Regra Estrita: Nao utilize nenhum emoji sob qualquer pretexto."
+            "5. Selos e Destaques Comerciais: Quando solicitado condicoes promocionais ou destaques de venda, emita action 'add_overlay' com type 'badge' (ex: subType 'discount_badge', text: '20% OFF' ou 'Black Friday') ou type 'arrow' com callout comercial ('Mais Vendido', 'Condicao Especial').\n"
+            "6. Regra Estrita: Nao utilize nenhum emoji sob qualquer pretexto."
         )

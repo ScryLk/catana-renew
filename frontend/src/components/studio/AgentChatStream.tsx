@@ -35,19 +35,16 @@ const TypewriterText: React.FC<TypewriterTextProps> = ({
   );
 
   React.useEffect(() => {
-    if (isCompleted) {
-      setDisplayedChars(text.length);
-      return;
-    }
-
-    if (isStreaming) {
+    if (isCompleted || isStreaming) {
       setDisplayedChars(text.length);
       return;
     }
 
     if (displayedChars >= text.length) {
-      onAnimationEnd?.();
-      return;
+      const finishTimer = setTimeout(() => {
+        onAnimationEnd?.();
+      }, 0);
+      return () => clearTimeout(finishTimer);
     }
 
     // Ritmo adaptativo de digitacao (300ms a 750ms total)
@@ -55,13 +52,7 @@ const TypewriterText: React.FC<TypewriterTextProps> = ({
     const step = Math.max(1, Math.ceil(remaining / 14));
 
     const timer = setTimeout(() => {
-      setDisplayedChars((prev) => {
-        const next = Math.min(prev + step, text.length);
-        if (next >= text.length) {
-          onAnimationEnd?.();
-        }
-        return next;
-      });
+      setDisplayedChars((prev) => Math.min(prev + step, text.length));
     }, 18);
 
     return () => clearTimeout(timer);

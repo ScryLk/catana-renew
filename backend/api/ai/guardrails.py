@@ -106,6 +106,7 @@ CATALOG_INTENT_PATTERNS = [
     re.compile(r'\b(pote|embalag|garrafa|caixa|frasco|copo|delivery|alimento|comida|confeitaria|a[cç]ougue|bolsa|joia|anel|relogio|carteira)\b', re.IGNORECASE),
     re.compile(r'\b(cor|cores|paleta|palheta|pintura|tom|tipografia|fonte|respiro|grid|a4|visual|est[eé]tica|design|foto|imagem|ouro|prata|bronze)\b', re.IGNORECASE),
     re.compile(r'\b(headline|texto|copy|narrativa|storytelling|descri[cç][aã]o|marca|branding|logo|manifesto|claim)\b', re.IGNORECASE),
+    re.compile(r'\b(confete|festa|balao|bal[oõ]es|adesivo|selo|sticker|badge|seta|c[ií]rculo|circula|circul|forma|estrela|meteoro|meteoros|cadente|cadentes|carimbo|destaque|moldura|overlay|decora[cç]|decorat|part[ií]cula|brilho)\b', re.IGNORECASE),
     re.compile(r'\b(arrum|ajust|melhor|organiz|cri|mont|faz|ger|alter|estrutur|coloc|bota|taca|mete|tira|arranca|limp|enxug|poda|sob|baix|rezum|resum|sintetiz|cadastr|aloc)\b', re.IGNORECASE),
 ]
 

@@ -43,7 +43,7 @@ class OrchestratorAgent(BaseAgent):
             "  \"spread_index\": <indice_zero_based_da_lamina_afetada>,\n"
             "  \"actions\": [\n"
             "    {\n"
-            "      \"action\": \"add_page\" | \"remove_page\" | \"summarize_content\" | \"remove_product\" | \"assign_product\" | \"swap_product\" | \"create_product\" | \"change_layout\" | \"update_text\" | \"adjust_pricing\" | \"generate_skus\" | \"set_palette\" | \"brand_lock\" | \"remove_background\" | \"generate_photo\" | \"navigate\" | \"export_pdf\",\n"
+            "      \"action\": \"add_page\" | \"remove_page\" | \"reconfigure_catalog\" | \"summarize_content\" | \"remove_product\" | \"assign_product\" | \"swap_product\" | \"create_product\" | \"change_layout\" | \"update_text\" | \"set_page_color\" | \"adjust_pricing\" | \"generate_skus\" | \"set_palette\" | \"brand_lock\" | \"remove_background\" | \"generate_photo\" | \"navigate\" | \"export_pdf\" | \"add_overlay\" | \"highlight_product\" | \"remove_overlay\" | \"clear_overlays\" | \"update_overlay\",\n"
             "      \"target\": \"page:<numero>\" | \"product:<id>\" | \"catalog:theme\" | \"catalog:products\" | \"global\",\n"
             "      \"params\": { <parametros_da_acao> }\n"
             "    }\n"
@@ -58,6 +58,7 @@ class OrchestratorAgent(BaseAgent):
             "}\n"
             "```\n\n"
             "EXEMPLOS NORMATIVOS:\n"
+            "- Reconfigurar catálogo / definir total de páginas: action 'reconfigure_catalog', target 'global', params {'totalPages': 1 | 2 | 4 | 6, 'title': '...'}\n"
             "- Adicionar página: action 'add_page', target 'catalog:pages', params {'type': 'hero' | 'manifesto' | 'duo' | 'grid_4', 'afterPage': 2}\n"
             "- Remover página: action 'remove_page', target 'page:2'\n"
             "- Resumir conteúdo: action 'summarize_content', target 'page:2', params {'condensedText': '...'}\n"
@@ -68,9 +69,21 @@ class OrchestratorAgent(BaseAgent):
             "- Reajustar precos: action 'adjust_pricing', target 'global', params {'mode': 'percentage', 'amount': 15}\n"
             "- Gerar SKUs: action 'generate_skus', target 'catalog:products', params {'prefix': 'ART-', 'format': '000'}\n"
             "- Editar texto: action 'update_text', target 'page:2', params {'quote': '...', 'title': '...', 'content': '...'}\n"
+            "- Alterar cor da página / capa: action 'set_page_color', target 'page:1', params {'backgroundColor': '#000000'}\n"
             "- Remover fundo: action 'remove_background', target 'page:4', params {'slotIndex': 0}\n"
             "- Paleta e Trava: action 'set_palette' com 'brand_lock', params {'paletteName': 'Slate & Noir Minimaliste', 'locked': true}\n"
-            "- Exportar PDF: action 'export_pdf', target 'global'"
+            "- Exportar PDF: action 'export_pdf', target 'global'\n"
+            "- Adicionar particulas e estrelas no fundo escuro / capa cosmica: action 'add_overlay', target 'page:1', params {'type': 'stars', 'color': '#FFFFFF', 'density': 'high'}\n"
+            "- Adicionar confetes de festa: action 'add_overlay', target 'page:1', params {'type': 'confetti', 'subType': 'festive_confetti', 'density': 'high'}\n"
+            "- Destacar produto com circulo: action 'highlight_product', target 'page:3', params {'slotIndex': 0, 'style': 'hand_drawn_circle', 'color': '#B08D57'}\n"
+            "- Inserir seta geometrica com callout: action 'add_overlay', target 'page:4', params {'type': 'arrow', 'subType': 'callout_arrow', 'targetSlotIndex': 1, 'text': 'Mais Vendido', 'arrowDirection': 'to_bottom_right'}\n"
+            "- Adicionar selo promocional / desconto: action 'add_overlay', target 'page:2', params {'type': 'badge', 'subType': 'discount_badge', 'text': '20% OFF', 'x': 80, 'y': 15}\n"
+            "- Adicionar carimbo editorial: action 'add_overlay', target 'page:1', params {'type': 'stamp', 'text': 'Edicao Limitada', 'subText': 'Katana Atelier'}\n"
+            "- Inserir forma geometrica ou estrela: action 'add_overlay', target 'page:2', params {'type': 'shape', 'subType': 'star', 'x': 50, 'y': 50, 'color': '#D4AF37'}\n"
+            "- Remover overlays / limpar: action 'remove_overlay', target 'page:1', params {'type': 'confetti'} ou action 'clear_overlays', target 'page:1'\n\n"
+            "REGRA DE FIDELIDADE VISUAL PARA AGENTES:\n"
+            "- Quando a solicitacao referir-se a estrelas estaticas, ceu estrelado, cosmos, poeira cosmica ou particulas de fundo em pagina preta/escura, defina estritamente params {'type': 'stars', 'color': '#FFFFFF'}. Nao emita confetes de festa coloridos para demandas estelares.\n"
+            "- Quando a solicitacao referir-se a festa, comemoracao, aniversario ou carnaval, utilize params {'type': 'confetti', 'subType': 'festive_confetti'}."
         )
 
     def detect_target_role(self, prompt: str) -> str:
@@ -78,11 +91,15 @@ class OrchestratorAgent(BaseAgent):
         Deduze o especialista mais indicado para a demanda caso nao informado.
         """
         p_lower = prompt.lower()
-        if any(k in p_lower for k in ["layout", "diagrama", "grid", "respiro", "a4", "visual", "foto", "imagem", "cor", "paleta", "tipografia"]):
+        if any(k in p_lower for k in [
+            "layout", "diagrama", "grid", "respiro", "a4", "visual", "foto", "imagem", "cor", "paleta", "tipografia",
+            "confete", "festa", "circulo", "circul", "seta", "estrela", "forma", "geometric", "carimbo", "overlay", "decorac",
+            "particula"
+        ]):
             return "director"
         if any(k in p_lower for k in ["texto", "copy", "headline", "narrativa", "storytelling", "sensorial", "descricao", "descri"]):
             return "copywriter"
-        if any(k in p_lower for k in ["preco", "preço", "tabela", "sku", "moq", "desconto", "custo", "b2b", "condic"]):
+        if any(k in p_lower for k in ["preco", "preço", "tabela", "sku", "moq", "desconto", "custo", "b2b", "condic", "selo", "badge", "promoc"]):
             return "commercial"
         if any(k in p_lower for k in ["marca", "branding", "logo", "identidade", "manual", "conformidade", "proibic"]):
             return "branding"
@@ -102,6 +119,10 @@ class OrchestratorAgent(BaseAgent):
         raw_text = (user_prompt or "").strip()
         effective_role = target_role or self.detect_target_role(raw_text)
 
+        # 0. Parser de Requisitos e Restrições Estruturadas (P0 - P8)
+        from api.ai.requirement_parser import RequirementParser
+        contract = RequirementParser.parse(raw_text)
+
         # 1. Inspecao padrao de seguranca
         guard_result = KatanaGuardrailEngine.inspect_prompt(raw_text, agent_role=effective_role)
 
@@ -116,6 +137,9 @@ class OrchestratorAgent(BaseAgent):
                 "reformatting_actions": [],
                 "orchestrator_notes": "Prompt em conformidade com as diretrizes do conselho editorial.",
                 "target_role": effective_role,
+                "requirement_contract": contract.to_dict(),
+                "hard_constraints": contract.constraints.hard,
+                "negative_constraints": contract.constraints.negative,
             }
 
         # 2. Se falhou na inspecao, avalia se ha intencao genuina de catalogo recuperavel
@@ -175,21 +199,23 @@ class OrchestratorAgent(BaseAgent):
         # Remove pontuacoes desnecessarias, saudações e frases de preenchimento
         t = re.sub(r'^(por favor|pfv|ei|ola|olá|me ajuda a|ajuda a|quero que você|preciso que você|tanto faz[,\.\s]*|deixa disso[,\.\s]*)\s*', '', text, flags=re.IGNORECASE).strip()
 
-        # Substitui verbos informais de comando e dialetos regionais
-        t = re.sub(r'^(tira|tirar|arranca|arrancar|apaga|apagar|limpa|limpar)\s+', 'Remover da prancheta ', t, flags=re.IGNORECASE)
-        t = re.sub(r'^(bota|botar|taca|tacar|mete|meter|poe|põe|coloca|colocar)\s+', 'Organizar na prancheta ', t, flags=re.IGNORECASE)
-        t = re.sub(r'^(enxuga|enxugar|poda|podar|diminui|diminuir)\s+', 'Sintetizar e resumir ', t, flags=re.IGNORECASE)
-        t = re.sub(r'^arrum(ar|a|e)\s+', 'Revisar e aprimorar ', t, flags=re.IGNORECASE)
-        t = re.sub(r'^melhor(ar|a|e)\s+', 'Otimizar e refinar ', t, flags=re.IGNORECASE)
-        t = re.sub(r'^faz(er)?\s+', 'Estruturar e desenvolver ', t, flags=re.IGNORECASE)
-        t = re.sub(r'^mont(ar|a|e)\s+', 'Compor a diagramacao de ', t, flags=re.IGNORECASE)
-
         # Normalizacao de termos coloquiais frequentes
         t = re.sub(r'\b(folha|folhinha|l[aâ]mina|prancha|prancheta)\b', 'pagina', t, flags=re.IGNORECASE)
         t = re.sub(r'\b(pagna|pagnia|pajina)\b', 'pagina', t, flags=re.IGNORECASE)
         t = re.sub(r'\b(preso|precos)\b', 'preco', t, flags=re.IGNORECASE)
         t = re.sub(r'\b(pintura|tinta)\b', 'paleta', t, flags=re.IGNORECASE)
         t = re.sub(r'\b(conto|pau)\b', 'reais', t, flags=re.IGNORECASE)
+
+        # Substitui verbos informais de comando e dialetos regionais
+        t = re.sub(r'^(tira|tirar|arranca|arrancar|apaga|apagar|limpa|limpar)\s+', 'Remover da prancheta ', t, flags=re.IGNORECASE)
+        t = re.sub(r'^(bota|botar|taca|tacar|mete|meter|poe|põe|coloca|colocar)\s+', 'Organizar na prancheta ', t, flags=re.IGNORECASE)
+        t = re.sub(r'(?:^|[,\.]\s*)(circul(ar|a|e)|fa[cç]a um c[ií]rculo em|faz um c[ií]rculo em)\s+', 'Destacar com anel de foco ', t, flags=re.IGNORECASE)
+        t = re.sub(r'(?:^|[,\.]\s*)(apont(ar|a|e)|ponha uma seta em|bota uma seta em|insira uma seta para|insere uma seta para)\s+', 'Inserir seta indicadora para ', t, flags=re.IGNORECASE)
+        t = re.sub(r'^(enxuga|enxugar|poda|podar|diminui|diminuir)\s+', 'Sintetizar e resumir ', t, flags=re.IGNORECASE)
+        t = re.sub(r'^arrum(ar|a|e)\s+', 'Revisar e aprimorar ', t, flags=re.IGNORECASE)
+        t = re.sub(r'^melhor(ar|a|e)\s+', 'Otimizar e refinar ', t, flags=re.IGNORECASE)
+        t = re.sub(r'^faz(er)?\s+', 'Estruturar e desenvolver ', t, flags=re.IGNORECASE)
+        t = re.sub(r'^mont(ar|a|e)\s+', 'Compor a diagramacao de ', t, flags=re.IGNORECASE)
 
         if not t:
             t = "Estruturar proposta de composicao editorial para os produtos informados"

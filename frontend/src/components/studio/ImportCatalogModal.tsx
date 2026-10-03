@@ -12,6 +12,7 @@ import {
   Palette,
 } from 'lucide-react';
 import { useStudioStore, API_BASE_URL } from '../../store/studioStore';
+import { getAuthToken } from '../../services/api';
 import { toast } from 'sonner';
 
 interface ImportCatalogModalProps {
@@ -111,7 +112,7 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
       formData.append('mode', reconstructionMode);
       formData.append('style_preset', 'auto');
 
-      const token = localStorage.getItem('access_token');
+      const token = await getAuthToken();
       const response = await fetch(`${API_BASE_URL}/api/v2/studio/catalogs/import-document/`, {
         method: 'POST',
         headers: {

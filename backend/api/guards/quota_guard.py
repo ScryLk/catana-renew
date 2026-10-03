@@ -3,6 +3,7 @@ import time
 from collections import defaultdict
 from typing import Optional, Tuple
 from django.utils import timezone
+from django.db.models import F, Q
 from rest_framework.exceptions import APIException
 from rest_framework import status
 from api.models import (
@@ -14,10 +15,21 @@ from api.models import (
     User,
 )
 
+
 class QuotaExceededException(APIException):
     status_code = status.HTTP_429_TOO_MANY_REQUESTS
     default_detail = "Limite de uso atingido. Faca upgrade do seu plano para continuar gerando conteudo."
     default_code = "quota_exceeded"
+
+    def __init__(self, detail=None, code=None, tokens_used=0, token_quota=100000):
+        if detail is None:
+            detail = {
+                "code": "quota_exceeded",
+                "error": "Limite mensal de tokens atingido. Faca upgrade para continuar utilizando os agentes de IA.",
+                "tokens_used": tokens_used,
+                "token_quota": token_quota,
+            }
+        super().__init__(detail=detail, code=code or "quota_exceeded")
 
 
 class RateLimitExceededException(APIException):
@@ -26,10 +38,31 @@ class RateLimitExceededException(APIException):
     default_code = "rate_limit_exceeded"
 
 
-class FeatureNotAllowedException(APIException):
+class CatalogLimitExceededException(APIException):
     status_code = status.HTTP_403_FORBIDDEN
-    default_detail = "Este recurso requer um plano superior. Faca upgrade para desbloquear o Conselho Editorial."
-    default_code = "feature_not_allowed"
+    default_detail = {
+        "code": "catalog_limit_exceeded",
+        "error": "Voce atingiu o limite de catalogos ativos do seu plano. Arquive um catalogo existente ou faca upgrade.",
+    }
+    default_code = "catalog_limit_exceeded"
+
+
+class CouncilFeatureLockedException(APIException):
+    status_code = status.HTTP_403_FORBIDDEN
+    default_detail = {
+        "code": "feature_locked_pro",
+        "error": "O Conselho Editorial Multi-Agente e exclusivo para assinantes dos planos Pro e Enterprise.",
+    }
+    default_code = "feature_locked_pro"
+
+
+class ExportDpiRestrictedException(APIException):
+    status_code = status.HTTP_403_FORBIDDEN
+    default_detail = {
+        "code": "export_dpi_restricted",
+        "error": "A exportacao grafica em alta resolucao (300 DPI CMYK) requer o Plano Pro ou Enterprise.",
+    }
+    default_code = "export_dpi_restricted"
 
 
 class InMemoryRateLimiter:
@@ -43,7 +76,6 @@ class InMemoryRateLimiter:
         now = time.time()
         window_start = now - 60.0
 
-        # Filtra requisicoes fora da janela
         active_requests = [t for t in self._requests[identifier] if t > window_start]
         self._requests[identifier] = active_requests
 
@@ -59,7 +91,7 @@ rate_limiter = InMemoryRateLimiter()
 
 def get_or_create_default_plan(tier: str = "free") -> SubscriptionPlan:
     """
-    Retorna ou inicializa os planos padrao de assinatura do Catana Studio (Cenario A).
+    Retorna ou inicializa os planos padrao de assinatura do Catana Studio.
     """
     defaults = {
         "free": {
@@ -132,7 +164,6 @@ def get_or_create_default_plan(tier: str = "free") -> SubscriptionPlan:
         defaults=config,
     )
     if not created:
-        # Garante que os campos de preco e features estejam sempre sincronizados
         updated = False
         for k, v in config.items():
             if getattr(plan, k) != v:
@@ -153,17 +184,15 @@ def get_user_quota(user: Optional[User]) -> Tuple[Optional[OrganizationQuota], S
     if not user or not user.is_authenticated:
         return None, plan
 
-    # Tenta obter a organizacao principal do usuario
     org = user.organizations.first() or user.owned_organizations.first()
     if not org:
-        # Cria uma organizacao pessoal padrao se nao existir
         org, _ = Organization.objects.get_or_create(
             name=f"Workspace de {user.username}",
             owner=user,
         )
         user.organizations.add(org)
 
-    quota, created = OrganizationQuota.objects.get_or_create(
+    quota, _ = OrganizationQuota.objects.get_or_create(
         organization=org,
         defaults={
             "plan": plan,
@@ -172,14 +201,28 @@ def get_user_quota(user: Optional[User]) -> Tuple[Optional[OrganizationQuota], S
         }
     )
 
+    # Se a assinatura possuia cancelamento agendado e o periodo terminou, rebaixa cota para o plano gratuito
+    sub = getattr(org, 'subscription', None)
+    if (
+        sub
+        and sub.cancel_at_period_end
+        and sub.current_period_end
+        and sub.current_period_end <= timezone.now()
+    ):
+        sub.plan = plan
+        sub.status = "canceled"
+        sub.cancel_at_period_end = False
+        sub.save()
+        quota.plan = plan
+        quota.save()
+
     active_plan = quota.plan or plan
     return quota, active_plan
 
 
 def check_chat_guard(user: Optional[User], agent_role: str = "orchestrator", client_ip: str = "127.0.0.1"):
     """
-    Verifica se a requisicao de chat cumpre todas as condicoes de taxa, cota e permissoes de agentes.
-    Lanca excecoes HTTP 429 ou 403 se algum limite for violado.
+    Verifica se a requisicao de chat cumpre taxa (RPM), cota de tokens e permissoes de agentes.
     """
     quota, plan = get_user_quota(user)
     identifier = f"user_{user.id}" if user and user.is_authenticated else f"ip_{client_ip}"
@@ -188,24 +231,63 @@ def check_chat_guard(user: Optional[User], agent_role: str = "orchestrator", cli
     max_rpm = plan.rate_limit_rpm if plan else 15
     if not rate_limiter.check_rate_limit(identifier, max_rpm=max_rpm):
         raise RateLimitExceededException(
-            detail=f"Limite de taxa atingido ({max_rpm} requisicoes/minuto). Por favor, aguarde alguns segundos."
+            detail=f"Limite de taxa atingido ({max_rpm} requisicoes/minuto). Aguarde alguns segundos."
         )
 
-    # 2. Permissao de Agente (Ex: Conselho Editorial restrito a planos Pro/Enterprise)
-    if agent_role == "council" and plan and not plan.can_use_council:
-        # Permitir no modo mock de demonstracao ou avisar
-        # Se for mock/demo, permitimos com ressalva nos metadados ou bloqueamos se estrito
-        pass
+    # 2. Permissao de Agente (Conselho Editorial restrito a Pro / Enterprise)
+    if agent_role == "council":
+        check_council_guard(user)
 
     # 3. Cota Mensal de Tokens
     if quota and plan:
         if quota.tokens_used_this_month >= plan.monthly_token_quota:
             raise QuotaExceededException(
-                detail=(
-                    f"Cota mensal de tokens excedida ({quota.tokens_used_this_month}/{plan.monthly_token_quota} tokens). "
-                    f"O ciclo sera reiniciado na proxima data base ou mediante upgrade de plano."
-                )
+                tokens_used=quota.tokens_used_this_month,
+                token_quota=plan.monthly_token_quota,
             )
+
+
+def check_catalog_creation_guard(user: Optional[User]):
+    """
+    Bloqueia criacao de novos catalogos se a cota de catalogos ativos do plano for atingida.
+    """
+    if not user or not user.is_authenticated:
+        return
+
+    _, plan = get_user_quota(user)
+    if not plan:
+        return
+
+    active_count = StudioCatalog.objects.filter(
+        Q(created_by=user) | Q(organization__in=user.organizations.all())
+    ).distinct().count()
+    if active_count >= plan.max_active_catalogs:
+        raise CatalogLimitExceededException()
+
+
+def check_council_guard(user: Optional[User]):
+    """
+    Verifica se o usuario possui permissao para utilizar o Conselho Editorial (Pro ou Enterprise).
+    """
+    if not user or not user.is_authenticated:
+        raise CouncilFeatureLockedException()
+
+    _, plan = get_user_quota(user)
+    if not plan or not plan.can_use_council:
+        raise CouncilFeatureLockedException()
+
+
+def check_export_guard(user: Optional[User], dpi: int = 72):
+    """
+    Verifica se a resolucao solicitada (ex: 300 DPI CMYK) esta liberada para o plano do usuario.
+    """
+    if dpi > 150:
+        if not user or not user.is_authenticated:
+            raise ExportDpiRestrictedException()
+
+        _, plan = get_user_quota(user)
+        if not plan or plan.tier == "free":
+            raise ExportDpiRestrictedException()
 
 
 def record_token_usage(
@@ -217,14 +299,13 @@ def record_token_usage(
     model_name: str = "gemini-2.0-flash",
 ) -> TokenUsageLog:
     """
-    Registra detalhadamente o consumo de tokens e atualiza a cota mensal da organizacao.
+    Registra detalhadamente o consumo de tokens e atualiza atomicamente a cota mensal.
     """
     total = prompt_tokens + completion_tokens
     org = None
     if user and user.is_authenticated:
         org = user.organizations.first() or user.owned_organizations.first()
 
-    # Cria o registro de auditoria
     log_entry = TokenUsageLog.objects.create(
         organization=org,
         user=user if user and user.is_authenticated else None,
@@ -236,10 +317,9 @@ def record_token_usage(
         model_name=model_name,
     )
 
-    # Atualiza a contagem mensal se houver organizacao
     if org:
         OrganizationQuota.objects.filter(organization=org).update(
-            tokens_used_this_month=OrganizationQuota.objects.filter(organization=org).values_list('tokens_used_this_month', flat=True).first() or 0 + total
+            tokens_used_this_month=F('tokens_used_this_month') + total
         )
 
     return log_entry

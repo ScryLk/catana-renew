@@ -9,10 +9,14 @@ import {
   File,
   FileUp,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { useStudioStore, ChatAttachment } from '../../store/studioStore';
 import { ImportCatalogModal } from './ImportCatalogModal';
+import { CatalogGenerationModal } from './CatalogGenerationModal';
+import { CANONICAL_DEMO_TEMPLATES, DemoTemplateInfo } from '../../data/demoCatalogs.data';
 import { toast } from 'sonner';
+import { BrandSelectorPill } from './BrandSelectorPill';
 
 const PROMPT_SUGGESTIONS = [
   'Catálogo de confeitaria com potes gourmet e preços...',
@@ -27,13 +31,28 @@ export const StudioHomeChat: React.FC = () => {
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [selectedTemplateForDetails, setSelectedTemplateForDetails] = useState<DemoTemplateInfo | null>(null);
+  const [loadingTemplateKey, setLoadingTemplateKey] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleSelectDemoPrompt = (tpl: DemoTemplateInfo) => {
+    setPrompt(tpl.generationPrompt);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      const len = tpl.generationPrompt.length;
+      textareaRef.current.setSelectionRange(len, len);
+    }
+    toast.success(`Prompt de "${tpl.brandName}" selecionado!`);
+  };
 
   const {
     triggerCatalogGeneration,
     openExcelImportModal,
     theme,
     isGeneratingCatalog,
+    loadDemoCatalog,
+    isDemoLoading,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -154,7 +173,7 @@ export const StudioHomeChat: React.FC = () => {
         aria-label="Upload de arquivos"
       />
 
-      <div className="w-full max-w-2xl flex flex-col items-center text-center relative z-10">
+      <div className="w-full max-w-4xl flex flex-col items-center text-center relative z-10">
         {/* Cursive Brand Icon */}
         <div className="flex items-center gap-3 mb-3">
           <svg
@@ -185,14 +204,14 @@ export const StudioHomeChat: React.FC = () => {
 
         {/* Hero Title */}
         <h1
-          className={`text-3xl sm:text-4xl font-semibold tracking-tight mb-8 text-balance transition-colors ${
+          className={`text-3xl sm:text-4xl font-semibold tracking-tight mb-6 text-balance transition-colors ${
             isDark ? 'text-white' : 'text-zinc-900'
           }`}
         >
           O que vamos criar hoje?
         </h1>
 
-        <div className="w-full mb-8">
+        <div className="w-full mb-3">
           {/* Central Prompt Input Box */}
           <div
             onDragOver={(e) => {
@@ -201,7 +220,7 @@ export const StudioHomeChat: React.FC = () => {
             }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
-            className={`w-full rounded-2xl border transition-all text-left overflow-hidden ${
+            className={`w-full rounded-2xl border transition-all text-left relative ${
               isDragging
                 ? isDark
                   ? 'border-zinc-400 bg-zinc-900/90 shadow-2xl ring-2 ring-zinc-500/30'
@@ -213,6 +232,7 @@ export const StudioHomeChat: React.FC = () => {
           >
             <div className="p-3.5">
               <textarea
+                ref={textareaRef}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -256,13 +276,12 @@ export const StudioHomeChat: React.FC = () => {
                     ) : (
                       <File className="size-3.5 text-zinc-400 shrink-0" />
                     )}
-                    <span className="truncate max-w-[140px] font-medium">{att.name}</span>
-                    <span className="text-[10px] text-zinc-500 font-mono">({att.size})</span>
+                    <span className="truncate max-w-[140px]">{att.name}</span>
                     <button
                       type="button"
                       onClick={() => handleRemoveAttachment(att.id)}
-                      className="p-0.5 rounded hover:bg-zinc-700/50 text-zinc-400 hover:text-zinc-100 cursor-pointer ml-0.5 transition-colors"
-                      title="Remover anexo"
+                      className="p-0.5 rounded hover:bg-zinc-700/50 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                      aria-label="Remover anexo"
                     >
                       <X className="size-3" />
                     </button>
@@ -271,10 +290,10 @@ export const StudioHomeChat: React.FC = () => {
               </div>
             )}
 
-            {/* Action Bar (Attachments & Submit) */}
+            {/* Bottom Actions Bar */}
             <div
-              className={`flex items-center justify-between px-3.5 py-2.5 border-t ${
-                isDark ? 'border-zinc-800/80 bg-zinc-900/20' : 'border-zinc-100 bg-zinc-50/50'
+              className={`p-2.5 px-3.5 flex flex-wrap items-center justify-between gap-2 border-t rounded-b-2xl ${
+                isDark ? 'border-zinc-800/80 bg-zinc-900/40' : 'border-zinc-100 bg-zinc-50/50'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -307,7 +326,6 @@ export const StudioHomeChat: React.FC = () => {
                       ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/80'
                       : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
                   }`}
-                  title="Importar catálogo existente para torná-lo 100% editável"
                   aria-label="Importar catálogo"
                 >
                   <FileUp className="size-3.5" />
@@ -322,12 +340,13 @@ export const StudioHomeChat: React.FC = () => {
                       ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/80'
                       : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100'
                   }`}
-                  title="Importar produtos de planilha Excel ou CSV com confirmação de colunas e IA"
                   aria-label="Importar produtos"
                 >
                   <FileSpreadsheet className="size-3.5 text-zinc-400" />
                   <span>Importar Produtos</span>
                 </button>
+
+                <BrandSelectorPill direction="up" />
               </div>
 
               <button
@@ -356,7 +375,82 @@ export const StudioHomeChat: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Sugestões de Demonstração (Estilo ChatGPT: apenas descritivos como prompts, sem imagem) */}
+        <div id="demo-showcase-section" className="w-full pt-1 pb-10 text-left">
+          <div className="flex flex-col gap-1">
+            {CANONICAL_DEMO_TEMPLATES.map((tpl) => (
+              <div
+                key={tpl.key}
+                onClick={() => handleSelectDemoPrompt(tpl)}
+                className={`group flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
+                  isDark
+                    ? 'hover:bg-zinc-800/50 active:bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                    : 'hover:bg-zinc-100 active:bg-zinc-200 text-zinc-600 hover:text-zinc-900'
+                }`}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleSelectDemoPrompt(tpl);
+                  }
+                }}
+                aria-label={`Usar prompt de demonstração para ${tpl.brandName}`}
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <Sparkles className="size-4 shrink-0 text-zinc-500 group-hover:text-[#B08D57] transition-colors" />
+                  <span className="text-xs sm:text-sm font-normal truncate group-hover:text-zinc-100 transition-colors">
+                    {tpl.generationPrompt}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedTemplateForDetails(tpl);
+                    }}
+                    className={`text-[11px] font-medium px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
+                      isDark
+                        ? 'border-zinc-700/80 bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700 hover:text-white'
+                        : 'border-zinc-200 bg-zinc-100 text-zinc-700 hover:bg-zinc-200 hover:text-zinc-900'
+                    }`}
+                    title="Ver catálogo pronto e detalhes da direção criativa"
+                  >
+                    Ver exemplo pronto
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
+
+      {/* Modal de Detalhes da Geracao do Catalogo por IA */}
+      <CatalogGenerationModal
+        isOpen={Boolean(selectedTemplateForDetails)}
+        template={selectedTemplateForDetails}
+        onClose={() => setSelectedTemplateForDetails(null)}
+        onUsePrompt={(promptText) => {
+          setPrompt(promptText);
+          setSelectedTemplateForDetails(null);
+          toast.success('Prompt inserido no campo de criação!');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onLoadCatalog={async (key) => {
+          setLoadingTemplateKey(key);
+          try {
+            await loadDemoCatalog(key);
+            setSelectedTemplateForDetails(null);
+          } finally {
+            setLoadingTemplateKey(null);
+          }
+        }}
+        isLoadingCatalog={Boolean(isDemoLoading && loadingTemplateKey)}
+        isDark={isDark}
+      />
 
       {/* Modal de Importacao Inteligente de Catalogos */}
       <ImportCatalogModal

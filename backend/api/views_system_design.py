@@ -2,10 +2,10 @@ import json
 import logging
 import time
 from typing import Dict, Any, List
+from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from django.contrib.auth import get_user_model
 from api.models import UserCustomAgent
@@ -325,18 +325,14 @@ class StudioCustomAgentCreateDeleteView(APIView):
     POST /api/v2/studio/system-design/custom-agents/
     DELETE /api/v2/studio/system-design/custom-agents/<id>/
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         User = get_user_model()
-        user_id = request.data.get("user_id")
-        if user_id and str(user_id) != "all":
-            user = User.objects.filter(id=user_id).first()
-        else:
-            user = request.user if request.user.is_authenticated else User.objects.first()
+        user = request.user
 
-        if not user:
-            return Response({"error": "Usuario nao encontrado no sistema."}, status=status.HTTP_400_BAD_REQUEST)
+        if not user or not user.is_authenticated:
+            return Response({"error": "Autenticacao necessaria."}, status=status.HTTP_401_UNAUTHORIZED)
 
         name = request.data.get("name", "").strip()
         role = request.data.get("role", "").strip().lower().replace(" ", "_")
@@ -371,7 +367,7 @@ class StudioCustomAgentCreateDeleteView(APIView):
             defaults={
                 "name": name,
                 "title": title or name,
-                "department": department or "Especialidades",
+                "department": department or "Custom Strategy",
                 "mission": mission,
                 "decision_scope": decision_scope,
                 "scope_constraints": scope_constraints,
@@ -400,8 +396,12 @@ class StudioCustomAgentCreateDeleteView(APIView):
         }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     def delete(self, request, pk=None):
+        user = request.user
         try:
-            agent = UserCustomAgent.objects.get(id=pk)
+            if user.is_superuser:
+                agent = UserCustomAgent.objects.get(id=pk)
+            else:
+                agent = UserCustomAgent.objects.get(id=pk, user=user)
             agent.delete()
             return Response({"success": True, "message": "Agente removido com sucesso."}, status=status.HTTP_200_OK)
         except UserCustomAgent.DoesNotExist:

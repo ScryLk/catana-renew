@@ -16,12 +16,26 @@ import { NewCatalogModal } from '../components/studio/NewCatalogModal';
 import { BrandModal } from '../components/studio/BrandModal';
 import { AuthModal } from '../components/auth/AuthModal';
 import { useStudioStore } from '../store/studioStore';
-import { useAuthStore, isAutoLoginSettled } from '../store/authStore';
+import { useAuthStore, isAutoLoginSettled, isClerkConfigured } from '../store/authStore';
+import { toast } from 'sonner';
+import { billingService } from '../services/billingService';
 
 export const KatanaStudio: React.FC = () => {
   const location = useLocation();
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const search = window.location.search || '';
+    const hash = window.location.hash || '';
+    // Nao exibe a tela de apresentacao caso o usuario esteja retornando de fluxo de autenticacao
+    if (search.includes('__clerk') || hash.includes('__clerk') || search.includes('auth=')) {
+      return false;
+    }
+    // Exibe no maximo uma vez por sessao de navegacao
+    return !sessionStorage.getItem('catana_splash_shown');
+  });
+
   const {
+    user,
     isAuthenticated,
     isAuthModalOpen,
     openAuthModal,
@@ -30,14 +44,35 @@ export const KatanaStudio: React.FC = () => {
     autoLogin,
   } = useAuthStore();
 
-  const [checkingAuth, setCheckingAuth] = useState(!isAutoLoginSettled());
+  const [checkingAuth, setCheckingAuth] = useState(() => {
+    if (isClerkConfigured) return !isAuthenticated;
+    return !isAutoLoginSettled();
+  });
+
+  const handleSplashComplete = () => {
+    setShowSplash(false);
+    try {
+      sessionStorage.setItem('catana_splash_shown', 'true');
+    } catch {
+      // Silencioso
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setCheckingAuth(false);
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     checkAuth();
     if (isAutoLoginSettled()) {
       setCheckingAuth(false);
-    } else {
+    } else if (!isClerkConfigured) {
       autoLogin().finally(() => setCheckingAuth(false));
+    } else {
+      const timer = setTimeout(() => setCheckingAuth(false), 1000);
+      return () => clearTimeout(timer);
     }
   }, [checkAuth, autoLogin]);
 
@@ -65,24 +100,74 @@ export const KatanaStudio: React.FC = () => {
     openNewCatalogModal,
     theme,
     isAccountSettingsOpen,
+    openAccountSettings,
     closeAccountSettings,
     toggleProductDrawer,
     loadExistingCatalog,
+    syncUserCatalogs,
+    setActiveUserId,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
 
-  // Restaura projeto ativo apos recarregar a pagina (F5)
+  // Sincroniza os catalogos do usuario do banco de dados na inicializacao
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      setActiveUserId(user.id);
+      syncUserCatalogs();
+    }
+  }, [isAuthenticated, user?.id, setActiveUserId, syncUserCatalogs]);
+
+  // Trata retorno de checkout do AbacatePay (?billing=success ou ?billing=canceled)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const billingParam = searchParams.get('billing');
+
+    if (billingParam === 'success') {
+      // Reconciliacao ativa imediata com o backend
+      billingService.syncBilling()
+        .then((res) => {
+          if (res.synced) {
+            toast.success(`Assinatura confirmada! Seu ${res.plan_name} ja esta ativo.`);
+          } else {
+            toast.success('Assinatura confirmada com sucesso! Seu plano ja esta ativo.');
+          }
+          billingService.notifySubscriptionUpdated();
+        })
+        .catch(() => {
+          toast.success('Assinatura confirmada com sucesso!');
+          billingService.notifySubscriptionUpdated();
+        });
+      window.history.replaceState({}, document.title, location.pathname);
+    } else if (billingParam === 'canceled') {
+      toast.info('Checkout cancelado.', {
+        description: 'Nenhuma cobranca foi realizada.',
+      });
+      window.history.replaceState({}, document.title, location.pathname);
+    }
+  }, [location.search, location.pathname]);
+
+  // Listener para abrir modal de faturamento remotamente (ex: cota excedida)
+  useEffect(() => {
+    const handleOpenBilling = () => {
+      openAccountSettings();
+    };
+    window.addEventListener('catana:open-billing-modal', handleOpenBilling);
+    return () => window.removeEventListener('catana:open-billing-modal', handleOpenBilling);
+  }, [openAccountSettings]);
+
+  // Restaura projeto ativo apos recarregar a pagina (F5) estritamente para o usuario autenticado
   useEffect(() => {
     try {
-      const lastActiveCatalogId = localStorage.getItem('katana_studio_last_active_catalog');
+      if (!isAuthenticated || !user?.id) return;
+      const lastActiveCatalogId = localStorage.getItem(`katana_studio_last_active_catalog:${user.id}`);
       if (lastActiveCatalogId && !useStudioStore.getState().hasStartedSession) {
         loadExistingCatalog(lastActiveCatalogId);
       }
     } catch (e) {
       console.warn('Erro ao restaurar sessao do catalogo:', e);
     }
-  }, [loadExistingCatalog]);
+  }, [isAuthenticated, user?.id, loadExistingCatalog]);
 
   // Global shortcut Ctrl+B / Cmd+B to toggle global sidebar, Ctrl+J / Cmd+J to toggle AI CoPilot
   useEffect(() => {
@@ -116,7 +201,7 @@ export const KatanaStudio: React.FC = () => {
       {showSplash && (
         <KatanaSplashScreen
           durationMs={3400}
-          onComplete={() => setShowSplash(false)}
+          onComplete={handleSplashComplete}
         />
       )}
 

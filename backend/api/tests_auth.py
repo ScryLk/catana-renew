@@ -1,4 +1,5 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
+from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_bytes
@@ -122,6 +123,7 @@ class CatanaAuthTests(TestCase):
         with self.assertRaises(Exception):
             RefreshToken(str(t2))
 
+    @override_settings(ALLOW_MOCK_OAUTH=True, DEBUG=True, ENVIRONMENT='development')
     def test_google_auth_mock_provisioning(self):
         res = self.client.post('/api/auth/google/', {
             'credential': 'mock-google-test-token',
@@ -226,4 +228,217 @@ class CatanaAuthTests(TestCase):
         })
         self.assertEqual(res.status_code, 400)
         self.assertIn('error', res.data)
+
+
+class OAuthAndMassAssignmentSecurityTests(TestCase):
+    """
+    Suíte obrigatória de segurança cobrindo:
+    1. Rejeição estrita de tokens mock de OAuth em produção/DEBUG=False.
+    2. Bloqueio de Mass Assignment de role e parâmetros privilegiados no registro público.
+    3. Validação de complexidade de senhas em registro e alteração.
+    4. Isolamento estrito de Multi-Tenancy e privacidade LGPD.
+    """
+
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.client = APIClient()
+        self.user_victim = User.objects.create_user(
+            username='victim_admin',
+            email='victim@corp.test',
+            password='StrongPassword123!',
+            role='admin'
+        )
+        self.org_victim = Organization.objects.create(name='Org Vitima', owner=self.user_victim)
+        self.user_victim.organizations.add(self.org_victim)
+
+        self.user_attacker = User.objects.create_user(
+            username='attacker_user',
+            email='attacker@corp.test',
+            password='AttackerPassword123!',
+            role='editor'
+        )
+        self.org_attacker = Organization.objects.create(name='Org Atacante', owner=self.user_attacker)
+        self.user_attacker.organizations.add(self.org_attacker)
+
+    # --------------------------------------------------------------------------
+    # 1. OAUTH BYPASS REGRESSION & SECURITY TESTS
+    # --------------------------------------------------------------------------
+
+    @override_settings(ENVIRONMENT='production', DEBUG=False, ALLOW_MOCK_OAUTH=False)
+    def test_mock_oauth_token_rejected_in_production(self):
+        """Valida que em producao (DEBUG=False, ENV=production) nenhum token mock seja aceito"""
+        res = self.client.post('/api/auth/google/', {
+            'credential': 'mock-google-test-token',
+            'email': 'victim@corp.test',
+        })
+        self.assertEqual(res.status_code, 401)
+        self.assertNotIn('access', res.data)
+
+    @override_settings(ENVIRONMENT='development', DEBUG=False, ALLOW_MOCK_OAUTH=True)
+    def test_mock_oauth_token_rejected_when_debug_false(self):
+        """Valida que mock OAuth seja rejeitado se DEBUG for False, mesmo com ALLOW_MOCK_OAUTH=True"""
+        res = self.client.post('/api/auth/google/', {
+            'credential': 'mock-google-any',
+            'email': 'any@corp.test',
+        })
+        self.assertEqual(res.status_code, 401)
+
+    @override_settings(ENVIRONMENT='development', DEBUG=True, ALLOW_MOCK_OAUTH=False)
+    def test_mock_oauth_token_rejected_when_mock_flag_disabled(self):
+        """Valida que por padrao (ALLOW_MOCK_OAUTH=False) tokens mockados sao rejeitados"""
+        res = self.client.post('/api/auth/google/', {
+            'credential': 'mock-google-test-token',
+            'email': 'any@corp.test',
+        })
+        self.assertEqual(res.status_code, 401)
+
+    def test_oauth_empty_credential_rejected(self):
+        """Valida que credencial vazia seja rejeitada com 400 Bad Request"""
+        res = self.client.post('/api/auth/google/', {'credential': ''})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('error', res.data)
+
+    def test_oauth_malformed_token_rejected(self):
+        """Valida que token malformado ou adulterado seja rejeitado com 401"""
+        res = self.client.post('/api/auth/google/', {'credential': 'invalid.malformed.google_token'})
+        self.assertEqual(res.status_code, 401)
+
+    # --------------------------------------------------------------------------
+    # 2. MASS ASSIGNMENT & PUBLIC REGISTRATION TESTS
+    # --------------------------------------------------------------------------
+
+    def test_public_registration_cannot_assign_admin_role(self):
+        """Valida que o cliente nao possa enviar role='admin' para obter privilegios"""
+        res = self.client.post('/api/register/', {
+            'username': 'attacker_candidate',
+            'email': 'candidate@attack.test',
+            'password': 'StrongSecurePass123!',
+            'role': 'admin'
+        })
+        # O sistema deve rejeitar o atributo privilegiado
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(User.objects.filter(username='attacker_candidate').exists())
+
+    def test_public_registration_prohibits_internal_privilege_flags(self):
+        """Valida que tentativas de passar is_staff, is_superuser, permissions, tenant_id sejam rejeitadas"""
+        malicious_payloads = [
+            {'is_superuser': True},
+            {'is_staff': True},
+            {'is_admin': True},
+            {'permissions': ['admin_all']},
+            {'organization_id': self.org_victim.id},
+            {'tenant_id': self.org_victim.id},
+            {'owner_id': self.user_victim.id},
+        ]
+        for payload in malicious_payloads:
+            cache.clear()
+            full_data = {
+                'username': f'user_{list(payload.keys())[0]}',
+                'email': f'user_{list(payload.keys())[0]}@corp.test',
+                'password': 'StrongSecurePass123!',
+                **payload
+            }
+            res = self.client.post('/api/register/', full_data)
+            self.assertEqual(res.status_code, 400, f"Falha de seguranca: payload {payload} foi aceito!")
+            self.assertFalse(User.objects.filter(username=full_data['username']).exists())
+
+    def test_public_registration_rejects_weak_password(self):
+        """Valida que senhas fracas sejam rejeitadas conforme regras do Django"""
+        res = self.client.post('/api/register/', {
+            'username': 'weak_user',
+            'email': 'weak@corp.test',
+            'password': '123'
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(User.objects.filter(username='weak_user').exists())
+
+    def test_public_registration_success_enforces_default_role_and_cookie(self):
+        """Valida registro legitimo: assume role='editor', is_staff=False, is_superuser=False e injeta cookie"""
+        res = self.client.post('/api/register/', {
+            'username': 'legit_user',
+            'email': 'legit@corp.test',
+            'password': 'StrongValidPassword987!'
+        })
+        self.assertEqual(res.status_code, 201)
+        new_user = User.objects.get(username='legit_user')
+        self.assertEqual(new_user.role, 'editor')
+        self.assertFalse(new_user.is_staff)
+        self.assertFalse(new_user.is_superuser)
+        # Verifica presenca de cookie HttpOnly de refresh
+        self.assertIn('catana_refresh_token', res.cookies)
+
+    # --------------------------------------------------------------------------
+    # 3. PASSWORD CHANGE COMPLEXITY
+    # --------------------------------------------------------------------------
+
+    def test_change_password_rejects_weak_new_password(self):
+        """Valida que alteracao de senha rejeite senhas curtas/fracas"""
+        self.client.force_authenticate(user=self.user_attacker)
+        res = self.client.post('/api/profile/change-password/', {
+            'old_password': 'AttackerPassword123!',
+            'new_password': '123',
+            'confirm_password': '123'
+        })
+        self.assertEqual(res.status_code, 400)
+        # Senha antiga permanece ativa
+        self.assertTrue(self.user_attacker.check_password('AttackerPassword123!'))
+
+    # --------------------------------------------------------------------------
+    # 4. MULTI-TENANT ISOLATION & PRIVACY
+    # --------------------------------------------------------------------------
+
+    def test_private_profile_privacy_enforced(self):
+        """Valida que perfis marcados como privados nao sejam expostos a terceiros"""
+        from api.models import PublicProfile
+        profile_victim = PublicProfile.objects.create(
+            user=self.user_victim,
+            username='victim_priv',
+            display_name='Vitima Admin',
+            visibility='privado'
+        )
+
+        # 1. Anonimo nao tem acesso -> 403
+        anon_client = APIClient()
+        res_anon = anon_client.get(f'/api/public-profiles/{profile_victim.id}')
+        self.assertEqual(res_anon.status_code, 403)
+
+        # 2. Outro usuario comum autenticado nao tem acesso -> 403
+        self.client.force_authenticate(user=self.user_attacker)
+        res_attacker = self.client.get(f'/api/public-profiles/{profile_victim.id}')
+        self.assertEqual(res_attacker.status_code, 403)
+
+        # 3. O proprio titular tem acesso -> 200
+        self.client.force_authenticate(user=self.user_victim)
+        res_owner = self.client.get(f'/api/public-profiles/{profile_victim.id}')
+        self.assertEqual(res_owner.status_code, 200)
+
+    def test_custom_agent_owner_isolation(self):
+        """Valida que usuario B nao consiga deletar agente customizado de usuario A"""
+        from api.models import UserCustomAgent
+        agent_a = UserCustomAgent.objects.create(
+            user=self.user_victim,
+            role='specialist_a',
+            name='Especialista A',
+            mission='Missao A'
+        )
+
+        # Usuario B tenta deletar agente de A -> 404
+        self.client.force_authenticate(user=self.user_attacker)
+        res_del = self.client.delete(f'/api/v2/studio/system-design/custom-agents/{agent_a.id}/')
+        self.assertEqual(res_del.status_code, 404)
+        self.assertTrue(UserCustomAgent.objects.filter(id=agent_a.id).exists())
+
+        # Usuario A (dono) consegue deletar -> 200
+        self.client.force_authenticate(user=self.user_victim)
+        res_del_ok = self.client.delete(f'/api/v2/studio/system-design/custom-agents/{agent_a.id}/')
+        self.assertEqual(res_del_ok.status_code, 200)
+        self.assertFalse(UserCustomAgent.objects.filter(id=agent_a.id).exists())
+
+    def test_catalog_import_json_unauthenticated_rejected(self):
+        """Valida que importacao de catalogo json sem autenticacao seja rejeitada com 401"""
+        anon_client = APIClient()
+        res = anon_client.post('/api/catalogs/import-json/', {'app': 'Catana'})
+        self.assertEqual(res.status_code, 401)
+
 

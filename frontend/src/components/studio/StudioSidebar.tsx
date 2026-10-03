@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   PanelLeftClose,
@@ -7,22 +6,20 @@ import {
   Sun,
   Moon,
   Settings,
-  Image as ImageIcon,
   LogOut,
   ChevronUp,
   Sparkles,
-  Cpu,
   Folder,
   FolderPlus,
   ChevronRight,
   ChevronDown,
+  BookOpen,
 } from 'lucide-react';
 import { useStudioStore, Brand } from '../../store/studioStore';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
 
 export const StudioSidebar: React.FC = () => {
-  const navigate = useNavigate();
   const { user, logout, isAuthenticated, openAuthModal } = useAuthStore();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -51,11 +48,21 @@ export const StudioSidebar: React.FC = () => {
     activeBrandId,
     setActiveBrandId,
     openBrandModal,
+    unlinkedCatalogs,
+    loadDemoCatalog,
+    isDemoLoading,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedBrands, setExpandedBrands] = useState<Record<string, boolean>>({});
+  const [expandedBrands, setExpandedBrands] = useState<Record<string, boolean>>({
+    'brand-vektron': true,
+    'brand-maison': false,
+    'brand-atelier': true,
+    'brand-nexus': true,
+    'brand-cristallo': true,
+  });
+  const [isDemosExpanded, setIsDemosExpanded] = useState(false);
 
   const toggleBrandExpanded = (brandId: string) => {
     setExpandedBrands((prev) => ({
@@ -65,6 +72,7 @@ export const StudioSidebar: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     let isMounted = true;
     const fetchQuota = async () => {
       try {
@@ -77,10 +85,17 @@ export const StudioSidebar: React.FC = () => {
       }
     };
     fetchQuota();
+
+    const handleSubUpdated = () => {
+      fetchQuota();
+    };
+    window.addEventListener('catana:subscription-updated', handleSubUpdated);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('catana:subscription-updated', handleSubUpdated);
     };
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -127,6 +142,16 @@ export const StudioSidebar: React.FC = () => {
       })
       .filter((b): b is Brand => b !== null);
   }, [brands, searchQuery]);
+
+  const filteredUnlinkedCatalogs = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return unlinkedCatalogs;
+    return unlinkedCatalogs.filter(
+      (c) =>
+        c.title.toLowerCase().includes(q) ||
+        (c.category && c.category.toLowerCase().includes(q))
+    );
+  }, [unlinkedCatalogs, searchQuery]);
 
   const handleSelectCatalog = (catalogId: string) => {
     loadExistingCatalog(catalogId);
@@ -231,16 +256,16 @@ export const StudioSidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* Marcas & Projetos (Antigravity Projects style) */}
+      {/* Seções de Navegação (Estilo Antigravity IDE: Marcas, Projetos Não Vinculados e Templates Demo) */}
       <div className="flex-1 overflow-y-auto custom-scrollbar px-2 py-2 space-y-2">
-        {/* Section Header */}
-        <div className="px-2 py-1 flex items-center justify-between">
+        {/* 1. Seção: MARCAS */}
+        <div className="px-2.5 py-1 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-semibold">
               Marcas
             </span>
             <span className="text-[10px] font-mono text-zinc-500">
-              {brands.length}
+              {filteredBrands.length}
             </span>
           </div>
 
@@ -252,39 +277,39 @@ export const StudioSidebar: React.FC = () => {
                 ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100'
                 : 'hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900'
             }`}
-            title="Nova Marca / Empresa"
+            title="Nova Marca"
             aria-label="Nova Marca"
           >
             <FolderPlus className="size-3.5" />
           </button>
         </div>
 
-        {/* Brands Tree List */}
-        <div className="space-y-1.5">
+        {/* Lista de Pastas de Marcas */}
+        <div className="space-y-1">
           {filteredBrands.map((brand) => {
             const isBrandActive = activeBrandId === brand.id;
-            const isExpanded = expandedBrands[brand.id] ?? true;
+            const isExpanded = expandedBrands[brand.id] ?? false;
 
             return (
               <div key={brand.id} className="space-y-0.5">
-                {/* Brand Folder Row */}
+                {/* Linha da Pasta da Marca (Estilo Antigravity Workspace) */}
                 <div
                   onClick={() => {
                     setActiveBrandId(brand.id);
                     toggleBrandExpanded(brand.id);
                   }}
-                  className={`group flex items-center justify-between px-2 py-1.5 rounded-xl text-xs transition-all cursor-pointer select-none border ${
+                  className={`group flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer select-none border ${
                     isBrandActive
                       ? isDark
-                        ? 'bg-zinc-900/90 border-zinc-800 text-zinc-200 font-medium'
-                        : 'bg-zinc-200/60 border-zinc-300 text-zinc-900 font-medium'
+                        ? 'bg-zinc-800/60 border-zinc-700/80 text-zinc-100 font-medium'
+                        : 'bg-zinc-200/70 border-zinc-300 text-zinc-900 font-medium'
                       : isDark
                       ? 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
                       : 'border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <Folder className={`size-3.5 shrink-0 ${isBrandActive ? 'text-[#B08D57]' : 'text-zinc-500'}`} />
+                    <Folder className={`size-3.5 shrink-0 ${isBrandActive ? 'text-zinc-200' : 'text-zinc-500'}`} />
                     <span className="truncate font-medium">{brand.name}</span>
                   </div>
 
@@ -295,8 +320,8 @@ export const StudioSidebar: React.FC = () => {
                         e.stopPropagation();
                         openBrandModal(brand.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-700/40 text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer"
-                      title={`Editar Brand Kit: ${brand.name}`}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-zinc-700/40 text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer"
+                      title={`Editar Kit da Marca: ${brand.name}`}
                     >
                       <Settings className="size-3" />
                     </button>
@@ -308,42 +333,210 @@ export const StudioSidebar: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Brand Catalogs (Indented) */}
-                {isExpanded && brand.catalogs && brand.catalogs.length > 0 && (
-                  <div className="pl-2.5 space-y-0.5 border-l border-zinc-800/50 ml-3.5 mt-0.5">
-                    {brand.catalogs.map((catalog) => {
-                      const isCatalogActive = hasStartedSession && activeCatalogId === catalog.id;
+                {/* Catálogos da Marca (Indentados com Linha de Árvore) */}
+                {isExpanded && (
+                  brand.catalogs && brand.catalogs.length > 0 ? (
+                    <div
+                      className={`pl-3 space-y-0.5 border-l ml-4 my-0.5 ${
+                        isDark ? 'border-zinc-800/80' : 'border-zinc-300'
+                      }`}
+                    >
+                      {brand.catalogs.map((catalog) => {
+                        const isCatalogActive = hasStartedSession && activeCatalogId === catalog.id;
 
-                      return (
-                        <button
-                          key={catalog.id}
-                          type="button"
-                          onClick={() => {
-                            setActiveBrandId(brand.id);
-                            handleSelectCatalog(catalog.id);
-                          }}
-                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-all flex items-center justify-between gap-2 cursor-pointer ${
-                            isCatalogActive
-                              ? isDark
-                                ? 'bg-zinc-800 text-white font-medium shadow-xs ring-1 ring-zinc-700'
-                                : 'bg-zinc-900 text-white font-medium shadow-xs'
-                              : isDark
-                              ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
-                              : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50'
-                          }`}
-                        >
-                          <span className="truncate min-w-0 flex-1">{catalog.title}</span>
-                          <span className={`text-[10px] font-mono shrink-0 ${isCatalogActive ? 'text-zinc-300' : 'text-zinc-500'}`}>
-                            {catalog.updatedAt}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                        return (
+                          <button
+                            key={catalog.id}
+                            type="button"
+                            onClick={() => {
+                              setActiveBrandId(brand.id);
+                              handleSelectCatalog(catalog.id);
+                            }}
+                            className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                              isCatalogActive
+                                ? isDark
+                                  ? 'bg-zinc-800 text-white font-medium shadow-xs border border-zinc-700'
+                                  : 'bg-zinc-900 text-white font-medium shadow-xs'
+                                : isDark
+                                ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
+                                : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50'
+                            }`}
+                          >
+                            <span className="truncate min-w-0 flex-1">{catalog.title}</span>
+                            <span
+                              className={`text-[10px] font-mono shrink-0 ${
+                                isCatalogActive ? 'text-zinc-300' : 'text-zinc-500'
+                              }`}
+                            >
+                              {catalog.updatedAt}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div
+                      className={`pl-3 py-1.5 border-l ml-4 my-0.5 flex items-center justify-between gap-1.5 ${
+                        isDark ? 'border-zinc-800/80' : 'border-zinc-300'
+                      }`}
+                    >
+                      <span className="text-[11px] text-zinc-500 italic select-none truncate">
+                        Nenhum projeto cadastrado
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveBrandId(brand.id);
+                          openNewCatalogModal();
+                        }}
+                        className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded transition-all cursor-pointer shrink-0 border ${
+                          isDark
+                            ? 'bg-zinc-900/80 hover:bg-zinc-800 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200'
+                            : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-600 hover:text-zinc-900'
+                        }`}
+                        title={`Criar primeiro projeto para ${brand.name}`}
+                      >
+                        + Criar
+                      </button>
+                    </div>
+                  )
                 )}
               </div>
             );
           })}
+        </div>
+
+        {/* 2. Seção: PROJETOS NÃO VINCULADOS (Estilo Antigravity Conversations) */}
+        <div className="pt-3">
+          <div className="px-2.5 py-1 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-semibold">
+                Projetos
+              </span>
+              <span className="text-[10px] font-mono text-zinc-500">
+                {filteredUnlinkedCatalogs.length}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleNewCatalog}
+              className={`p-1 rounded-md transition-colors cursor-pointer ${
+                isDark
+                  ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100'
+                  : 'hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900'
+              }`}
+              title="Novo Projeto / Conversa"
+              aria-label="Novo Projeto"
+            >
+              <Plus className="size-3.5" />
+            </button>
+          </div>
+
+          {/* Lista Plana de Projetos Independentes */}
+          <div className="space-y-0.5 mt-1">
+            {filteredUnlinkedCatalogs.length === 0 ? (
+              <div className="px-2.5 py-1.5 text-[11px] text-zinc-500 italic select-none">
+                Nenhum projeto avulso
+              </div>
+            ) : (
+              filteredUnlinkedCatalogs.map((catalog) => {
+                const isCatalogActive = hasStartedSession && activeCatalogId === catalog.id;
+
+                return (
+                  <button
+                    key={catalog.id}
+                    type="button"
+                    onClick={() => handleSelectCatalog(catalog.id)}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                      isCatalogActive
+                        ? isDark
+                          ? 'bg-zinc-800 text-white font-medium shadow-xs border border-zinc-700'
+                          : 'bg-zinc-900 text-white font-medium shadow-xs'
+                        : isDark
+                        ? 'text-zinc-300 hover:text-white hover:bg-zinc-900/60'
+                        : 'text-zinc-700 hover:text-zinc-950 hover:bg-zinc-200/50'
+                    }`}
+                  >
+                    <span className="truncate min-w-0 flex-1 font-medium">{catalog.title}</span>
+                    {catalog.isUnread ? (
+                      <span className="size-1.5 rounded-full bg-sky-500 shrink-0" title="Ativo / Rascunho" />
+                    ) : (
+                      <span className={`text-[10px] font-mono shrink-0 ${isCatalogActive ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                        {catalog.updatedAt}
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* 3. Seção: TEMPLATES DEMONSTRAÇÃO */}
+        <div className="pt-2.5 border-t border-inherit/40 mt-3 space-y-1">
+          <div
+            onClick={() => setIsDemosExpanded((prev) => !prev)}
+            className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer select-none ${
+              isDark
+                ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
+                : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <BookOpen className="size-3.5 text-zinc-400 shrink-0" />
+              <span className="truncate font-medium">Templates Demo</span>
+              <span className="text-[10px] font-mono text-zinc-500">4</span>
+            </div>
+            {isDemosExpanded ? (
+              <ChevronDown className="size-3 text-zinc-500" />
+            ) : (
+              <ChevronRight className="size-3 text-zinc-500" />
+            )}
+          </div>
+
+          {isDemosExpanded && (
+            <div
+              className={`pl-3 space-y-0.5 border-l ml-4 my-1 ${
+                isDark ? 'border-zinc-800/80' : 'border-zinc-300'
+              }`}
+            >
+              {[
+                { key: 'maison_verdana', title: 'Maison Verdana', desc: 'Moda & Luxo' },
+                { key: 'vektron_systems', title: 'VEKTRON Systems', desc: 'Hardware B2B' },
+                { key: 'atelier_sucre', title: 'Atelier Sucré', desc: 'Gastronomia' },
+                { key: 'cristallo_joias', title: 'Cristallo Joias', desc: 'Alta Joalheria' },
+              ].map((tpl) => {
+                const isActive =
+                  activeCatalogId?.toLowerCase().includes(tpl.key.replace('_', '-')) ||
+                  activeCatalogId?.toLowerCase().includes(tpl.key);
+
+                return (
+                  <button
+                    key={tpl.key}
+                    type="button"
+                    disabled={isDemoLoading}
+                    onClick={() => loadDemoCatalog(tpl.key)}
+                    className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                      isActive
+                        ? isDark
+                          ? 'bg-zinc-800 text-white font-medium shadow-xs border border-zinc-700'
+                          : 'bg-zinc-900 text-white font-medium shadow-xs'
+                        : isDark
+                        ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
+                        : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50'
+                    }`}
+                  >
+                    <span className="truncate min-w-0 flex-1">{tpl.title}</span>
+                    <span className="text-[10px] font-mono text-zinc-500 shrink-0">
+                      {tpl.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -367,7 +560,7 @@ export const StudioSidebar: React.FC = () => {
                   className={`size-1.5 rounded-full ${
                     agentStatus === 'thinking' || agentStatus === 'generating'
                       ? 'bg-amber-400 animate-pulse'
-                      : 'bg-emerald-400'
+                      : 'bg-zinc-400'
                   }`}
                 />
                 <span className="capitalize">
@@ -414,8 +607,8 @@ export const StudioSidebar: React.FC = () => {
                       <span
                         className={`text-[9px] font-mono px-1.5 py-0.2 rounded-full border shrink-0 ${
                           isDark
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            ? 'bg-zinc-800 text-zinc-300 border-zinc-700'
+                            : 'bg-zinc-100 text-zinc-700 border-zinc-300'
                         }`}
                       >
                         {planName}
@@ -429,7 +622,7 @@ export const StudioSidebar: React.FC = () => {
                 <div className="p-2 my-1 rounded-xl bg-zinc-500/5 border border-inherit">
                   <div className="flex items-center justify-between text-[10px] text-zinc-400 font-medium mb-1.5">
                     <span className="flex items-center gap-1">
-                      <Sparkles className="size-2.5 text-indigo-400" />
+                      <Sparkles className="size-2.5 text-zinc-400" />
                       <span>Consumo de IA</span>
                     </span>
                     <span className="font-mono">
@@ -438,7 +631,7 @@ export const StudioSidebar: React.FC = () => {
                   </div>
                   <div className="w-full h-1.5 rounded-full bg-zinc-700/30 overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-300"
+                      className="h-full rounded-full bg-zinc-400 dark:bg-zinc-400 transition-all duration-300"
                       style={{ width: `${Math.min(100, Math.max(2, percentageUsed))}%` }}
                     />
                   </div>
@@ -460,38 +653,6 @@ export const StudioSidebar: React.FC = () => {
                   >
                     <Settings className="size-3.5 text-zinc-400" />
                     <span className="flex-1">Configurações da Conta</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsProfileMenuOpen(false);
-                      navigate('/media');
-                    }}
-                    className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors cursor-pointer text-left ${
-                      isDark
-                        ? 'hover:bg-zinc-800/80 hover:text-white text-zinc-300'
-                        : 'hover:bg-zinc-100 hover:text-zinc-950 text-zinc-700'
-                    }`}
-                  >
-                    <ImageIcon className="size-3.5 text-zinc-400" />
-                    <span className="flex-1">Biblioteca de Mídias</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsProfileMenuOpen(false);
-                      navigate('/system-design');
-                    }}
-                    className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors cursor-pointer text-left ${
-                      isDark
-                        ? 'hover:bg-zinc-800/80 hover:text-white text-zinc-300'
-                        : 'hover:bg-zinc-100 hover:text-zinc-950 text-zinc-700'
-                    }`}
-                  >
-                    <Cpu className="size-3.5 text-zinc-400" />
-                    <span className="flex-1">System Design & Agentes</span>
                   </button>
                 </div>
 

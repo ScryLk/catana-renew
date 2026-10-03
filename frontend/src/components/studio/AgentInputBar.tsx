@@ -39,6 +39,8 @@ export const AgentInputBar: React.FC = () => {
     pendingInputPrompt,
     setPendingInputPrompt,
     agentStatus,
+    isProductDrawerOpen,
+    toggleProductDrawer,
   } = useStudioStore();
   const isDark = theme === 'dark';
   const isWorking = agentStatus === 'thinking' || agentStatus === 'generating';
@@ -487,12 +489,18 @@ export const AgentInputBar: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => toast.info('Abrindo gaveta de produtos cadastrados...')}
-              className={`p-1 rounded transition-colors ${
-                isDark ? 'hover:text-white hover:bg-zinc-800' : 'hover:text-zinc-900 hover:bg-zinc-200'
+              onClick={toggleProductDrawer}
+              className={`p-1 rounded transition-colors cursor-pointer ${
+                isProductDrawerOpen
+                  ? isDark
+                    ? 'bg-zinc-800 text-white'
+                    : 'bg-zinc-200 text-zinc-950'
+                  : isDark
+                  ? 'hover:text-white hover:bg-zinc-800 text-zinc-400'
+                  : 'hover:text-zinc-900 hover:bg-zinc-200 text-zinc-500'
               }`}
-              title="Inserir produto do catálogo"
-              aria-label="Inserir produto do catálogo"
+              title={isProductDrawerOpen ? 'Fechar Gaveta de Produtos' : 'Abrir Gaveta de Produtos (Acervo & Planilha)'}
+              aria-label="Gaveta de Produtos"
             >
               <LayoutGrid className="size-3.5" />
             </button>

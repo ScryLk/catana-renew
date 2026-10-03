@@ -14,9 +14,9 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import * as XLSX from '@e965/xlsx';
-import axios from 'axios';
+import api from '../../services/api';
 import { toast } from 'sonner';
-import { useStudioStore, API_BASE_URL } from '../../store/studioStore';
+import { useStudioStore } from '../../store/studioStore';
 
 export type TargetFieldKey =
   | 'name'
@@ -186,11 +186,31 @@ export const StudioExcelImportModal: React.FC = () => {
     setFileSize(`${(file.size / 1024).toFixed(1)} KB`);
 
     try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+      let data: any[][] = [];
+      const isCsv = file.name.toLowerCase().endsWith('.csv');
+
+      if (isCsv) {
+        const text = await file.text();
+        const firstLine = text.split(/\r?\n/)[0] || '';
+        if (firstLine.includes(';') && (!firstLine.includes(',') || text.split(';').length > text.split(',').length)) {
+          const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+          data = lines.map((l) =>
+            l.split(';').map((cell) => cell.trim().replace(/^["']|["']$/g, ''))
+          );
+        } else {
+          const buffer = await file.arrayBuffer();
+          const workbook = XLSX.read(buffer, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+        }
+      } else {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+      }
 
       if (data.length < 2) {
         toast.error('A planilha deve conter ao menos a linha de cabeçalho e uma linha de produtos.');
@@ -299,7 +319,7 @@ export const StudioExcelImportModal: React.FC = () => {
         const p = preparedProducts[i];
         if (!p.image || p.image.trim() === '') {
           try {
-            const resp = await axios.post(`${API_BASE_URL}/api/v2/studio/products/generate-image/`, {
+            const resp = await api.post('/api/v2/studio/products/generate-image/', {
               name: p.name,
               category: p.category || '',
               description: p.description || '',

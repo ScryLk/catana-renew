@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Sparkles,
   Check,
@@ -9,10 +9,14 @@ import {
   ArrowLeftRight,
   Plus,
   Package,
+  Upload,
+  Palette,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
 import { CatalogPageData } from '../../data/editorialCatalog.mock';
 import { MiniPageThumbnail } from './MiniPageThumbnail';
+import { AgentCursorLayer } from './AgentCursorLayer';
+import { PageOverlayLayer } from './PageOverlayLayer';
 import { Tooltip } from '../ui/Tooltip';
 import { toast } from 'sonner';
 
@@ -28,11 +32,13 @@ export const SpreadViewport: React.FC = () => {
     setAgentStatus,
     theme,
     updateProduct,
+    updatePage,
     setSpreadPage,
     swapSpreadPages,
     activePalette,
     openProductDrawer,
     catalogTitle,
+    triggerAgentCursor,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -42,9 +48,34 @@ export const SpreadViewport: React.FC = () => {
   const [editingPrice, setEditingPrice] = useState('');
   const [editingName, setEditingName] = useState('');
 
+  // Logo upload ref — one hidden input shared across cover pages
+  const logoFileRef = useRef<HTMLInputElement>(null);
+  const [pendingLogoPageNumber, setPendingLogoPageNumber] = useState<number | null>(null);
+
+  const handleLogoClick = (e: React.MouseEvent, pageNumber: number) => {
+    e.stopPropagation();
+    setPendingLogoPageNumber(pageNumber);
+    logoFileRef.current?.click();
+  };
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || pendingLogoPageNumber === null) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      updatePage(pendingLogoPageNumber, { editorialImage: dataUrl });
+      toast.success('Logomarca atualizada na capa!');
+    };
+    reader.readAsDataURL(file);
+    // Reset so the same file can be re-selected if needed
+    e.target.value = '';
+  };
+
   // Encontra as duas páginas do spread atual
   const leftPage = pages.find((p) => p.pageNumber === currentSpread[0]);
   const rightPage = pages.find((p) => p.pageNumber === currentSpread[1]);
+
 
   // Handler para selecionar elemento
   const handleSelect = (elementId: string, e: React.MouseEvent, defaultName?: string, defaultPrice?: string) => {
@@ -62,6 +93,19 @@ export const SpreadViewport: React.FC = () => {
   // Aplica prompt customizado ou chip rápido no elemento
   const handleApplyAction = (actionPrompt: string, targetProductId?: string) => {
     if (!actionPrompt.trim()) return;
+
+    // Dispara cursor visual imediatamente sobre o elemento
+    if (editingPrice && targetProductId) {
+      triggerAgentCursor('commercial', `Recalibrando preço para ${editingPrice}`, { x: 68, y: 55 });
+    } else if (editingName && targetProductId) {
+      triggerAgentCursor('copywriter', `Ajustando título para "${editingName}"`, { x: 45, y: 35 });
+    } else if (actionPrompt.toLowerCase().includes('copy') || actionPrompt.toLowerCase().includes('descri')) {
+      triggerAgentCursor('copywriter', actionPrompt, { x: 40, y: 60 });
+    } else if (actionPrompt.toLowerCase().includes('preço') || actionPrompt.toLowerCase().includes('valor')) {
+      triggerAgentCursor('commercial', actionPrompt, { x: 65, y: 50 });
+    } else {
+      triggerAgentCursor('director', actionPrompt, { x: 50, y: 40 });
+    }
 
     setAgentStatus('generating');
     setSelectedElementId(null);
@@ -144,6 +188,7 @@ export const SpreadViewport: React.FC = () => {
   };
 
   const [openDropdown, setOpenDropdown] = useState<'left' | 'right' | null>(null);
+  const [openColorPicker, setOpenColorPicker] = useState<'left' | 'right' | null>(null);
 
   const getPageTitleOrLabel = (page: CatalogPageData): string => {
     if (page.type === 'cover') return 'Capa · Coleção 2026';
@@ -155,6 +200,99 @@ export const SpreadViewport: React.FC = () => {
     if (page.type === 'grid_4') return `Grade Comercial · ${page.products?.length || 0}/4 itens`;
     if (page.type === 'backcover') return 'Contracapa · Atelier';
     return `Página ${page.pageNumber}`;
+  };
+
+  const renderColorPickerDropdown = (slot: 'left' | 'right') => {
+    const activePage = slot === 'left' ? leftPage : rightPage;
+    if (!activePage) return null;
+
+    const colorPresets = [
+      { name: 'Preto Puro', hex: '#000000' },
+      { name: 'Preto Atelier', hex: '#121214' },
+      { name: 'Carbon Tech', hex: '#0F0F11' },
+      { name: 'Grafite Slate', hex: '#1E2022' },
+      { name: 'Marfim Editorial', hex: '#F5F1EA' },
+      { name: 'Branco Puro', hex: '#FFFFFF' },
+    ];
+
+    return (
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`absolute right-0 top-full mt-1.5 w-60 rounded-xl border shadow-2xl p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150 transition-colors ${
+          isDark
+            ? 'bg-[#141418] border-zinc-700 text-zinc-100 shadow-[0_16px_40px_rgba(0,0,0,0.85)]'
+            : 'bg-white border-zinc-200 text-zinc-900 shadow-[0_12px_36px_rgba(0,0,0,0.18)]'
+        }`}
+      >
+        <div className="flex items-center justify-between pb-2 mb-2 border-b border-zinc-700/40">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400">
+            Fundo · Pág. {String(activePage.pageNumber).padStart(2, '0')}
+          </span>
+          <button
+            type="button"
+            onClick={() => setOpenColorPicker(null)}
+            className="text-zinc-400 hover:text-zinc-200 p-0.5 rounded cursor-pointer"
+            aria-label="Fechar seletor de cor"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-1.5 mb-2.5">
+          {colorPresets.map((preset) => {
+            const isCurrent = activePage.backgroundColor?.toLowerCase() === preset.hex.toLowerCase();
+            return (
+              <button
+                key={preset.hex}
+                type="button"
+                onClick={() => {
+                  updatePage(activePage.pageNumber, { backgroundColor: preset.hex });
+                  setOpenColorPicker(null);
+                  toast.success(`Fundo da página ${activePage.pageNumber} alterado para ${preset.name}!`);
+                }}
+                className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                  isCurrent
+                    ? 'border-amber-500 ring-1 ring-amber-500 bg-amber-500/10'
+                    : isDark
+                    ? 'border-zinc-800 hover:border-zinc-600 bg-zinc-900/60'
+                    : 'border-zinc-200 hover:border-zinc-300 bg-zinc-50'
+                }`}
+                title={`${preset.name} (${preset.hex})`}
+              >
+                <span
+                  className="size-5 rounded-md border border-zinc-600/40 shadow-xs"
+                  style={{ backgroundColor: preset.hex }}
+                />
+                <span className="text-[9px] font-medium truncate w-full text-zinc-300">
+                  {preset.name.split(' ')[0]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-1.5 pt-1.5 border-t border-zinc-700/40">
+          <span className="text-[10px] font-mono text-zinc-400">HEX</span>
+          <input
+            type="text"
+            defaultValue={activePage.backgroundColor || '#000000'}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const val = (e.currentTarget.value || '').trim();
+                if (val) {
+                  const hexVal = val.startsWith('#') ? val : `#${val}`;
+                  updatePage(activePage.pageNumber, { backgroundColor: hexVal });
+                  setOpenColorPicker(null);
+                  toast.success(`Fundo da página ${activePage.pageNumber} alterado para ${hexVal}!`);
+                }
+              }
+            }}
+            className="flex-1 bg-zinc-900/60 border border-zinc-700/60 rounded px-1.5 py-0.5 text-[10px] font-mono outline-none focus:border-amber-500 text-white"
+            placeholder="#000000"
+          />
+        </div>
+      </div>
+    );
   };
 
   const renderPagePickerDropdown = (slot: 'left' | 'right') => {
@@ -277,52 +415,76 @@ export const SpreadViewport: React.FC = () => {
             {/* Top Empty Space for Editorial Balance */}
             <div className="h-6" />
 
-            {/* Central Identity Monogram + Wordmark */}
-            <div
-              className={`flex flex-col items-center gap-6 p-4 rounded-xl transition-all cursor-pointer ${
-                selectedElementId === `page-${page.pageNumber}-brand`
-                  ? 'ring-2 ring-amber-600/80 bg-white/5'
-                  : 'hover:bg-white/5'
-              }`}
-              onClick={(e) => handleSelect(`page-${page.pageNumber}-brand`, e, 'Identidade da Capa')}
-            >
-              {/* Monogram or Brand Emblem */}
-              <div
-                className="w-24 h-24 rounded-full border flex items-center justify-center p-2 bg-black/20 shadow-lg overflow-hidden"
-                style={{ borderColor: `${accent}66` }}
-              >
-                {page.editorialImage ? (
-                  <img
-                    src={page.editorialImage}
-                    alt={page.title || 'Capa'}
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <span
-                    className="text-4xl font-serif font-light select-none"
-                    style={{
-                      fontFamily: "'Cormorant Garamond', Georgia, serif",
-                      color: accent,
-                    }}
-                  >
-                    {(page.title || catalogTitle || 'C').trim().charAt(0).toUpperCase()}
-                  </span>
-                )}
-              </div>
 
-              {/* Wordmark */}
-              <div className="flex flex-col items-center">
+            {/* Central Identity: Logo (independent) + Wordmark (separate clickable block) */}
+            <div className="flex flex-col items-center gap-6">
+
+              {/* Logo Circle — independent click target for upload */}
+              <Tooltip text={page.editorialImage ? 'Trocar logomarca' : 'Adicionar logomarca'} position="top">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Adicionar ou trocar logomarca da capa"
+                  className="relative w-24 h-24 rounded-full border flex items-center justify-center p-2 bg-black/20 shadow-lg overflow-hidden cursor-pointer group"
+                  style={{ borderColor: `${accent}66` }}
+                  onClick={(e) => handleLogoClick(e, page.pageNumber)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleLogoClick(e as unknown as React.MouseEvent, page.pageNumber); } }}
+                >
+                  {page.editorialImage ? (
+                    <>
+                      <img
+                        src={page.editorialImage}
+                        alt={page.title || 'Capa'}
+                        className="w-full h-full object-contain"
+                      />
+                      {/* Edit overlay on hover */}
+                      <div className="absolute inset-0 rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                        <Upload className="size-4 text-white" />
+                        <span className="text-[8px] text-white font-medium tracking-wide uppercase">Trocar</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span
+                        className="text-4xl font-serif font-light select-none group-hover:opacity-0 transition-opacity"
+                        style={{
+                          fontFamily: "'Cormorant Garamond', Georgia, serif",
+                          color: accent,
+                        }}
+                      >
+                        {(page.title || catalogTitle || 'C').trim().charAt(0).toUpperCase()}
+                      </span>
+                      {/* Upload hint on hover */}
+                      <div className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                        <Upload className="size-4" style={{ color: accent }} />
+                        <span className="text-[8px] font-medium tracking-wide uppercase" style={{ color: accent }}>Logo</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </Tooltip>
+
+              {/* Wordmark block — separate selectable element */}
+              <div
+                className={`flex flex-col items-center p-3 rounded-xl transition-all cursor-pointer ${
+                  selectedElementId === `page-${page.pageNumber}-brand`
+                    ? 'ring-2 ring-amber-600/80 bg-white/5'
+                    : 'hover:bg-white/5'
+                }`}
+                onClick={(e) => handleSelect(`page-${page.pageNumber}-brand`, e, 'Identidade da Capa')}
+              >
                 <h1
                   className="text-4xl tracking-[0.35em] text-[#F5F1EA] font-normal uppercase"
                   style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
                 >
-                  {page.title || 'CATÁLOGO'}
+                  {page.title || 'CATALOGO'}
                 </h1>
                 <div className="w-8 h-[1px] my-3" style={{ backgroundColor: accent }} />
                 <span className="text-[10px] tracking-[0.3em] uppercase font-medium" style={{ color: accent }}>
-                  {page.label || 'COLEÇÃO EXECUTIVA 2026'}
+                  {page.label || 'COLECAO EXECUTIVA 2026'}
                 </span>
               </div>
+
             </div>
 
             {/* Bottom Subtitle / Origin */}
@@ -335,11 +497,12 @@ export const SpreadViewport: React.FC = () => {
               onClick={(e) => handleSelect(`page-${page.pageNumber}-sub`, e, 'Assinatura')}
             >
               <p className="text-[9px] tracking-[0.3em] text-[#F5F1EA]/80 uppercase font-light">
-                {page.subtitle || 'MODA & ACESSÓRIOS · SÃO PAULO'}
+                {page.subtitle || 'MODA & ACESSORIOS · SAO PAULO'}
               </p>
             </div>
           </div>
         );
+
 
       // ---------------- PÁGINA 02: MANIFESTO ----------------
       case 'manifesto':
@@ -1212,6 +1375,7 @@ export const SpreadViewport: React.FC = () => {
       onClick={() => {
         setSelectedElementId(null);
         setOpenDropdown(null);
+        setOpenColorPicker(null);
       }}
       className={`flex-1 overflow-auto custom-scrollbar relative select-none transition-colors ${
         isDark ? 'bg-[#0a0a0c]' : 'bg-[#F4F0E8]'
@@ -1233,13 +1397,15 @@ export const SpreadViewport: React.FC = () => {
         >
           {/* Spread Container (proporcao A4 escalada a partir do canto superior esquerdo) */}
           <div
-            className="origin-top-left flex items-start justify-center gap-6 shrink-0 transition-transform duration-150"
+            className="origin-top-left flex items-start justify-center gap-6 shrink-0 transition-transform duration-150 relative"
             style={{
               width: `${baseWidth}px`,
               height: `${baseHeight}px`,
               transform: `scale(${scale})`,
             }}
           >
+            {/* Camada de Cursores Vivos dos Multi-Agentes (UX Pilot / Figma style) */}
+            <AgentCursorLayer />
         {/* ================= LEFT PAGE WRAPPER ================= */}
         {leftPage && (
           <div className={`flex flex-col items-center ${viewMode === 'single' ? 'hidden' : ''}`}>
@@ -1264,33 +1430,66 @@ export const SpreadViewport: React.FC = () => {
                 </span>
               </div>
 
-              {/* Page Switcher Trigger */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenDropdown(openDropdown === 'left' ? null : 'left');
-                  }}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-xs ${
-                    openDropdown === 'left'
-                      ? isDark
-                        ? 'bg-zinc-200 text-zinc-950 border-white font-bold'
-                        : 'bg-zinc-900 text-white border-zinc-900 font-bold'
-                      : isDark
-                      ? 'bg-[#141418] hover:bg-[#1f1f26] text-zinc-200 border-zinc-700 hover:border-zinc-500'
-                      : 'bg-white hover:bg-zinc-50 text-zinc-800 border-zinc-300 hover:border-zinc-400'
-                  }`}
-                  title="Trocar página exibida no lado esquerdo"
-                  aria-label="Trocar página esquerda"
-                >
-                  <ArrowLeftRight className="size-3 text-zinc-400" />
-                  <span>Trocar Página</span>
-                  <ChevronDown className="size-3 text-zinc-400" />
-                </button>
+              <div className="flex items-center gap-1.5">
+                {/* Page Color Picker Trigger */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenColorPicker(openColorPicker === 'left' ? null : 'left');
+                      setOpenDropdown(null);
+                    }}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-xs ${
+                      openColorPicker === 'left'
+                        ? isDark
+                          ? 'bg-zinc-200 text-zinc-950 border-white font-bold'
+                          : 'bg-zinc-900 text-white border-zinc-900 font-bold'
+                        : isDark
+                        ? 'bg-[#141418] hover:bg-[#1f1f26] text-zinc-200 border-zinc-700 hover:border-zinc-500'
+                        : 'bg-white hover:bg-zinc-50 text-zinc-800 border-zinc-300 hover:border-zinc-400'
+                    }`}
+                    title="Alterar cor de fundo da página"
+                    aria-label="Cor de fundo da página esquerda"
+                  >
+                    <span
+                      className="size-3 rounded-full border border-zinc-500/60 shadow-2xs shrink-0"
+                      style={{ backgroundColor: leftPage.backgroundColor || '#000000' }}
+                    />
+                    <Palette className="size-3 text-zinc-400" />
+                  </button>
+                  {openColorPicker === 'left' && renderColorPickerDropdown('left')}
+                </div>
 
-                {/* Dropdown Menu */}
-                {openDropdown === 'left' && renderPagePickerDropdown('left')}
+                {/* Page Switcher Trigger */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenDropdown(openDropdown === 'left' ? null : 'left');
+                      setOpenColorPicker(null);
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-xs ${
+                      openDropdown === 'left'
+                        ? isDark
+                          ? 'bg-zinc-200 text-zinc-950 border-white font-bold'
+                          : 'bg-zinc-900 text-white border-zinc-900 font-bold'
+                        : isDark
+                        ? 'bg-[#141418] hover:bg-[#1f1f26] text-zinc-200 border-zinc-700 hover:border-zinc-500'
+                        : 'bg-white hover:bg-zinc-50 text-zinc-800 border-zinc-300 hover:border-zinc-400'
+                    }`}
+                    title="Trocar página exibida no lado esquerdo"
+                    aria-label="Trocar página esquerda"
+                  >
+                    <ArrowLeftRight className="size-3 text-zinc-400" />
+                    <span>Trocar Página</span>
+                    <ChevronDown className="size-3 text-zinc-400" />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {openDropdown === 'left' && renderPagePickerDropdown('left')}
+                </div>
               </div>
             </div>
 
@@ -1307,6 +1506,7 @@ export const SpreadViewport: React.FC = () => {
               }}
             >
               {renderPageContent(leftPage)}
+              <PageOverlayLayer page={leftPage} />
             </div>
           </div>
         )}
@@ -1359,35 +1559,67 @@ export const SpreadViewport: React.FC = () => {
                 </span>
               </div>
 
-              {/* Page Switcher Trigger */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenDropdown(openDropdown === 'right' ? null : 'right');
-                  }}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-xs ${
-                    openDropdown === 'right'
-                      ? isDark
-                        ? 'bg-zinc-200 text-zinc-950 border-white font-bold'
-                        : 'bg-zinc-900 text-white border-zinc-900 font-bold'
-                      : isDark
-                      ? 'bg-[#141418] hover:bg-[#1f1f26] text-zinc-200 border-zinc-700 hover:border-zinc-500'
-                      : 'bg-white hover:bg-zinc-50 text-zinc-800 border-zinc-300 hover:border-zinc-400'
-                  }`}
-                  title="Trocar página exibida no lado direito"
-                  aria-label="Trocar página direita"
-                >
-                  <ArrowLeftRight className="size-3 text-zinc-400" />
-                  <span>Trocar Página</span>
-                  <ChevronDown className="size-3 text-zinc-400" />
-                </button>
+              <div className="flex items-center gap-1.5">
+                {/* Page Color Picker Trigger */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenColorPicker(openColorPicker === 'right' ? null : 'right');
+                      setOpenDropdown(null);
+                    }}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-xs ${
+                      openColorPicker === 'right'
+                        ? isDark
+                          ? 'bg-zinc-200 text-zinc-950 border-white font-bold'
+                          : 'bg-zinc-900 text-white border-zinc-900 font-bold'
+                        : isDark
+                        ? 'bg-[#141418] hover:bg-[#1f1f26] text-zinc-200 border-zinc-700 hover:border-zinc-500'
+                        : 'bg-white hover:bg-zinc-50 text-zinc-800 border-zinc-300 hover:border-zinc-400'
+                    }`}
+                    title="Alterar cor de fundo da página"
+                    aria-label="Cor de fundo da página direita"
+                  >
+                    <span
+                      className="size-3 rounded-full border border-zinc-500/60 shadow-2xs shrink-0"
+                      style={{ backgroundColor: rightPage.backgroundColor || '#FFFFFF' }}
+                    />
+                    <Palette className="size-3 text-zinc-400" />
+                  </button>
+                  {openColorPicker === 'right' && renderColorPickerDropdown('right')}
+                </div>
 
-                {/* Dropdown Menu */}
-                {openDropdown === 'right' && renderPagePickerDropdown('right')}
+                {/* Page Switcher Trigger */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenDropdown(openDropdown === 'right' ? null : 'right');
+                      setOpenColorPicker(null);
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-xs ${
+                      openDropdown === 'right'
+                        ? isDark
+                          ? 'bg-zinc-200 text-zinc-950 border-white font-bold'
+                          : 'bg-zinc-900 text-white border-zinc-900 font-bold'
+                        : isDark
+                        ? 'bg-[#141418] hover:bg-[#1f1f26] text-zinc-200 border-zinc-700 hover:border-zinc-500'
+                        : 'bg-white hover:bg-zinc-50 text-zinc-800 border-zinc-300 hover:border-zinc-400'
+                    }`}
+                    title="Trocar página exibida no lado direito"
+                    aria-label="Trocar página direita"
+                  >
+                    <ArrowLeftRight className="size-3 text-zinc-400" />
+                    <span>Trocar Página</span>
+                    <ChevronDown className="size-3 text-zinc-400" />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {openDropdown === 'right' && renderPagePickerDropdown('right')}
+                </div>
               </div>
-
             </div>
 
             {/* Right Page Frame */}
@@ -1403,6 +1635,7 @@ export const SpreadViewport: React.FC = () => {
               }}
             >
               {renderPageContent(rightPage)}
+              <PageOverlayLayer page={rightPage} />
             </div>
           </div>
         )}
@@ -1553,6 +1786,16 @@ export const SpreadViewport: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Hidden file input for logo upload on cover pages */}
+      <input
+        ref={logoFileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/svg+xml,image/webp"
+        className="hidden"
+        onChange={handleLogoFileChange}
+        aria-hidden="true"
+      />
     </div>
   );
 };

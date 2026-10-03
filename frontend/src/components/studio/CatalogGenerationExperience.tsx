@@ -13,6 +13,8 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useStudioStore } from '../../store/studioStore';
+import { AgentCursorLayer } from './AgentCursorLayer';
+import { AgentCursor, AGENT_CURSOR_CONFIGS } from '../../types/agentCursor';
 
 interface GenerationStep {
   id: number;
@@ -106,6 +108,147 @@ export const CatalogGenerationExperience: React.FC = () => {
     const secs = totalSec % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}s`;
   };
+
+  const generationCursors: AgentCursor[] = React.useMemo(() => {
+    if (generationStage === 1) {
+      return [
+        {
+          id: 'gen-orchestrator',
+          roleId: 'orchestrator',
+          name: AGENT_CURSOR_CONFIGS.orchestrator.name,
+          roleLabel: AGENT_CURSOR_CONFIGS.orchestrator.roleLabel,
+          initials: AGENT_CURSOR_CONFIGS.orchestrator.initials,
+          color: AGENT_CURSOR_CONFIGS.orchestrator.color,
+          startX: AGENT_CURSOR_CONFIGS.orchestrator.originPosition.x,
+          startY: AGENT_CURSOR_CONFIGS.orchestrator.originPosition.y,
+          x: 24,
+          y: 22,
+          actionText: 'Estruturando ritmo visual e densidade editorial...',
+          isActing: true,
+          timestamp: Date.now(),
+        },
+      ];
+    }
+    if (generationStage === 2) {
+      return [
+        {
+          id: 'gen-director',
+          roleId: 'director',
+          name: AGENT_CURSOR_CONFIGS.director.name,
+          roleLabel: AGENT_CURSOR_CONFIGS.director.roleLabel,
+          initials: AGENT_CURSOR_CONFIGS.director.initials,
+          color: AGENT_CURSOR_CONFIGS.director.color,
+          startX: AGENT_CURSOR_CONFIGS.director.originPosition.x,
+          startY: AGENT_CURSOR_CONFIGS.director.originPosition.y,
+          x: 28,
+          y: 52,
+          actionText: 'Calculando proporção áurea e respiro de 96px...',
+          isActing: true,
+          timestamp: Date.now(),
+        },
+        {
+          id: 'gen-branding',
+          roleId: 'branding',
+          name: AGENT_CURSOR_CONFIGS.branding.name,
+          roleLabel: AGENT_CURSOR_CONFIGS.branding.roleLabel,
+          initials: AGENT_CURSOR_CONFIGS.branding.initials,
+          color: AGENT_CURSOR_CONFIGS.branding.color,
+          startX: AGENT_CURSOR_CONFIGS.branding.originPosition.x,
+          startY: AGENT_CURSOR_CONFIGS.branding.originPosition.y,
+          x: 72,
+          y: 26,
+          actionText: 'Definindo monograma e pares tipográficos...',
+          isActing: true,
+          timestamp: Date.now(),
+        },
+      ];
+    }
+    if (generationStage === 3) {
+      return [
+        {
+          id: 'gen-director',
+          roleId: 'director',
+          name: AGENT_CURSOR_CONFIGS.director.name,
+          roleLabel: AGENT_CURSOR_CONFIGS.director.roleLabel,
+          initials: AGENT_CURSOR_CONFIGS.director.initials,
+          color: AGENT_CURSOR_CONFIGS.director.color,
+          startX: 28,
+          startY: 52,
+          x: 24,
+          y: 65,
+          actionText: 'Sintetizando paleta cromática e contrastes...',
+          isActing: true,
+          timestamp: Date.now(),
+        },
+        {
+          id: 'gen-commercial',
+          roleId: 'commercial',
+          name: AGENT_CURSOR_CONFIGS.commercial.name,
+          roleLabel: AGENT_CURSOR_CONFIGS.commercial.roleLabel,
+          initials: AGENT_CURSOR_CONFIGS.commercial.initials,
+          color: AGENT_CURSOR_CONFIGS.commercial.color,
+          startX: AGENT_CURSOR_CONFIGS.commercial.originPosition.x,
+          startY: AGENT_CURSOR_CONFIGS.commercial.originPosition.y,
+          x: 74,
+          y: 62,
+          actionText: 'Mapeando SKUs e tabela de preços B2B...',
+          isActing: true,
+          timestamp: Date.now(),
+        },
+      ];
+    }
+    if (generationStage === 4) {
+      return [
+        {
+          id: 'gen-copywriter',
+          roleId: 'copywriter',
+          name: AGENT_CURSOR_CONFIGS.copywriter.name,
+          roleLabel: AGENT_CURSOR_CONFIGS.copywriter.roleLabel,
+          initials: AGENT_CURSOR_CONFIGS.copywriter.initials,
+          color: AGENT_CURSOR_CONFIGS.copywriter.color,
+          startX: AGENT_CURSOR_CONFIGS.copywriter.originPosition.x,
+          startY: AGENT_CURSOR_CONFIGS.copywriter.originPosition.y,
+          x: 68,
+          y: 42,
+          actionText: 'Redigindo chamada de capa e manifesto...',
+          isActing: true,
+          timestamp: Date.now(),
+        },
+        {
+          id: 'gen-director',
+          roleId: 'director',
+          name: AGENT_CURSOR_CONFIGS.director.name,
+          roleLabel: AGENT_CURSOR_CONFIGS.director.roleLabel,
+          initials: AGENT_CURSOR_CONFIGS.director.initials,
+          color: AGENT_CURSOR_CONFIGS.director.color,
+          startX: 24,
+          startY: 65,
+          x: 48,
+          y: 30,
+          actionText: 'Equilibrando colunas do grid editorial...',
+          isActing: true,
+          timestamp: Date.now(),
+        },
+      ];
+    }
+    return [
+      {
+        id: 'gen-branding',
+        roleId: 'branding',
+        name: AGENT_CURSOR_CONFIGS.branding.name,
+        roleLabel: AGENT_CURSOR_CONFIGS.branding.roleLabel,
+        initials: AGENT_CURSOR_CONFIGS.branding.initials,
+        color: AGENT_CURSOR_CONFIGS.branding.color,
+        startX: 72,
+        startY: 26,
+        x: 25,
+        y: 48,
+        actionText: 'Homologando conformidade de design system...',
+        isActing: true,
+        timestamp: Date.now(),
+      },
+    ];
+  }, [generationStage]);
 
   return (
     <div className="fixed inset-0 z-50 bg-[#09090b] text-zinc-100 flex flex-col overflow-hidden select-none font-sans">
@@ -223,6 +366,9 @@ export const CatalogGenerationExperience: React.FC = () => {
 
             {/* The Spread Container */}
             <div className="relative w-full h-full flex rounded-xl border border-zinc-800/80 shadow-2xl overflow-hidden bg-[#111115]/90 transition-all duration-700">
+              {/* Camada de Cursores Vivos dos Multi-Agentes trabalhando no mockup */}
+              <AgentCursorLayer cursorsOverride={generationCursors} />
+
               {/* Wireframe Laser Scanline effect when in early stages */}
               {generationProgress < 90 && (
                 <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-zinc-200 to-transparent opacity-60 shadow-[0_0_15px_rgba(255,255,255,0.8)] z-30 animate-pulse pointer-events-none" />

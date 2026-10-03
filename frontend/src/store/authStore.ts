@@ -4,13 +4,22 @@ import { persist } from 'zustand/middleware';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { setInMemoryAccessToken } from '../services/api';
+import { useStudioStore } from './studioStore';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
+const CLERK_PUBLISHABLE_KEY =
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
+  import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+export const isClerkConfigured =
+  Boolean(CLERK_PUBLISHABLE_KEY) &&
+  (CLERK_PUBLISHABLE_KEY.startsWith('pk_test_') || CLERK_PUBLISHABLE_KEY.startsWith('pk_live_')) &&
+  !CLERK_PUBLISHABLE_KEY.includes('placeholder');
+
 // Login automatico (conveniencia de dev - autenticacao nao exigida no momento).
-// Para desligar e voltar a exigir login manual: VITE_AUTO_LOGIN=false no .env do front.
+// Desabilitado automaticamente quando o Clerk estiver configurado.
 export const AUTO_LOGIN_ENABLED =
-  (import.meta.env.VITE_AUTO_LOGIN ?? 'true') !== 'false';
+  !isClerkConfigured && (import.meta.env.VITE_AUTO_LOGIN ?? 'true') !== 'false';
 const DEFAULT_USER = {
   username: import.meta.env.VITE_DEFAULT_USER || 'demo',
   password: import.meta.env.VITE_DEFAULT_PASSWORD || 'demo12345',
@@ -49,6 +58,8 @@ interface AuthStore {
   clearError: () => void;
   register: (user: any) => Promise<void>;
   autoLogin: () => Promise<void>;
+  syncClerkUser: (clerkUser: any, token: string | null) => Promise<void>;
+  setClerkAuthSettled: () => void;
   requestPasswordReset: (email: string) => Promise<{ message: string }>;
   confirmPasswordReset: (payload: { uid: string; token: string; new_password: string }) => Promise<{ message: string }>;
 }
@@ -144,6 +155,12 @@ export const useAuthStore = create<AuthStore>()(
 
           await setupUserOrganizationContext(access);
 
+          const previousUserId = get().user?.id;
+          if (previousUserId && previousUserId !== user.id) {
+            useStudioStore.getState().resetStudioState();
+          }
+          useStudioStore.getState().setActiveUserId(user.id);
+
           set({
             user,
             token: access,
@@ -196,6 +213,12 @@ export const useAuthStore = create<AuthStore>()(
           };
 
           await setupUserOrganizationContext(access);
+
+          const prevUid = get().user?.id;
+          if (prevUid && prevUid !== user.id) {
+            useStudioStore.getState().resetStudioState();
+          }
+          useStudioStore.getState().setActiveUserId(user.id);
 
           set({
             user,
@@ -272,6 +295,9 @@ export const useAuthStore = create<AuthStore>()(
             token: access,
             isAuthenticated: true,
           });
+          if (user?.id) {
+            useStudioStore.getState().setActiveUserId(user.id);
+          }
           return true;
         } catch {
           setInMemoryAccessToken(null);
@@ -287,12 +313,23 @@ export const useAuthStore = create<AuthStore>()(
 
       logout: async (promptRelogin = false) => {
         try {
+          // Apenas dispara signOut no Clerk em logout explicito acionado pelo usuario,
+          // evitando redirecionamentos e loops em caso de expiracao silenciosa
+          if (!promptRelogin && typeof window !== 'undefined' && (window as any).Clerk?.signOut) {
+            try {
+              await (window as any).Clerk.signOut();
+            } catch {
+              // Silencioso
+            }
+          }
           const storedRefresh = localStorage.getItem('refresh_token');
-          await axios.post(
-            `${API_BASE_URL}/api/auth/logout/`,
-            { refresh: storedRefresh || undefined },
-            { withCredentials: true }
-          );
+          if (storedRefresh) {
+            await axios.post(
+              `${API_BASE_URL}/api/auth/logout/`,
+              { refresh: storedRefresh },
+              { withCredentials: true }
+            ).catch(() => {});
+          }
         } catch (e) {
           logger.debug('Logout endpoint falhou silenciosamente:', e);
         } finally {
@@ -301,6 +338,8 @@ export const useAuthStore = create<AuthStore>()(
           localStorage.removeItem('refresh_token');
           localStorage.removeItem('active_organization');
           localStorage.removeItem('active_sede');
+          // Reseta completamente o estado do Studio na memória e remove chaves não-isoladas
+          useStudioStore.getState().resetStudioState();
           set({
             user: null,
             token: null,
@@ -317,7 +356,84 @@ export const useAuthStore = create<AuthStore>()(
         }
       },
 
+      syncClerkUser: async (clerkUser: any, token: string | null) => {
+        if (token) {
+          setInMemoryAccessToken(token);
+          localStorage.setItem('access_token', token);
+        }
+        const user: User = {
+          id: typeof clerkUser.id === 'number' ? clerkUser.id : 1,
+          name: clerkUser.fullName || clerkUser.firstName || 'Usuario',
+          email: clerkUser.primaryEmailAddress?.emailAddress || '',
+          avatar: clerkUser.imageUrl,
+          username: clerkUser.username || (clerkUser.primaryEmailAddress?.emailAddress || '').split('@')[0],
+          role: 'editor',
+        };
+        if (token) {
+          setupUserOrganizationContext(token).catch(() => {});
+        }
+        const prevUid = get().user?.id;
+        if (prevUid && prevUid !== user.id) {
+          useStudioStore.getState().resetStudioState();
+        }
+        useStudioStore.getState().setActiveUserId(user.id);
+        set({
+          user,
+          token: token || null,
+          isAuthenticated: true,
+          isLoading: false,
+          isAuthModalOpen: false,
+        });
+        autoLoginDone = true;
+      },
+
+      setClerkAuthSettled: () => {
+        autoLoginDone = true;
+      },
+
       checkAuth: async () => {
+        if (typeof window !== 'undefined' && (window as any).Clerk?.user) {
+          try {
+            const clerkUser = (window as any).Clerk.user;
+            const clerkToken = await (window as any).Clerk.session?.getToken();
+            if (clerkToken) {
+              setInMemoryAccessToken(clerkToken);
+              localStorage.setItem('access_token', clerkToken);
+            }
+            const user: User = {
+              id: typeof clerkUser.id === 'number' ? clerkUser.id : 1,
+              name: clerkUser.fullName || clerkUser.firstName || 'Usuario',
+              email: clerkUser.primaryEmailAddress?.emailAddress || '',
+              avatar: clerkUser.imageUrl,
+              username: clerkUser.username || (clerkUser.primaryEmailAddress?.emailAddress || '').split('@')[0],
+              role: 'editor',
+            };
+            if (clerkToken) {
+              await setupUserOrganizationContext(clerkToken);
+            }
+            const prevUid = get().user?.id;
+            if (prevUid && prevUid !== user.id) {
+              useStudioStore.getState().resetStudioState();
+            }
+            useStudioStore.getState().setActiveUserId(user.id);
+            set({
+              user,
+              token: clerkToken || null,
+              isAuthenticated: true,
+              isLoading: false,
+            });
+            autoLoginDone = true;
+            return;
+          } catch {
+            // Continua para o fallback padrao
+          }
+        }
+
+        // Se o Clerk estiver ativo e ainda carregando no browser, evita limpar tokens prematuramente
+        if (isClerkConfigured) {
+          return;
+        }
+
         const storedToken = localStorage.getItem('access_token');
         if (storedToken) {
           setInMemoryAccessToken(storedToken);
@@ -393,6 +509,12 @@ export const useAuthStore = create<AuthStore>()(
             role: userData.role || 'viewer',
           };
 
+          const prevUid = get().user?.id;
+          if (prevUid && prevUid !== user.id) {
+            useStudioStore.getState().resetStudioState();
+          }
+          useStudioStore.getState().setActiveUserId(user.id);
+
           set({
             user,
             token: access,
@@ -467,6 +589,10 @@ export const useAuthStore = create<AuthStore>()(
 // Listener global para tratar expiracao de sessao (HTTP 401) e perda de conexao
 if (typeof window !== 'undefined') {
   window.addEventListener('catana:unauthorized', () => {
+    // Se o usuario estiver com sessao ativa no Clerk, ignora para evitar falsos positivos
+    if ((window as any).Clerk?.session) {
+      return;
+    }
     useAuthStore.getState().logout(true);
   });
 

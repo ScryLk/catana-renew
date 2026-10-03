@@ -44,6 +44,7 @@ class SedeSharing(models.Model):
         unique_together = ('source_sede', 'target_sede', 'resource_type')
 
 class User(AbstractUser):
+    clerk_user_id = models.CharField(max_length=128, unique=True, null=True, blank=True, db_index=True)
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
     position = models.CharField(max_length=100, blank=True, null=True)
     role = models.CharField(max_length=20, choices=[('admin', 'Admin'), ('editor', 'Editor'), ('viewer', 'Viewer')])
@@ -584,6 +585,10 @@ class OrganizationSubscription(models.Model):
     billing_interval = models.CharField(max_length=20, choices=INTERVAL_CHOICES, default='monthly')
     payment_method_type = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='none')
     payment_method_details = models.JSONField(default=dict, blank=True)
+    abacatepay_customer_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    abacatepay_billing_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    abacatepay_subscription_id = models.CharField(max_length=100, blank=True, null=True)
+    last_webhook_event_id = models.CharField(max_length=150, blank=True, null=True)
     current_period_start = models.DateTimeField(auto_now_add=True)
     current_period_end = models.DateTimeField(null=True, blank=True)
     cancel_at_period_end = models.BooleanField(default=False)
@@ -616,6 +621,9 @@ class BillingInvoice(models.Model):
     payment_method_type = models.CharField(max_length=20, default='credit_card')
     payment_method_summary = models.CharField(max_length=100, blank=True, default='')
     receipt_code = models.CharField(max_length=64, unique=True)
+    gateway_provider = models.CharField(max_length=30, default='abacatepay')
+    external_transaction_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    invoice_url = models.URLField(max_length=500, blank=True, null=True)
     paid_at = models.DateTimeField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -672,6 +680,10 @@ class StudioCatalog(models.Model):
     font_family = models.CharField(max_length=100, default='Inter')
     page_width = models.PositiveIntegerField(default=794)
     page_height = models.PositiveIntegerField(default=1123)
+    total_pages = models.PositiveIntegerField(default=6)
+    brand_lock = models.BooleanField(default=False)
+    palette_data = models.JSONField(default=dict, blank=True)
+    unassigned_products = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

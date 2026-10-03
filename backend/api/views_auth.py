@@ -6,6 +6,7 @@ from django.core.mail import send_mail
 from django.db import transaction
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -15,6 +16,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 
 from .models import Organization, Sede, SubscriptionPlan, OrganizationQuota
+from .throttling import LoginRateThrottle, PasswordResetRateThrottle
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -74,6 +76,7 @@ class CatanaTokenObtainPairView(APIView):
     Retorna o access_token no corpo JSON e define o refresh_token em cookie HttpOnly.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         identifier = request.data.get('username') or request.data.get('email')
@@ -215,6 +218,7 @@ class GoogleAuthView(APIView):
     autentica ou cadastra o usuario, emitindo sessao com cookie HttpOnly.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         credential = request.data.get('credential')
@@ -229,8 +233,13 @@ class GoogleAuthView(APIView):
         last_name = ''
         picture = ''
 
-        # Suporte a mock em ambiente de desenvolvimento/teste local
-        is_mock_token = credential.startswith('mock-google-') or credential == 'test-mock-token'
+        # Suporte a mock estritamente restrito a ambiente de desenvolvimento/teste com flag explicita
+        allow_mock = (
+            getattr(settings, 'DEBUG', False) is True
+            and getattr(settings, 'ENVIRONMENT', 'development') != 'production'
+            and getattr(settings, 'ALLOW_MOCK_OAUTH', False) is True
+        )
+        is_mock_token = allow_mock and (credential.startswith('mock-google-') or credential == 'test-mock-token')
         if is_mock_token:
             email = request.data.get('email') or 'google.user@example.com'
             first_name = request.data.get('given_name') or 'Google'
@@ -351,6 +360,7 @@ class PasswordResetRequestView(APIView):
     Retorna sempre HTTP 200 para evitar enumeracao de usuarios.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [PasswordResetRateThrottle]
 
     def post(self, request):
         email = request.data.get('email', '').strip()
@@ -369,7 +379,7 @@ class PasswordResetRequestView(APIView):
             frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5174').rstrip('/')
             reset_url = f"{frontend_url}/reset-password?uid={uidb64}&token={token}"
 
-            logger.info("Solicitacao de redefinicao de senha para %s: %s", user.email, reset_url)
+            logger.info("Solicitacao de redefinicao de senha processada para usuario_id=%s", user.id)
 
             subject = "Recuperacao de Senha - Catana"
             user_name = user.first_name or user.username
@@ -406,6 +416,7 @@ class PasswordResetConfirmView(APIView):
     Invalida sessoes ativas anteriores garantindo seguranca pos-redefinicao.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [PasswordResetRateThrottle]
 
     def post(self, request):
         uidb64 = request.data.get('uid')
@@ -415,12 +426,6 @@ class PasswordResetConfirmView(APIView):
         if not uidb64 or not token or not new_password:
             return Response(
                 {'error': 'Dados incompletos para redefinicao de senha.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if len(new_password) < 6:
-            return Response(
-                {'error': 'A nova senha deve ter no minimo 6 caracteres.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -435,6 +440,11 @@ class PasswordResetConfirmView(APIView):
                 {'error': 'Link de recuperacao invalido ou expirado.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        try:
+            validate_password(new_password, user=user)
+        except Exception as err:
+            return Response({'error': list(err.messages)}, status=status.HTTP_400_BAD_REQUEST)
 
         user.set_password(new_password)
         user.save()
