@@ -131,6 +131,7 @@ class IngestCatalogIOTests(APITestCase):
         self.importar = importar_catalogo_json
         self.user = User.objects.create_user(username='ig', email='i@i.com',
                                               password='x', role='admin')
+        self.client.force_authenticate(user=self.user)
 
     def test_materializa_geometria_e_content(self):
         cat, n_pag, n_el = self.importar(self._json(), user=self.user)
@@ -247,3 +248,13 @@ class BulkImportTests(APITestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data['failed'], 1)
         self.assertTrue(resp.data['errors'])
+
+
+class HealthCheckEndpointTests(APITestCase):
+    """Testes dos endpoints de healthcheck para orquestradores de producao."""
+
+    def test_health_check_endpoints_return_200(self):
+        for path in ['/health/', '/api/health/']:
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json(), {'status': 'ok', 'database': 'connected'})

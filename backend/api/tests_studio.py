@@ -341,7 +341,7 @@ class StudioBackendTests(TestCase):
             catalog_context={"brand_name": "Luxe Joias", "style_preset": "noir_or"}
         )
 
-        self.assertIn("[REFERENCIA EDITORIAL DE TEMPLATE (RAG)]", prompt)
+        self.assertIn("[CONHECIMENTO EDITORIAL E REFERENCIA (RAG - NON-BINDING)]", prompt)
         self.assertIn("Blueprint Estrutural de Referencia", prompt)
 
     def test_template_list_api_endpoint(self):

@@ -17,9 +17,11 @@ export const isClerkConfigured =
   !CLERK_PUBLISHABLE_KEY.includes('placeholder');
 
 // Login automatico (conveniencia de dev - autenticacao nao exigida no momento).
-// Desabilitado automaticamente quando o Clerk estiver configurado.
+// Desabilitado automaticamente em producao ou quando o Clerk estiver configurado.
 export const AUTO_LOGIN_ENABLED =
-  !isClerkConfigured && (import.meta.env.VITE_AUTO_LOGIN ?? 'true') !== 'false';
+  !import.meta.env.PROD &&
+  !isClerkConfigured &&
+  (import.meta.env.VITE_AUTO_LOGIN ?? 'true') !== 'false';
 const DEFAULT_USER = {
   username: import.meta.env.VITE_DEFAULT_USER || 'demo',
   password: import.meta.env.VITE_DEFAULT_PASSWORD || 'demo12345',

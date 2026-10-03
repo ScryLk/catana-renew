@@ -191,11 +191,14 @@ AUTH_USER_MODEL = 'api.User'
 # SEG-05: hardening de producao. So vale quando DEBUG=False; em dev nada muda.
 if not DEBUG:
     SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)
-    SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=0)
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
-    SECURE_HSTS_PRELOAD = False
-    SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=False)
-    CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=False)
+    SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=31536000)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=True)
+    CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=True)
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SAMESITE = 'Lax'
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_BROWSER_XSS_FILTER = True
@@ -255,7 +258,7 @@ GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID', default='')
 GOOGLE_CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET', default='')
 
 # Password Reset & Email Configuration
-FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5174')
+FRONTEND_URL = env('FRONTEND_URL', default=('http://localhost:5173' if DEBUG else 'https://usecatana.com.br'))
 EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Catana <noreply@catana.dev>')
 
