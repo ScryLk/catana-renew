@@ -8,7 +8,6 @@ o arranjo vencedor, mantendo métodos de composição como safe recipes.
 from typing import Dict, Any, List, Optional
 import random
 import logging
-import dataclasses
 from .requirement_contract import RequirementContract
 from .visual_dna import VisualDNA
 from .creative_director import CreativeDirection
@@ -38,6 +37,7 @@ class CompositionPlanner:
         page_dict: Dict[str, Any],
         palette: Dict[str, str],
         creative_seed: int = 42,
+        previous_pages: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
         Gera a composição completa explorando múltiplos candidatos espaciais e elegendo a melhor prancheta.
@@ -55,114 +55,26 @@ class CompositionPlanner:
 
         balance = "axial" if visual_dna.symmetry > 0.65 else "asymmetric"
         grid_cols = 12 if visual_dna.grid_rigidity > 0.6 else 8
-        base_meta = GenerativeCompositionMeta(
-            grid=GenerativeGridSpec(columns=grid_cols, rows=16, gutter=0.02),
-            balance=balance,
-            axis=narrative.layout_axis,
-            whitespaceRatio=narrative.whitespace_target,
-            visualTension=visual_dna.axis_tension,
-            dominantPrimitive=narrative.dominant_primitive,
-        )
-
-        # ---------------- GERAÇÃO COMBINATÓRIA DE 3 CANDIDATOS ESPACIAIS ----------------
-        candidates: List[Dict[str, Any]] = []
-
-        # Candidato 1: Arranjo primário governado pelo eixo narrativo
-        cand1_blocks: List[GenerativeBlock] = []
+        base_blocks: List[GenerativeBlock] = []
         cls._dispatch_composition(
-            role=role,
-            page_num=page_num,
-            blocks=cand1_blocks,
-            title=title,
-            subtitle=subtitle,
-            content=content,
-            quote=quote,
-            folio=folio_str,
-            visual_dna=visual_dna,
-            direction=direction,
-            font_p=font_p,
-            palette=palette,
-            rng=random.Random(creative_seed + page_num * 101),
-            has_images=has_images,
-            page_dict=page_dict,
-            is_one_pager=(role == "one_pager"),
-            prods=prods,
+            role=role, page_num=page_num, blocks=base_blocks, title=title, subtitle=subtitle,
+            content=content, quote=quote, folio=folio_str, visual_dna=visual_dna,
+            direction=direction, font_p=font_p, palette=palette,
+            rng=random.Random(creative_seed + page_num * 101), has_images=has_images,
+            page_dict=page_dict, is_one_pager=(role == "one_pager"), prods=prods,
             axis_override=narrative.layout_axis,
         )
-        candidates.append({"blocks": cand1_blocks, "axis": narrative.layout_axis, "meta": base_meta})
-
-        # Candidato 2: Variação de polaridade de eixo (inversão espacial)
-        cand2_blocks: List[GenerativeBlock] = []
-        alt_axis = "asymmetric_right" if "left" in narrative.layout_axis else "asymmetric_left"
-        cand2_dna = dataclasses.replace(
-            visual_dna,
-            symmetry=max(0.25, visual_dna.symmetry - 0.10),
-            whitespace=min(0.60, visual_dna.whitespace + 0.05),
-        )
-        cls._dispatch_composition(
-            role=role,
-            page_num=page_num,
-            blocks=cand2_blocks,
-            title=title,
-            subtitle=subtitle,
-            content=content,
-            quote=quote,
-            folio=folio_str,
-            visual_dna=cand2_dna,
-            direction=direction,
-            font_p=font_p,
-            palette=palette,
-            rng=random.Random(creative_seed + page_num * 202),
-            has_images=has_images,
-            page_dict=page_dict,
-            is_one_pager=(role == "one_pager"),
-            prods=prods,
-            axis_override=alt_axis,
-        )
-        candidates.append({"blocks": cand2_blocks, "axis": alt_axis, "meta": base_meta})
-
-        # Candidato 3: Tensão diagonal dinâmica e escala tipográfica acentuada
-        cand3_blocks: List[GenerativeBlock] = []
-        cls._dispatch_composition(
-            role=role,
-            page_num=page_num,
-            blocks=cand3_blocks,
-            title=title,
-            subtitle=subtitle,
-            content=content,
-            quote=quote,
-            folio=folio_str,
-            visual_dna=visual_dna,
-            direction=direction,
-            font_p=font_p,
-            palette=palette,
-            rng=random.Random(creative_seed + page_num * 303),
-            has_images=has_images,
-            page_dict=page_dict,
-            is_one_pager=(role == "one_pager"),
-            prods=prods,
-            axis_override="diagonal_dynamic",
-        )
-        candidates.append({"blocks": cand3_blocks, "axis": "diagonal_dynamic", "meta": base_meta})
-
-        # Avaliação de Fitness e Eleição do Vencedor
-        best_candidate = candidates[0]
-        best_score = -1.0
-
-        for cand in candidates:
-            cand_dict_blocks = [b.to_dict() for b in cand["blocks"]]
-            score = CompositionCandidateGenerator.evaluate_candidate_fitness(
-                blocks=cand_dict_blocks,
-                role=role,
-                visual_dna=visual_dna,
-                safe_area=cls.SAFE_AREA,
-            )
-            if score > best_score:
-                best_score = score
-                best_candidate = cand
-
-        winner_blocks = best_candidate["blocks"]
-        winner_axis = best_candidate["axis"]
+        for block in base_blocks:
+            fit_block_to_safe_area(block.__dict__, cls.SAFE_AREA)
+            if block.productId is not None and block.type == 'text':
+                block.role = 'product_description' if block.role == 'body' else 'product_name'
+        candidates = CompositionCandidateGenerator.generate_candidates(
+            [b.to_dict() for b in base_blocks], role, visual_dna, contract, page_dict, creative_seed, previous_pages)
+        if not candidates:
+            raise ValueError('NO_VALID_COMPOSITION_CANDIDATE')
+        winner = max(candidates, key=lambda c: c['score'])
+        winner_blocks = [GenerativeBlock(**b) for b in winner['blocks']]
+        winner_axis = winner['axis']
 
         # Adiciona o fólio editorial discreto se ainda não existir
         if not any(b.role == "folio" for b in winner_blocks):
@@ -179,7 +91,7 @@ class CompositionPlanner:
                     fontRole="metadata",
                     fontFamily=font_p.get("metadata", "monospace"),
                     fontSize=9,
-                    colorToken="muted",
+                    colorToken="primary",
                     alignment="right" if folio_x > 0.5 else "left",
                     content=folio_str,
                     zIndex=10,
@@ -200,7 +112,10 @@ class CompositionPlanner:
         )
 
         return {
-            "composition": final_meta.to_dict(),
+            "composition": {**final_meta.to_dict(), "candidateCount": len(candidates),
+                "candidateSelected": winner['candidateId'], "candidateStrategy": winner['strategy'],
+                "candidateScore": winner['score'], "candidateScoreBreakdown": winner['scoreBreakdown'],
+                "candidates": [{k: v for k, v in c.items() if k != 'blocks'} for c in candidates]},
             "safeArea": cls.SAFE_AREA,
             "blocks": [b.to_dict() for b in winner_blocks],
         }
@@ -578,15 +493,14 @@ class CompositionPlanner:
         text_w = 0.38 if has_photo else 0.86
 
         # Categoria e SKU (se SKU não fornecido, não inventa)
-        sku_val = prod.get("sku")
         cat_val = prod.get("category", "PEÇA ÚNICA")
-        meta_content = f"{cat_val} · {sku_val}" if sku_val else str(cat_val)
+        meta_content = str(cat_val or "")
 
         blocks.append(
             GenerativeBlock(
                 id=f"prod-{prod.get('id', '1')}-meta",
                 type="metadata",
-                role="sku",
+                role="category",
                 x=round(text_x, 3),
                 y=0.18,
                 width=round(text_w, 3),
@@ -690,8 +604,8 @@ class CompositionPlanner:
         axis_override: Optional[str] = None,
     ):
         """Compõe 2 produtos com descolamento óptico dinâmico."""
-        p1 = prods[0] if len(prods) > 0 else {"id": "1", "name": f"{title} · Look I", "price": None, "sku": None}
-        p2 = prods[1] if len(prods) > 1 else {"id": "2", "name": f"{title} · Look II", "price": None, "sku": None}
+        p1 = prods[0] if len(prods) > 0 else {}
+        p2 = prods[1] if len(prods) > 1 else {}
 
         y1 = 0.12
         x1 = 0.06

@@ -1,3 +1,4 @@
+import { SafeImage } from './SafeImage';
 import React from 'react';
 import { CatalogPageData, StudioPalette } from '../../data/editorialCatalog.mock';
 import { PageOverlayLayer } from './PageOverlayLayer';
@@ -32,7 +33,7 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
                 style={{ borderColor: `${accent}66` }}
               >
                 {page.editorialImage ? (
-                  <img
+                  <SafeImage
                     src={page.editorialImage}
                     alt={page.title || 'Capa'}
                     className="w-full h-full object-contain"
@@ -118,7 +119,7 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
         return (
           <div className="h-full relative overflow-hidden flex flex-col justify-center items-center text-center p-8 select-none">
             {page.editorialImage && (
-              <img
+              <SafeImage
                 src={page.editorialImage}
                 alt={page.title || 'Divisoria de Categoria'}
                 className="absolute inset-0 w-full h-full object-cover object-center"
@@ -200,9 +201,9 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
         return (
           <div className="h-full flex flex-col justify-between py-9 px-9 select-none">
             <div className="w-full h-[360px] bg-stone-100 overflow-hidden relative rounded-sm">
-              <img
+              <SafeImage
                 src={prod.image || ''}
-                alt={prod.name}
+                alt={prod.name || ''}
                 className="w-full h-full object-cover object-center"
               />
               {prod.tag && (
@@ -260,9 +261,9 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
             return (
               <div className={`flex flex-col gap-2.5 transition-transform ${offsetClass}`}>
                 <div className="w-full h-44 bg-stone-100 overflow-hidden rounded-sm">
-                  <img
+                  <SafeImage
                     src={prod.image || ''}
-                    alt={prod.name}
+                    alt={prod.name || ''}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -384,9 +385,9 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
           <div className="h-full flex flex-col justify-between py-10 px-10 select-none">
             <div className="flex flex-col items-center text-center mt-4">
               <div className="w-64 h-72 bg-stone-100 overflow-hidden rounded-sm mb-6">
-                <img
+                <SafeImage
                   src={prod.image || ''}
-                  alt={prod.name}
+                  alt={prod.name || ''}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -444,9 +445,9 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
                   return (
                     <div key={prod.id || slotIdx} className="flex flex-col justify-between p-2.5 rounded-sm border border-stone-200 bg-white/40">
                       <div className="w-full h-28 bg-stone-100 overflow-hidden rounded-xs relative mb-2">
-                        <img
+                        <SafeImage
                           src={prod.image || ''}
-                          alt={prod.name}
+                          alt={prod.name || ''}
                           className="w-full h-full object-cover"
                         />
                         {prod.tag && (
@@ -559,7 +560,7 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
     }
   };
 
-  const isGenerative = page.renderMode === 'generative' && page.blocks && page.blocks.length > 0;
+  const isGenerative = page.renderMode === 'generative';
 
   const pageInner = (
     <div

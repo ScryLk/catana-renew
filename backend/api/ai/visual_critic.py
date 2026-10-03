@@ -48,6 +48,8 @@ class VisualCriticReport:
     cliches_detected: List[str] = field(default_factory=list)
     recommendations: List[str] = field(default_factory=list)
     passed: bool = True
+    contrast_ratio: float = 0.0
+    diagnostics: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -174,48 +176,23 @@ class VisualCritic:
         else:
             hierarchy_metric = 0.75
 
-        # 5.2 Legibility: ausência de colisões e proporções físicas adequadas
-        legibility_penalties = 0.0
-        for p in pages:
-            for b in p.get("blocks", []):
-                bw = float(b.get("width", 0.5))
-                bh = float(b.get("height", 0.2))
-                if bw < 0.08 and b.get("type") in ["text", "price"]:
-                    legibility_penalties += 0.05
-                if bh < 0.02 and b.get("type") in ["text", "price"]:
-                    legibility_penalties += 0.05
-        legibility_metric = round(max(0.40, min(1.0, 1.0 - legibility_penalties)), 2)
-
-        # 5.3 Rhythm: alternância de eixos e variedade de densidade entre pranchetas
-        axes = [p.get("composition", {}).get("axis", "diagonal") for p in pages if p.get("composition")]
-        axis_variety = len(set(axes)) / (len(axes) or 1)
-        rhythm_metric = round(max(0.40, min(1.0, 0.50 + (axis_variety * 0.45))), 2)
-
-        # 5.4 Balance: desvio médio de centro de massa visual das pranchetas
-        fingerprints = novelty_eval.get("fingerprints", [])
-        if fingerprints:
-            sym_scores = [fp.get("symmetry", 0.5) for fp in fingerprints]
-            balance_metric = round(sum(sym_scores) / len(sym_scores), 2)
-        else:
-            balance_metric = 0.75
-
-        # 5.5 Contrast: contraste cromático relativo entre fundo e texto da paleta
-        palette = document.get("palette", {})
-        bg_hex = palette.get("background", "#F6F5F2")
-        text_hex = palette.get("primary", "#141416")
-        contrast_metric = cls._calculate_color_contrast(bg_hex, text_hex)
-
-        # 5.6 Brand Fit: distância entre o VisualDNA solicitado e a composição final
-        if visual_dna and fingerprints:
-            actual_avg_sym = sum(fp.get("symmetry", 0.5) for fp in fingerprints) / len(fingerprints)
-            dna_target_sym = visual_dna.symmetry
-            sym_delta = abs(actual_avg_sym - dna_target_sym)
-            brand_fit_metric = round(max(0.50, min(1.0, 1.0 - sym_delta)), 2)
-        else:
-            brand_fit_metric = 0.85
+        # Programmatic metrics from the actual page blocks, including WCAG text contrast.
+        page_metrics = [cls.measure_page(page, visual_dna) for page in pages]
+        legibility_metric = round(sum(m['legibility'] for m in page_metrics) / len(pages), 3)
+        balance_metric = round(sum(m['balance'] for m in page_metrics) / len(pages), 3)
+        brand_fit_metric = round(sum(m['brandFit'] for m in page_metrics) / len(pages), 3)
+        axes = [p.get('composition', {}).get('axis', 'orthogonal') for p in pages]
+        rhythm_metric = round(.5 + .45 * len(set(axes)) / len(axes), 3)
+        contrast_ratio = min(m['contrastRatio'] for m in page_metrics)
+        contrast_metric = round(min(1.0, contrast_ratio / 7), 3)
+        if contrast_ratio < 4.5:
+            cliches.append('INSUFFICIENT_TEXT_CONTRAST')
+            recommendations.append('Increase text/background WCAG contrast to at least 4.5:1.')
+        if legibility_metric < .5:
+            cliches.append('INSUFFICIENT_LEGIBILITY')
 
         final_risk = round(min(1.0, generic_risk_score), 3)
-        passed = final_risk < cls.GENERIC_RISK_THRESHOLD
+        passed = final_risk < cls.GENERIC_RISK_THRESHOLD and contrast_ratio >= 4.5 and legibility_metric >= .5
 
         logger.info(
             f"[VisualCritic] Auditoria concluída: generic_risk={final_risk:.2f}, "
@@ -223,6 +200,8 @@ class VisualCritic:
         )
 
         return VisualCriticReport(
+            contrast_ratio=round(contrast_ratio, 3),
+            diagnostics={"pages": page_metrics},
             hierarchy=hierarchy_metric,
             legibility=legibility_metric,
             rhythm=rhythm_metric,
@@ -236,25 +215,67 @@ class VisualCritic:
             passed=passed,
         )
 
-    @classmethod
-    def _calculate_color_contrast(cls, hex1: str, hex2: str) -> float:
-        """Calcula o contraste de luminância aproximado entre duas cores hexadecimais."""
-        def hex_to_lum(h: str) -> float:
-            h = h.lstrip("#")
-            if len(h) != 6:
-                return 0.5
-            try:
-                r = int(h[0:2], 16) / 255.0
-                g = int(h[2:4], 16) / 255.0
-                b = int(h[4:6], 16) / 255.0
-                return 0.2126 * r + 0.7152 * g + 0.0722 * b
-            except Exception:
-                return 0.5
+    @staticmethod
+    def _calculate_color_contrast(hex1, hex2):
+        """WCAG relative luminance with sRGB linearization; return the actual ratio."""
+        def luminance(value):
+            if not isinstance(value, str):
+                raise ValueError('INVALID_COLOR')
+            value = value.lstrip('#')
+            if len(value) == 3:
+                value = ''.join(c * 2 for c in value)
+            if len(value) != 6:
+                raise ValueError('INVALID_COLOR')
+            channels = [int(value[i:i+2], 16) / 255 for i in (0,2,4)]
+            linear = [c / 12.92 if c <= .04045 else ((c+.055)/1.055)**2.4 for c in channels]
+            return sum(c*w for c,w in zip(linear, [.2126,.7152,.0722]))
+        try:
+            a,b = luminance(hex1), luminance(hex2)
+            return (max(a,b)+.05)/(min(a,b)+.05)
+        except (ValueError, TypeError):
+            return 1.0
 
-        lum1 = hex_to_lum(hex1)
-        lum2 = hex_to_lum(hex2)
-        l_high = max(lum1, lum2)
-        l_low = min(lum1, lum2)
-        ratio = (l_high + 0.05) / (l_low + 0.05)
-        # Ratio normalizado: 4.5 (AA) -> ~0.80, 7.0 (AAA) -> ~0.95
-        return round(min(1.0, max(0.40, ratio / 7.5)), 2)
+    @classmethod
+    def measure_page(cls, page, dna=None):
+        blocks = page.get('blocks', [])
+        background = page.get('backgroundColor', '#FFFFFF')
+        text = page.get('textColor', '#141416')
+        ratios = [cls._calculate_color_contrast(background, text)]
+        text_blocks = [b for b in blocks if b.get('content') is not None and b['type'] not in ['image', 'product_image', 'line', 'shape', 'color_field']]
+        penalties = []
+        for b in text_blocks:
+            color = b.get('colorToken', 'primary')
+            foreground = color if color.startswith('#') else {'primary':text, 'muted':'#71717A', 'accent':page.get('accentColor', text), 'background':background}.get(color,text)
+            ratio = cls._calculate_color_contrast(background, foreground)
+            ratios.append(ratio)
+            size = b.get('fontSize',12)
+            capacity = max(1, (b['width']*794/(size*.55)) * (b['height']*1123/(size*b.get('lineHeight',1.3))))
+            density = len(str(b.get('content',''))) / capacity
+            penalties.append(min(1, max(0,density-1)*.5 + (.3 if size < 9 else 0) + (.5 if ratio < 4.5 else 0)))
+        collisions = 0
+        for i,a in enumerate(text_blocks):
+            for b in text_blocks[i+1:]:
+                if a.get('allowOverlap') or b.get('allowOverlap'):
+                    continue
+                if min(a['x']+a['width'],b['x']+b['width']) > max(a['x'],b['x']) and min(a['y']+a['height'],b['y']+b['height']) > max(a['y'],b['y']):
+                    collisions += 1
+        weights = []
+        for b in blocks:
+            importance = 2.5 if 'image' in b['type'] else 2 if b.get('role') in ['headline','product_name'] else 1
+            weights.append(b['width']*b['height']*importance*(1+.02*max(0,b.get('zIndex',1))))
+        total = sum(weights) or 1
+        cx = sum((b['x']+b['width']/2)*w for b,w in zip(blocks,weights))/total if weights else .5
+        cy = sum((b['y']+b['height']/2)*w for b,w in zip(blocks,weights))/total if weights else .5
+        area = min(1, sum(b['width']*b['height'] for b in blocks))
+        image_area = sum(b['width']*b['height'] for b in blocks if 'image' in b['type'])
+        center = sum(b.get('alignment')=='center' for b in blocks)/(len(blocks) or 1)
+        sizes = [b.get('fontSize',12) for b in text_blocks]
+        actual = {'symmetry':center, 'density':area, 'whitespace':1-area,
+                  'image_dominance':min(1,image_area), 'grid_rigidity':1-len({b['x'] for b in blocks})/(len(blocks) or 1),
+                  'typographic_drama':min(1, (max(sizes)/min(sizes)-1)/4) if sizes else 0,
+                  'axis_tension':min(1,sum(abs(b.get('rotation',0)) for b in blocks)/(max(1,len(blocks))*45))}
+        fit = 1-sum(abs(v-getattr(dna,k,v)) for k,v in actual.items())/len(actual) if dna else 1
+        return {'pageNumber':page.get('pageNumber'), 'contrastRatio':min(ratios),
+                'legibility':max(0,1-(sum(penalties)+collisions*.3)/(len(text_blocks) or 1)),
+                'balance':max(0,1-math.hypot(cx-.5,cy-.5)), 'centerOfMass':[round(cx,3),round(cy,3)],
+                'brandFit':fit, 'dnaDimensions':actual}

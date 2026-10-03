@@ -273,8 +273,8 @@ class GenerativeHardeningTests(TestCase):
         fallback_page = RepairEngine._fallback_to_safe_editorial(page_dict, reason="UNRESOLVED_CRITICAL_COLLISION")
         self.assertEqual(fallback_page["renderMode"], "legacy")
         self.assertIn("generativeDraft", fallback_page)
-        self.assertEqual(len(fallback_page["generativeDraft"]), 1)
-        self.assertEqual(fallback_page["generativeDraft"][0]["id"], "draft-block")
+        self.assertEqual(len(fallback_page["generativeDraft"]["blocks"]), 1)
+        self.assertEqual(fallback_page["generativeDraft"]["blocks"][0]["id"], "draft-block")
         self.assertEqual(len(fallback_page["blocks"]), 0)
 
     # 8. GRAMÁTICA DE RUNTIME (REJEIÇÃO DE NAN, INF, XSS E CHAVES PERIGOSAS)

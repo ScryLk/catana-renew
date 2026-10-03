@@ -1,5 +1,6 @@
 import uuid
 import unittest
+from unittest.mock import patch, Mock
 from datetime import timedelta
 from decimal import Decimal
 from django.utils import timezone
@@ -77,12 +78,16 @@ class AbacatePayBillingTests(TestCase):
         """
         Valida se com chave configurada o servico gera checkout real da AbacatePay v2.
         """
-        res = abacatepay_client.create_billing_checkout(
-            user=self.user,
-            org=self.org,
-            plan=self.pro_plan,
-            interval="monthly",
-        )
+        response = Mock()
+        response.json.return_value = {"data": {"id": "checkout-fixture", "url": "https://pay.abacatepay.com/checkout-fixture"}}
+        with patch.object(abacatepay_client, 'is_sandbox', False), \
+             patch.object(abacatepay_client, 'get_or_create_product', return_value='product-fixture'), \
+             patch('api.services.abacatepay_service.requests.post', return_value=response) as post:
+            res = abacatepay_client.create_billing_checkout(
+                user=self.user, org=self.org, plan=self.pro_plan, interval="monthly")
+            post.assert_called_once()
+            self.assertEqual(post.call_args.kwargs['json']['items'], [{'id':'product-fixture', 'quantity':1}])
+            self.assertEqual(post.call_args.kwargs['timeout'], 12)
         self.assertIn("id", res)
         self.assertIn("checkout_url", res)
         self.assertIn("abacatepay.com", res.get("checkout_url"))

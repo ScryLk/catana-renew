@@ -17,7 +17,7 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
   showBadge = true,
 }) => {
   const isDarkBg = page.backgroundColor === '#1A1817';
-  const isGenerative = page.renderMode === 'generative' && page.blocks && page.blocks.length > 0;
+  const isGenerative = page.renderMode === 'generative';
 
   const renderThumbnailContent = () => {
     // 1. RENDERIZAÇÃO EXCLUSIVA GENERATIVA (Item 26: Nunca renderiza legacy por baixo de generative)

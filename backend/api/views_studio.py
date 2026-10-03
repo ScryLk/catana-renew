@@ -1091,6 +1091,11 @@ class StudioCatalogGenerateView(APIView):
 
         prompt = request.data.get("prompt", "").strip()
         products = request.data.get("products", [])
+        creative_seed = request.data.get('creativeSeed')
+        if not isinstance(products, list) or not all(isinstance(product, dict) for product in products):
+            return Response({'error':'products must be a list of product objects'}, status=status.HTTP_400_BAD_REQUEST)
+        if creative_seed is not None and type(creative_seed) is not int:
+            return Response({'error':'creativeSeed must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
         if not prompt and not products:
             return Response({"error": "O campo prompt ou uma lista de produtos e obrigatorio."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1099,7 +1104,7 @@ class StudioCatalogGenerateView(APIView):
             prompt = f"Catálogo comercial para a linha {first_cat} com {len(products)} itens cadastrados."
 
         try:
-            result = generate_catalog_from_gemini(prompt=prompt, products=products)
+            result = generate_catalog_from_gemini(prompt=prompt, products=products, creative_seed=creative_seed)
             return Response(result, status=status.HTTP_200_OK)
         except Exception as err:
             logger.error(f"[StudioCatalogGenerate] Falha ao gerar catalogo: {err}")

@@ -1,6 +1,7 @@
 import re
 import json
 import time
+from unittest.mock import patch, Mock
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -115,7 +116,13 @@ class SystemDesignAndFunctionalVerificationTests(TestCase):
             "prompt": "Como voce estruturaria a hierarquia e o grid de uma pagina dupla para embalagens plasticas?",
             "temperature": 0.4
         }
-        response = self.client.post(url, payload, format='json')
+        provider = Mock(default_model='test-transport')
+        provider.client.models.generate_content.return_value.text = 'Proposta de hierarquia visual e grid editorial com proporcao e espaco negativo.'
+        with patch('api.views_system_design.get_ai_provider', return_value=provider):
+            response = self.client.post(url, payload, format='json')
+        provider.client.models.generate_content.assert_called_once()
+        self.assertIn('system_instruction', provider.client.models.generate_content.call_args.kwargs['config'].model_fields)
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         data = response.data
@@ -142,7 +149,13 @@ class SystemDesignAndFunctionalVerificationTests(TestCase):
             "prompt": "Escreva a descricao de uma cupula plastica de alta transparencia para bolos artesanais.",
             "temperature": 0.5
         }
-        response = self.client.post(url, payload, format='json')
+        provider = Mock(default_model='test-transport')
+        provider.client.models.generate_content.return_value.text = 'Proposta de texto sobre apresentacao visual; especificacoes do produto devem ser confirmadas pelo usuario.'
+        with patch('api.views_system_design.get_ai_provider', return_value=provider):
+            response = self.client.post(url, payload, format='json')
+        provider.client.models.generate_content.assert_called_once()
+        self.assertIn('system_instruction', provider.client.models.generate_content.call_args.kwargs['config'].model_fields)
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         data = response.data

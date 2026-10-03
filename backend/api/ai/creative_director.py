@@ -11,7 +11,7 @@ import logging
 from .requirement_contract import RequirementContract
 from .visual_dna import VisualDNA
 from .content_planner import DocumentContentPlan
-from .font_registry import ALL_VERIFIED_FONTS, DEFAULT_FONT_REGISTRY
+from .font_registry import ALL_VERIFIED_FONTS, DEFAULT_FONT_REGISTRY, load_font_registry
 from .rag_principle_extractor import RAGPrincipleExtractor
 
 logger = logging.getLogger(__name__)
@@ -101,6 +101,7 @@ class CreativeDirector:
         creative_seed: int = 42,
     ) -> CreativeDirection:
         """Elabora a direção criativa combinatória para o catálogo."""
+        load_font_registry()  # An unavailable/corrupt canonical registry fails closed.
         rng = random.Random(creative_seed)
         negatives = set(contract.constraints.negative)
 

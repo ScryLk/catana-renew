@@ -1,3 +1,5 @@
+import { normalizeCatalogDocument, QualityGate } from '../data/editorialCatalog.mock';
+import { parseSuppliedPrice } from '../utils/commercialProduct';
 import { create } from 'zustand';
 import axios from 'axios';
 import api, { getAuthToken, setInMemoryAccessToken } from '../services/api';
@@ -462,6 +464,7 @@ export const saveStoredUnlinkedCatalogs = (catalogs: RecentCatalogItem[], userId
 };
 
 export interface StoredProjectSession {
+  qualityGate?: QualityGate;
   threads: ChatThread[];
   activeThreadId: string;
   catalogTitle?: string;
@@ -518,6 +521,7 @@ export const syncActiveCatalogStorage = (state: {
   pages: CatalogPageData[];
   totalPages: number;
   activeUserId?: string | number | null;
+  qualityGate?: QualityGate;
 }) => {
   if (typeof window === 'undefined' || !state.activeCatalogId) return;
   saveStoredProjectSession(state.activeCatalogId, {
@@ -527,11 +531,13 @@ export const syncActiveCatalogStorage = (state: {
     activePalette: state.activePalette,
     currentSpread: state.currentSpread,
     pages: state.pages,
+    qualityGate: state.qualityGate,
     totalPages: state.totalPages,
   }, state.activeUserId);
 };
 
 export interface StudioState {
+  qualityGate?: QualityGate;
   // Session & Workspace Mode
   hasStartedSession: boolean;
   startSession: (initialPrompt?: string, categoryName?: string, attachments?: ChatAttachment[]) => void;
@@ -868,7 +874,15 @@ const saveCustomRoles = (roles: StudioRole[], userId?: string | number | null) =
   }
 };
 
-export const useStudioStore = create<StudioState>((set, get) => ({
+export const useStudioStore = create<StudioState>((rawSet, get) => {
+  const set = (update: Partial<StudioState> | ((state: StudioState) => Partial<StudioState>)) => rawSet(state => {
+    const next = typeof update === 'function' ? update(state) : update;
+    if (!next.pages) return next;
+    const gate = next.qualityGate ?? (next.activeCatalogId && next.activeCatalogId !== state.activeCatalogId ? undefined : state.qualityGate);
+    const normalized = normalizeCatalogDocument({pages:next.pages, qualityGate:gate});
+    return {...next, pages:normalized.pages, qualityGate:normalized.qualityGate};
+  });
+  return ({
   theme: getInitialTheme(),
   toggleTheme: () =>
     set((s) => {
@@ -1007,6 +1021,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       activeCatalogId: null,
       catalogTitle: 'Novo Catálogo',
       pages: [],
+      qualityGate: undefined,
       totalPages: 0,
       executionPlan: [],
       messages: [],
@@ -1309,46 +1324,18 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   // Export Catalog Modal
   isExportModalOpen: false,
   exportModalTab: 'pdf',
-  openExportModal: (tab = 'pdf') => set({ isExportModalOpen: true, exportModalTab: tab }),
+  openExportModal: (tab = 'pdf') => {
+    if (get().qualityGate?.publishable === false) {
+      toast.error('Catálogo precisa de revisão antes da publicação.');
+      return;
+    }
+    set({ isExportModalOpen: true, exportModalTab: tab });
+  },
   closeExportModal: () => set({ isExportModalOpen: false }),
 
   // Product Drawer & Inventory Repository
   isProductDrawerOpen: false,
-  unassignedProducts: [
-    {
-      id: 'prod-unassigned-1',
-      category: 'ACESSORIOS',
-      index: '08',
-      name: 'Porta-Cartoes Minimalista',
-      sku: 'EDT-008',
-      price: 'R$ 490',
-      description: 'Acabamento encerado com bordas polidas artesanalmente a quente.',
-      image: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=800&q=80',
-      tag: 'Disponivel',
-    },
-    {
-      id: 'prod-unassigned-2',
-      category: 'DESIGN',
-      index: '09',
-      name: 'Peca de Destaque Atelier',
-      sku: 'EDT-009',
-      price: 'R$ 3.800',
-      description: 'Estrutura refinada com materias-primas nobres e ferragens escovadas.',
-      image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&q=80',
-      tag: 'Edicao Limitada',
-    },
-    {
-      id: 'prod-unassigned-3',
-      category: 'TEXTIL',
-      index: '10',
-      name: 'Lenco Geometrico Seda',
-      sku: 'EDT-010',
-      price: 'R$ 320',
-      description: 'Tecido nobre com acabamento manual em padrao geometrico discreto.',
-      image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=800&q=80',
-      tag: 'Seda Pura',
-    },
-  ],
+  unassignedProducts: [],
   activeTargetSlot: null,
   openProductDrawer: (targetSlot) => set({ isProductDrawerOpen: true, activeTargetSlot: targetSlot ?? null }),
   closeProductDrawer: () => set({ isProductDrawerOpen: false, activeTargetSlot: null }),
@@ -1479,17 +1466,16 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     if (!items || items.length === 0) return;
 
     const newProducts: ProductItem[] = items.map((item, idx) => {
-      const rawPrice = item.price ? String(item.price).trim() : '0,00';
-      const formattedPrice = rawPrice.startsWith('R$') ? rawPrice : `R$ ${rawPrice.replace(/^[^\d]+/, '')}`;
+      const formattedPrice = item.price == null || !String(item.price).trim() ? null : String(item.price);
       return {
         id: `prod-excel-${Date.now()}-${idx}`,
-        name: (item.name || 'Produto sem nome').trim(),
-        price: formattedPrice || 'R$ 0,00',
+        name: item.name || null,
+        price: formattedPrice,
         category: (item.category || 'COLECAO 2026').trim(),
-        sku: (item.sku || `SKU-${String(idx + 1).padStart(3, '0')}`).trim(),
-        description: (item.description || 'Item catalogado via importacao de planilha comercial.').trim(),
-        image: item.image && item.image.trim().startsWith('http') ? item.image.trim() : (item.image?.trim() || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80'),
-        tag: (item.tag || 'Importado').trim(),
+        sku: item.sku || null,
+        description: item.description || null,
+        image: item.image || null,
+        tag: item.tag || null,
         index: String(idx + 1).padStart(2, '0'),
       };
     });
@@ -1651,7 +1637,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
       if (!get().isGeneratingCatalog) return;
 
-      const generated: GeneratedCatalogResult = response.data;
+      const generated: GeneratedCatalogResult = normalizeCatalogDocument(response.data);
       if (!generated || !generated.pages || generated.pages.length === 0) {
         throw new Error('Retorno do Gemini sem paginas validas');
       }
@@ -1694,7 +1680,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
               time: nowTime(),
               roleId: 'branding_auditor',
               roleName: 'Auditor de Branding',
-              text: 'Homologacao editorial concluida. Compilando pranchetas de alta fidelidade para o Katana Studio.',
+              text: generated.qualityGate?.passed === false ? 'Catálogo gerado para revisão; os gates obrigatórios não foram aprovados.' : 'Auditoria editorial concluída. Compilando pranchetas para o Katana Studio.',
             },
           ],
         }));
@@ -1714,6 +1700,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
       const fallback = generateCatalogFromPrompt(prompt, attachments);
       fallback.initialPrompt = prompt;
+      // Contingency is visual only; never promote demo products into user inventory.
+      fallback.pages = fallback.pages.map(page => ({...page, products: [], renderMode:'legacy', blocks:[]}));
+      fallback.qualityGate = {passed:false, publishable:false, status:'needs_review', reasons:['REMOTE_GENERATION_UNAVAILABLE']};
 
       set((s) => ({
         generationStage: 4,
@@ -1805,6 +1794,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       activeCatalogId: target.catalogId,
       catalogTitle: target.title,
       pages: target.pages,
+      qualityGate: target.qualityGate,
       totalPages: target.totalPages,
       activePalette: target.palette,
       currentSpread: spreadToUse,
@@ -1816,7 +1806,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         { id: 'step-1', label: `Análise semântica do briefing: "${target.category}"`, status: 'completed', roleBadge: 'Estratégia' },
         { id: 'step-2', label: `Aplicação da paleta cromática ${target.palette.name}`, status: 'completed', roleBadge: 'Design' },
         { id: 'step-3', label: `Diagramação de ${target.totalPages} página(s) no padrão A4`, status: 'completed', roleBadge: 'Diagramação' },
-        { id: 'step-4', label: 'Auditoria editorial e conformidade de leitura WCAG AAA', status: 'completed', roleBadge: 'Auditoria' },
+        { id: 'step-4', label: target.qualityGate?.passed === false ? 'Auditoria editorial requer revisão' : 'Auditoria editorial e conformidade de leitura', status: target.qualityGate?.passed === false ? 'pending' : 'completed', roleBadge: 'Auditoria' },
       ],
       isPlanCollapsed: true,
       isPlanHidden: false,
@@ -1829,6 +1819,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       activePalette: target.palette,
       currentSpread: spreadToUse,
       pages: target.pages,
+      qualityGate: target.qualityGate,
       totalPages: target.totalPages,
     });
 
@@ -2136,6 +2127,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         catalogTitle: existing.catalogTitle || defaultTitle,
         activeCatalogId: catalogId,
         pages: pagesToUse,
+        qualityGate: existing.qualityGate,
         totalPages: existing.totalPages || pagesToUse.length,
         currentSpread: existing.currentSpread || [1, 2],
         activePalette: paletteToUse,
@@ -2154,6 +2146,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         activePalette: paletteToUse,
         currentSpread: existing.currentSpread || [1, 2],
         pages: pagesToUse,
+        qualityGate: existing.qualityGate,
         totalPages: existing.totalPages || pagesToUse.length,
       }, s.activeUserId);
       return;
@@ -3125,6 +3118,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           products: page.products.map((prod) =>
             prod.id === productId ? { ...prod, ...updates } : prod
           ),
+          blocks: page.blocks?.map(block => {
+            if (String(block.productId) !== String(productId)) return block;
+            const field = block.type === 'price' || block.type === 'sku' ? block.type : block.role === 'product_name' ? 'name' : block.role === 'product_description' ? 'description' : null;
+            if (field && field in updates) return {...block, content: updates[field]};
+            if (block.type === 'product_image' && 'image' in updates) return {...block, imageUrl: updates.image || undefined};
+            return block;
+          }),
         };
       }),
       unassignedProducts: s.unassignedProducts.map((prod) =>
@@ -3480,8 +3480,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
                 ];
                 const match = allProds.find(
                   (p) =>
-                    p.name.toLowerCase().includes(String(query).toLowerCase()) ||
-                    String(query).toLowerCase().includes(p.name.toLowerCase()) ||
+                    (p.name || '').toLowerCase().includes(String(query).toLowerCase()) ||
+                    String(query).toLowerCase().includes((p.name || '').toLowerCase()) ||
                     (p.sku && p.sku.toLowerCase() === String(query).toLowerCase())
                 );
                 if (match) effectiveProdId = match.id;
@@ -3519,7 +3519,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             const foundProd = allProducts.find(
               (p) =>
                 (prodId && p.id === prodId) ||
-                (pQuery && p.name && p.name.toLowerCase().includes(String(pQuery).toLowerCase())) ||
+                (pQuery && p.name && (p.name || '').toLowerCase().includes(String(pQuery).toLowerCase())) ||
                 (pQuery && p.sku && p.sku.toLowerCase() === String(pQuery).toLowerCase())
             ) || allProducts[0];
             if (foundProd) {
@@ -3540,7 +3540,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             const newProd = allProds.find(
               (p) =>
                 p.id === newId ||
-                (p.name && newId && p.name.toLowerCase() === String(newId).toLowerCase())
+                (p.name && newId && (p.name || '').toLowerCase() === String(newId).toLowerCase())
             );
             if (newProd) {
               let finalPage = typeof targetPage === 'number' ? targetPage : undefined;
@@ -3563,18 +3563,16 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           }
 
           case 'create_product': {
-            const name = rawAction.title || rawAction.name || params.title || params.name || 'Novo Produto';
+            const name = rawAction.title || rawAction.name || params.title || params.name || null;
             const created = get().addProductToRepository({
               name,
-              sku: rawAction.sku || params.sku || `SKU-${Date.now().toString().slice(-4)}`,
-              price: rawAction.price || params.price || 'R$ 0,00',
+              sku: rawAction.sku ?? params.sku ?? null,
+              price: rawAction.price ?? params.price ?? null,
               category: rawAction.category || params.category || 'Coleção',
-              description: rawAction.description || params.description || 'Item de alta precisão e acabamento manual.',
+              description: rawAction.description ?? params.description ?? null,
               index: rawAction.index || params.index || '01',
               image:
-                rawAction.image ||
-                params.image ||
-                'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000&auto=format&fit=crop',
+                rawAction.image ?? params.image ?? null,
             });
             if (typeof targetPage === 'number') {
               get().assignProductToSpread(created, targetPage, slotIdx ?? 0);
@@ -3722,16 +3720,18 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             get().pushHistorySnapshot();
             set((s) => {
               const updateProdPrice = (prod: ProductItem) => {
-                const priceStr = prod.price || '100';
-                const currentNumeric =
-                  parseFloat(priceStr.replace(/[^\d.,]/g, '').replace(',', '.')) || 100;
-                let newNumeric = currentNumeric;
+                const currentNumeric = parseSuppliedPrice(prod.price);
+                if (currentNumeric == null && mode !== 'set') {
+                  toast.error('Defina um preço antes de aplicar reajuste.');
+                  return prod;
+                }
+                let newNumeric = currentNumeric ?? 0;
                 if (mode === 'set' && targetVal > 0) {
                   newNumeric = targetVal;
                 } else if (mode === 'decrease') {
-                  newNumeric = currentNumeric * (1 - Math.abs(pct) / 100);
+                  newNumeric = (currentNumeric ?? 0) * (1 - Math.abs(pct) / 100);
                 } else {
-                  newNumeric = currentNumeric * (1 + Math.abs(pct) / 100);
+                  newNumeric = (currentNumeric ?? 0) * (1 + Math.abs(pct) / 100);
                 }
                 const formatted = `R$ ${newNumeric.toLocaleString('pt-BR', {
                   minimumFractionDigits: 2,
@@ -3972,12 +3972,12 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             const targetProd = allProds.find(
               (p) =>
                 p.id === prodToGen ||
-                (p.name && prodToGen && p.name.toLowerCase().includes(prodToGen.toLowerCase()))
+                (p.name && prodToGen && (p.name || '').toLowerCase().includes(prodToGen.toLowerCase()))
             );
             if (targetProd) {
               get().generateAIProductImage(
                 targetProd.id,
-                targetProd.name,
+                targetProd.name || 'Produto',
                 targetProd.category || 'Editorial',
                 rawAction.prompt ||
                   params.prompt ||
@@ -5219,7 +5219,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       for (const p of state.pages) {
         if (!p.products) continue;
         for (const prod of p.products) {
-          const prodClean = removeAccents(prod.name.toLowerCase());
+          const prodClean = removeAccents((prod.name || '').toLowerCase());
           const skuClean = prod.sku ? prod.sku.toLowerCase() : '';
           if (
             lower.includes(prodClean) ||
@@ -5315,7 +5315,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       ];
 
       const foundProduct = allAvailable.find((p) => {
-        const pNameClean = removeAccents(p.name.toLowerCase());
+        const pNameClean = removeAccents((p.name || '').toLowerCase());
         const pSkuClean = p.sku ? p.sku.toLowerCase() : '';
         return (
           pNameClean.includes(prodQueryClean) ||
@@ -5383,19 +5383,19 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
     if (createProductMatch && !assignMatch) {
       const prodName = createProductMatch[1].trim();
-      const rawPrice = createProductMatch[2] ? createProductMatch[2].trim() : 'R$ 890,00';
-      const formattedPrice = rawPrice.startsWith('R$') ? rawPrice : `R$ ${rawPrice.replace(/[^\d.,]/g, '')}`;
+      const rawPrice = createProductMatch[2]?.trim() || null;
+      const formattedPrice = rawPrice == null ? null : rawPrice.startsWith('R$') ? rawPrice : `R$ ${rawPrice.replace(/[^\d.,]/g, '')}`;
       const pageNumStr = createProductMatch[3];
       const targetPageNum = pageNumStr ? (parseSpelledNumber(pageNumStr) || parseInt(pageNumStr, 10)) : undefined;
 
       const createdProduct = state.addProductToRepository({
         name: prodName,
-        sku: `SKU-${Date.now().toString().slice(-4)}`,
+        sku: null,
         price: formattedPrice,
         category: 'Coleção Exclusiva',
-        description: 'Item desenvolvido com excelência técnica e acabamento artesanal refinado.',
+        description: null,
         index: String(state.unassignedProducts.length + 1).padStart(2, '0'),
-        image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000&auto=format&fit=crop',
+        image: null,
       });
 
       if (targetPageNum && targetPageNum <= state.totalPages) {
@@ -5889,15 +5889,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       ];
       const targetProd = allProducts.find(
         (p) =>
-          p.name.toLowerCase().includes(prodQuery.toLowerCase()) ||
-          prodQuery.toLowerCase().includes(p.name.toLowerCase()) ||
+          (p.name || '').toLowerCase().includes(prodQuery.toLowerCase()) ||
+          prodQuery.toLowerCase().includes((p.name || '').toLowerCase()) ||
           (p.sku && p.sku.toLowerCase().includes(prodQuery.toLowerCase()))
       ) || allProducts[0];
 
       if (targetProd) {
         state.generateAIProductImage(
           targetProd.id,
-          targetProd.name,
+          targetProd.name || 'Produto',
           targetProd.category || 'Editorial',
           'Fotografia de estúdio profissional em alta resolução com iluminação suave sobre fundo neutro'
         );
@@ -5955,7 +5955,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         const queryClean = removeAccents(prodQuery);
         for (const p of state.pages) {
           const match = p.products?.find((pr) => {
-            const prNameClean = removeAccents(pr.name);
+            const prNameClean = removeAccents(pr.name || '');
             const prSkuClean = pr.sku ? pr.sku.toLowerCase() : '';
             return (
               prNameClean.includes(queryClean) ||
@@ -5972,7 +5972,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         }
         if (!targetProd) {
           targetProd = state.unassignedProducts.find((pr) => {
-            const prNameClean = removeAccents(pr.name);
+            const prNameClean = removeAccents(pr.name || '');
             return (
               prNameClean.includes(queryClean) ||
               queryClean.includes(prNameClean) ||
@@ -6041,14 +6041,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         return {
           ...p,
           products: p.products.map((prod) => {
-            const prodClean = removeAccents(prod.name.toLowerCase());
+            const prodClean = removeAccents((prod.name || '').toLowerCase());
             if (
               (state.selectedElementId && state.selectedElementId.includes(prod.id)) ||
               lower.includes(prodClean) ||
               (!updated && prod.id === 'prod-bolsa')
             ) {
               updated = true;
-              targetProduct = prod.name;
+              targetProduct = prod.name || 'Produto';
               return { ...prod, price: newPrice };
             }
             return prod;
@@ -6518,6 +6518,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       activeCatalogId: null,
       catalogTitle: 'Novo Catálogo',
       pages: [],
+      qualityGate: undefined,
       totalPages: 0,
       executionPlan: [],
       messages: [],
@@ -6533,4 +6534,5 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       generationTargetCatalog: null,
     });
   },
-}));
+});
+});

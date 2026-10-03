@@ -1,7 +1,8 @@
-import { CatalogPageData, StudioPalette, STUDIO_PALETTE_PRESETS } from '../data/editorialCatalog.mock';
+import { QualityGate, CatalogPageData, StudioPalette, STUDIO_PALETTE_PRESETS } from '../data/editorialCatalog.mock';
 import { ChatAttachment } from '../store/studioStore';
 
 export interface GeneratedCatalogResult {
+  qualityGate?: QualityGate;
   catalogId: string;
   title: string;
   category: string;

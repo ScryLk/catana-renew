@@ -27,10 +27,11 @@ class RAGPrincipleExtractor:
                 "rhythm": "slow-fast-slow",
                 "grid_behavior": "modular_loose",
                 "chromatic_tendency": "balanced_editorial",
+                "references_consulted": 0,
             }
 
         synthesis_data = rag_context.get("synthesis_data", {})
-        references = rag_context.get("top_k_templates", [])
+        references = rag_context.get("retrieved_templates") or rag_context.get("top_k_templates") or []
 
         # 1. Escala e Contraste
         has_luxury = any("luxo" in str(r).lower() or "alta" in str(r).lower() for r in references)

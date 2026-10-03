@@ -1,4 +1,5 @@
-{
+// Generated from shared/font_registry.json. Do not edit.
+export const FONT_REGISTRY = {
   "version": 1,
   "fallbacks": {
     "display": "Cormorant Garamond",
@@ -247,4 +248,5 @@
       "provider": "google"
     }
   ]
-}
+} as const;
+export const ALL_VERIFIED_FONTS = FONT_REGISTRY.fonts.map(font => font.family);

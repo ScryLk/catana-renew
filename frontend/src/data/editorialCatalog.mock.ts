@@ -1,3 +1,5 @@
+import { GENERATIVE_CONTRACT } from '../generated/generativeContract.generated';
+import { isSafeImageUrl } from '../utils/imagePolicy';
 /**
  * Catálogo Editorial — Showcase de Design e Tipografia Editorial
  * 
@@ -12,7 +14,8 @@ export interface ProductItem {
   id: string;
   category: string;
   index: string;
-  name: string;
+  name: string | null;
+  displayLabel?: string;
   sku?: string | null;
   price?: string | null;
   description?: string | null;
@@ -20,8 +23,11 @@ export interface ProductItem {
   tag?: string | null;
   details?: string[];
   source?: 'sheet' | 'system' | 'catalog';
-  quantity?: number | null;
+  quantity?: number | string | null;
   technical_specs?: Record<string, any> | null;
+  availability?: string | null;
+  inventory?: string | number | null;
+  discount?: string | number | null;
 }
 
 export type PageLayoutType = 
@@ -83,42 +89,9 @@ export interface PageOverlayElement {
   zIndex?: number;
 }
 
-export type PageRenderMode = 'legacy' | 'generative';
-
-export type GenerativeBlockType =
-  | 'text'
-  | 'image'
-  | 'product_image'
-  | 'metadata'
-  | 'price'
-  | 'sku'
-  | 'caption'
-  | 'line'
-  | 'shape'
-  | 'folio'
-  | 'badge'
-  | 'quote'
-  | 'logo'
-  | 'table'
-  | 'color_field';
-
-export const VALID_GENERATIVE_BLOCK_TYPES: GenerativeBlockType[] = [
-  'text',
-  'image',
-  'product_image',
-  'metadata',
-  'price',
-  'sku',
-  'caption',
-  'line',
-  'shape',
-  'folio',
-  'badge',
-  'quote',
-  'logo',
-  'table',
-  'color_field',
-];
+export type PageRenderMode = typeof GENERATIVE_CONTRACT.renderModes[number];
+export type GenerativeBlockType = typeof GENERATIVE_CONTRACT.blockTypes[number];
+export const VALID_GENERATIVE_BLOCK_TYPES: readonly GenerativeBlockType[] = GENERATIVE_CONTRACT.blockTypes;
 
 export interface GenerativeBlock {
   id: string;
@@ -140,7 +113,7 @@ export interface GenerativeBlock {
   lineHeight?: number;
   textTransform?: 'none' | 'uppercase' | 'lowercase';
   colorToken?: string;
-  content?: string;
+  content?: string | number | null;
   productId?: string;
   imageUrl?: string;
   cropMode?: 'cover' | 'contain' | 'editorial';
@@ -155,25 +128,82 @@ export interface GenerativeBlock {
  * Garante que o frontend Studio nunca quebre por blocos malformados.
  */
 export function validateGenerativeBlock(block: any): GenerativeBlock | null {
-  if (!block || typeof block !== 'object') return null;
-  if (!block.id || typeof block.id !== 'string') return null;
-  if (!VALID_GENERATIVE_BLOCK_TYPES.includes(block.type)) return null;
-
-  const x = Number(block.x);
-  const y = Number(block.y);
-  const width = Number(block.width);
-  const height = Number(block.height);
-
-  if (isNaN(x) || isNaN(y) || isNaN(width) || isNaN(height)) return null;
-  if (width <= 0 || height <= 0) return null;
-
-  return {
-    ...block,
-    x: Math.max(-0.1, Math.min(1.2, x)),
-    y: Math.max(-0.1, Math.min(1.2, y)),
-    width: Math.min(1.2, width),
-    height: Math.min(1.2, height),
+  if (!block || typeof block !== 'object' || Array.isArray(block)) return null;
+  if (!block.id || typeof block.id !== 'string' || !VALID_GENERATIVE_BLOCK_TYPES.includes(block.type)) return null;
+  const forbidden = new Set(['innerhtml', 'dangerouslysetinnerhtml', 'rawhtml', 'rawcss', 'html', 'stylestring', 'script', 'eval']);
+  const inspect = (value: unknown): boolean => {
+    if (Array.isArray(value)) return value.every(inspect);
+    if (value && typeof value === 'object') return Object.entries(value).every(([key, child]) =>
+      !forbidden.has(key.toLowerCase()) && !key.toLowerCase().startsWith('on') &&
+      (!['imageurl', 'src', 'url', 'href'].includes(key.toLowerCase()) || child == null || isSafeImageUrl(child)) && inspect(child));
+    return typeof value !== 'number' || Number.isFinite(value);
   };
+  if (!inspect(block)) return null;
+  if (!['x', 'y', 'width', 'height'].every(k => typeof block[k] === 'number' && Number.isFinite(block[k]))) return null;
+  const margin = block.bleed === true ? 0.05 : 0;
+  if (block.width <= 0 || block.height <= 0 || block.x < -margin || block.y < -margin || block.x + block.width > 1 + margin + 1e-9 || block.y + block.height > 1 + margin + 1e-9) return null;
+  for (const [key, low, high] of [['opacity', 0, 1], ['rotation', -360, 360], ['fontSize', 0.1, 500], ['fontWeight', 1, 1000], ['lineHeight', 0.1, 10], ['zIndex', -100, 1000]] as const) {
+    if (block[key] != null && (typeof block[key] !== 'number' || !Number.isFinite(block[key]) || block[key] < low || block[key] > high)) return null;
+  }
+  for (const key of ['imageUrl','fontFamily','letterSpacing','colorToken']) {
+    if (block[key] != null && typeof block[key] !== 'string') return null;
+  }
+  for (const [key, allowed] of [['alignment',['left','center','right']], ['textTransform',['none','uppercase','lowercase']], ['cropMode',['cover','contain','editorial']]] as const) {
+    if (block[key] != null && !(allowed as readonly string[]).includes(block[key])) return null;
+  }
+  if (block.content != null && !['string', 'number'].includes(typeof block.content)) return null;
+  if (block.letterSpacing != null && !/^-?\d+(?:\.\d+)?(?:em|px)$/.test(block.letterSpacing)) return null;
+  return block;
+}
+
+export interface QualityGate {
+  passed: boolean;
+  publishable: boolean;
+  status: 'passed' | 'needs_review' | 'blocked';
+  reasons: string[];
+}
+
+/** Applied before data enters the store and again at the renderer boundary. */
+export function normalizeCatalogDocument<T extends { pages?: CatalogPageData[]; qualityGate?: QualityGate }>(document: T): T {
+  const blockedGate: QualityGate = {passed:false, publishable:false, status:'blocked', reasons:['INVALID_RUNTIME_BLOCK']};
+  const normalizeGate = (gate: unknown): QualityGate | undefined => {
+    if (gate == null) return undefined;
+    const value = gate as QualityGate;
+    if (typeof value.passed !== 'boolean' || typeof value.publishable !== 'boolean' || !['passed','needs_review','blocked'].includes(value.status) || !Array.isArray(value.reasons) || !value.reasons.every(r => typeof r === 'string')) return {...blockedGate, reasons:['INVALID_QUALITY_GATE']};
+    if (value.publishable && (!value.passed || value.status !== 'passed' || value.reasons.length > 0)) return {...blockedGate, reasons:['INCONSISTENT_QUALITY_GATE']};
+    return value;
+  };
+  const qualityGate = normalizeGate(document.qualityGate);
+  let invalid = document.pages !== undefined && !Array.isArray(document.pages);
+  const pages = (Array.isArray(document?.pages) ? document.pages : []).filter(page => {if (!page || typeof page !== 'object') {invalid=true; return false;} return true;}).map(page => {
+    let pageInvalid = false;
+    const products = (Array.isArray(page.products) ? page.products : []).filter(product => product && typeof product === 'object').map(product => ({ ...product,
+      ...Object.fromEntries(GENERATIVE_CONTRACT.nullableProductFields.map(field => [field, (product as any)[field] ?? null])),
+      image: isSafeImageUrl(product.image) ? product.image : null,
+    })) as ProductItem[];
+    const blocks = (Array.isArray(page.blocks) ? page.blocks : []).flatMap(raw => {
+      const block = validateGenerativeBlock(raw);
+      if (!block) { invalid = true; pageInvalid=true; return []; }
+      const commercialField = block.type === 'price' || block.type === 'sku' ? block.type : block.role === 'product_name' ? 'name' : block.role === 'product_description' ? 'description' : null;
+      if (commercialField || block.type === 'product_image') {
+        const product = products.find(p => String(p.id) === String(block.productId));
+        if (!product) { invalid = true; pageInvalid=true; return []; }
+        const expected = commercialField ? product[commercialField] : product.image;
+        const actual = commercialField ? block.content : block.imageUrl;
+        if (actual !== undefined && actual !== expected) { invalid = true; pageInvalid=true; return []; }
+        if (expected == null) return [];
+        return [{ ...block, ...(commercialField ? {content: expected} : {imageUrl: expected as string}) }];
+      }
+      return [block];
+    });
+    const generativeDraft = Array.isArray(page.generativeDraft) ? { blocks: page.generativeDraft } : page.generativeDraft;
+    return { ...page, qualityGate: pageInvalid ? blockedGate : qualityGate || normalizeGate(page.qualityGate), products, generativeDraft, renderMode: page.renderMode === 'generative' ? 'generative' as const : 'legacy' as const,
+      blocks: page.renderMode === 'generative' ? blocks : [],
+      editorialImage: isSafeImageUrl(page.editorialImage) ? page.editorialImage : undefined };
+  });
+  if (invalid && import.meta.env.DEV) console.warn('Invalid generative blocks discarded');
+  const persistedFailure = pages.find(page => page.qualityGate?.publishable === false)?.qualityGate;
+  return { ...document, qualityGate, pages, ...(persistedFailure ? {qualityGate:persistedFailure} : {}), ...(invalid ? {qualityGate: {passed:false, publishable:false, status:'blocked', reasons:['INVALID_RUNTIME_BLOCK']}} : {}) } as T;
 }
 
 export interface GenerativeCompositionMeta {
@@ -192,6 +222,7 @@ export interface GenerativeCompositionMeta {
 }
 
 export interface CatalogPageData {
+  qualityGate?: QualityGate;
   id: string;
   pageNumber: number;
   type: PageLayoutType;

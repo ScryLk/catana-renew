@@ -187,10 +187,12 @@ class TemplateRAGService:
             if product_capacity is not None and tpl.product_capacity == product_capacity:
                 sim += 0.15
 
+            if any(word in query.lower() for word in ['atacado', 'b2b', 'industrial']) and tpl.industry == 'industrial_b2b':
+                sim += 0.30
             scored_candidates.append((sim, tpl))
 
         # Ordena decrescente por similaridade
-        scored_candidates.sort(key=lambda item: item[0], reverse=True)
+        scored_candidates.sort(key=lambda item: (-item[0], item[1].slug))
 
         return [tpl for _, tpl in scored_candidates[:limit]]
 
@@ -299,7 +301,7 @@ class TemplateRAGService:
         text_corpus = prompt.lower()
         if products:
             for p in products[:6]:
-                text_corpus += " " + (p.get("name", "") + " " + p.get("category", "") + " " + p.get("description", "")).lower()
+                text_corpus += " " + (" ".join(str(p.get(k) or "") for k in ["name", "category", "description"])).lower()
 
         if any(k in text_corpus for k in ["cutelaria", "faca", "facas", "forja", "damasco", "chef", "lamina", "lâmina", "artesanal", "cutelo", "afiador", "katana"]):
             return "cutlery_craftsmanship"

@@ -8,7 +8,10 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "fonts:generate": "node ../scripts/generate_font_registry.mjs",
+    "fonts:check": "node ../scripts/generate_font_registry.mjs --check",
+    "prebuild": "npm run fonts:check"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.9",

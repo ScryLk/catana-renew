@@ -1,3 +1,5 @@
+import { SafeImage } from '../components/studio/SafeImage';
+import { normalizeCatalogDocument } from '../data/editorialCatalog.mock';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
@@ -98,7 +100,10 @@ export const PublicCatalogReader: React.FC = () => {
       try {
         const res = await api.get(`/api/v2/studio/public/catalogs/${id}/`);
         if (isMounted && res.data) {
-          setCatalog(res.data);
+          setCatalog({...res.data, spreads: (res.data.spreads || []).map((spread: any) => ({...spread,
+            left_page: spread.left_page ? normalizeCatalogDocument({pages:[spread.left_page]}).pages[0] : null,
+            right_page: spread.right_page ? normalizeCatalogDocument({pages:[spread.right_page]}).pages[0] : null,
+          }))});
           setLoading(false);
           return;
         }
@@ -257,7 +262,8 @@ export const PublicCatalogReader: React.FC = () => {
 
   // Pedido de produto via WhatsApp
   const handleOrderProductViaWhatsApp = (prod: ProductItem) => {
-    const text = `Olá! Tenho interesse no item "${prod.name}" (SKU: ${prod.sku}, Valor: ${prod.price}) visualizado no catálogo "${catalog?.title}". Poderia me passar mais detalhes e disponibilidade?`;
+    const details = [prod.sku && `SKU: ${prod.sku}`, prod.price && `Valor: ${prod.price}`].filter(Boolean).join(', ');
+    const text = `Olá! Tenho interesse no item "${prod.name || 'Produto'}"${details ? ` (${details})` : ''} visualizado no catálogo "${catalog?.title || ''}". Poderia me passar mais detalhes e disponibilidade?`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   };
 
@@ -740,9 +746,9 @@ export const PublicCatalogReader: React.FC = () => {
             {/* Imagem do Produto */}
             <div className="relative aspect-video w-full bg-stone-100 overflow-hidden">
               {selectedProduct.image && (
-                <img
+                <SafeImage
                   src={selectedProduct.image}
-                  alt={selectedProduct.name}
+                  alt={selectedProduct.name || ''}
                   className="w-full h-full object-cover"
                 />
               )}

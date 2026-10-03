@@ -1,5 +1,5 @@
 import React from 'react';
-import { CatalogPageData, GenerativeBlock } from '../../data/editorialCatalog.mock';
+import { CatalogPageData, GenerativeBlock, validateGenerativeBlock, normalizeCatalogDocument } from '../../data/editorialCatalog.mock';
 import { resolveSafeFontFamily } from '../../utils/fontRegistry';
 
 interface GenerativeBlockRendererProps {
@@ -9,20 +9,7 @@ interface GenerativeBlockRendererProps {
   onBlockClick?: (block: GenerativeBlock) => void;
 }
 
-const isSafeImageUrl = (url?: string): boolean => {
-  if (!url) return false;
-  const lower = url.trim().toLowerCase();
-  if (lower.startsWith('javascript:') || lower.startsWith('vbscript:') || lower.startsWith('file:') || lower.startsWith('data:text')) {
-    return false;
-  }
-  return (
-    lower.startsWith('https://') ||
-    lower.startsWith('http://') ||
-    lower.startsWith('/') ||
-    lower.startsWith('data:image/') ||
-    lower.startsWith('blob:')
-  );
-};
+import { isSafeImageUrl } from '../../utils/imagePolicy';
 
 export const GenerativeBlockRenderer: React.FC<GenerativeBlockRendererProps> = ({
   block,
@@ -30,6 +17,11 @@ export const GenerativeBlockRenderer: React.FC<GenerativeBlockRendererProps> = (
   interactive = false,
   onBlockClick,
 }) => {
+  if (!validateGenerativeBlock(block) || page.renderMode === 'legacy') return null;
+  const normalized = normalizeCatalogDocument({...{pages: [page]}, pages: [{...page, renderMode: 'generative', blocks: [block]}]});
+  const safeBlock = normalized.pages[0].blocks?.[0];
+  if (!safeBlock) return null;
+  block = safeBlock;
   // Resolução segura de cores a partir do token ou valor direto
   const resolveColor = (token?: string, fallback?: string): string => {
     if (!token) return fallback || page.textColor || '#141416';
@@ -95,7 +87,7 @@ export const GenerativeBlockRenderer: React.FC<GenerativeBlockRendererProps> = (
         {hasValidImage ? (
           <img
             src={block.imageUrl}
-            alt={block.content || 'Editorial element'}
+            alt={String(block.content || 'Editorial element')}
             className="w-full h-full object-center transition-transform duration-500 group-hover:scale-105"
             style={{ objectFit }}
             loading="lazy"
