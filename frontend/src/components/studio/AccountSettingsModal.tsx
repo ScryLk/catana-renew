@@ -390,8 +390,8 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
       }
 
       if (res.is_sandbox) {
-        toast.info('Modo Sandbox Ativo', {
-          description: 'Confirmando cobranca e ativando plano em ambiente de desenvolvimento...',
+        toast.info('Processando Assinatura', {
+          description: 'Confirmando transação e ativando seu plano...',
         });
 
         const confirmRes = await billingService.confirmSandbox({
@@ -400,7 +400,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
           billing_id: res.billing_id,
         });
 
-        toast.success(confirmRes.message || 'Assinatura ativada com sucesso no modo Sandbox!');
+        toast.success(confirmRes.message || 'Assinatura ativada com sucesso!');
         const [updatedSub, quotaRes] = await Promise.all([
           billingService.getSubscription(),
           api.get('/api/v2/studio/quotas/').catch(() => null),

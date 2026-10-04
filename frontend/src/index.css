@@ -449,3 +449,16 @@ html:not(.dark) .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   }
 }
 
+/* Salvaguarda de Interface: Ocultar badges ou marcadores de desenvolvimento injetados por SDKs */
+.clerk-internal-development-badge,
+[data-clerk-dev-badge],
+#clerk-dev-badge,
+.clerk-dev-mode-badge,
+div[class*="clerk-internal"][class*="badge"],
+div[class*="clerk"][class*="development-badge"] {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
