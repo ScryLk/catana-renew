@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sidebar } from '../components/Sidebar';
-import { Header } from '../components/Header';
 import { catalogService } from '../services/catalogService';
 import { Catalog } from '@/types/api';
 import {
@@ -157,11 +155,11 @@ export const UserCatalogs: FC = () => {
         });
 
     return (
-        <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex">
-            <Sidebar />
-            <div className="flex-1 ml-16 flex flex-col min-w-0">
-                <Header />
-                <main className="flex-1 p-8 pt-20 max-w-7xl mx-auto w-full">
+        <div className="min-h-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex">
+
+            <div className="flex-1  flex flex-col min-w-0">
+
+                <main className="flex-1  max-w-7xl mx-auto w-full">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                         <div>
                             <h1 className="text-2xl font-bold tracking-tight">Meus Catálogos</h1>
@@ -169,7 +167,7 @@ export const UserCatalogs: FC = () => {
                                 Gerencie e acesse seus catálogos no Katana 2.0 AI Studio
                             </p>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
                             <button
                                 onClick={() => setShowDemoModal(true)}
                                 className="flex items-center gap-2 px-4 py-2 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-lg text-sm font-medium transition-colors cursor-pointer"
@@ -223,7 +221,7 @@ export const UserCatalogs: FC = () => {
                     ) : (
                         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-xs">
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left text-sm">
+                                <table className="responsive-records w-full text-left text-sm">
                                     <thead className="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                                         <tr>
                                             <th className="px-6 py-3 cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-200" onClick={() => handleSort('title')}>
@@ -249,20 +247,20 @@ export const UserCatalogs: FC = () => {
                                                 onClick={() => handleOpenStudio(catalog)}
                                                 className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors"
                                             >
-                                                <td className="px-6 py-4 font-medium">
-                                                    <div className="flex items-center gap-3">
+                                                <td data-label="Catálogo" className="px-6 py-4 font-medium">
+                                                    <div className="flex flex-wrap items-center gap-3">
                                                         <div className="h-9 w-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 shrink-0">
                                                             <BookOpen className="h-4 w-4" />
                                                         </div>
                                                         <div>
-                                                            <div className="font-semibold text-zinc-900 dark:text-zinc-100">{catalog.title}</div>
+                                                            <button type="button" onClick={(event) => { event.stopPropagation(); handleOpenStudio(catalog); }} className="text-left font-semibold text-zinc-900 dark:text-zinc-100">{catalog.title}</button>
                                                             {catalog.description && (
                                                                 <div className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-1">{catalog.description}</div>
                                                             )}
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                                <td data-label="Explorer" className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                                                     <div className="flex items-center gap-2">
                                                         <button
                                                             onClick={() => handleTogglePublic(catalog)}
@@ -276,13 +274,13 @@ export const UserCatalogs: FC = () => {
                                                         </span>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 text-xs text-zinc-500">
+                                                <td data-label="Criado em" className="px-6 py-4 text-xs text-zinc-500">
                                                     <div className="flex items-center gap-1.5">
                                                         <Calendar className="h-3.5 w-3.5 text-zinc-400" />
                                                         <span>{new Date(catalog.created_at).toLocaleDateString('pt-BR')}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                                                <td data-label="Ações" className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                                                     <div className="flex items-center justify-end gap-1">
                                                         <button
                                                             onClick={() => handleOpenStudio(catalog)}
@@ -359,7 +357,7 @@ export const UserCatalogs: FC = () => {
 
             {showDeleteModal && (
                 <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 max-w-sm w-full">
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl max-w-sm w-full">
                         <h3 className="text-base font-semibold mb-2">Excluir Catálogo?</h3>
                         <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-6">
                             Esta ação é permanente e removerá todas as páginas e configurações associadas a este catálogo.

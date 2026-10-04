@@ -1,7 +1,5 @@
 import { FC, useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Sidebar } from '../components/Sidebar';
-import { Header } from '../components/Header';
 import { LoadingScreen } from '../components/common/LoadingScreen';
 import { globalSearchService, GlobalSearchResults } from '../services/globalSearchService';
 import { User, BookOpen, Package, Search } from 'lucide-react';
@@ -53,20 +51,19 @@ export const SearchResults: FC = () => {
   const filtered = filteredResults();
 
   return (
-    <div className="min-h-screen bg-zinc-950">
-      <Sidebar />
-      <Header />
+    <div className="min-h-full bg-zinc-50 dark:bg-zinc-950">
 
-      <main className="ml-16 pt-20">
-        <div className="p-8 max-w-[1400px] mx-auto">
+
+      <main className="min-w-0">
+        <div className="max-w-[1400px] mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-zinc-100 mb-2">
+            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
               Resultados da busca
             </h1>
             {query && (
-              <p className="text-zinc-400">
-                Resultados para <span className="text-zinc-100 font-medium">"{query}"</span>
+              <p className="text-zinc-600 dark:text-zinc-400">
+                Resultados para <span className="text-zinc-900 dark:text-zinc-100 font-medium">"{query}"</span>
                 {results && <span className="ml-2">• {results.total} resultados</span>}
               </p>
             )}
@@ -74,14 +71,14 @@ export const SearchResults: FC = () => {
 
           {/* Tabs */}
           {results && results.total > 0 && (
-            <div className="flex gap-2 mb-6 border-b border-zinc-800">
+            <div className="flex gap-2 mb-6 border-b border-zinc-200 dark:border-zinc-800">
               <button
                 onClick={() => setActiveTab('all')}
                 className={cn(
                   "px-4 py-3 text-sm font-medium border-b-2 transition-colors",
                   activeTab === 'all'
                     ? "border-blue-500 text-blue-500"
-                    : "border-transparent text-zinc-400 hover:text-zinc-100"
+                    : "border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
                 )}
               >
                 Todos ({results.total})
@@ -93,7 +90,7 @@ export const SearchResults: FC = () => {
                     "px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2",
                     activeTab === 'profiles'
                       ? "border-blue-500 text-blue-500"
-                      : "border-transparent text-zinc-400 hover:text-zinc-100"
+                      : "border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
                   )}
                 >
                   <User className="w-4 h-4" />
@@ -107,7 +104,7 @@ export const SearchResults: FC = () => {
                     "px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2",
                     activeTab === 'catalogs'
                       ? "border-blue-500 text-blue-500"
-                      : "border-transparent text-zinc-400 hover:text-zinc-100"
+                      : "border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
                   )}
                 >
                   <BookOpen className="w-4 h-4" />
@@ -121,7 +118,7 @@ export const SearchResults: FC = () => {
                     "px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2",
                     activeTab === 'products'
                       ? "border-blue-500 text-blue-500"
-                      : "border-transparent text-zinc-400 hover:text-zinc-100"
+                      : "border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
                   )}
                 >
                   <Package className="w-4 h-4" />
@@ -138,12 +135,12 @@ export const SearchResults: FC = () => {
 
           {/* Empty Query */}
           {!isLoading && query.trim().length < 2 && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-12 text-center">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-12 text-center">
               <Search className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-zinc-100 mb-2">
+              <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
                 Digite algo para buscar
               </h3>
-              <p className="text-zinc-400">
+              <p className="text-zinc-600 dark:text-zinc-400">
                 Pesquise por perfis, catálogos ou produtos
               </p>
             </div>
@@ -151,12 +148,12 @@ export const SearchResults: FC = () => {
 
           {/* No Results */}
           {!isLoading && query.trim().length >= 2 && results && results.total === 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-12 text-center">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-12 text-center">
               <Search className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-zinc-100 mb-2">
+              <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
                 Nenhum resultado encontrado
               </h3>
-              <p className="text-zinc-400">
+              <p className="text-zinc-600 dark:text-zinc-400">
                 Tente buscar com outros termos
               </p>
             </div>
@@ -168,7 +165,7 @@ export const SearchResults: FC = () => {
               {/* Profiles Section */}
               {filtered.profiles.length > 0 && (
                 <div>
-                  <h2 className="text-xl font-semibold text-zinc-100 mb-4 flex items-center gap-2">
+                  <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
                     <User className="w-5 h-5" />
                     Perfis
                   </h2>
@@ -177,25 +174,25 @@ export const SearchResults: FC = () => {
                       <button
                         key={profile.id}
                         onClick={() => navigate(`/profiles/${profile.username}`)}
-                        className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 hover:bg-zinc-800 transition-colors text-left group"
+                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
                       >
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        <div className="flex flex-wrap items-center gap-3 mb-3">
+                          <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden flex-shrink-0">
                             {profile.avatar ? (
                               <img src={profile.avatar} alt={profile.name} className="w-full h-full object-cover" />
                             ) : (
-                              <User className="w-6 h-6 text-zinc-400" />
+                              <User className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-zinc-100 truncate group-hover:text-blue-400 transition-colors">
+                            <p className="font-medium text-zinc-900 dark:text-zinc-100 truncate group-hover:text-blue-400 transition-colors">
                               {profile.name}
                             </p>
                             <p className="text-sm text-zinc-500">@{profile.username}</p>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between text-xs text-zinc-400">
-                          <span className="capitalize px-2 py-1 bg-zinc-800 rounded">{profile.type}</span>
+                        <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400">
+                          <span className="capitalize px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded">{profile.type}</span>
                           {profile.followers_count > 0 && (
                             <span>{profile.followers_count} seguidores</span>
                           )}
@@ -209,7 +206,7 @@ export const SearchResults: FC = () => {
               {/* Catalogs Section */}
               {filtered.catalogs.length > 0 && (
                 <div>
-                  <h2 className="text-xl font-semibold text-zinc-100 mb-4 flex items-center gap-2">
+                  <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
                     <BookOpen className="w-5 h-5" />
                     Catálogos
                   </h2>
@@ -218,19 +215,19 @@ export const SearchResults: FC = () => {
                       <button
                         key={catalog.id}
                         onClick={() => navigate(`/catalogs/${catalog.id}/view`)}
-                        className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 hover:bg-zinc-800 transition-colors text-left group"
+                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
                       >
                         <div className="flex gap-3 mb-3">
-                          <div className="w-16 h-20 rounded bg-zinc-800 flex items-center justify-center overflow-hidden flex-shrink-0">
+                          <div className="w-16 h-20 rounded bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden flex-shrink-0">
                             {catalog.cover_image ? (
                               <img src={catalog.cover_image} alt={catalog.title} className="w-full h-full object-cover" />
                             ) : (
-                              <BookOpen className="w-6 h-6 text-zinc-400" />
+                              <BookOpen className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <p className="font-medium text-zinc-100 truncate group-hover:text-blue-400 transition-colors">
+                              <p className="font-medium text-zinc-900 dark:text-zinc-100 truncate group-hover:text-blue-400 transition-colors">
                                 {catalog.title}
                               </p>
                               {catalog.is_sponsored && (
@@ -242,7 +239,7 @@ export const SearchResults: FC = () => {
                             <p className="text-sm text-zinc-500 truncate">por {catalog.author}</p>
                           </div>
                         </div>
-                        <div className="text-xs text-zinc-400">
+                        <div className="text-xs text-zinc-600 dark:text-zinc-400">
                           {catalog.pages_count} páginas
                         </div>
                       </button>
@@ -254,7 +251,7 @@ export const SearchResults: FC = () => {
               {/* Products Section */}
               {filtered.products.length > 0 && (
                 <div>
-                  <h2 className="text-xl font-semibold text-zinc-100 mb-4 flex items-center gap-2">
+                  <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
                     <Package className="w-5 h-5" />
                     Produtos
                   </h2>
@@ -263,21 +260,21 @@ export const SearchResults: FC = () => {
                       <button
                         key={product.id}
                         onClick={() => navigate(`/products/${product.id}`)}
-                        className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 hover:bg-zinc-800 transition-colors text-left group"
+                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
                       >
-                        <div className="w-full aspect-square rounded bg-zinc-800 flex items-center justify-center overflow-hidden mb-3">
+                        <div className="w-full aspect-square rounded bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden mb-3">
                           {product.image_url ? (
                             <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                           ) : (
-                            <Package className="w-12 h-12 text-zinc-400" />
+                            <Package className="w-12 h-12 text-zinc-600 dark:text-zinc-400" />
                           )}
                         </div>
-                        <p className="font-medium text-zinc-100 truncate group-hover:text-blue-400 transition-colors mb-1">
+                        <p className="font-medium text-zinc-900 dark:text-zinc-100 truncate group-hover:text-blue-400 transition-colors mb-1">
                           {product.name}
                         </p>
                         <p className="text-xs text-zinc-500 mb-2">{product.category}</p>
                         {product.price && (
-                          <p className="text-sm font-semibold text-zinc-100">
+                          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                             {new Intl.NumberFormat('pt-BR', {
                               style: 'currency',
                               currency: product.currency || 'BRL',

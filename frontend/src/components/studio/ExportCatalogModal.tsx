@@ -1,3 +1,4 @@
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
@@ -291,7 +292,7 @@ export const ExportCatalogModal: React.FC = () => {
   return (
     <>
       {/* Backdrop */}
-      <div
+      <ResponsiveModal label="Exportar catálogo" onDismiss={closeExportModal} dismissible={!isExportingPDF && !isExportingImage}
         className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
         onClick={() => {
           if (!isExportingPDF && !isExportingImage) closeExportModal();
@@ -1049,7 +1050,7 @@ export const ExportCatalogModal: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
+      </ResponsiveModal>
 
       {/* Offscreen Container para Renderização de Páginas para PDF e Imagens */}
       <div

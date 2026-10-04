@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
+import React, { useState, useRef } from 'react';
 import {
   Paperclip,
   FileUp,
@@ -32,24 +33,6 @@ export const NewCatalogModal: React.FC = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isNewCatalogModalOpen && !isImportModalOpen) {
-        closeNewCatalogModal();
-      }
-    };
-    if (isNewCatalogModalOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-      // Auto-foco no textarea ao abrir o modal
-      setTimeout(() => {
-        textareaRef.current?.focus();
-      }, 50);
-    }
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isNewCatalogModalOpen, isImportModalOpen, closeNewCatalogModal]);
 
   if (!isNewCatalogModalOpen) return null;
 
@@ -117,7 +100,7 @@ export const NewCatalogModal: React.FC = () => {
 
   return (
     <>
-      <div
+      <ResponsiveModal label="Novo catálogo" onDismiss={closeNewCatalogModal} dismissible={!isImportModalOpen}
         role="dialog"
         aria-modal="true"
         aria-label="Novo Catálogo"
@@ -339,7 +322,7 @@ export const NewCatalogModal: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </ResponsiveModal>
 
       {/* Modal secundário de importação de catálogo existente */}
       <ImportCatalogModal

@@ -11,7 +11,7 @@ export const CatalogCanvasWorkspace: React.FC = () => {
 
   return (
     <main
-      className={`flex-1 h-full flex flex-col overflow-hidden transition-colors ${
+      className={`studio-canvas min-w-0 min-h-0 flex-1 h-full flex flex-col overflow-hidden transition-colors ${
         isDark ? 'bg-[#09090b]' : 'bg-[#f3f4f6]'
       }`}
     >

@@ -93,7 +93,7 @@ export function LandingPage() {
 
   return (
     <div
-      className={`min-h-screen w-full relative overflow-x-hidden transition-colors duration-300 ${
+      className={`min-h-dvh w-full relative overflow-x-hidden transition-colors duration-300 ${
         isLightMode ? 'bg-[#F8F6F1] text-[#1A1817]' : 'bg-[#070709] text-[#EEEEEE]'
       }`}
     >

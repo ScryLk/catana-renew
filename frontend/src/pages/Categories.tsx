@@ -1,6 +1,4 @@
 import { FC, useState, useEffect } from 'react';
-import { Sidebar } from '../components/Sidebar';
-import { Header } from '../components/Header';
 import { FiPlus, FiEdit2, FiTrash2, FiFolder, FiChevronRight, FiChevronDown, FiList, FiGitBranch } from 'react-icons/fi';
 import { CategoryModal } from '../components/products/CategoryModal';
 import { Button } from '../components/ui/button';
@@ -112,7 +110,7 @@ export const Categories: FC = () => {
           className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"
           style={{ marginLeft: `${level * 24}px` }}
         >
-          <div className="flex items-center gap-3 flex-1">
+          <div className="flex flex-wrap items-center gap-3 flex-1">
             {/* Expand/Collapse Button */}
             {hasSubcategories && (
               <button
@@ -238,14 +236,13 @@ export const Categories: FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-      <Sidebar />
-      <Header />
+    <div className="min-h-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
 
-      <main className="ml-16 pt-20">
-        <div className="p-8 max-w-[1400px] mx-auto">
+
+      <main className="min-w-0">
+        <div className="max-w-[1400px] mx-auto">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 Categorias de Produtos

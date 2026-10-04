@@ -33,7 +33,7 @@ export const ExploreHeader: FC<ExploreHeaderProps> = ({
                     />
                     {searchQuery && (
                         <button
-                            onClick={() => onSearchChange('')}
+                            aria-label="Limpar busca" onClick={() => onSearchChange('')}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 p-1"
                         >
                             <X className="w-4 h-4" />
@@ -42,9 +42,9 @@ export const ExploreHeader: FC<ExploreHeaderProps> = ({
                 </div>
 
                 {/* Quick Filters */}
-                <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
+                <div className="flex min-w-0 flex-wrap gap-2 pb-2 md:pb-0">
                     <select
-                        className="h-12 px-4 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-medium text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 cursor-pointer min-w-[140px]"
+                        className="h-12 px-4 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-medium text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 cursor-pointer min-w-0 flex-1 md:flex-none"
                         defaultValue=""
                     >
                         <option value="" disabled>Categoria</option>
@@ -54,7 +54,7 @@ export const ExploreHeader: FC<ExploreHeaderProps> = ({
                     </select>
 
                     <select
-                        className="h-12 px-4 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-medium text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 cursor-pointer min-w-[140px]"
+                        className="h-12 px-4 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-medium text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 cursor-pointer min-w-0 flex-1 md:flex-none"
                         defaultValue=""
                     >
                         <option value="" disabled>Avaliação</option>
@@ -62,7 +62,7 @@ export const ExploreHeader: FC<ExploreHeaderProps> = ({
                         <option value="5">5 Estrelas</option>
                     </select>
 
-                    <button className="h-12 w-12 flex items-center justify-center bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors flex-shrink-0">
+                    <button aria-label="Filtros de exploração" className="h-12 w-12 flex items-center justify-center bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors flex-shrink-0">
                         <Filter className="w-5 h-5" />
                     </button>
                 </div>

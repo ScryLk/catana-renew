@@ -1,3 +1,4 @@
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import React, { useState, useEffect } from 'react';
 import {
   X,
@@ -463,7 +464,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
   };
 
   return (
-    <div
+    <ResponsiveModal label="Configurações da conta" onDismiss={onClose}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={onClose}
     >
@@ -1614,6 +1615,6 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </ResponsiveModal>
   );
 };

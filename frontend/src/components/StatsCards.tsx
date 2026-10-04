@@ -82,7 +82,7 @@ export const StatsCards: FC = () => {
       badgeColor: 'gray',
       icon: BookOpen,
       iconBg: 'bg-zinc-500/10',
-      iconColor: 'text-zinc-400',
+      iconColor: 'text-zinc-600 dark:text-zinc-400',
     },
     {
       title: 'Arquivados',
@@ -103,7 +103,7 @@ export const StatsCards: FC = () => {
         return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
       case 'gray':
       default:
-        return 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20';
+        return 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20';
     }
   };
 
@@ -114,7 +114,7 @@ export const StatsCards: FC = () => {
         return (
           <div
             key={stat.title}
-            className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 hover:border-zinc-700 transition-colors"
+            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 hover:border-zinc-700 transition-colors"
           >
             <div className="flex items-start justify-between mb-4">
               <div className={`rounded-lg p-3 ${stat.iconBg}`}>
@@ -124,8 +124,8 @@ export const StatsCards: FC = () => {
                 {stat.badge}
               </span>
             </div>
-            <p className="text-zinc-400 text-sm mb-2">{stat.title}</p>
-            <p className="text-3xl font-bold text-zinc-100">{stat.value}</p>
+            <p className="text-zinc-600 dark:text-zinc-400 text-sm mb-2">{stat.title}</p>
+            <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{stat.value}</p>
           </div>
         );
       })}

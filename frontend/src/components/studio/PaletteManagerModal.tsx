@@ -1,3 +1,4 @@
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import React, { useEffect } from 'react';
 import {
   X,
@@ -83,7 +84,7 @@ export const PaletteManagerModal: React.FC = () => {
   };
 
   return (
-    <div
+    <ResponsiveModal label="Paleta" onDismiss={() => setIsPalettePanelOpen(false)}
       onClick={() => setIsPalettePanelOpen(false)}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200"
     >
@@ -505,6 +506,6 @@ export const PaletteManagerModal: React.FC = () => {
           </button>
         </div>
       </div>
-    </div>
+    </ResponsiveModal>
   );
 };

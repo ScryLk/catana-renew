@@ -3,8 +3,6 @@ import type { FC } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Sidebar } from '@/components/Sidebar';
-import { Header } from '@/components/Header';
 import { organizationService } from '@/services/organizationService';
 import type { Organization, Sede } from '@/types/api';
 import { Building2, Plus, Loader2, Trash2, MapPin, Settings, Share2, Users, Star, Shield } from 'lucide-react';
@@ -227,22 +225,20 @@ export const Organizations: FC = () => {
         window.location.reload();
     };
 
-
     const activeOrgId = JSON.parse(localStorage.getItem('active_organization') || '{}').id;
     const activeSedeId = JSON.parse(localStorage.getItem('active_sede') || '{}').id;
 
     const activeOrg = organizations.find(o => o.id === activeOrgId);
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-zinc-950">
-            <Sidebar />
-            <Header title={activeOrg?.sedes?.find(s => s.id === activeSedeId)?.name || activeOrg?.name || "Gerenciamento"} />
+        <div className="min-h-full bg-gray-50 dark:bg-zinc-950">
 
-            <main className="ml-16 pt-20">
-                <div className="p-6 max-w-4xl mx-auto space-y-8">
+
+            <main className="min-w-0">
+                <div className="max-w-4xl mx-auto space-y-8">
                     {/* Organizations Section */}
                     <div>
-                        <div className="flex justify-between items-center mb-6">
+                        <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
                             <div>
                                 <h1 className="text-3xl font-bold text-foreground mb-2">Organizações</h1>
                                 <p className="text-muted-foreground">Gerencie suas organizações e espaços de trabalho</p>
@@ -275,10 +271,10 @@ export const Organizations: FC = () => {
                                 {organizations.map(org => (
                                     <div
                                         key={org.id}
-                                        className={`bg-card p-6 rounded-xl border flex items-center justify-between group cursor-pointer transition-all ${activeOrgId === org.id ? 'ring-2 ring-primary bg-primary/5' : 'hover:border-primary/50'}`}
+                                        className={`bg-card p-6 rounded-xl border flex flex-col gap-3 md:flex-row md:items-center md:justify-between group cursor-pointer transition-all ${activeOrgId === org.id ? 'ring-2 ring-primary bg-primary/5' : 'hover:border-primary/50'}`}
                                         onClick={() => handleSelectOrganization(org)}
                                     >
-                                        <div className="flex items-center gap-4">
+                                        <div className="flex min-w-0 items-center gap-4">
                                             <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
                                                 {org.logo ? (
                                                     <img src={org.logo} alt={org.name} className="w-full h-full object-cover rounded-lg" />
@@ -287,7 +283,7 @@ export const Organizations: FC = () => {
                                                 )}
                                             </div>
                                             <div>
-                                                <h3 className="text-lg font-semibold">{org.name} {activeOrgId === org.id && <span className="ml-2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">Ativa</span>}</h3>
+                                                <h3 className="text-lg font-semibold break-words">{org.name} {activeOrgId === org.id && <span className="ml-2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">Ativa</span>}</h3>
                                                 <p className="text-sm text-muted-foreground">Criado em {new Date(org.created_at).toLocaleDateString()}</p>
                                                 {org.default_sede && (
                                                     <div className="flex items-center gap-1.5 mt-2 text-xs font-medium text-amber-500 bg-amber-500/10 px-2 py-1 rounded-md w-fit">
@@ -314,7 +310,7 @@ export const Organizations: FC = () => {
                     {/* Sedes Section */}
                     {activeOrg && (
                         <div className="pt-8 border-t">
-                            <div className="flex justify-between items-center mb-6">
+                            <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
                                 <div>
                                     <h2 className="text-2xl font-bold text-foreground mb-2">Sedes / Filiais</h2>
                                     <p className="text-muted-foreground">Gerencie as sedes da organização <strong>{activeOrg.name}</strong></p>
@@ -368,7 +364,7 @@ export const Organizations: FC = () => {
                                             `}
                                                 onClick={() => handleSelectSede(sede)}
                                             >
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex flex-wrap items-center gap-3">
                                                     <MapPin className={`h-5 w-5 ${activeSedeId === sede.id ? 'text-primary' : 'text-primary/70'}`} />
                                                     <span className={`font-medium truncate ${isDefault ? 'text-amber-700 dark:text-amber-400' : ''}`}>{sede.name}</span>
                                                 </div>
@@ -507,7 +503,7 @@ export const Organizations: FC = () => {
                                             <div className="space-y-2">
                                                 {sedeShares.map(share => (
                                                     <div key={share.id} className="flex justify-between items-center p-3 border rounded-md bg-background/50 hover:bg-background transition-colors">
-                                                        <div className="flex items-center gap-3">
+                                                        <div className="flex flex-wrap items-center gap-3">
                                                             <div className="bg-primary/20 p-1.5 rounded-full">
                                                                 <Share2 className="h-3 w-3 text-primary" />
                                                             </div>

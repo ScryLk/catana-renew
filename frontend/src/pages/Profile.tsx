@@ -6,7 +6,7 @@ export const Profile: FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="h-screen w-screen bg-[#09090b] flex items-center justify-center relative overflow-hidden">
+    <div className="h-full w-full bg-[#09090b] flex items-center justify-center relative overflow-hidden">
       <AccountSettingsModal
         isOpen={true}
         onClose={() => navigate('/')}

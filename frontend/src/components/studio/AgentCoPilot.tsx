@@ -1,3 +1,5 @@
+import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
+import { MobileSheet } from '../mobile/MobileSheet';
 import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Plus, History, ChevronDown, Check, Trash2, Settings2, Users, Scale, Palette, Lock, Unlock, PanelLeftOpen, PanelLeftClose, ListOrdered } from 'lucide-react';
 import { ExecutionPlanCard } from './ExecutionPlanCard';
@@ -13,6 +15,7 @@ import { Tooltip } from '../ui/Tooltip';
 import { toast } from 'sonner';
 
 export const AgentCoPilot: React.FC = () => {
+  const { isCompact } = useResponsiveLayout();
   const {
     roles,
     activeRoleId,
@@ -38,6 +41,7 @@ export const AgentCoPilot: React.FC = () => {
   } = useStudioStore();
 
   const isDark = theme === 'dark';
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   const historyRef = useRef<HTMLDivElement>(null);
@@ -68,7 +72,7 @@ export const AgentCoPilot: React.FC = () => {
 
   return (
     <aside
-      className={`w-[420px] max-w-[460px] min-w-[360px] h-full flex flex-col border-r select-none transition-colors ${
+      className={`studio-copilot w-[360px] lg:w-[420px] max-w-[460px] min-w-0 h-full flex flex-col border-r select-none transition-colors ${
         isDark
           ? 'bg-[#0e0e11] border-zinc-800 text-zinc-300'
           : 'bg-[#fcfcfd] border-zinc-200 text-zinc-700'
@@ -76,12 +80,12 @@ export const AgentCoPilot: React.FC = () => {
     >
       {/* Persona Mode & Session Header */}
       <div
-        className={`h-11 px-3 border-b flex items-center justify-between text-xs transition-colors relative ${
+        className={`studio-copilot-header h-11 px-3 border-b flex items-center justify-between text-xs transition-colors relative ${
           isDark ? 'border-zinc-800 text-zinc-300' : 'border-zinc-200 text-zinc-700'
         }`}
       >
         <div className="flex items-center gap-1.5">
-          {!isStudioSidebarOpen && (
+          {!isStudioSidebarOpen && !isCompact && (
             <Tooltip text="Abrir barra lateral" shortcut="Ctrl+B" position="bottom">
               <button
                 type="button"
@@ -215,8 +219,20 @@ export const AgentCoPilot: React.FC = () => {
           </div>
         </div>
 
+        {/* Phone actions share the same handlers and conversation state. */}
+        <button type="button" aria-label="Mais ações do assistente" aria-expanded={mobileToolsOpen} onClick={() => setMobileToolsOpen(true)} className="touch-control rounded-lg md:hidden">•••</button>
+        <MobileSheet open={mobileToolsOpen} onClose={() => setMobileToolsOpen(false)} title="Ações do assistente">
+          <div className="grid gap-2">
+            <button type="button" onClick={() => { setMobileToolsOpen(false); handleCreateNewThread(); }} className="rounded-lg border p-3 text-left">Nova conversa</button>
+            <button type="button" onClick={() => { setMobileToolsOpen(false); setIsCouncilModalOpen(true); }} className="rounded-lg border p-3 text-left">Conselho editorial</button>
+            <button type="button" onClick={() => { setMobileToolsOpen(false); setIsRoleManagerOpen(true); }} className="rounded-lg border p-3 text-left">Agentes e diretrizes</button>
+            {executionPlan.length > 0 && <button type="button" onClick={() => { setPlanHidden(false); setMobileToolsOpen(false); }} className="rounded-lg border p-3 text-left">Plano de execução</button>}
+            <h3 className="mt-3 text-sm font-semibold">Conversas</h3>
+            {threads.map((thread) => <button key={thread.id} type="button" aria-current={thread.id === activeThreadId ? 'true' : undefined} onClick={() => { switchThread(thread.id); setMobileToolsOpen(false); }} className="truncate rounded-lg border p-3 text-left">{thread.title}</button>)}
+          </div>
+        </MobileSheet>
         {/* Action icons */}
-        <div className="flex items-center gap-1">
+        <div className="hidden md:flex items-center gap-1">
           <Tooltip text="Conselho Editorial (Mesa Redonda)" position="bottom">
             <button
               type="button"
@@ -397,7 +413,7 @@ export const AgentCoPilot: React.FC = () => {
 
       {/* Brand & Palette Quick Strip */}
       <div
-        className={`mx-3 mt-2 px-2.5 py-1.5 rounded-lg border text-xs flex items-center justify-between transition-colors ${
+        className={`copilot-palette shrink-0 mx-3 mt-2 px-2.5 py-1.5 rounded-lg border text-xs flex items-center justify-between transition-colors ${
           isDark
             ? 'bg-[#121215] border-zinc-800 text-zinc-300'
             : 'bg-zinc-50 border-zinc-200 text-zinc-700'

@@ -1,3 +1,4 @@
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -153,7 +154,7 @@ export const StudioSystemDesignModal: React.FC = () => {
   const currentAgent = agentsList.find((a) => a.role === selectedRole) || agentsList[0];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs select-none">
+    <ResponsiveModal label="Sistema editorial" onDismiss={closeSystemDesignModal} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs select-none">
       <div
         className={`w-full max-w-5xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[92vh] transition-all animate-in fade-in zoom-in-95 ${
           isDark
@@ -602,6 +603,6 @@ export const StudioSystemDesignModal: React.FC = () => {
           </button>
         </div>
       </div>
-    </div>
+    </ResponsiveModal>
   );
 };

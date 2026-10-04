@@ -1,3 +1,4 @@
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import React, { useState, useRef } from 'react';
 import {
   Upload,
@@ -350,7 +351,7 @@ export const StudioExcelImportModal: React.FC = () => {
   if (!isExcelImportModalOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs select-none">
+    <ResponsiveModal label="Importar produtos" onDismiss={closeExcelImportModal} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs select-none">
       <div
         className={`w-full max-w-3xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transition-all animate-in fade-in zoom-in-95 ${
           isDark
@@ -832,6 +833,6 @@ export const StudioExcelImportModal: React.FC = () => {
           </div>
         )}
       </div>
-    </div>
+    </ResponsiveModal>
   );
 };

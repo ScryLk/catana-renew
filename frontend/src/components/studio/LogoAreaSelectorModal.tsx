@@ -1,3 +1,4 @@
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X,
@@ -359,7 +360,7 @@ export const LogoAreaSelectorModal: React.FC<LogoAreaSelectorModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 select-none">
+    <ResponsiveModal label="Selecionar logomarca" onDismiss={onClose} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 select-none">
       <div
         className={`w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${
           isDark
@@ -761,6 +762,6 @@ export const LogoAreaSelectorModal: React.FC<LogoAreaSelectorModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </ResponsiveModal>
   );
 };

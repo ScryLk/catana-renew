@@ -1,9 +1,5 @@
 import { type FC, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Sidebar
-} from '../components/Sidebar';
-import { Header } from '../components/Header';
 import { productService, Product } from '../services/productService';
 import { categoryService, Category } from '../services/categoryService';
 import { Checkbox } from '../components/ui/checkbox';
@@ -188,12 +184,11 @@ export const Products: FC = () => {
   const hasActiveFilters = selectedCategory || selectedStatus || searchTerm;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-zinc-950">
-      <Sidebar />
-      <Header />
+    <div className="min-h-full bg-gray-50 dark:bg-zinc-950">
 
-      <main className="ml-16 pt-20">
-        <div className="p-8 max-w-[1600px] mx-auto">
+
+      <main className="min-w-0">
+        <div className="max-w-[1600px] mx-auto">
           {/* Header */}
           <div className="mb-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
@@ -203,7 +198,7 @@ export const Products: FC = () => {
                   Gerencie e organize seus produtos
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={() => setShowExportModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors font-medium text-sm"
@@ -231,7 +226,7 @@ export const Products: FC = () => {
 
           {/* Search and Filters */}
           <div className="mb-6 flex flex-wrap items-center gap-3">
-            <div className="flex-1 relative min-w-[240px]">
+            <div className="flex-1 relative min-w-0 w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 w-4 h-4" />
               <input
                 type="text"
@@ -366,8 +361,8 @@ export const Products: FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="overflow-x-auto max-h-[calc(100vh-300px)] overflow-y-auto">
-                <table className="w-full text-left text-sm">
+              <div className="overflow-x-auto md:max-h-[calc(100dvh-300px)] overflow-y-auto">
+                <table className="responsive-records w-full text-left text-sm">
                   <thead className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10">
                     <tr>
                       <th className="w-12 px-6 py-4">
@@ -387,7 +382,7 @@ export const Products: FC = () => {
                   <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                     {products.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-zinc-500 dark:text-zinc-400">
+                        <td data-label="Selecionar" colSpan={7} className="px-6 py-12 text-center text-zinc-500 dark:text-zinc-400">
                           <div className="flex flex-col items-center justify-center">
                             <Package className="w-12 h-12 text-zinc-200 dark:text-zinc-700 mb-3" strokeWidth={1.5} />
                             <p className="text-base font-medium text-zinc-900 dark:text-zinc-100">Nenhum produto encontrado</p>
@@ -411,17 +406,17 @@ export const Products: FC = () => {
                             key={product.id}
                             className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors"
                           >
-                            <td className="px-6 py-4">
+                            <td data-label="Selecionar" className="px-6 py-4">
                               <Checkbox
                                 checked={selectedProducts.has(product.id)}
                                 onCheckedChange={() => toggleSelectProduct(product.id)}
                               />
                             </td>
-                            <td className="px-6 py-4">
+                            <td data-label="Produto" className="px-6 py-4">
                               <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex-shrink-0 overflow-hidden border border-zinc-200 dark:border-zinc-700 flex items-center justify-center">
                                   {product.image_url ? (
-                                    <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                                    <img loading="lazy" decoding="async" src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                                   ) : (
                                     <Package className="w-6 h-6 text-zinc-300 dark:text-zinc-600" />
                                   )}
@@ -434,13 +429,13 @@ export const Products: FC = () => {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-sm text-zinc-600 dark:text-zinc-300">
+                            <td data-label="Categoria" className="px-6 py-4 text-sm text-zinc-600 dark:text-zinc-300">
                               {category?.name || '-'}
                             </td>
-                            <td className="px-6 py-4 text-sm text-zinc-900 dark:text-zinc-100 font-medium">
+                            <td data-label="Preço" className="px-6 py-4 text-sm text-zinc-900 dark:text-zinc-100 font-medium">
                               {formatPrice(Number(product.price), product.currency)}
                             </td>
-                            <td className="px-6 py-4">
+                            <td data-label="Status" className="px-6 py-4">
                               <span
                                 className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${isActive
                                   ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/10 dark:text-green-400 dark:border-green-900/20'
@@ -451,10 +446,10 @@ export const Products: FC = () => {
                                 {isActive ? 'Ativo' : 'Inativo'}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400">
+                            <td data-label="Atualizado em" className="px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400">
                               {formatDate(product.updated_at || product.created_at)}
                             </td>
-                            <td className="px-6 py-4">
+                            <td data-label="Ações" className="px-6 py-4">
                               <div className="flex items-center justify-end gap-2">
                                 <button
                                   onClick={() => navigate(`/products/${product.id}`)}

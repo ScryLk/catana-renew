@@ -1,3 +1,4 @@
+import { cn } from '../../lib/utils';
 import React from 'react';
 import { CatalogPageData } from '../../data/editorialCatalog.mock';
 
@@ -40,7 +41,7 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
                 }}
               >
                 {isImg && b.imageUrl ? (
-                  <img src={b.imageUrl} alt="" className="w-full h-full object-cover" />
+                  <img loading="lazy" decoding="async" src={b.imageUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <div
                     className="w-full h-full overflow-hidden"
@@ -72,6 +73,7 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
             >
               {page.editorialImage ? (
                 <img
+                  loading="lazy" decoding="async"
                   src={page.editorialImage}
                   alt="Logo"
                   className="w-full h-full object-contain"
@@ -135,6 +137,7 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-1.5 overflow-hidden">
             {page.editorialImage && (
               <img
+                  loading="lazy" decoding="async"
                 src={page.editorialImage}
                 alt=""
                 className="absolute inset-0 w-full h-full object-cover"
@@ -163,6 +166,7 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
                 <div className="w-full h-18 bg-stone-100 overflow-hidden rounded-xs flex items-center justify-center">
                   {page.products[0].image ? (
                     <img
+                  loading="lazy" decoding="async"
                       src={page.products[0].image}
                       alt=""
                       className="w-full h-full object-cover"
@@ -202,7 +206,7 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
                   <div key={prod.id || idx} className="flex flex-col gap-0.5">
                     <div className="w-full h-10 bg-stone-100 overflow-hidden rounded-xs flex items-center justify-center">
                       {prod.image ? (
-                        <img src={prod.image} alt="" className="w-full h-full object-cover" />
+                        <img loading="lazy" decoding="async" src={prod.image} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-[5px] text-stone-400 font-mono">FOTO</span>
                       )}
@@ -236,6 +240,7 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
                 <div className="w-14 h-16 bg-stone-100 overflow-hidden rounded-xs flex items-center justify-center">
                   {page.products[0].image ? (
                     <img
+                  loading="lazy" decoding="async"
                       src={page.products[0].image}
                       alt=""
                       className="w-full h-full object-cover"
@@ -275,7 +280,7 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
                   <div key={prod.id || idx} className="flex flex-col gap-0.2">
                     <div className="w-full h-7 bg-stone-100 overflow-hidden rounded-xs flex items-center justify-center">
                       {prod.image ? (
-                        <img src={prod.image} alt="" className="w-full h-full object-cover" />
+                        <img loading="lazy" decoding="async" src={prod.image} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-[4px] text-stone-400 font-mono">FOTO</span>
                       )}
@@ -336,11 +341,11 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`relative w-24 h-34 rounded-sm border overflow-hidden select-none transition-all flex flex-col justify-between p-2 cursor-pointer ${
+      className={cn(`relative w-24 h-34 rounded-sm border overflow-hidden select-none transition-all flex flex-col justify-between p-2 cursor-pointer ${
         isSelected
           ? 'ring-2 ring-white border-white shadow-md'
           : 'border-zinc-700/60 hover:border-zinc-400 opacity-90 hover:opacity-100'
-      } ${className}`}
+      }`, className)}
       style={{
         backgroundColor: page.backgroundColor,
         color: page.textColor,

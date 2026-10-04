@@ -114,21 +114,21 @@ export const ContextSelector: FC = () => {
   const currentOrg = organizations.find(o => o.id === activeOrg?.id);
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative min-w-0" ref={dropdownRef}>
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 outline-none border",
+          "flex w-full lg:w-auto min-w-0 items-center gap-2 px-2 lg:px-3 py-2 rounded-lg transition-all duration-200 outline-none border",
           isOpen
-            ? "bg-zinc-800 border-zinc-700 shadow-lg"
-            : "bg-zinc-900/50 border-zinc-800 hover:bg-zinc-800 hover:border-zinc-700"
+            ? "bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 shadow-lg"
+            : "bg-white dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:border-zinc-700"
         )}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <Building2 className="w-4 h-4 text-violet-400" />
-          <div className="flex flex-col items-start">
-            <span className="text-xs font-medium text-zinc-100">
+          <div className="flex min-w-0 flex-col items-start">
+            <span className="max-w-[120px] lg:max-w-none truncate text-xs font-medium text-zinc-900 dark:text-zinc-100">
               {activeOrg?.name || 'Selecione uma organização'}
             </span>
             {activeSede && (
@@ -149,10 +149,10 @@ export const ContextSelector: FC = () => {
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 w-80 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2 fade-in duration-200 z-50">
+        <div className="absolute top-full left-0 mt-2 w-[min(320px,calc(100vw-24px))] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2 fade-in duration-200 z-50">
           {/* Header */}
-          <div className="p-3 border-b border-zinc-800 bg-zinc-900/50">
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+          <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50">
+            <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
               Contexto Ativo
             </p>
           </div>
@@ -172,12 +172,12 @@ export const ContextSelector: FC = () => {
                       "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer text-left",
                       activeOrg?.id === org.id
                         ? "bg-violet-500/10 border border-violet-500/20"
-                        : "hover:bg-zinc-800 border border-transparent"
+                        : "hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-transparent"
                     )}
                   >
                     <div className={cn(
                       "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                      activeOrg?.id === org.id ? "bg-violet-500/20" : "bg-zinc-800"
+                      activeOrg?.id === org.id ? "bg-violet-500/20" : "bg-zinc-100 dark:bg-zinc-800"
                     )}>
                       {org.logo ? (
                         <img src={org.logo} alt={org.name} className="w-full h-full object-cover rounded-lg" />
@@ -190,7 +190,7 @@ export const ContextSelector: FC = () => {
                     <div className="flex-1 min-w-0">
                       <p className={cn(
                         "text-sm font-medium truncate",
-                        activeOrg?.id === org.id ? "text-violet-400" : "text-zinc-300"
+                        activeOrg?.id === org.id ? "text-violet-400" : "text-zinc-700 dark:text-zinc-300"
                       )}>
                         {org.name}
                       </p>
@@ -208,7 +208,7 @@ export const ContextSelector: FC = () => {
 
                   {/* Sedes List (only show if org is active) */}
                   {activeOrg?.id === org.id && currentOrg?.sedes && currentOrg.sedes.length > 0 && (
-                    <div className="ml-6 pl-3 border-l-2 border-zinc-800 space-y-1 py-1">
+                    <div className="ml-6 pl-3 border-l-2 border-zinc-200 dark:border-zinc-800 space-y-1 py-1">
                       <p className="text-[9px] font-semibold text-zinc-600 uppercase tracking-wider px-2 py-1">
                         Sedes
                       </p>
@@ -222,7 +222,7 @@ export const ContextSelector: FC = () => {
                               "w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer text-left text-xs",
                               activeSede?.id === sede.id
                                 ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                                : "hover:bg-zinc-800 text-zinc-400 border border-transparent"
+                                : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-transparent"
                             )}
                           >
                             <MapPin className={cn(
@@ -247,12 +247,12 @@ export const ContextSelector: FC = () => {
           </div>
 
           {/* Footer */}
-          <div className="p-2 border-t border-zinc-800 bg-zinc-900/50">
+          <div className="p-2 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50">
             <button
               onClick={() => {
                 window.location.href = '/organizations';
               }}
-              className="w-full px-3 py-2 text-xs text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer text-center"
+              className="w-full px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer text-center"
             >
               Gerenciar Organizações e Sedes
             </button>
