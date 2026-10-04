@@ -19,7 +19,7 @@ import { useStudioStore, Brand } from '../../store/studioStore';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
 
-export const StudioSidebar: React.FC = () => {
+export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNavigate?: () => void }> = ({ mobile = false, compact = false, onNavigate }) => {
   const { user, logout, isAuthenticated, openAuthModal } = useAuthStore();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -155,17 +155,20 @@ export const StudioSidebar: React.FC = () => {
 
   const handleSelectCatalog = (catalogId: string) => {
     loadExistingCatalog(catalogId);
+    onNavigate?.();
   };
 
   const handleNewCatalog = () => {
     openNewCatalogModal();
+    onNavigate?.();
   };
 
-  if (!isStudioSidebarOpen) return null;
+  if (!mobile && !isStudioSidebarOpen) return null;
 
   return (
     <aside
-      className={`w-64 sm:w-68 h-dvh flex flex-col shrink-0 border-r select-none z-30 transition-all duration-200 ${
+      onClick={(event) => { if ((event.target as HTMLElement).closest('[data-close-navigation="true"]')) onNavigate?.(); }}
+      className={`${mobile ? 'w-full h-full' : compact ? 'w-52 h-full' : 'w-64 sm:w-68 h-dvh'} flex flex-col shrink-0 border-r select-none z-30 transition-all duration-200 ${
         isDark
           ? 'bg-[#0b0b0e] border-zinc-800 text-zinc-300'
           : 'bg-[#f9f9fb] border-zinc-200 text-zinc-700'
@@ -175,7 +178,7 @@ export const StudioSidebar: React.FC = () => {
       <div className="h-13 px-3.5 flex items-center justify-between border-b border-inherit shrink-0">
         <button
           type="button"
-          onClick={resetToHome}
+          data-close-navigation="true" onClick={resetToHome}
           className="flex items-center gap-2 cursor-pointer group bg-transparent border-none p-0"
           title="Ir para o início"
         >
@@ -206,7 +209,7 @@ export const StudioSidebar: React.FC = () => {
 
         <button
           type="button"
-          onClick={toggleStudioSidebar}
+          onClick={mobile ? onNavigate : toggleStudioSidebar}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
             isDark
               ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100'
@@ -389,6 +392,7 @@ export const StudioSidebar: React.FC = () => {
                           e.stopPropagation();
                           setActiveBrandId(brand.id);
                           openNewCatalogModal();
+    onNavigate?.();
                         }}
                         className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded transition-all cursor-pointer shrink-0 border ${
                           isDark
@@ -539,7 +543,6 @@ export const StudioSidebar: React.FC = () => {
           )}
         </div>
       </div>
-
 
       {/* Footer: Status, Theme & Account */}
       {(() => {

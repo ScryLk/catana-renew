@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 
 interface GlobalSearchDropdownProps {
   isOpen: boolean;
+  inline?: boolean;
   onClose: () => void;
   inputValue: string;
   inputRef: React.RefObject<HTMLInputElement | null>;
@@ -13,6 +14,7 @@ interface GlobalSearchDropdownProps {
 
 export const GlobalSearchDropdown: FC<GlobalSearchDropdownProps> = ({
   isOpen,
+  inline = false,
   onClose,
   inputValue,
   inputRef,
@@ -151,7 +153,7 @@ export const GlobalSearchDropdown: FC<GlobalSearchDropdownProps> = ({
     return (
       <div
         ref={dropdownRef}
-        className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-lg z-50 p-4"
+        className={`${inline ? 'relative' : 'absolute top-full left-0 right-0'} mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-lg z-50 p-4`}
       >
         <div className="flex items-center justify-center text-zinc-500 dark:text-zinc-400 text-sm">
           <Search className="w-4 h-4 mr-2" />
@@ -166,7 +168,7 @@ export const GlobalSearchDropdown: FC<GlobalSearchDropdownProps> = ({
     return (
       <div
         ref={dropdownRef}
-        className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-lg z-50 p-4"
+        className={`${inline ? 'relative' : 'absolute top-full left-0 right-0'} mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-lg z-50 p-4`}
       >
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
@@ -188,7 +190,7 @@ export const GlobalSearchDropdown: FC<GlobalSearchDropdownProps> = ({
     return (
       <div
         ref={dropdownRef}
-        className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-lg z-50 p-8 text-center"
+        className={`${inline ? 'relative' : 'absolute top-full left-0 right-0'} mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-lg z-50 p-8 text-center`}
       >
         <Search className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
         <p className="text-zinc-600 dark:text-zinc-400 font-medium">Nenhum resultado encontrado</p>
@@ -204,7 +206,7 @@ export const GlobalSearchDropdown: FC<GlobalSearchDropdownProps> = ({
   return (
     <div
       ref={dropdownRef}
-      className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl z-50 max-h-[400px] overflow-y-auto"
+      className={`${inline ? 'relative' : 'absolute top-full left-0 right-0'} mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl z-50 max-h-[400px] overflow-y-auto`}
     >
       {/* Perfis */}
       {results && results.profiles.length > 0 && (

@@ -6,7 +6,6 @@ import { MessageSquare, Send, User as UserIcon, Loader2, Search, ArrowLeft, Pack
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
-import { Sidebar } from '../components/Sidebar';
 
 export function Inbox() {
     const { user } = useAuthStore();
@@ -123,11 +122,10 @@ export function Inbox() {
     };
 
     return (
-        <div className="flex h-screen bg-white dark:bg-black overflow-hidden">
-            <Sidebar />
+        <div className="flex h-full bg-white dark:bg-black overflow-hidden">
 
             {/* Main Content Area (Push right by sidebar width) */}
-            <div className="flex-1 flex ml-16 h-full">
+            <div className="flex-1 flex min-w-0 h-full">
 
                 {/* Sidebar List (Conversation List) */}
                 <div className={cn(
@@ -174,6 +172,8 @@ export function Inbox() {
                             conversations.map((conv) => (
                                 <div
                                     key={conv.id}
+                                    role="button" tabIndex={0}
+                                    onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleConversationClick(conv); } }}
                                     onClick={() => handleConversationClick(conv)}
                                     className={cn(
                                         "group relative p-3 rounded-lg cursor-pointer transition-all duration-200",
@@ -249,20 +249,20 @@ export function Inbox() {
                             <div className="flex-1 flex flex-col h-full animate-in fade-in duration-300 slide-in-from-bottom-2" >
                                 {/* Chat Header */}
                                 <div className="h-16 px-6 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-10">
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex min-w-0 items-center gap-4">
                                         <button
-                                            className="md:hidden p-2 -ml-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                                            aria-label="Voltar às conversas" className="md:hidden p-2 -ml-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
                                             onClick={() => setSelectedConversation(null)}
                                         >
                                             <ArrowLeft className="w-5 h-5" />
                                         </button>
 
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex flex-wrap items-center gap-3">
                                             <div className="w-8 h-8 rounded bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-zinc-500">
                                                 {selectedConversation.origin_type === 'catalog' ? <Search className="w-4 h-4" /> : <Package className="w-4 h-4" />}
                                             </div>
                                             <div>
-                                                <h2 className="text-sm font-semibold text-zinc-900 dark:text-white leading-none mb-1">
+                                                <h2 className="truncate max-w-[calc(100vw-150px)] md:max-w-none text-sm font-semibold text-zinc-900 dark:text-white leading-none mb-1">
                                                     {selectedConversation.context?.title || `Conversa #${selectedConversation.id} `}
                                                 </h2>
                                                 <div className="flex items-center gap-2">
@@ -341,7 +341,7 @@ export function Inbox() {
                                             value={newMessage}
                                             onChange={(e) => setNewMessage(e.target.value)}
                                             placeholder="Digite sua mensagem..."
-                                            className="flex-1 bg-transparent border-0 px-4 py-2.5 text-sm focus:ring-0 placeholder:text-zinc-400 dark:text-white min-h-[44px]"
+                                            aria-label="Mensagem" className="min-w-0 flex-1 bg-transparent border-0 px-4 py-2.5 text-sm focus:ring-0 placeholder:text-zinc-400 dark:text-white min-h-[44px]"
                                         />
                                         <button
                                             type="submit"

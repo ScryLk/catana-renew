@@ -309,7 +309,7 @@ export const AgentChatStream: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar px-3 py-4 space-y-4 text-xs select-text">
+    <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-3 py-4 space-y-4 text-xs select-text">
       {displayMessages.length === 0 && (
         <div className="h-full flex flex-col items-center justify-center text-center p-4 space-y-3">
           <div

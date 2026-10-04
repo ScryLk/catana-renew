@@ -62,13 +62,13 @@ export const RecentCatalogs: FC = () => {
   if (isLoading) {
     return (
       <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-zinc-100">Meus Catálogos</h2>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Meus Catálogos</h2>
         </div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 flex items-center justify-center h-64">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-8 flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-zinc-100 mx-auto mb-4"></div>
-            <p className="text-zinc-400">Carregando catálogos...</p>
+            <p className="text-zinc-600 dark:text-zinc-400">Carregando catálogos...</p>
           </div>
         </div>
       </section>
@@ -78,13 +78,13 @@ export const RecentCatalogs: FC = () => {
   if (catalogs.length === 0) {
     return (
       <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-zinc-100">Meus Catálogos</h2>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Meus Catálogos</h2>
         </div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-8 text-center">
           <BookOpen className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
-          <h3 className="text-zinc-100 font-medium mb-1">Você ainda não possui catálogos cadastrados</h3>
-          <p className="text-zinc-400 mb-6">Crie seu primeiro catálogo para começar.</p>
+          <h3 className="text-zinc-900 dark:text-zinc-100 font-medium mb-1">Você ainda não possui catálogos cadastrados</h3>
+          <p className="text-zinc-600 dark:text-zinc-400 mb-6">Crie seu primeiro catálogo para começar.</p>
           <Button
             onClick={() => navigate('/editor')}
             variant="default"
@@ -107,7 +107,7 @@ export const RecentCatalogs: FC = () => {
         );
       case 'draft':
         return (
-          <span className="px-3 py-1 rounded-full text-xs font-medium bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
+          <span className="px-3 py-1 rounded-full text-xs font-medium bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20">
             Rascunho
           </span>
         );
@@ -138,14 +138,14 @@ export const RecentCatalogs: FC = () => {
 
   return (
     <section>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-zinc-100">Meus Catálogos</h2>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+        <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Meus Catálogos</h2>
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="relative min-w-0 flex-1">
             <input
               type="text"
               placeholder="Buscar..."
-              className="w-64 h-9 pl-9 pr-4 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-700 focus:border-transparent"
+              aria-label="Buscar catálogos recentes" className="w-full md:w-64 h-9 pl-9 pr-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-700 focus:border-transparent"
             />
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500"
@@ -161,29 +161,29 @@ export const RecentCatalogs: FC = () => {
               />
             </svg>
           </div>
-          <button className="p-2 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer">
-            <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button aria-label="Filtrar catálogos" className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer">
+            <svg className="w-5 h-5 text-zinc-600 dark:text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
             </svg>
           </button>
         </div>
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="border-b border-zinc-800">
+          <table className="responsive-records w-full">
+            <thead className="border-b border-zinc-200 dark:border-zinc-800">
               <tr>
-                <th className="text-left py-4 px-6 text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                <th className="text-left py-4 px-6 text-xs font-medium text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
                   Nome do Catálogo
                 </th>
-                <th className="text-left py-4 px-6 text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                <th className="text-left py-4 px-6 text-xs font-medium text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="text-left py-4 px-6 text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                <th className="text-left py-4 px-6 text-xs font-medium text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
                   Última Atualização
                 </th>
-                <th className="text-left py-4 px-6 text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                <th className="text-left py-4 px-6 text-xs font-medium text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
                   Ações
                 </th>
               </tr>
@@ -202,26 +202,26 @@ export const RecentCatalogs: FC = () => {
                   <tr
                     key={catalog.id}
                     onClick={() => navigate(`/editor/${catalog.id}`)}
-                    className="hover:bg-zinc-800/50 transition-colors cursor-pointer"
+                    className="hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer"
                   >
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-3">
+                    <td data-label="Catálogo" className="py-4 px-6">
+                      <div className="flex min-w-0 items-center gap-3">
                         <div className={`w-10 h-10 rounded-lg ${color.bg} flex items-center justify-center`}>
                           <BookOpen className={`w-5 h-5 ${color.text}`} />
                         </div>
                         <div>
-                          <p className="font-medium text-zinc-100">{catalog.title}</p>
-                          <p className="text-sm text-zinc-400">{catalog.pages_count || 0} páginas</p>
+                          <button type="button" className="text-left font-medium text-zinc-900 dark:text-zinc-100" onClick={(event) => { event.stopPropagation(); navigate(`/editor/${catalog.id}`); }}>{catalog.title}</button>
+                          <p className="text-sm text-zinc-600 dark:text-zinc-400">{catalog.pages_count || 0} páginas</p>
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-6">
+                    <td data-label="Status" className="py-4 px-6">
                       {getStatusBadge(catalog.status || 'published')}
                     </td>
-                    <td className="py-4 px-6 text-zinc-400">
+                    <td data-label="Atualizado em" className="py-4 px-6 text-zinc-600 dark:text-zinc-400">
                       {formatDate(catalog.updated_at)}
                     </td>
-                    <td className="py-4 px-6">
+                    <td data-label="Ações" className="py-4 px-6">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -236,7 +236,7 @@ export const RecentCatalogs: FC = () => {
                         className="p-2 hover:bg-red-900/20 rounded-lg transition-colors cursor-pointer group"
                         title="Excluir catálogo"
                       >
-                        <Trash2 className="w-5 h-5 text-zinc-400 group-hover:text-red-400" />
+                        <Trash2 className="w-5 h-5 text-zinc-600 dark:text-zinc-400 group-hover:text-red-400" />
                       </button>
                     </td>
                   </tr>

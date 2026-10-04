@@ -1,3 +1,4 @@
+import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
 import { useState } from 'react';
 import type { FC } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,6 +36,7 @@ export const MediaCard: FC<MediaCardProps> = ({
   onDoubleClick,
   selected = false,
 }) => {
+  const { isCompact } = useResponsiveLayout();
   const [showActions, setShowActions] = useState(false);
   const [imageError, setImageError] = useState(false);
 
@@ -92,7 +94,7 @@ export const MediaCard: FC<MediaCardProps> = ({
       <div className="aspect-square bg-muted relative overflow-hidden">
         {media.media_type === 'image' && !imageError ? (
           <img
-            src={media.file}
+            loading="lazy" decoding="async" src={media.file}
             alt={media.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={handleImageError}
@@ -110,8 +112,8 @@ export const MediaCard: FC<MediaCardProps> = ({
         )}
 
         {/* Overlay com ações */}
-        {showActions && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2 transition-opacity">
+        {(showActions || isCompact) && (
+          <div className={`absolute ${isCompact ? 'inset-x-0 bottom-0 min-h-11' : 'inset-0'} bg-black/50 flex items-center justify-center gap-2 transition-opacity`}>
             <Button
               size="sm"
               variant="ghost"
@@ -121,7 +123,7 @@ export const MediaCard: FC<MediaCardProps> = ({
                 handleDownload();
               }}
             >
-              <Download className="h-4 w-4" />
+              <Download className="h-4 w-4" /><span className="sr-only">Baixar arquivo</span>
             </Button>
 
             {onMove && (
@@ -148,7 +150,7 @@ export const MediaCard: FC<MediaCardProps> = ({
                   onDelete(media.id);
                 }}
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-4 w-4" /><span className="sr-only">Excluir arquivo</span>
               </Button>
             )}
           </div>
@@ -182,6 +184,7 @@ export const MediaCard: FC<MediaCardProps> = ({
 
       {/* Informações */}
       <CardContent className="p-3">
+        {onDoubleClick && <button type="button" onClick={(event) => { event.stopPropagation(); onDoubleClick(media); }} className="mb-2 min-h-11 w-full rounded-lg border px-3 text-sm md:hidden" aria-label={`Abrir ${media.name}`}>Abrir arquivo</button>}
         <h3 className="font-medium text-sm text-foreground truncate mb-1">{media.name}</h3>
 
         <div className="flex items-center justify-between text-xs text-muted-foreground">

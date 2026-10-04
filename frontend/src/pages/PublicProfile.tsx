@@ -167,7 +167,7 @@ export const PublicProfilePage: FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
+      <div className="min-h-full bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
@@ -175,7 +175,7 @@ export const PublicProfilePage: FC = () => {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
+      <div className="min-h-full bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
         <div className="text-center">
           <User className="w-16 h-16 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
@@ -202,7 +202,7 @@ export const PublicProfilePage: FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-full bg-zinc-50 dark:bg-zinc-950">
       {/* Cover Image */}
       <div className="relative h-64 bg-gradient-to-br from-blue-600 to-purple-600">
         {profile.coverImage && (
@@ -430,7 +430,7 @@ export const PublicProfilePage: FC = () => {
 
                     {/* Stats */}
                     <div className="flex items-center justify-between pt-3 border-t border-zinc-200 dark:border-zinc-800">
-                      <div className="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
                         <div className="flex items-center gap-1">
                           <Eye className="w-4 h-4" />
                           {catalog.viewCount}

@@ -1,3 +1,4 @@
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Sparkles,
@@ -164,7 +165,7 @@ export const SkillsCatalogModal: React.FC = () => {
   if (!isSkillsModalOpen) return null;
 
   return (
-    <div
+    <ResponsiveModal label="Habilidades" onDismiss={() => setIsSkillsModalOpen(false)}
       className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-150"
       onClick={() => setIsSkillsModalOpen(false)}
       role="dialog"
@@ -246,7 +247,6 @@ export const SkillsCatalogModal: React.FC = () => {
                   ? 'bg-zinc-900/90 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-600 focus:bg-zinc-900'
                   : 'bg-white border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400'
               }`}
-              autoFocus
             />
             {searchQuery && (
               <button
@@ -491,6 +491,6 @@ export const SkillsCatalogModal: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </ResponsiveModal>
   );
 };

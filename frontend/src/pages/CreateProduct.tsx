@@ -1,8 +1,6 @@
 import type { FC } from 'react';
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Sidebar } from '../components/Sidebar';
-import { Header } from '../components/Header';
 import { FiSave, FiUpload, FiX } from 'react-icons/fi'; // Using react-icons for consistency within this file initially, or use lucide
 import { Image as ImageIcon } from 'lucide-react'; // Mixing is fine if needed
 import { Input } from '../components/ui/input';
@@ -246,7 +244,7 @@ export const CreateProduct: FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center">
+      <div className="min-h-full bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center">
         <div className="flex flex-col items-center">
           <div className="w-8 h-8 border-4 border-zinc-300 border-t-zinc-900 dark:border-t-white rounded-full animate-spin mb-4" />
           <p className="text-zinc-500 dark:text-zinc-400">Carregando...</p>
@@ -256,12 +254,11 @@ export const CreateProduct: FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900">
-      <Sidebar />
-      <Header />
+    <div className="min-h-full bg-zinc-50 dark:bg-zinc-900">
 
-      <main className="ml-16 pt-20">
-        <div className="p-8 max-w-[1200px] mx-auto">
+
+      <main className="min-w-0">
+        <div className="max-w-[1200px] mx-auto">
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400 mb-6">
             <span>Catana</span>
@@ -284,7 +281,6 @@ export const CreateProduct: FC = () => {
             {/* Botão de preencher dados fictícios removido temporariamente */}
           </div>
 
-
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Basic Information Card */}
             <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
@@ -297,7 +293,7 @@ export const CreateProduct: FC = () => {
                   <Label className="text-sm font-medium text-zinc-900 dark:text-white mb-2 block">
                     Imagem do Produto
                   </Label>
-                  <div className="flex items-start gap-6">
+                  <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
                     <div className="w-32 h-32 bg-zinc-50 dark:bg-zinc-900 rounded-lg border-2 border-dashed border-zinc-300 dark:border-zinc-600 flex items-center justify-center overflow-hidden relative group">
                       {previewUrl ? (
                         <>
@@ -305,7 +301,7 @@ export const CreateProduct: FC = () => {
                           <button
                             type="button"
                             onClick={handleRemoveImage}
-                            className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label="Remover imagem do produto" className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <FiX className="text-white w-6 h-6" />
                           </button>
@@ -443,7 +439,7 @@ export const CreateProduct: FC = () => {
                       <Input
                         id="price"
                         name="price"
-                        type="number"
+                        type="number" inputMode="decimal"
                         step="0.01"
                         required
                         value={formData.price}
@@ -480,7 +476,7 @@ export const CreateProduct: FC = () => {
                     <Input
                       id="stock"
                       name="stock"
-                      type="number"
+                      type="number" inputMode="numeric"
                       value={formData.stock}
                       onChange={handleChange}
                       placeholder="0"
@@ -522,7 +518,7 @@ export const CreateProduct: FC = () => {
                   {/* Dimensões */}
                   <div>
                     <h4 className="font-medium text-sm text-zinc-900 dark:text-white mb-3">Dimensões da Embalagem</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="width" className="text-sm text-zinc-700 dark:text-zinc-300">
                           Largura (cm)
@@ -530,7 +526,7 @@ export const CreateProduct: FC = () => {
                         <Input
                           id="width"
                           name="width"
-                          type="number"
+                          type="number" inputMode="decimal"
                           step="0.01"
                           value={formData.width}
                           onChange={handleChange}
@@ -545,7 +541,7 @@ export const CreateProduct: FC = () => {
                         <Input
                           id="height"
                           name="height"
-                          type="number"
+                          type="number" inputMode="decimal"
                           step="0.01"
                           value={formData.height}
                           onChange={handleChange}
@@ -560,7 +556,7 @@ export const CreateProduct: FC = () => {
                         <Input
                           id="depth"
                           name="depth"
-                          type="number"
+                          type="number" inputMode="decimal"
                           step="0.01"
                           value={formData.depth}
                           onChange={handleChange}
@@ -575,7 +571,7 @@ export const CreateProduct: FC = () => {
                         <Input
                           id="weight"
                           name="weight"
-                          type="number"
+                          type="number" inputMode="decimal"
                           step="0.01"
                           value={formData.weight}
                           onChange={handleChange}
@@ -630,7 +626,7 @@ export const CreateProduct: FC = () => {
                         <Input
                           id="leadTime"
                           name="leadTime"
-                          type="number"
+                          type="number" inputMode="decimal"
                           value={formData.leadTime}
                           onChange={handleChange}
                           placeholder="Ex: 7"
@@ -646,7 +642,7 @@ export const CreateProduct: FC = () => {
                           <Input
                             id="shippingCost"
                             name="shippingCost"
-                            type="number"
+                            type="number" inputMode="decimal"
                             step="0.01"
                             value={formData.shippingCost}
                             onChange={handleChange}

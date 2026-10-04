@@ -1,3 +1,8 @@
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { MobileSheet } from '../components/mobile/MobileSheet';
+import { StudioResponsiveProvider } from '../components/studio/StudioResponsiveProvider';
+import { useStudioResponsive } from '../hooks/useStudioResponsive';
+import { StudioMobileNavigation } from '../components/studio/StudioMobileNavigation';
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { PanelLeftOpen, Plus } from 'lucide-react';
@@ -20,10 +25,13 @@ import { useAuthStore, isAutoLoginSettled, isClerkConfigured } from '../store/au
 import { toast } from 'sonner';
 import { billingService } from '../services/billingService';
 
-export const KatanaStudio: React.FC = () => {
+const StudioLayout: React.FC = () => {
+  const { isPhone, isTablet, isCompact } = useResponsiveLayout();
+  const { pane, setPane } = useStudioResponsive();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const location = useLocation();
   const [showSplash, setShowSplash] = useState(() => {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
     const search = window.location.search || '';
     const hash = window.location.hash || '';
     // Nao exibe a tela de apresentacao caso o usuario esteja retornando de fluxo de autenticacao
@@ -182,10 +190,10 @@ export const KatanaStudio: React.FC = () => {
 
       if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
         e.preventDefault();
-        toggleStudioSidebar();
+        if (isCompact) setMobileSidebarOpen((open) => !open); else toggleStudioSidebar();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'j' || e.key === 'J')) {
         e.preventDefault();
-        toggleCoPilot();
+        if (isPhone) setPane(pane === 'assistant' ? 'catalog' : 'assistant'); else toggleCoPilot();
       } else if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'p' || e.key === 'P')) {
         e.preventDefault();
         toggleProductDrawer();
@@ -193,14 +201,14 @@ export const KatanaStudio: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleStudioSidebar, toggleCoPilot, toggleProductDrawer]);
+  }, [toggleStudioSidebar, toggleCoPilot, toggleProductDrawer, isCompact, isPhone, pane, setPane]);
 
   return (
-    <div className="h-screen w-screen flex bg-[#09090b] text-zinc-100 overflow-hidden font-sans antialiased relative">
+    <div className="studio-shell flex bg-[#09090b] text-zinc-100 overflow-hidden font-sans antialiased relative">
       {/* Splash Screen with signature drawing animation from usecatana.com.br */}
       {showSplash && (
         <KatanaSplashScreen
-          durationMs={3400}
+          durationMs={isCompact ? 600 : 3400}
           onComplete={handleSplashComplete}
         />
       )}
@@ -209,8 +217,8 @@ export const KatanaStudio: React.FC = () => {
       {isGeneratingCatalog && <CatalogGenerationExperience />}
 
       {/* Floating Sidebar Open Toggle Button when closed (ChatGPT style) */}
-      {!isStudioSidebarOpen && !hasStartedSession && (
-        <div className="fixed top-3.5 left-3.5 z-40 flex items-center gap-1.5 animate-in fade-in duration-200">
+      {!isCompact && !isStudioSidebarOpen && !hasStartedSession && (
+        <div className="hidden md:flex fixed top-3.5 left-3.5 z-40 flex items-center gap-1.5 animate-in fade-in duration-200">
           <button
             type="button"
             onClick={toggleStudioSidebar}
@@ -242,19 +250,25 @@ export const KatanaStudio: React.FC = () => {
       )}
 
       {/* ChatGPT-style Collapsible Sidebar */}
-      <StudioSidebar />
+      {isCompact ? <MobileSheet open={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} title="Catana Studio" side="left">
+        <StudioSidebar mobile onNavigate={() => setMobileSidebarOpen(false)} />
+      </MobileSheet> : <StudioSidebar compact={isTablet} /> }
 
       {/* Main Workspace: Either Home Chat or Split-Screen (Agent Studio + Living Canvas) */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+      <main className="min-w-0 min-h-0 flex-1 flex flex-col h-full overflow-hidden relative">
+        <StudioMobileNavigation onMenu={() => setMobileSidebarOpen(true)} />
         {!hasStartedSession ? (
-          <StudioHomeChat />
+          <section id="studio-assistant" role={isPhone ? 'tabpanel' : undefined} aria-label="Assistente" className="min-h-0 flex flex-1"><StudioHomeChat /></section>
         ) : (
-          <div className="flex-1 w-full flex overflow-hidden animate-in fade-in duration-300">
+          <div className="min-h-0 flex-1 w-full flex overflow-hidden animate-in fade-in duration-300">
             {/* Left: AI Agent Studio */}
-            {isCoPilotOpen && <AgentCoPilot />}
+            <section id="studio-assistant" role={isPhone ? 'tabpanel' : undefined} aria-label="Assistente"
+              hidden={isPhone ? pane !== 'assistant' : !isCoPilotOpen}
+              className={`studio-primary-pane ${isPhone ? 'w-full' : 'shrink-0'}`}><AgentCoPilot /></section>
 
             {/* Right: Living Catalog Canvas & Artifact Preview */}
-            <CatalogCanvasWorkspace />
+            <section id="studio-catalog" role={isPhone ? 'tabpanel' : undefined} aria-label="Catálogo"
+              hidden={isPhone && pane !== 'catalog'} className="studio-primary-pane flex-1"><CatalogCanvasWorkspace /></section>
           </div>
         )}
       </main>
@@ -292,3 +306,5 @@ export const KatanaStudio: React.FC = () => {
     </div>
   );
 };
+
+export const KatanaStudio: React.FC = () => <StudioResponsiveProvider><StudioLayout /></StudioResponsiveProvider>;

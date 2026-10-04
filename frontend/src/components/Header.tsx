@@ -1,3 +1,5 @@
+import { MobileSheet } from './mobile/MobileSheet';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { type FC, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -17,6 +19,8 @@ interface HeaderProps {
 }
 
 export const Header: FC<HeaderProps> = () => {
+  const { isCompact } = useResponsiveLayout();
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
 
@@ -47,8 +51,10 @@ export const Header: FC<HeaderProps> = () => {
       }
     };
 
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setIsNotifOpen(false); setIsProfileOpen(false); } };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => { document.removeEventListener('mousedown', handleClickOutside); document.removeEventListener('keydown', closeOnEscape); };
   }, []);
 
   const fetchNotifications = async (silent = false) => {
@@ -140,15 +146,22 @@ export const Header: FC<HeaderProps> = () => {
   };
 
   return (
-    <header className="h-20 bg-zinc-900 border-b border-zinc-800 fixed top-0 right-0 left-16 z-10 w-[calc(100%-4rem)]">
-      <div className="h-full flex items-center justify-between px-8">
+    <header className="management-header bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 fixed top-0 right-0 z-10">
+      <div className="h-full flex items-center justify-between gap-2 px-3 lg:px-8">
         {/* Left Side: Context Selector */}
-        <ContextSelector />
+        <div className="min-w-0 flex-1 lg:flex-none"><ContextSelector /></div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1 lg:gap-4">
           {/* Global Search with Dropdown */}
+          {isCompact ? <>
+            <button type="button" aria-label="Abrir busca global" aria-expanded={mobileSearchOpen}
+              onClick={() => setMobileSearchOpen(true)} className="touch-control rounded-lg text-zinc-700 dark:text-zinc-300">
+              <svg className="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth={2} d="m21 21-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0" /></svg>
+            </button>
+            <MobileSheet open={mobileSearchOpen} onClose={() => setMobileSearchOpen(false)} title="Busca global">
           <div className="relative">
             <input
+              autoFocus={isCompact}
               ref={searchInputRef}
               type="text"
               value={searchValue}
@@ -158,26 +171,55 @@ export const Header: FC<HeaderProps> = () => {
               }}
               onFocus={() => setIsSearchOpen(true)}
               placeholder="Buscar perfis, catálogos, produtos..."
-              className="w-96 h-11 pl-11 pr-4 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-600 focus:border-transparent"
+              aria-label="Busca global" className="w-full lg:w-96 h-11 pl-11 pr-4 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-600 focus:border-transparent"
             />
-            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600 dark:text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <GlobalSearchDropdown
+              inline={isCompact}
               isOpen={isSearchOpen}
-              onClose={() => setIsSearchOpen(false)}
+              onClose={() => { setIsSearchOpen(false); setMobileSearchOpen(false); }}
               inputValue={searchValue}
               inputRef={searchInputRef}
             />
           </div>
+              <button type="button" onClick={() => { navigate(`/search?q=${encodeURIComponent(searchValue)}`); setMobileSearchOpen(false); }}
+                className="mt-4 min-h-11 w-full rounded-lg bg-zinc-900 dark:bg-zinc-800 px-4 text-white">Ver todos os resultados</button>
+            </MobileSheet>
+          </> : (          <div className="relative">
+            <input
+              autoFocus={isCompact}
+              ref={searchInputRef}
+              type="text"
+              value={searchValue}
+              onChange={(e) => {
+                setSearchValue(e.target.value);
+                setIsSearchOpen(true);
+              }}
+              onFocus={() => setIsSearchOpen(true)}
+              placeholder="Buscar perfis, catálogos, produtos..."
+              aria-label="Busca global" className="w-full lg:w-96 h-11 pl-11 pr-4 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-600 focus:border-transparent"
+            />
+            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600 dark:text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <GlobalSearchDropdown
+              inline={isCompact}
+              isOpen={isSearchOpen}
+              onClose={() => { setIsSearchOpen(false); setMobileSearchOpen(false); }}
+              inputValue={searchValue}
+              inputRef={searchInputRef}
+            />
+          </div>)}
 
           {/* Notifications */}
           <div className="relative" ref={notifPopoverRef}>
             <button
-              onClick={() => setIsNotifOpen(!isNotifOpen)}
+              aria-label="Notificações" aria-expanded={isNotifOpen} onClick={() => setIsNotifOpen(!isNotifOpen)}
               className={cn(
                 "relative p-2 rounded-lg transition-colors outline-none cursor-pointer",
-                isNotifOpen ? "bg-zinc-800 text-zinc-100" : "hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100"
+                isNotifOpen ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100" : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
               )}
             >
               <Bell className="w-6 h-6" />
@@ -187,9 +229,9 @@ export const Header: FC<HeaderProps> = () => {
             </button>
 
             {isNotifOpen && (
-              <div className="absolute top-full right-0 mt-2 w-96 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2 fade-in duration-200 z-50">
-                <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50 backdrop-blur-sm">
-                  <h3 className="font-semibold text-zinc-100">Notificações</h3>
+              <div className="absolute max-lg:fixed max-lg:top-[var(--top-bar-height)] max-lg:right-3 top-full right-0 mt-2 w-[min(384px,calc(100vw-24px))] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2 fade-in duration-200 z-50">
+                <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-white dark:bg-zinc-900/50 backdrop-blur-sm">
+                  <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">Notificações</h3>
                   {unreadCount > 0 && (
                     <button onClick={handleMarkAllRead} className="text-xs text-blue-500 hover:text-blue-400 font-medium transition-colors flex items-center gap-1 cursor-pointer">
                       <Check className="w-3 h-3" />
@@ -207,16 +249,16 @@ export const Header: FC<HeaderProps> = () => {
                           key={notification.id}
                           onClick={() => handleNotificationClick(notification)}
                           className={cn(
-                            "w-full text-left p-4 hover:bg-zinc-800/50 transition-colors flex gap-3 group relative cursor-pointer",
-                            !notification.read_at && "bg-zinc-800/20"
+                            "w-full text-left p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors flex gap-3 group relative cursor-pointer",
+                            !notification.read_at && "bg-zinc-100 dark:bg-zinc-800/20"
                           )}
                         >
                           {!notification.read_at && <span className="absolute left-0 top-4 bottom-4 w-0.5 bg-blue-500 rounded-r-full" />}
-                          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border border-zinc-800 group-hover:border-zinc-700 transition-colors", !notification.read_at ? "bg-zinc-800" : "bg-zinc-900")}>
+                          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border border-zinc-200 dark:border-zinc-800 group-hover:border-zinc-700 transition-colors", !notification.read_at ? "bg-zinc-100 dark:bg-zinc-800" : "bg-white dark:bg-zinc-900")}>
                             {getIcon(notification.type)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={cn("text-sm mb-0.5 truncate pr-4", !notification.read_at ? "text-zinc-100 font-medium" : "text-zinc-400")}>{notification.title}</p>
+                            <p className={cn("text-sm mb-0.5 truncate pr-4", !notification.read_at ? "text-zinc-900 dark:text-zinc-100 font-medium" : "text-zinc-600 dark:text-zinc-400")}>{notification.title}</p>
                             <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed mb-1.5">{notification.content}</p>
                             <span className="text-[10px] text-zinc-600 block">{new Date(notification.created_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
@@ -225,7 +267,7 @@ export const Header: FC<HeaderProps> = () => {
                     </div>
                   ) : (
                     <div className="p-12 text-center">
-                      <div className="w-12 h-12 bg-zinc-800/50 rounded-full flex items-center justify-center mx-auto mb-3"><Bell className="w-5 h-5 text-zinc-600" /></div>
+                      <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800/50 rounded-full flex items-center justify-center mx-auto mb-3"><Bell className="w-5 h-5 text-zinc-600" /></div>
                       <p className="text-zinc-500 text-sm">Nenhuma notificação por enquanto</p>
                     </div>
                   )}
@@ -237,32 +279,32 @@ export const Header: FC<HeaderProps> = () => {
           {/* Profile Dropdown */}
           <div className="relative" ref={profileRef}>
             <button
-              onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="flex items-center gap-3 hover:bg-zinc-800 rounded-lg p-2 transition-colors group outline-none cursor-pointer"
+              aria-label="Menu do perfil" aria-expanded={isProfileOpen} onClick={() => setIsProfileOpen(!isProfileOpen)}
+              className="flex items-center gap-1 lg:gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg p-2 transition-colors group outline-none cursor-pointer"
             >
               <img
                 src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.name || 'User'}&background=8b5cf6&color=fff`}
                 alt={user?.name || "User"}
-                className="w-8 h-8 rounded-full border border-zinc-700"
+                className="w-8 h-8 rounded-full border border-zinc-300 dark:border-zinc-700"
               />
               <ChevronDown className={cn(
-                "w-4 h-4 text-zinc-500 transition-transform duration-200",
-                isProfileOpen && "rotate-180 text-zinc-100"
+                "hidden lg:block w-4 h-4 text-zinc-500 transition-transform duration-200",
+                isProfileOpen && "rotate-180 text-zinc-900 dark:text-zinc-100"
               )} />
             </button>
 
             {isProfileOpen && (
-              <div className="absolute top-full right-0 mt-2 w-64 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2 fade-in duration-200 z-50">
+              <div className="absolute max-lg:fixed max-lg:top-[var(--top-bar-height)] max-lg:right-3 top-full right-0 mt-2 w-[min(256px,calc(100vw-24px))] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2 fade-in duration-200 z-50">
                 {/* Header */}
-                <div className="p-4 border-b border-zinc-800 bg-zinc-900/50">
+                <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50">
                   <div className="flex items-center gap-3 mb-3">
                     <img
                       src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.name || 'User'}&background=8b5cf6&color=fff`}
                       alt={user?.name}
-                      className="w-12 h-12 rounded-full border border-zinc-700"
+                      className="w-12 h-12 rounded-full border border-zinc-300 dark:border-zinc-700"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-zinc-100 truncate">{user?.name}</p>
+                      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{user?.name}</p>
                       <p className="text-xs text-zinc-500 truncate">{user?.email}</p>
                     </div>
                   </div>
@@ -278,7 +320,7 @@ export const Header: FC<HeaderProps> = () => {
                       </div>
                     )}
                     {user?.role === 'viewer' && (
-                      <div className="px-2 py-0.5 rounded-full bg-zinc-500/10 border border-zinc-500/20 text-[10px] font-medium text-zinc-400">
+                      <div className="px-2 py-0.5 rounded-full bg-zinc-500/10 border border-zinc-500/20 text-[10px] font-medium text-zinc-600 dark:text-zinc-400">
                         Visualizador
                       </div>
                     )}
@@ -289,34 +331,34 @@ export const Header: FC<HeaderProps> = () => {
                 <div className="p-2 space-y-1">
                   <button
                     onClick={() => { navigate('/profile'); setIsProfileOpen(false); }}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
                   >
                     <UserIcon className="w-4 h-4" />
                     <span>Meu Perfil</span>
                   </button>
                   <button
                     onClick={() => { navigate('/organizations'); setIsProfileOpen(false); }}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
                   >
                     <Building2 className="w-4 h-4" />
                     <span>Minha Empresa</span>
                   </button>
                 </div>
 
-                <div className="h-px bg-zinc-800 mx-2 my-1" />
+                <div className="h-px bg-zinc-100 dark:bg-zinc-800 mx-2 my-1" />
 
                 <div className="p-2 space-y-1">
-                  <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer">
+                  <button onClick={() => { navigate('/profile'); setIsProfileOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer">
                     <Settings className="w-4 h-4" />
                     <span>Preferências</span>
                   </button>
-                  <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer">
+                  <button onClick={() => { navigate('/transparency'); setIsProfileOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer">
                     <HelpCircle className="w-4 h-4" />
                     <span>Ajuda</span>
                   </button>
                 </div>
 
-                <div className="h-px bg-zinc-800 mx-2 my-1" />
+                <div className="h-px bg-zinc-100 dark:bg-zinc-800 mx-2 my-1" />
 
                 <div className="p-2">
                   <button

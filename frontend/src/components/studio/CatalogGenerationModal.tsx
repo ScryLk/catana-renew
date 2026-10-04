@@ -1,3 +1,4 @@
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import React, { useState, useEffect } from 'react';
 import {
   X,
@@ -62,7 +63,7 @@ export const CatalogGenerationModal: React.FC<CatalogGenerationModalProps> = ({
   };
 
   return (
-    <div
+    <ResponsiveModal label="Gerar catálogo" onDismiss={onClose}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -435,6 +436,6 @@ export const CatalogGenerationModal: React.FC<CatalogGenerationModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </ResponsiveModal>
   );
 };

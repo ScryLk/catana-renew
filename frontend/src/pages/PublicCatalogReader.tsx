@@ -1,3 +1,8 @@
+import { MobileSheet } from '../components/mobile/MobileSheet';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { usePublicationFit } from '../hooks/usePublicationFit';
+import { usePageSwipe } from '../hooks/usePageSwipe';
+import { ResponsiveModal } from '../components/mobile/ResponsiveModal';
 import { SafeImage } from '../components/studio/SafeImage';
 import { normalizeCatalogDocument } from '../data/editorialCatalog.mock';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -62,30 +67,22 @@ export const PublicCatalogReader: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Estados de navegação e visualização
-  const [viewMode, setViewMode] = useState<'spread' | 'single'>('spread');
-  const [currentSpreadIndex, setCurrentSpreadIndex] = useState<number>(0);
-  const [currentSinglePageIndex, setCurrentSinglePageIndex] = useState<number>(0);
+  const { isCompact } = useResponsiveLayout();
+  const [preferredMode, setViewMode] = useState<'spread' | 'single'>('spread');
+  const viewMode = isCompact ? 'single' : preferredMode;
+  const [currentSinglePageIndex, setCurrentSinglePageIndex] = useState(0);
+  const currentSpreadIndex = Math.floor(currentSinglePageIndex / 2);
+  const setCurrentSpreadIndex = (action: React.SetStateAction<number>) => setCurrentSinglePageIndex((current) =>
+    (typeof action === 'function' ? action(Math.floor(current / 2)) : action) * 2);
+  const { ref: readerViewportRef, fit } = usePublicationFit(viewMode === 'single' ? 490 : 980, 693, 32);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [ambientTheme, setAmbientTheme] = useState<'dark' | 'light'>('dark');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
 
   // Modal de produto
+  const [productsOpen, setProductsOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
-
-  // Auto-detectar largura de tela no mount para escolher spread vs single
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setViewMode('single');
-      } else {
-        setViewMode('spread');
-      }
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   // Busca do catálogo público
   useEffect(() => {
@@ -189,6 +186,8 @@ export const PublicCatalogReader: React.FC = () => {
     }
   }, [viewMode, totalSpreads, allPages.length]);
 
+  const swipe = usePageSwipe(handlePrev, handleNext, zoomLevel === 1 && !selectedProduct);
+
   // Controles por teclado
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -225,8 +224,7 @@ export const PublicCatalogReader: React.FC = () => {
   // Sincronizar fullscreen state
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-      setIsFullscreen(true);
+      document.documentElement.requestFullscreen?.().catch(() => {});
     } else {
       if (document.exitFullscreen) {
         document.exitFullscreen().catch(() => {});
@@ -270,7 +268,7 @@ export const PublicCatalogReader: React.FC = () => {
   // Fallback de carregamento elegante
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#09090b] text-zinc-100 flex flex-col items-center justify-center p-6">
+      <div className="min-h-dvh bg-[#09090b] text-zinc-100 flex flex-col items-center justify-center p-6">
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="size-12 rounded-2xl border border-zinc-800 bg-zinc-900/60 flex items-center justify-center animate-pulse">
             <BookOpen className="size-6 text-zinc-400" />
@@ -290,7 +288,7 @@ export const PublicCatalogReader: React.FC = () => {
   // Fallback de erro / não encontrado
   if (error || !catalog) {
     return (
-      <div className="min-h-screen bg-[#09090b] text-zinc-100 flex flex-col items-center justify-center p-6">
+      <div className="min-h-dvh bg-[#09090b] text-zinc-100 flex flex-col items-center justify-center p-6">
         <div className="max-w-md w-full rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8 text-center space-y-5 shadow-2xl">
           <div className="size-12 mx-auto rounded-2xl border border-zinc-800 bg-zinc-900 flex items-center justify-center text-zinc-400">
             <BookOpen className="size-6" />
@@ -327,13 +325,13 @@ export const PublicCatalogReader: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen flex flex-col select-none transition-colors duration-300 overflow-x-hidden ${
+      className={`public-reader flex flex-col select-none transition-colors duration-300 overflow-x-hidden ${
         isDark ? 'bg-[#09090b] text-zinc-100' : 'bg-[#EFECE6] text-zinc-900'
       }`}
     >
       {/* ================= BARRA SUPERIOR EDITORIAL ================= */}
       <header
-        className={`h-14 px-4 sm:px-6 flex items-center justify-between border-b shrink-0 z-30 transition-colors ${
+        className={`public-reader-header h-14 px-4 sm:px-6 flex items-center justify-between border-b shrink-0 z-30 transition-colors ${
           isDark
             ? 'bg-[#0c0c0f]/90 border-zinc-800/80 backdrop-blur-md'
             : 'bg-white/90 border-stone-200 backdrop-blur-md shadow-xs'
@@ -501,13 +499,13 @@ export const PublicCatalogReader: React.FC = () => {
       </header>
 
       {/* ================= ÁREA DE LEITURA (DIGITAL FLIPBOOK CANVAS) ================= */}
-      <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-8 relative overflow-hidden">
+      <main ref={readerViewportRef} {...swipe} data-testid="reader-publication-viewport" style={{ touchAction: zoomLevel === 1 ? 'pan-y pinch-zoom' : 'pan-x pan-y pinch-zoom' }} className="publication-viewport flex-1 relative overflow-auto">
         {/* Botão Anterior Flutuante */}
         <button
           type="button"
           onClick={handlePrev}
           disabled={viewMode === 'spread' ? currentSpreadIndex === 0 : currentSinglePageIndex === 0}
-          className={`absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-20 size-11 rounded-full border flex items-center justify-center transition-all cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed shadow-xl ${
+          className={`absolute left-3 sm:left-6 bottom-3 md:bottom-auto md:top-1/2 md:-translate-y-1/2 z-20 size-11 rounded-full border flex items-center justify-center transition-all cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed shadow-xl ${
             isDark
               ? 'bg-zinc-900/90 border-zinc-700 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-500'
               : 'bg-white/95 border-stone-300 text-stone-800 hover:bg-stone-50 hover:border-stone-400'
@@ -527,7 +525,7 @@ export const PublicCatalogReader: React.FC = () => {
               ? currentSpreadIndex >= totalSpreads - 1
               : currentSinglePageIndex >= allPages.length - 1
           }
-          className={`absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-20 size-11 rounded-full border flex items-center justify-center transition-all cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed shadow-xl ${
+          className={`absolute right-3 sm:right-6 bottom-3 md:bottom-auto md:top-1/2 md:-translate-y-1/2 z-20 size-11 rounded-full border flex items-center justify-center transition-all cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed shadow-xl ${
             isDark
               ? 'bg-zinc-900/90 border-zinc-700 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-500'
               : 'bg-white/95 border-stone-300 text-stone-800 hover:bg-stone-50 hover:border-stone-400'
@@ -539,10 +537,9 @@ export const PublicCatalogReader: React.FC = () => {
         </button>
 
         {/* Contêiner de Escalonamento e Proporção A4 */}
-        <div
-          className="transition-transform duration-200 ease-out flex items-center justify-center origin-center"
-          style={{ transform: `scale(${zoomLevel})` }}
-        >
+        <div className="flex min-h-full min-w-full w-fit p-4">
+        <div className="relative m-auto shrink-0" style={{ width: (viewMode === 'single' ? 490 : 980) * fit * zoomLevel, height: 693 * fit * zoomLevel }}>
+        <div className="origin-top-left flex items-center justify-center" style={{ width: viewMode === 'single' ? 490 : 980, height: 693, transform: `scale(${fit * zoomLevel})` }}>
           {viewMode === 'spread' && currentSpread ? (
             /* ================= MODO SPREAD DUPLO (REVISTA ABERTA) ================= */
             <div
@@ -626,12 +623,21 @@ export const PublicCatalogReader: React.FC = () => {
               />
             </div>
           ) : null}
-        </div>
+        </div></div></div>
+        {((viewMode === 'single' ? currentSinglePage?.products : [...(currentSpread?.left_page?.products || []), ...(currentSpread?.right_page?.products || [])])?.length || 0) > 0 &&
+          <button type="button" onClick={() => setProductsOpen(true)} aria-label="Ver produtos da página"
+            className={`absolute bottom-3 left-1/2 -translate-x-1/2 z-20 min-h-11 rounded-lg border px-3 text-xs ${isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-white text-stone-900 border-stone-300'}`}>Produtos</button>}
       </main>
+      <MobileSheet theme={ambientTheme} open={productsOpen} onClose={() => setProductsOpen(false)} title="Produtos da página">
+        <div className="grid gap-2">{(viewMode === 'single' ? currentSinglePage?.products || [] : [...(currentSpread?.left_page?.products || []), ...(currentSpread?.right_page?.products || [])]).map((product) =>
+          <button key={product.id} type="button" onClick={() => { setProductsOpen(false); setSelectedProduct(product); }} className="min-h-12 rounded-lg border p-3 text-left">
+            <span className="block font-medium">{product.name}</span><span className="text-sm opacity-70">{product.sku} · {product.price}</span>
+          </button>)}</div>
+      </MobileSheet>
 
       {/* ================= BARRA INFERIOR DE NAVEGAÇÃO E ZOOM ================= */}
       <footer
-        className={`h-16 px-4 sm:px-6 border-t flex items-center justify-between shrink-0 z-30 transition-colors ${
+        className={`public-reader-footer h-16 px-4 sm:px-6 border-t flex items-center justify-between shrink-0 z-30 transition-colors ${
           isDark
             ? 'bg-[#0c0c0f]/95 border-zinc-800/80 backdrop-blur-md'
             : 'bg-white/95 border-stone-200 backdrop-blur-md shadow-xs'
@@ -696,12 +702,13 @@ export const PublicCatalogReader: React.FC = () => {
             <div className="flex items-center gap-2 w-full max-w-xs">
               <span className="text-[11px] font-mono text-zinc-500 shrink-0">1</span>
               <input
+                aria-label="Selecionar página"
                 type="range"
                 min={0}
                 max={Math.max(0, totalSpreads - 1)}
                 value={currentSpreadIndex}
                 onChange={(e) => setCurrentSpreadIndex(Number(e.target.value))}
-                className="w-full accent-zinc-400 cursor-pointer h-1.5 bg-zinc-700 rounded-lg appearance-none"
+                className="min-w-0 flex-1 w-full accent-zinc-400 cursor-pointer h-1.5 bg-zinc-700 rounded-lg appearance-none"
               />
               <span className="text-[11px] font-mono text-zinc-500 shrink-0">{totalSpreads}</span>
             </div>
@@ -709,12 +716,13 @@ export const PublicCatalogReader: React.FC = () => {
             <div className="flex items-center gap-2 w-full max-w-xs">
               <span className="text-[11px] font-mono text-zinc-500 shrink-0">1</span>
               <input
+                aria-label="Selecionar página"
                 type="range"
                 min={0}
                 max={Math.max(0, allPages.length - 1)}
                 value={currentSinglePageIndex}
                 onChange={(e) => setCurrentSinglePageIndex(Number(e.target.value))}
-                className="w-full accent-zinc-400 cursor-pointer h-1.5 bg-zinc-700 rounded-lg appearance-none"
+                className="min-w-0 flex-1 w-full accent-zinc-400 cursor-pointer h-1.5 bg-zinc-700 rounded-lg appearance-none"
               />
               <span className="text-[11px] font-mono text-zinc-500 shrink-0">{allPages.length}</span>
             </div>
@@ -731,7 +739,7 @@ export const PublicCatalogReader: React.FC = () => {
 
       {/* ================= MODAL DE INSPEÇÃO RÁPIDA DE PRODUTO ================= */}
       {selectedProduct && (
-        <div
+        <ResponsiveModal label="Detalhes do produto" onDismiss={() => setSelectedProduct(null)}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
           onClick={() => setSelectedProduct(null)}
         >
@@ -835,7 +843,7 @@ export const PublicCatalogReader: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </ResponsiveModal>
       )}
     </div>
   );

@@ -1,7 +1,5 @@
 import type { FC } from 'react';
 import { useState, useEffect } from 'react';
-import { Sidebar } from '../../components/Sidebar';
-import { Header } from '../../components/Header';
 import { ExploreHeader } from '../../components/explore/ExploreHeader';
 import { ExploreCatalogCard, ExploreCatalog } from '../../components/explore/ExploreCatalogCard';
 import { ExploreProductCard, ExploreProduct } from '../../components/explore/ExploreProductCard';
@@ -20,7 +18,6 @@ import {
     PaginationNext,
     PaginationPrevious,
 } from '@/components/ui/pagination';
-
 
 export const Explore: FC = () => {
     const [activeTab, setActiveTab] = useState<'catalogs' | 'products'>('catalogs');
@@ -216,13 +213,12 @@ export const Explore: FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-zinc-900">
-            <Sidebar />
-            <div className="flex-1 ml-16">
-                <Header />
+        <div className="min-h-full bg-gray-50 dark:bg-zinc-900">
 
-                <main className="pt-20">
-                    <div className="max-w-[1400px] mx-auto p-4 md:p-8">
+            <div className="flex-1 ">
+
+                <main className="">
+                    <div className="max-w-[1400px] mx-auto">
                         {/* Header Section */}
                         <div className="mb-8">
                             <h1 className="text-3xl font-bold text-zinc-900 dark:text-white mb-2">
@@ -241,7 +237,7 @@ export const Explore: FC = () => {
                                     setCurrentPage(1);
                                 }}
                                 className={cn(
-                                    "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+                                    "flex items-center gap-1 md:gap-2 px-3 md:px-4 py-3 text-sm font-medium border-b-2 transition-colors",
                                     activeTab === 'catalogs'
                                         ? "border-zinc-900 text-zinc-900 dark:border-white dark:text-white"
                                         : "border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
@@ -259,7 +255,7 @@ export const Explore: FC = () => {
                                     setCurrentPage(1);
                                 }}
                                 className={cn(
-                                    "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+                                    "flex items-center gap-1 md:gap-2 px-3 md:px-4 py-3 text-sm font-medium border-b-2 transition-colors",
                                     activeTab === 'products'
                                         ? "border-zinc-900 text-zinc-900 dark:border-white dark:text-white"
                                         : "border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"

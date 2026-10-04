@@ -1,3 +1,4 @@
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   X,
@@ -156,7 +157,7 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
   };
 
   return (
-    <div
+    <ResponsiveModal label="Importar catálogo" onDismiss={onClose} dismissible={!isProcessing}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isProcessing) onClose();
@@ -576,6 +577,6 @@ export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </ResponsiveModal>
   );
 };

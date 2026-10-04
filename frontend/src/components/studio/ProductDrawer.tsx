@@ -1,3 +1,4 @@
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import { manualProduct } from '../../utils/commercialProduct';
 import { SafeImage } from './SafeImage';
 import React, { useState, useMemo, useEffect } from 'react';
@@ -361,8 +362,8 @@ export const ProductDrawer: React.FC = () => {
       />
 
       {/* Slide-over Drawer */}
-      <aside
-        className={`fixed top-0 right-0 z-50 h-full w-full sm:w-[420px] lg:w-[460px] border-l shadow-2xl flex flex-col transition-transform duration-300 animate-in slide-in-from-right select-none ${
+      <ResponsiveModal label="Produtos" onDismiss={closeProductDrawer} dismissible={!targetProductToAssign && !isAddModalOpen}
+        className={`responsive-product-drawer fixed top-0 right-0 z-50 h-full w-full sm:w-[420px] lg:w-[460px] border-l shadow-2xl flex flex-col transition-transform duration-300 animate-in slide-in-from-right select-none ${
           isDark
             ? 'bg-[#0b0b0e] border-zinc-800 text-zinc-100 shadow-[0_0_60px_rgba(0,0,0,0.9)]'
             : 'bg-[#FAF8F5] border-[#E4E0D6] text-zinc-900 shadow-[0_0_40px_rgba(0,0,0,0.08)]'
@@ -883,7 +884,7 @@ export const ProductDrawer: React.FC = () => {
                           </p>
 
                           {/* Action Toolbar on Card */}
-                          <div className="flex items-center justify-between pt-1 border-t border-inherit">
+                          <div className="flex flex-wrap gap-2 items-center justify-between pt-1 border-t border-inherit">
                             <div className="flex items-center gap-1">
                               {/* Edit Button */}
                               <Tooltip text="Editar nome e preço" position="bottom">
@@ -1309,7 +1310,7 @@ export const ProductDrawer: React.FC = () => {
             </div>
           </div>
         )}
-      </aside>
+      </ResponsiveModal>
     </>
   );
 };

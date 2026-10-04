@@ -22,8 +22,6 @@ import { MediaPreviewDialog } from '@/components/media/MediaPreviewDialog';
 import { mediaService, type MediaFilters } from '@/services/mediaService';
 import type { Media, MediaType, MediaStats, MediaFolder } from '@/types/api';
 import { cn } from '@/lib/utils';
-import { Sidebar } from '@/components/Sidebar';
-import { Header } from '@/components/Header';
 import { LoadingScreen } from '@/components/common/LoadingScreen';
 
 export const MediaLibrary: FC = () => {
@@ -131,7 +129,7 @@ export const MediaLibrary: FC = () => {
     setSearchTerm(value);
     if (value.trim()) {
       // When searching, we might want to search everywhere, but for now keeping current folder context
-      // to avoid confusion or complex UI state. 
+      // to avoid confusion or complex UI state.
       // If global search is desired, we would set folder: undefined here.
       setFilters((prev) => ({ ...prev, search: value.trim() }));
     } else {
@@ -213,12 +211,11 @@ export const MediaLibrary: FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-zinc-950">
-      <Sidebar />
-      <Header />
+    <div className="min-h-full bg-gray-50 dark:bg-zinc-950">
 
-      <main className="ml-16 pt-20">
-        <div className="p-6 max-w-[1600px] mx-auto">
+
+      <main className="min-w-0">
+        <div className="max-w-[1600px] mx-auto">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">Biblioteca de Mídia</h1>
@@ -254,7 +251,7 @@ export const MediaLibrary: FC = () => {
           {/* Barra de ferramentas */}
           <div className="flex flex-wrap gap-4 mb-6">
             {/* Busca */}
-            <div className="relative flex-1 min-w-[300px]">
+            <div className="relative flex-1 min-w-0 w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar arquivos..."
@@ -265,7 +262,7 @@ export const MediaLibrary: FC = () => {
             </div>
 
             {/* Botões de ação */}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button onClick={() => setShowUpload(!showUpload)} className="gap-2">
                 <UploadIcon className="h-4 w-4" />
                 Upload
@@ -285,7 +282,7 @@ export const MediaLibrary: FC = () => {
                 <Button
                   variant={viewMode === 'grid' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setViewMode('grid')}
+                  aria-label="Visualização em grade" onClick={() => setViewMode('grid')}
                   className="rounded-none"
                 >
                   <Grid3x3 className="h-4 w-4" />
@@ -293,7 +290,7 @@ export const MediaLibrary: FC = () => {
                 <Button
                   variant={viewMode === 'list' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setViewMode('list')}
+                  aria-label="Visualização em lista" onClick={() => setViewMode('list')}
                   className="rounded-none"
                 >
                   <List className="h-4 w-4" />

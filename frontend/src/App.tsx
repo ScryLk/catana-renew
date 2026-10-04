@@ -1,3 +1,6 @@
+import { useResponsiveLayout } from './hooks/useResponsiveLayout';
+import { ResponsiveAppShell } from './components/layout/ResponsiveAppShell';
+import { ViewportFoundation } from './components/layout/ViewportFoundation';
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { KatanaStudio } from './pages/KatanaStudio';
@@ -29,6 +32,7 @@ import { ClerkAuthSync } from './components/auth/ClerkAuthSync';
 import { isClerkConfigured } from './store/authStore';
 
 function App() {
+  const { isPhone } = useResponsiveLayout();
   const { checkAuth } = useAuthStore();
   const theme = useStudioStore((s) => s.theme);
   const [selectedProductCode, setSelectedProductCode] = useState<string | null>(null);
@@ -62,9 +66,12 @@ function App() {
 
   return (
     <>
+      <ViewportFoundation />
       {isClerkConfigured && <ClerkAuthSync />}
       <Toaster
-        position="top-right"
+        position={isPhone ? 'top-center' : 'top-right'}
+        offset={isPhone ? { top: 'calc(var(--safe-top) + 104px)', left: 12, right: 12 } : undefined}
+        mobileOffset={{ top: 'calc(var(--safe-top) + 104px)', left: 12, right: 12 }}
         theme={theme}
         richColors
         closeButton
@@ -103,119 +110,23 @@ function App() {
           <Route path="/studio/system-design" element={<SystemDesignPage />} />
 
           {/* Management Hubs */}
-          <Route
-            path="/dashboard"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/catalogs"
-            element={
-              <PrivateRoute>
-                <UserCatalogs />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/products"
-            element={
-              <PrivateRoute>
-                <Products />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/products/new"
-            element={
-              <PrivateRoute>
-                <CreateProduct />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/products/:id"
-            element={
-              <PrivateRoute>
-                <CreateProduct />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/products/edit/:id"
-            element={
-              <PrivateRoute>
-                <CreateProduct />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/categories"
-            element={
-              <PrivateRoute>
-                <Categories />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/media"
-            element={
-              <PrivateRoute>
-                <MediaLibrary />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/organizations"
-            element={
-              <PrivateRoute>
-                <Organizations />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <PrivateRoute>
-                <Profile />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/profiles/:username"
-            element={
-              <PrivateRoute>
-                <PublicProfilePage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/explore"
-            element={
-              <PrivateRoute>
-                <Explore />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/search"
-            element={
-              <PrivateRoute>
-                <SearchResults />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/inbox"
-            element={
-              <PrivateRoute>
-                <Inbox />
-              </PrivateRoute>
-            }
-          />
+          <Route element={<PrivateRoute><ResponsiveAppShell /></PrivateRoute>}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/catalogs" element={<UserCatalogs />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/products/new" element={<CreateProduct />} />
+          <Route path="/products/:id" element={<CreateProduct />} />
+          <Route path="/products/edit/:id" element={<CreateProduct />} />
+          <Route path="/categories" element={<Categories />} />
+          <Route path="/media" element={<MediaLibrary />} />
+          <Route path="/organizations" element={<Organizations />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/profiles/:username" element={<PublicProfilePage />} />
+          <Route path="/explore" element={<Explore />} />
+          <Route path="/search" element={<SearchResults />} />
+          <Route path="/inbox" element={<Inbox />} />
 
+          </Route>
           {/* Wildcard Fallback Route */}
           <Route path="*" element={<KatanaStudio />} />
         </Routes>

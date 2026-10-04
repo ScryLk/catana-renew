@@ -1,6 +1,9 @@
+import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
+import { usePublicationFit } from '../../hooks/usePublicationFit';
+import { useStudioResponsive } from '../../hooks/useStudioResponsive';
 import { adjustSuppliedPrice } from '../../utils/commercialProduct';
 import { SafeImage } from './SafeImage';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Sparkles,
   Check,
@@ -24,6 +27,9 @@ import { Tooltip } from '../ui/Tooltip';
 import { toast } from 'sonner';
 
 export const SpreadViewport: React.FC = () => {
+  const { isCompact, isPhone } = useResponsiveLayout();
+  const { pageNumber, phoneZoom } = useStudioResponsive();
+  const { ref: viewportRef, fit } = usePublicationFit(490, 760);
   const {
     zoomLevel,
     viewMode,
@@ -77,8 +83,7 @@ export const SpreadViewport: React.FC = () => {
 
   // Encontra as duas páginas do spread atual
   const leftPage = pages.find((p) => p.pageNumber === currentSpread[0]);
-  const rightPage = pages.find((p) => p.pageNumber === currentSpread[1]);
-
+  const rightPage = pages.find((p) => p.pageNumber === (isCompact ? pageNumber : currentSpread[1]));
 
   // Handler para selecionar elemento
   const handleSelect = (elementId: string, e: React.MouseEvent, defaultName?: string | null, defaultPrice?: string | null) => {
@@ -195,6 +200,14 @@ export const SpreadViewport: React.FC = () => {
 
   const [openDropdown, setOpenDropdown] = useState<'left' | 'right' | null>(null);
   const [openColorPicker, setOpenColorPicker] = useState<'left' | 'right' | null>(null);
+  useEffect(() => {
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setOpenDropdown(null); setOpenColorPicker(null); setSelectedElementId(null); }
+    };
+    window.addEventListener('keydown', dismiss);
+    return () => window.removeEventListener('keydown', dismiss);
+  }, [setSelectedElementId]);
+
 
   const getPageTitleOrLabel = (page: CatalogPageData): string => {
     if (page.type === 'cover') return 'Capa · Coleção 2026';
@@ -373,9 +386,10 @@ export const SpreadViewport: React.FC = () => {
     );
   };
 
-  const scale = zoomLevel / 100;
-  const baseWidth = viewMode === 'single' ? 490 : 1066;
-  const baseHeight = 735;
+  const effectiveViewMode = isCompact ? 'single' : viewMode;
+  const scale = (isCompact ? fit : 1) * (isPhone ? phoneZoom : zoomLevel) / 100;
+  const baseWidth = effectiveViewMode === 'single' ? 490 : 1066;
+  const baseHeight = isCompact ? 760 : 735;
   const scaledWidth = Math.round(baseWidth * scale);
   const scaledHeight = Math.round(baseHeight * scale);
 
@@ -443,7 +457,6 @@ export const SpreadViewport: React.FC = () => {
           <div className="h-full flex flex-col justify-between items-center text-center py-12 px-8 select-none relative">
             {/* Top Empty Space for Editorial Balance */}
             <div className="h-6" />
-
 
             {/* Central Identity: Logo (independent) + Wordmark (separate clickable block) */}
             <div className="flex flex-col items-center gap-6">
@@ -531,7 +544,6 @@ export const SpreadViewport: React.FC = () => {
             </div>
           </div>
         );
-
 
       // ---------------- PÁGINA 02: MANIFESTO ----------------
       case 'manifesto':
@@ -1425,12 +1437,14 @@ export const SpreadViewport: React.FC = () => {
 
   return (
     <div
+      ref={viewportRef}
+      data-testid="studio-publication-viewport"
       onClick={() => {
         setSelectedElementId(null);
         setOpenDropdown(null);
         setOpenColorPicker(null);
       }}
-      className={`flex-1 overflow-auto custom-scrollbar relative select-none transition-colors ${
+      className={`publication-viewport min-h-0 flex-1 overflow-auto custom-scrollbar relative select-none transition-colors ${
         isDark ? 'bg-[#0a0a0c]' : 'bg-[#F4F0E8]'
       }`}
       style={{
@@ -1439,7 +1453,7 @@ export const SpreadViewport: React.FC = () => {
       }}
     >
       {/* Wrapper flexivel que expande e preserva alinhamento a zero sem cortar o lado esquerdo */}
-      <div className="w-fit min-w-full h-fit min-h-full flex p-6 sm:p-10">
+      <div className={`canvas-scroll-padding w-fit min-w-full h-fit min-h-full flex ${isCompact ? 'p-3' : 'p-6 sm:p-10'}`}>
         {/* Caixa escalada para manter o bounding box sincronizado com o scroll */}
         <div
           className="m-auto shrink-0 relative transition-all duration-150"
@@ -1461,7 +1475,7 @@ export const SpreadViewport: React.FC = () => {
             <AgentCursorLayer />
         {/* ================= LEFT PAGE WRAPPER ================= */}
         {leftPage && (
-          <div className={`flex flex-col items-center ${viewMode === 'single' ? 'hidden' : ''}`}>
+          <div className={`flex flex-col items-center ${effectiveViewMode === 'single' ? 'hidden' : ''}`}>
             {/* Top Bar for Left Page */}
             <div className="w-[490px] flex items-center justify-between px-1.5 pb-2.5 text-xs select-none">
               <div className="flex items-center gap-2 min-w-0">
@@ -1565,7 +1579,7 @@ export const SpreadViewport: React.FC = () => {
         )}
 
         {/* Center Swap Pages Quick Button (Between Left and Right) */}
-        {viewMode !== 'single' && (
+        {effectiveViewMode !== 'single' && (
           <div className="flex flex-col items-center justify-center pt-44 self-start">
             <Tooltip text="Inverter páginas (Esquerda ⇄ Direita)" position="top">
               <button
@@ -1700,7 +1714,7 @@ export const SpreadViewport: React.FC = () => {
       {selectedElementId && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className={`fixed bottom-16 right-8 w-96 rounded-2xl border shadow-2xl p-4 z-40 animate-in fade-in slide-in-from-bottom-3 duration-200 transition-colors ${
+          className={`fixed bottom-16 right-3 w-[min(384px,calc(100vw-24px))] max-h-[calc(var(--app-height,100dvh)-120px)] overflow-y-auto rounded-2xl border shadow-2xl p-4 z-40 animate-in fade-in slide-in-from-bottom-3 duration-200 transition-colors ${
             isDark
               ? 'bg-[#121216] border-zinc-700 text-zinc-100 shadow-[0_20px_50px_rgba(0,0,0,0.8)]'
               : 'bg-white border-zinc-200 text-zinc-900 shadow-[0_20px_40px_rgba(0,0,0,0.15)]'
@@ -1738,7 +1752,7 @@ export const SpreadViewport: React.FC = () => {
                   <DollarSign className="size-3 text-amber-500" />
                   <input
                     type="text"
-                    value={editingPrice}
+                    inputMode="decimal" aria-label="Preço do produto" value={editingPrice}
                     onChange={(e) => setEditingPrice(e.target.value)}
                     className="w-full bg-transparent text-xs font-mono font-medium outline-none"
                     placeholder="R$ 4.900"
@@ -1752,7 +1766,7 @@ export const SpreadViewport: React.FC = () => {
                   <Edit3 className="size-3 text-zinc-400" />
                   <input
                     type="text"
-                    value={editingName}
+                    aria-label="Nome do produto" value={editingName}
                     onChange={(e) => setEditingName(e.target.value)}
                     className="w-full bg-transparent text-xs font-medium outline-none"
                     placeholder="Nome da peça"

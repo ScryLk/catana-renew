@@ -251,19 +251,19 @@ export const CatalogGenerationExperience: React.FC = () => {
   }, [generationStage]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#09090b] text-zinc-100 flex flex-col overflow-hidden select-none font-sans">
+    <div className="fixed inset-x-0 top-0 h-[var(--app-height,100dvh)] z-50 bg-[#09090b] text-zinc-100 flex flex-col overflow-hidden select-none font-sans">
       {/* Background Matrix Grid Pattern */}
       <div className="absolute inset-0 bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:24px_24px] opacity-35 pointer-events-none" />
 
       {/* Top Header Bar */}
-      <header className="relative z-10 h-16 border-b border-zinc-800/80 bg-[#0b0b0e]/90 backdrop-blur-md px-6 flex items-center justify-between">
+      <header className="relative z-10 shrink-0 min-h-16 pt-[var(--safe-top)] border-b border-zinc-800/80 bg-[#0b0b0e]/90 backdrop-blur-md px-3 py-2 sm:px-6 flex flex-wrap items-center justify-between gap-2">
         {/* Left: Brand Identity & Active Status */}
-        <div className="flex items-center gap-3.5">
+        <div className="flex min-w-0 items-center gap-3.5">
           <div className="size-9 rounded-xl bg-zinc-900 border border-zinc-700/80 flex items-center justify-center shadow-inner">
             <Cpu className="size-4 text-zinc-200 animate-pulse" />
           </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-col">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-mono uppercase tracking-widest text-zinc-400 font-semibold">
                 Katana Engine 2.0
               </span>
@@ -272,7 +272,7 @@ export const CatalogGenerationExperience: React.FC = () => {
                 Gerando Catálogo
               </span>
             </div>
-            <h2 className="text-sm font-semibold text-white tracking-tight truncate max-w-[280px] sm:max-w-md">
+            <h2 className="text-sm font-semibold text-white tracking-tight truncate max-w-[min(280px,calc(100vw-84px))] sm:max-w-md">
               {targetTitle}
             </h2>
           </div>
@@ -341,11 +341,11 @@ export const CatalogGenerationExperience: React.FC = () => {
       </header>
 
       {/* Main Workspace Split: Center Stage Preview + Live Agent Console */}
-      <div className="relative z-10 flex-1 flex flex-col lg:flex-row overflow-hidden">
+      <div className="relative z-10 min-h-0 flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Center Stage: Living Canvas Assembly */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-10 relative overflow-hidden bg-gradient-to-b from-[#0b0b0e] via-[#09090b] to-[#0b0b0e]">
+        <div className="shrink-0 sm:flex-1 min-h-0 flex flex-col items-center justify-center p-3 sm:p-6 lg:p-10 relative overflow-hidden bg-gradient-to-b from-[#0b0b0e] via-[#09090b] to-[#0b0b0e]">
           {/* Subtle Stage Subtitle */}
-          <div className="mb-6 flex flex-col items-center text-center">
+          <div className="sm:mb-6 flex flex-col items-center text-center">
             <span className="text-[11px] font-mono uppercase tracking-widest text-zinc-400">
               Etapa {generationStage} de 5 · {GENERATION_STEPS[generationStage - 1]?.label}
             </span>
@@ -355,7 +355,7 @@ export const CatalogGenerationExperience: React.FC = () => {
           </div>
 
           {/* Living A4 Mockup Spread Assembling */}
-          <div className="relative w-full max-w-4xl aspect-[1.414/1] max-h-[58vh] flex items-center justify-center perspective-[1200px]">
+          <div className="relative w-full max-w-4xl aspect-[1.414/1] max-h-[58vh] hidden sm:flex items-center justify-center perspective-[1200px]">
             {/* Ambient Backlight based on palette */}
             <div
               className="absolute inset-4 blur-3xl opacity-20 transition-all duration-1000 rounded-full"
@@ -586,7 +586,7 @@ export const CatalogGenerationExperience: React.FC = () => {
 
           {/* Palette Swatches Bar */}
           {palette && (
-            <div className="mt-6 flex items-center gap-2 bg-zinc-900/90 border border-zinc-800 px-4 py-2 rounded-xl animate-in fade-in duration-500 shadow-md">
+            <div className="mt-3 sm:mt-6 flex max-w-full flex-wrap items-center gap-2 bg-zinc-900/90 border border-zinc-800 px-4 py-2 rounded-xl animate-in fade-in duration-500 shadow-md">
               <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-semibold mr-1">
                 Paleta:
               </span>
@@ -615,9 +615,9 @@ export const CatalogGenerationExperience: React.FC = () => {
         </div>
 
         {/* Right / Bottom Panel: Real-Time Multi-Agent Console */}
-        <aside className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-zinc-800/80 bg-[#0c0c10]/95 flex flex-col h-64 lg:h-auto">
+        <aside className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-zinc-800/80 bg-[#0c0c10]/95 min-h-0 flex flex-col flex-1 sm:flex-none sm:h-64 lg:h-auto">
           {/* Console Header */}
-          <div className="h-12 border-b border-zinc-800/80 px-4 flex items-center justify-between bg-zinc-900/40">
+          <div className="min-h-12 shrink-0 border-b border-zinc-800/80 px-3 sm:px-4 flex flex-wrap gap-1 py-2 items-center justify-between bg-zinc-900/40">
             <div className="flex items-center gap-2">
               <Terminal className="size-4 text-zinc-400" />
               <span className="text-xs font-mono font-semibold tracking-wider text-zinc-300">
@@ -633,7 +633,7 @@ export const CatalogGenerationExperience: React.FC = () => {
           {/* Log Stream Container */}
           <div
             ref={logContainerRef}
-            className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs custom-scrollbar"
+            className="min-h-0 flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs custom-scrollbar"
           >
             {generationLogs.map((log) => (
               <div
@@ -658,7 +658,7 @@ export const CatalogGenerationExperience: React.FC = () => {
           </div>
 
           {/* Council Roles Pill Strip */}
-          <div className="p-3.5 border-t border-zinc-800/80 bg-zinc-900/40 flex items-center justify-between text-[10px] text-zinc-400">
+          <div className="p-3.5 pb-[max(14px,var(--safe-bottom))] shrink-0 border-t border-zinc-800/80 bg-zinc-900/40 flex flex-wrap gap-2 items-center justify-between text-[10px] text-zinc-400">
             <div className="flex items-center gap-2">
               <ShieldCheck className="size-3.5 text-zinc-400" />
               <span>5 agentes colaborando em tempo real</span>
@@ -669,7 +669,7 @@ export const CatalogGenerationExperience: React.FC = () => {
       </div>
 
       {/* Bottom Global Progress Bar */}
-      <div className="h-1 w-full bg-zinc-900 relative">
+      <div className="h-1 shrink-0 w-full bg-zinc-900 relative">
         <div
           className="h-full bg-gradient-to-r from-zinc-400 via-white to-zinc-300 transition-all duration-300 ease-out shadow-[0_0_12px_rgba(255,255,255,0.6)]"
           style={{ width: `${generationProgress}%` }}

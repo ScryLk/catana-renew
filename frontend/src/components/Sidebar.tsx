@@ -34,8 +34,8 @@ const menuItems: MenuItem[] = [
 
 const bottomMenuItems: MenuItem[] = [
   { id: 'organizacoes', label: 'Organizações', icon: Building2, path: '/organizations' },
-  { id: 'configuracoes', label: 'Configurações', icon: Settings, path: '#' },
-  { id: 'suporte', label: 'Suporte', icon: HelpCircle, path: '#' },
+  { id: 'configuracoes', label: 'Configurações', icon: Settings, path: '/profile' },
+  { id: 'suporte', label: 'Suporte', icon: HelpCircle, path: '/transparency' },
 ];
 
 export const Sidebar: FC = () => {
@@ -67,7 +67,7 @@ export const Sidebar: FC = () => {
   }, []);
 
   return (
-    <aside className="w-16 h-screen bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col fixed left-0 top-0 z-50">
+    <aside className="hidden lg:flex w-16 h-dvh bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex-col fixed left-0 top-0 z-50">
       {/* Logo */}
       <div className="flex items-center justify-center h-20 border-b border-zinc-200 dark:border-zinc-800 px-2">
         <Link to="/" className="flex items-center justify-center w-full">
@@ -87,7 +87,7 @@ export const Sidebar: FC = () => {
           const showBadge = item.id === 'mensagens' && unreadCount > 0;
 
           return (
-            <Link key={item.id} to={item.path} title={item.label} className="relative group">
+            <Link key={item.id} to={item.path} aria-label={item.label} title={item.label} className="relative group">
               <div
                 className={cn(
                   'w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200',
@@ -119,7 +119,7 @@ export const Sidebar: FC = () => {
           const Icon = item.icon;
 
           return (
-            <Link key={item.id} to={item.path} title={item.label} className="relative group">
+            <Link key={item.id} to={item.path} aria-label={item.label} title={item.label} className="relative group">
               <div className="w-10 h-10 flex items-center justify-center rounded-xl text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-all duration-200">
                 <Icon className="w-5 h-5" />
               </div>

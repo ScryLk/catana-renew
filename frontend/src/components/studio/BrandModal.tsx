@@ -1,3 +1,4 @@
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Building2,
@@ -119,20 +120,6 @@ export const BrandModal: React.FC = () => {
     }
     setShowMarkdownPreview(false);
   }, [editingBrand, isBrandModalOpen]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isBrandModalOpen) {
-        closeBrandModal();
-      }
-    };
-    if (isBrandModalOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-    }
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isBrandModalOpen, closeBrandModal]);
 
   if (!isBrandModalOpen) return null;
 
@@ -279,7 +266,7 @@ export const BrandModal: React.FC = () => {
   };
 
   return (
-    <div
+    <ResponsiveModal label="Marca" onDismiss={closeBrandModal}
       role="dialog"
       aria-modal="true"
       aria-labelledby="brand-modal-title"
@@ -854,6 +841,6 @@ export const BrandModal: React.FC = () => {
           isDark={isDark}
         />
       )}
-    </div>
+    </ResponsiveModal>
   );
 };

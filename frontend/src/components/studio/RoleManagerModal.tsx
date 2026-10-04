@@ -1,3 +1,4 @@
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import React, { useState, useEffect } from 'react';
 import {
   X,
@@ -163,7 +164,7 @@ export const RoleManagerModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+    <ResponsiveModal label="Agentes e cargos" onDismiss={() => setIsRoleManagerOpen(false)} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
       <div
         className={`w-full max-w-4xl h-[640px] rounded-2xl border shadow-2xl flex flex-col overflow-hidden transition-colors ${
           isDark
@@ -212,10 +213,10 @@ export const RoleManagerModal: React.FC = () => {
         </div>
 
         {/* Content Body: Split View */}
-        <div className="flex-1 flex min-h-0">
+        <div className="modal-two-pane flex-1 flex min-h-0">
           {/* Left Pane: Role List */}
           <div
-            className={`w-72 border-r flex flex-col shrink-0 ${
+            className={`w-full md:w-72 max-md:max-h-40 border-r flex flex-col shrink-0 ${
               isDark ? 'border-zinc-800 bg-[#0d0d10]' : 'border-zinc-200 bg-zinc-50/50'
             }`}
           >
@@ -774,6 +775,6 @@ export const RoleManagerModal: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </ResponsiveModal>
   );
 };

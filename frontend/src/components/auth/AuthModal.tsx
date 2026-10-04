@@ -1,3 +1,4 @@
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 import { SignIn, SignUp } from '@clerk/clerk-react';
@@ -164,7 +165,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const displayedError = localError || error;
 
   return (
-    <div
+    <ResponsiveModal label="Autenticação" onDismiss={() => { if (canDismiss) (onClose || closeAuthModal)(); }} dismissible={canDismiss}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
       onClick={handleDismiss}
       role="dialog"
@@ -634,6 +635,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <MultiAgentShowcase />
         </div>
       </div>
-    </div>
+    </ResponsiveModal>
   );
 };

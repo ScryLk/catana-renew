@@ -253,7 +253,7 @@ export const AgentInputBar: React.FC = () => {
 
   return (
     <div
-      className={`p-3 border-t transition-colors ${
+      className={`agent-input p-3 border-t transition-colors ${
         isDark ? 'border-zinc-800 bg-[#0c0c0e]' : 'border-zinc-200 bg-white'
       }`}
     >
@@ -408,7 +408,7 @@ export const AgentInputBar: React.FC = () => {
                   >
                     <Upload className="size-3.5 text-zinc-400 shrink-0" />
                     <div>
-                      <span className="font-medium block text-[11px]">Upload do Computador</span>
+                      <span className="font-medium block text-[11px]">Escolher arquivos</span>
                       <span className={`text-[9px] ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
                         PDF, CSV, Excel, Word ou Imagens
                       </span>
@@ -551,7 +551,7 @@ export const AgentInputBar: React.FC = () => {
       </div>
 
       {/* Quick Slash Commands Pills */}
-      <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px]">
+      <div className="agent-shortcuts mt-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px]">
         <button
           type="button"
           onClick={() => handleSlashCommand('/captar')}

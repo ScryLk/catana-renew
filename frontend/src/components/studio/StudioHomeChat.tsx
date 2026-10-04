@@ -158,7 +158,7 @@ export const StudioHomeChat: React.FC = () => {
 
   return (
     <div
-      className={`flex-1 h-dvh overflow-y-auto custom-scrollbar flex flex-col items-center justify-center p-6 select-none relative transition-colors ${
+      className={`studio-home flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center justify-center p-6 select-none relative transition-colors ${
         isDark ? 'bg-[#09090b]' : 'bg-[#f8f9fa]'
       }`}
     >
@@ -204,7 +204,7 @@ export const StudioHomeChat: React.FC = () => {
 
         {/* Hero Title */}
         <h1
-          className={`text-3xl sm:text-4xl font-semibold tracking-tight mb-6 text-balance transition-colors ${
+          className={`text-2xl sm:text-4xl font-semibold tracking-tight mb-6 text-balance transition-colors ${
             isDark ? 'text-white' : 'text-zinc-900'
           }`}
         >
@@ -296,7 +296,7 @@ export const StudioHomeChat: React.FC = () => {
                 isDark ? 'border-zinc-800/80 bg-zinc-900/40' : 'border-zinc-100 bg-zinc-50/50'
               }`}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -460,5 +460,4 @@ export const StudioHomeChat: React.FC = () => {
     </div>
   );
 };
-
 

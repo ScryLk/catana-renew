@@ -1,3 +1,5 @@
+import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
+import { useStudioResponsive } from '../../hooks/useStudioResponsive';
 import React, { useState } from 'react';
 import {
   SlidersHorizontal,
@@ -11,6 +13,8 @@ import { MiniPageThumbnail } from './MiniPageThumbnail';
 import { toast } from 'sonner';
 
 export const PageFilmstrip: React.FC = () => {
+  const { isCompact } = useResponsiveLayout();
+  const { pageNumber, selectPage } = useStudioResponsive();
   const {
     totalPages,
     currentSpread,
@@ -75,9 +79,16 @@ export const PageFilmstrip: React.FC = () => {
   const leftPageObj = pages.find((p) => p.pageNumber === selectedLeft) || pages[0];
   const rightPageObj = pages.find((p) => p.pageNumber === selectedRight) || pages[1] || pages[0];
 
+  if (isCompact) return <nav aria-label="Páginas do catálogo" className={`flex h-20 shrink-0 snap-x gap-2 overflow-x-auto border-t px-3 py-2 ${isDark ? 'bg-[#09090b] border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'}`}>
+    {pages.map((page) => <button key={page.id} type="button" aria-label={`Abrir página ${page.pageNumber}`} aria-current={pageNumber === page.pageNumber ? 'page' : undefined}
+      onClick={() => selectPage(page.pageNumber)} className="flex w-12 shrink-0 snap-center flex-col items-center justify-center gap-1 rounded border border-transparent aria-[current=page]:border-amber-500">
+      <span className="relative block h-10 w-7 overflow-hidden"><MiniPageThumbnail page={page} className="absolute left-0 top-0 h-34 w-24 origin-top-left scale-[0.294]" showBadge={false} /></span><span className="text-[10px]">{page.pageNumber}</span>
+    </button>)}
+  </nav>;
+
   return (
     <div
-      className={`h-12 w-full border-t px-4 flex items-center justify-between select-none z-20 text-xs transition-colors relative ${
+      className={`h-12 shrink-0 w-full border-t px-4 flex items-center justify-between select-none z-20 text-xs transition-colors relative ${
         isDark ? 'bg-[#09090b] border-zinc-800' : 'bg-white border-zinc-200'
       }`}
     >

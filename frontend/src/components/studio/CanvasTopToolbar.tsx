@@ -1,3 +1,5 @@
+import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
+import { StudioPhoneCanvasToolbar } from './StudioPhoneCanvasToolbar';
 import React, { useState, useEffect } from 'react';
 import {
   BookOpen,
@@ -25,6 +27,7 @@ import { useStudioStore } from '../../store/studioStore';
 import { Tooltip } from '../ui/Tooltip';
 
 export const CanvasTopToolbar: React.FC = () => {
+  const { isPhone } = useResponsiveLayout();
   const {
     viewMode,
     setViewMode,
@@ -109,14 +112,16 @@ export const CanvasTopToolbar: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo, canUndo, canRedo]);
 
+  if (isPhone) return <StudioPhoneCanvasToolbar />;
+
   return (
     <div
-      className={`h-11 w-full border-b px-3 flex items-center justify-between text-xs select-none z-20 transition-colors gap-2 ${
+      className={`min-h-11 shrink-0 w-full overflow-x-auto border-b px-3 flex items-center justify-between text-xs select-none z-20 transition-colors gap-2 ${
         isDark ? 'bg-[#0e0e11] border-zinc-800 text-zinc-300' : 'bg-white border-zinc-200 text-zinc-700'
       }`}
     >
       {/* LEFT: Catalog Title + Spread Navigator + Undo/Redo + Autosave */}
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2 min-w-0 shrink-0">
         {!isCoPilotOpen && (
           <button
             type="button"
@@ -446,7 +451,6 @@ export const CanvasTopToolbar: React.FC = () => {
             </span>
           </button>
         </Tooltip>
-
 
         {/* Quick Export Action: Compartilhar (Icon only with Tooltip) */}
         <Tooltip text="Compartilhar catálogo (copiar link público)" position="bottom">

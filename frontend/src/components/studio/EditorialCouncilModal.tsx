@@ -1,3 +1,4 @@
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import React, { useState } from 'react';
 import {
   X,
@@ -81,7 +82,7 @@ export const EditorialCouncilModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
+    <ResponsiveModal label="Conselho editorial" onDismiss={() => setIsCouncilModalOpen(false)} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
       <div
         className={`w-full max-w-4xl h-[680px] rounded-2xl border shadow-2xl flex flex-col overflow-hidden transition-colors ${
           isDark
@@ -423,6 +424,6 @@ export const EditorialCouncilModal: React.FC = () => {
           </button>
         </div>
       </div>
-    </div>
+    </ResponsiveModal>
   );
 };
