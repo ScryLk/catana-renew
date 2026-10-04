@@ -454,8 +454,18 @@ html:not(.dark) .scrollbar-thin::-webkit-scrollbar-thumb:hover {
 [data-clerk-dev-badge],
 #clerk-dev-badge,
 .clerk-dev-mode-badge,
+cl-development-badge,
+.cl-development-badge,
+.cl-internal-development-badge,
+.cl-developmentBadge,
+[data-localization-key="developmentMode"],
 div[class*="clerk-internal"][class*="badge"],
-div[class*="clerk"][class*="development-badge"] {
+div[class*="clerk"][class*="development-badge"],
+div[class*="developmentBadge"],
+div[class*="devBadge"],
+div[class*="DevelopmentBadge"],
+[id*="clerk-dev"],
+[id*="clerk_dev"] {
   display: none !important;
   opacity: 0 !important;
   pointer-events: none !important;

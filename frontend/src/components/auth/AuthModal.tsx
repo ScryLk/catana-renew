@@ -205,7 +205,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   {isRegisterView ? 'Criar sua conta' : 'Acessar o Katana Studio'}
                 </h2>
                 <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  Autenticação segura gerenciada pelo Clerk.
+                  Autenticação segura e criptografada.
                 </p>
               </div>
               {isRegisterView ? (

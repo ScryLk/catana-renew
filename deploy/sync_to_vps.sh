@@ -10,11 +10,8 @@ echo "=========================================================="
 echo "    🚀 CATANA 2.0 — DEPLOY PRODUCAO VIA DOCKER COMPOSE"
 echo "=========================================================="
 
-echo "📦 [0/4] Verificando build do frontend..."
-if [ ! -d "${LOCAL_SRC}/frontend/dist" ] || [ -z "$(ls -A "${LOCAL_SRC}/frontend/dist")" ]; then
-    echo "⚡ Gerando build do frontend..."
-    npm --prefix "${LOCAL_SRC}/frontend" run build
-fi
+echo "📦 [0/4] Compilando build de produção atualizado do frontend..."
+npm --prefix "${LOCAL_SRC}/frontend" run build
 
 echo "📡 [1/4] Sincronizando arquivos para a VPS (${VPS_USER}@${VPS_IP}:${REMOTE_DEST})..."
 rsync -avz --progress \
