@@ -472,3 +472,89 @@ div[class*="DevelopmentBadge"],
   visibility: hidden !important;
 }
 
+/* ==============================================================================
+   CLERK AUTH — DESIGN INTEGRADO (MINIMALISTA ALTO CONTRASTE)
+   ============================================================================== */
+.cl-card,
+.cl-cardBox {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+/* Ocultar titulos e subtitulos duplicados em ingles */
+.cl-header,
+.cl-headerTitle,
+.cl-headerSubtitle {
+  display: none !important;
+}
+
+/* Fundo 100% transparente e sem divisao acinzentada no rodape */
+.cl-footer,
+.cl-footerAction,
+.cl-footerPages {
+  background-color: transparent !important;
+  border-top: none !important;
+  box-shadow: none !important;
+}
+
+/* Botao principal em Branco Minimalista */
+.cl-formButtonPrimary {
+  background-color: #FFFFFF !important;
+  color: #09090B !important;
+  font-weight: 600 !important;
+  border-radius: 0.75rem !important;
+  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.cl-formButtonPrimary:hover {
+  background-color: #E4E4E7 !important;
+  transform: translateY(-1px);
+}
+
+.cl-formButtonPrimary:active {
+  transform: translateY(0);
+}
+
+/* Campos de entrada e Google Button */
+.cl-socialButtonsBlockButton {
+  background-color: rgba(24, 24, 27, 0.8) !important;
+  border: 1px solid rgba(63, 63, 70, 0.5) !important;
+  border-radius: 0.75rem !important;
+  color: #F4F4F5 !important;
+  transition: all 150ms ease !important;
+}
+
+.cl-socialButtonsBlockButton:hover {
+  background-color: rgba(39, 39, 42, 0.9) !important;
+  border-color: rgba(82, 82, 91, 0.7) !important;
+}
+
+.cl-formFieldInput {
+  background-color: rgba(24, 24, 27, 0.8) !important;
+  border: 1px solid rgba(63, 63, 70, 0.5) !important;
+  border-radius: 0.75rem !important;
+  color: #F4F4F5 !important;
+  transition: all 150ms ease !important;
+}
+
+.cl-formFieldInput:focus {
+  border-color: #A1A1AA !important;
+  box-shadow: 0 0 0 1px #A1A1AA !important;
+}
+
+.cl-footerActionText {
+  color: #A1A1AA !important;
+}
+
+.cl-footerActionLink {
+  color: #FFFFFF !important;
+  font-weight: 500 !important;
+}
+
+.cl-footerActionLink:hover {
+  color: #D4D4D8 !important;
+}
+

@@ -218,6 +218,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     elements: {
                       rootBox: 'w-full',
                       card: 'bg-transparent shadow-none border-0 p-0 w-full',
+                      header: 'hidden',
+                      headerTitle: 'hidden',
+                      headerSubtitle: 'hidden',
+                      footer: 'bg-transparent border-0 shadow-none',
+                      footerAction: 'bg-transparent border-0',
+                      footerPages: 'bg-transparent border-0',
                     },
                   }}
                 />
@@ -231,6 +237,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     elements: {
                       rootBox: 'w-full',
                       card: 'bg-transparent shadow-none border-0 p-0 w-full',
+                      header: 'hidden',
+                      headerTitle: 'hidden',
+                      headerSubtitle: 'hidden',
+                      footer: 'bg-transparent border-0 shadow-none',
+                      footerAction: 'bg-transparent border-0',
+                      footerPages: 'bg-transparent border-0',
                     },
                   }}
                 />

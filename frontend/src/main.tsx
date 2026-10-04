@@ -61,7 +61,7 @@ createRoot(document.getElementById('root')!).render(
         appearance={{
           baseTheme: dark,
           variables: {
-            colorPrimary: '#B08D57',
+            colorPrimary: '#FFFFFF',
             colorBackground: '#121214',
             colorText: '#F5F1EA',
           },
