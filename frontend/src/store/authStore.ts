@@ -3,10 +3,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { setInMemoryAccessToken } from '../services/api';
+import { setInMemoryAccessToken, API_BASE_URL } from '../services/api';
 import { useStudioStore } from './studioStore';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 const CLERK_PUBLISHABLE_KEY =
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||

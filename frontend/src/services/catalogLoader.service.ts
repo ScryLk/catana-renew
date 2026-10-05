@@ -7,13 +7,12 @@
 
 import { logger } from '../utils/logger';
 import { genId } from '../utils/id';
-import api from './api';
+import api, { API_BASE_URL } from './api';
 import { catalogService } from './catalogService';
 import { processPage, validateCatalog, generateValidationReport } from './layoutEngine.service';
 
 // Base da API para prefixar URLs de mídia relativas (ex.: catálogos demo gravam
 // "/media/..."; o browser precisa da URL absoluta do backend).
-const API_BASE_URL = (import.meta.env && import.meta.env.VITE_API_BASE_URL) || 'http://localhost:8000';
 function absMedia(url?: string): string | undefined {
   if (!url) return url;
   if (/^https?:\/\//.test(url) || url.startsWith('data:') || url.startsWith('blob:')) return url;

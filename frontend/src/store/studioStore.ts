@@ -2,7 +2,7 @@ import { normalizeCatalogDocument, QualityGate } from '../data/editorialCatalog.
 import { parseSuppliedPrice } from '../utils/commercialProduct';
 import { create } from 'zustand';
 import axios from 'axios';
-import api, { getAuthToken, setInMemoryAccessToken } from '../services/api';
+import api, { getAuthToken, setInMemoryAccessToken, API_BASE_URL } from '../services/api';
 import { toast } from 'sonner';
 import {
   CatalogPageData,
@@ -27,7 +27,7 @@ import {
 } from '../types/agentCursor';
 import { CANONICAL_DEMO_TEMPLATES } from '../data/demoCatalogs.data';
 
-export const API_BASE_URL = (import.meta.env && import.meta.env.VITE_API_BASE_URL) || 'http://localhost:8000';
+export { API_BASE_URL };
 let saveTimeout: any = null;
 
 export type StudioMode = 'director' | 'commercial' | 'copywriter' | string;

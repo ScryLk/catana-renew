@@ -1,7 +1,7 @@
 import React from 'react';
 import { Trash2, RotateCw, ZoomIn, ZoomOut } from 'lucide-react';
 import { CatalogPageData, PageOverlayElement } from '../../data/editorialCatalog.mock';
-import { useStudioStore } from '../../store/studioStore';
+import { useStudioStore, API_BASE_URL } from '../../store/studioStore';
 
 interface PageOverlayLayerProps {
   page: CatalogPageData;
@@ -246,8 +246,6 @@ function renderOverlayContent(
 // --------------------------------------------------------
 // Sub-renderizadores de Alta Fidelidade Vetorial & Sprites
 // --------------------------------------------------------
-
-const API_BASE_URL = (import.meta.env && import.meta.env.VITE_API_BASE_URL) || 'http://localhost:8000';
 
 function resolveMediaUrl(url?: string): string {
   if (!url) return '';

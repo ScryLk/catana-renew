@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { toast } from 'sonner';
 
 // Base URL da API (de acordo com o swagger)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL !== undefined
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL !== undefined && import.meta.env.VITE_API_BASE_URL !== '')
   ? import.meta.env.VITE_API_BASE_URL
   : (import.meta.env.DEV ? 'http://localhost:8000' : '');
 

@@ -12,6 +12,7 @@ declare global {
         };
       };
     };
+    _catanaGsiInitialized?: boolean;
   }
 }
 
@@ -19,6 +20,17 @@ interface GoogleLoginButtonProps {
   onSuccess: (credential: string) => void;
   onError?: (error: string) => void;
   isLoading?: boolean;
+}
+
+let activeSuccessCallback: ((credential: string) => void) | null = null;
+let activeErrorCallback: ((error: string) => void) | null = null;
+
+function globalGsiCallback(response: any) {
+  if (response.credential) {
+    activeSuccessCallback?.(response.credential);
+  } else if (activeErrorCallback) {
+    activeErrorCallback('Nenhuma credencial retornada pelo Google.');
+  }
 }
 
 export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
@@ -29,6 +41,15 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+  useEffect(() => {
+    activeSuccessCallback = onSuccess;
+    activeErrorCallback = onError || null;
+    return () => {
+      activeSuccessCallback = null;
+      activeErrorCallback = null;
+    };
+  }, [onSuccess, onError]);
 
   useEffect(() => {
     // Se o script ja foi carregado anteriormente
@@ -56,16 +77,15 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     if (!scriptLoaded || !containerRef.current || !clientId) return;
 
     try {
-      window.google?.accounts.id.initialize({
-        client_id: clientId,
-        callback: (response: any) => {
-          if (response.credential) {
-            onSuccess(response.credential);
-          } else if (onError) {
-            onError('Nenhuma credencial retornada pelo Google.');
-          }
-        },
-      });
+      if (!window._catanaGsiInitialized && window.google?.accounts?.id) {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: globalGsiCallback,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+        window._catanaGsiInitialized = true;
+      }
 
       if (containerRef.current) {
         containerRef.current.innerHTML = '';
@@ -88,7 +108,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     } catch (err) {
       console.error('Erro ao inicializar Google Identity Services:', err);
     }
-  }, [scriptLoaded, clientId, onSuccess, onError]);
+  }, [scriptLoaded, clientId]);
 
   // Se nao ha Client ID configurado (desenvolvimento inicial sem chaves cadastradas)
   const handleDevMockClick = () => {
