@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ClerkProvider } from '@clerk/clerk-react';
 import { dark } from '@clerk/themes';
+import { ptBR } from '@clerk/localizations';
 import './index.css';
 import App from './App.tsx';
 
@@ -58,10 +59,11 @@ createRoot(document.getElementById('root')!).render(
       <ClerkProvider
         publishableKey={CLERK_PUBLISHABLE_KEY}
         afterSignOutUrl="/"
+        localization={ptBR}
         appearance={{
           baseTheme: dark,
           variables: {
-            colorPrimary: '#FFFFFF',
+            colorPrimary: '#C5A880',
             colorBackground: '#121214',
             colorText: '#F5F1EA',
           },

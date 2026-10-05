@@ -499,50 +499,89 @@ div[class*="DevelopmentBadge"],
   box-shadow: none !important;
 }
 
-/* Botao principal em Branco Minimalista */
+/* Botao primario editorial refinado (Dark Luxury) */
 .cl-formButtonPrimary {
-  background-color: #FFFFFF !important;
-  color: #09090B !important;
-  font-weight: 600 !important;
+  background-color: #18181B !important;
+  color: #F4F4F5 !important;
+  border: 1px solid rgba(82, 82, 91, 0.6) !important;
+  font-weight: 500 !important;
+  font-size: 0.8125rem !important;
+  letter-spacing: 0.025em !important;
   border-radius: 0.75rem !important;
-  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1) !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  transition: all 160ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+  cursor: pointer !important;
 }
 
 .cl-formButtonPrimary:hover {
-  background-color: #E4E4E7 !important;
-  transform: translateY(-1px);
+  background-color: #27272A !important;
+  border-color: rgba(161, 161, 170, 0.8) !important;
+  color: #FFFFFF !important;
+  transform: translateY(-1px) !important;
 }
 
 .cl-formButtonPrimary:active {
-  transform: translateY(0);
+  transform: translateY(0) !important;
+  background-color: #18181B !important;
 }
 
-/* Campos de entrada e Google Button */
+/* Ocultar glifo de seta de reproducao */
+.cl-formButtonPrimary svg,
+.cl-formButtonPrimary::after {
+  display: none !important;
+}
+
+/* Campos de entrada e Google Button padronizados em 44px */
 .cl-socialButtonsBlockButton {
-  background-color: rgba(24, 24, 27, 0.8) !important;
-  border: 1px solid rgba(63, 63, 70, 0.5) !important;
+  background-color: rgba(24, 24, 27, 0.6) !important;
+  border: 1px solid rgba(63, 63, 70, 0.6) !important;
   border-radius: 0.75rem !important;
   color: #F4F4F5 !important;
+  height: 44px !important;
+  min-height: 44px !important;
   transition: all 150ms ease !important;
 }
 
 .cl-socialButtonsBlockButton:hover {
-  background-color: rgba(39, 39, 42, 0.9) !important;
-  border-color: rgba(82, 82, 91, 0.7) !important;
+  background-color: rgba(39, 39, 42, 0.8) !important;
+  border-color: rgba(113, 113, 122, 0.8) !important;
 }
 
 .cl-formFieldInput {
-  background-color: rgba(24, 24, 27, 0.8) !important;
-  border: 1px solid rgba(63, 63, 70, 0.5) !important;
+  background-color: rgba(24, 24, 27, 0.6) !important;
+  border: 1px solid rgba(63, 63, 70, 0.6) !important;
   border-radius: 0.75rem !important;
   color: #F4F4F5 !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  padding: 0 14px !important;
   transition: all 150ms ease !important;
 }
 
 .cl-formFieldInput:focus {
-  border-color: #A1A1AA !important;
-  box-shadow: 0 0 0 1px #A1A1AA !important;
+  border-color: #C5A880 !important;
+  box-shadow: 0 0 0 1px #C5A880 !important;
+  outline: none !important;
+}
+
+/* Divisor visual refinado */
+.cl-dividerRow {
+  margin: 16px 0 !important;
+}
+
+.cl-dividerLine {
+  background-color: rgba(63, 63, 70, 0.4) !important;
+}
+
+.cl-dividerText {
+  color: #71717A !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 10px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  padding: 0 12px !important;
 }
 
 .cl-footerActionText {
@@ -550,12 +589,12 @@ div[class*="DevelopmentBadge"],
 }
 
 .cl-footerActionLink {
-  color: #FFFFFF !important;
+  color: #C5A880 !important;
   font-weight: 500 !important;
 }
 
 .cl-footerActionLink:hover {
-  color: #D4D4D8 !important;
+  color: #E2C9A6 !important;
 }
 
 
