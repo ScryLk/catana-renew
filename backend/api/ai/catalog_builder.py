@@ -282,7 +282,7 @@ def _run_gemini_or_contingency_synthesis(prompt: str, clean_products: List[Dict[
     return synthesis_data
 
 
-def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, Any]]] = None, creative_seed: Optional[int] = None, brand_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, Any]]] = None, creative_seed: Optional[int] = None, brand_context: Optional[Dict[str, Any]] = None, source_document: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Gera um catalogo editorial desacoplado e governado por restricoes via EditorialGenerationPipeline.
     Executa o fluxo completo de 12 camadas:
@@ -297,7 +297,7 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
     clean_products = [CommercialIntegrityGuard.sanitize_supplied_product(p) for p in (products or [])]
     for idx, product in enumerate(clean_products):
         product.setdefault('index', f'{idx + 1:02d}')
-        if product['id'] is None:
+        if product['id'] is None and source_document is None:
             product['id'] = f'input-product-{idx + 1}'
     detected_industry = TemplateRAGService.detect_industry(prompt, clean_products)
     # Layout and its metadata are deterministic. Remote creative proposals cannot
@@ -310,12 +310,22 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
         synthesis_generator_func=None,
         creative_seed=creative_seed,
         brand_context=brand_context,
+        source_document=source_document,
     )
 
     # 4. Enriquecimento dos metadados de conselho editorial e contingencia para compatibilidade total
     is_one_pager = len(doc.get("pages", [])) == 1
     doc_title = doc.get("title", "Coleção Editorial")
     palette = doc.get("palette", {})
+
+    if source_document is not None:
+        redesigned = sum(page.get('renderMode') == 'generative' for page in doc.get('pages', []))
+        doc['councilDelegations'] = [{
+            'roleId': 'orchestrator', 'roleName': 'Editor-Chefe', 'badge': 'Importação',
+            'action': (f"{redesigned} de {len(doc.get('pages', []))} páginas recompostas com conteúdo verificável; o original permanece disponível."
+                       if redesigned else 'O redesenho requer revisão. O documento original permanece preservado.')
+        }]
+        return doc
 
     doc["councilDelegations"] = [
         {
@@ -603,4 +613,3 @@ def generate_product_image_with_ai(name: str, category: str = "", description: s
         "prompt_used": prompt_used,
         "source": "studio_stock",
     }
-

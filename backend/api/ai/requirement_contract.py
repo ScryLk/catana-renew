@@ -85,6 +85,7 @@ class RequirementContract:
     assets: AssetInventory = field(default_factory=AssetInventory)
     raw_prompt: str = ""
     brand_context: Dict[str, Any] = field(default_factory=dict)
+    source_document: Dict[str, Any] = field(default_factory=dict)
     detected_industry: str = "general_retail"
 
     def to_dict(self) -> Dict[str, Any]:
@@ -92,6 +93,8 @@ class RequirementContract:
         result = asdict(self)
         if not self.brand_context:
             result.pop('brand_context')
+        if not self.source_document:
+            result.pop('source_document')
         return result
 
     @classmethod
@@ -111,5 +114,6 @@ class RequirementContract:
             assets=AssetInventory(**assets_data) if isinstance(assets_data, dict) else AssetInventory(),
             raw_prompt=data.get("raw_prompt", ""),
             brand_context=data.get("brand_context", {}) if isinstance(data.get("brand_context", {}), dict) else {},
+            source_document=data.get("source_document", {}) if isinstance(data.get("source_document", {}), dict) else {},
             detected_industry=data.get("detected_industry", "general_retail"),
         )

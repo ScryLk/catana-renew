@@ -64,6 +64,10 @@ class GenerationValidator:
     ) -> ValidationResult:
         """Executa a bateria completa de validações determinísticas e semânticas."""
         res = ValidationResult()
+        if contract.source_document:
+            from .source_context import SourceIntegrityGuard
+            for error in SourceIntegrityGuard.verify(contract, document, complete='sourceDocument' in document):
+                res.add_error(error)
         for error in ConstraintEngine.validate_brand_expression(contract, document):
             res.add_error(error)
 
@@ -214,7 +218,7 @@ class GenerationValidator:
 
         # 5. VALIDAÇÃO DE PLACEHOLDERS INVÁLIDOS (LOREM IPSUM)
         for pattern in cls.INVALID_PLACEHOLDER_PATTERNS:
-            if re.search(pattern, doc_text_corpus, re.IGNORECASE):
+            if not contract.source_document and re.search(pattern, doc_text_corpus, re.IGNORECASE):
                 res.add_error(f"INVALID_PLACEHOLDER: Detectado texto de preenchimento ou rascunho inválido ({pattern}).")
                 break
 

@@ -29,6 +29,7 @@ from .composition_mutator import CompositionMutator
 from .seed_utils import derive_creative_seed, compute_generation_fingerprint
 from .commercial_guard import CommercialIntegrityGuard
 from .design_grammar import validate_runtime_block
+from .source_context import SourceDocumentContext, SourceIntegrityGuard
 import hashlib
 import json
 
@@ -50,13 +51,18 @@ class EditorialGenerationPipeline:
 
     @classmethod
     def execute(cls, prompt, products=None, attachments=None, synthesis_generator_func=None,
-                creative_seed=None, creativity_level=0.5, brand_context=None):
+                creative_seed=None, creativity_level=0.5, brand_context=None, source_document=None):
         try:
             return cls._execute(prompt, products, attachments, synthesis_generator_func,
-                                creative_seed, creativity_level, brand_context)
+                                creative_seed, creativity_level, brand_context, source_document)
         except Exception as exc:
             # A failed subsystem cannot turn a safe renderer fallback into approval.
             logger.error('[EditorialPipeline] Controlled failure: %s', type(exc).__name__)
+            if source_document is not None:
+                reason = str(exc) if isinstance(exc, ValueError) and str(exc).startswith('SOURCE_') else 'SOURCE_REDESIGN_SUBSYSTEM_FAILURE:' + type(exc).__name__
+                fallback = SourceDocumentContext.fallback(source_document, reason)
+                cls._attach_brand_snapshot(fallback, brand_context)
+                return fallback
             clean = [CommercialIntegrityGuard.sanitize_supplied_product(p) for p in (products or [])]
             for idx, product in enumerate(clean):
                 if product['id'] is None:
@@ -100,6 +106,7 @@ class EditorialGenerationPipeline:
         creative_seed: Optional[int] = None,
         creativity_level: float = 0.5,
         brand_context: Optional[Dict[str, Any]] = None,
+        source_document: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Executa as etapas completas do pipeline generativo com validação, crítica e auto-reparo.
@@ -112,6 +119,8 @@ class EditorialGenerationPipeline:
         t0 = time.time()
         contract = RequirementParser.parse(prompt=prompt, products=products, attachments=attachments)
         contract = ConstraintEngine.apply_brand_context(contract, brand_context)
+        if source_document is not None:
+            contract = SourceDocumentContext.bind(contract, source_document, products)
         timings["requirement_parser_ms"] = int((time.time() - t0) * 1000)
 
         # ETAPA 3: CONSTRAINT ENGINE & FEASIBILITY CHECK
@@ -134,10 +143,12 @@ class EditorialGenerationPipeline:
         if products:
             for idx, p in enumerate(products):
                 clean_products.append(CommercialIntegrityGuard.sanitize_supplied_product(p, default_index=idx + 1))
+        if contract.source_document:
+            clean_products = SourceDocumentContext.candidates(contract.source_document)
 
         # Internal IDs are technical, never SKU/name fallbacks. Preserve supplied IDs exactly.
         for idx, product in enumerate(clean_products):
-            if product['id'] is None:
+            if product['id'] is None and not contract.source_document:
                 product['id'] = f"input-product-{idx + 1}"
         commercial_originals = copy.deepcopy(clean_products)
         commercial_snapshot = CommercialIntegrityGuard.create_snapshot(commercial_originals)
@@ -158,6 +169,9 @@ class EditorialGenerationPipeline:
             brand_snapshot_hash=ConstraintEngine.brand_snapshot_hash(brand_context) if brand_context else None,
         )
 
+        if source_document is not None:
+            gen_fingerprint = SourceDocumentContext.digest({'generation': gen_fingerprint, 'source': SourceDocumentContext.digest(source_document)})
+
         # ETAPA 4: PAGE BUDGET ENGINE (Criação de N slots com orçamentos espaciais)
         t0 = time.time()
         page_slots = PageBudgetEngine.calculate_and_allocate_slots(contract=contract, products=clean_products)
@@ -166,13 +180,13 @@ class EditorialGenerationPipeline:
         # ETAPA 5: RAG RETRIEVAL CONSCIENTE DE RESTRIÇÕES (Inspiração e princípios, não cópia)
         t0 = time.time()
         from api.services.template_rag import TemplateRAGService
-        rag_context = TemplateRAGService.retrieve_context_for_contract(contract)
+        rag_context = {} if source_document is not None else TemplateRAGService.retrieve_context_for_contract(contract)
         timings["rag_ms"] = int((time.time() - t0) * 1000)
 
         # ETAPA 6: CONTENT PLANNER (WHAT TO SAY)
         t0 = time.time()
         synthesis_data = rag_context.get("synthesis_data")
-        if brand_context:
+        if brand_context and source_document is None:
             identity, tone = brand_context.get('identity', {}), brand_context.get('tone', {})
             name = str(identity.get('name', '')).strip()[:180]
             dimensions = tone.get('dimensions') or {}
@@ -247,6 +261,8 @@ class EditorialGenerationPipeline:
             clean_products=clean_products,
         )
         cls._attach_brand_snapshot(raw_document, brand_context)
+        if source_document is not None:
+            SourceDocumentContext.attach(raw_document, source_document)
         timings["composition_planner_ms"] = int((time.time() - t0) * 1000)
 
         # ETAPA 10: VALIDATOR (DETERMINÍSTICO, SEMÂNTICO E GEOMÉTRICO)
@@ -285,6 +301,22 @@ class EditorialGenerationPipeline:
         elapsed_ms = int((time.time() - start_time) * 1000)
         timings["total_elapsed_ms"] = elapsed_ms
 
+        source_fallback_pages = []
+        if source_document is not None:
+            source_errors = SourceIntegrityGuard.verify(contract, final_doc, allow_repair_legacy=True)
+            if source_errors:
+                fallback = SourceDocumentContext.fallback(source_document, source_errors[0])
+                fallback['qualityGate']['reasons'] = source_errors
+                fallback['observability']['sourceRedesignIntegrityErrors'] = source_errors
+                cls._attach_brand_snapshot(fallback, brand_context)
+                return fallback
+            # One unsupported visual never discards independently safe source pages.
+            for index, page in enumerate(final_doc.get('pages', [])):
+                if page.get('renderMode') != 'generative':
+                    reason = page.get('importWarning') or 'SOURCE_REDESIGN_REQUIRES_REVIEW'
+                    final_doc['pages'][index] = SourceDocumentContext.fallback_page(source_document, index + 1, reason, page)
+                    source_fallback_pages.append(index + 1)
+
         # ETAPA 13: AUDITORIA DE INTEGRIDADE COMERCIAL (Item 11 & 12)
         comm_passed, comm_violations = CommercialIntegrityGuard.verify_document_commercial_integrity(
             original_products=commercial_originals,
@@ -295,12 +327,14 @@ class EditorialGenerationPipeline:
         # Final mandatory boundary, including repaired blocks.
         final_val = GenerationValidator.validate(contract=contract, document=final_doc)
         runtime_passed = all(validate_runtime_block(b)[0] for p in final_doc.get('pages', []) for b in p.get('blocks', []))
-        gate_passed = final_val.passed and critic_report.passed and comm_passed and runtime_passed
+        gate_passed = final_val.passed and critic_report.passed and comm_passed and runtime_passed and not source_fallback_pages
         reasons = final_val.errors + comm_violations
         if not critic_report.passed:
             reasons.append('VISUAL_CRITIC_FAILED')
         if not runtime_passed:
             reasons.append('RUNTIME_SECURITY_FAILED')
+        if source_fallback_pages:
+            reasons.append('SOURCE_REDESIGN_PARTIAL')
         cls._attach_brand_snapshot(final_doc, brand_context)
         final_doc['qualityGate'] = {
             'passed': gate_passed, 'publishable': gate_passed,
@@ -319,11 +353,13 @@ class EditorialGenerationPipeline:
             effective_render_mode = "generative"
         elif all(m == "legacy" for m in page_render_modes):
             effective_render_mode = "legacy"
+        elif all(m == "document" for m in page_render_modes):
+            effective_render_mode = "document"
         else:
             effective_render_mode = "mixed"
 
         repair_meta = final_doc.get("repair_metadata", {})
-        fallback_used = repair_meta.get("fallbackUsed", False)
+        fallback_used = repair_meta.get("fallbackUsed", False) or bool(source_fallback_pages)
 
         # Relatório Unificado de Qualidade (Item 6)
         quality_report = GenerationQualityReport(
@@ -332,8 +368,9 @@ class EditorialGenerationPipeline:
             commercial_data_valid=comm_passed,
             novelty_valid=novelty_eval.get("passed", True),
             visual_critic_valid=critic_report.passed,
-            passed=(final_val.passed and critic_report.passed and comm_passed and novelty_eval.get("passed", True)),
-            errors=final_val.errors + comm_violations + ([f"GENERIC_RISK_EXCEEDED: {critic_report.generic_risk}"] if not critic_report.passed else []),
+            passed=(gate_passed and novelty_eval.get("passed", True)),
+            errors=final_val.errors + comm_violations + ([f"GENERIC_RISK_EXCEEDED: {critic_report.generic_risk}"] if not critic_report.passed else [])
+                   + (['SOURCE_REDESIGN_PARTIAL'] if source_fallback_pages else []),
             warnings=final_val.warnings,
             generic_risk=critic_report.generic_risk,
             novelty_score=novelty_eval.get("overall_novelty", 0.80),
@@ -369,7 +406,7 @@ class EditorialGenerationPipeline:
             "renderMode": effective_render_mode,
             "fallbackUsed": fallback_used,
             "fallbackReason": repair_meta.get("fallbackReason", ""),
-            "fallbackPages": repair_meta.get("fallbackPages", []),
+            "fallbackPages": sorted(set(repair_meta.get("fallbackPages", []) + source_fallback_pages)),
             "visualDNA": visual_dna.to_dict(),
             "creativeDirection": creative_direction.to_dict(),
             "noveltyScore": novelty_eval.get("overall_novelty", 0.80),
@@ -404,6 +441,11 @@ class EditorialGenerationPipeline:
             },
         }
 
+        if source_document is not None:
+            final_doc["observability"].update(sourceFingerprint=source_document["sourceFingerprint"],
+                                             sourcePageCount=source_document["pageCount"], sourceIntegrityPass=True,
+                                             sourceFallbackPages=source_fallback_pages,
+                                             sourceContentHash=SourceDocumentContext.digest(source_document))
         if brand_context:
             final_doc["observability"].update({
                 "brandId": final_doc["brandId"], "brandVersion": final_doc["brandVersion"],
@@ -457,7 +499,7 @@ class EditorialGenerationPipeline:
         palette = design_plan.palette_spec
 
         # Se houver função de síntese externa injetada, invoca para enriquecer metadados
-        if synthesis_func and callable(synthesis_func):
+        if synthesis_func and callable(synthesis_func) and not contract.source_document:
             try:
                 external_synth = synthesis_func(contract.raw_prompt)
                 if isinstance(external_synth, dict):
@@ -537,10 +579,14 @@ class EditorialGenerationPipeline:
                 contact = contract.brand_context.get('identity', {}).get('commercial_contact', {})
                 page_obj['content'] = ' · '.join(str(contact[k])[:300] for k in ['whatsapp', 'email', 'website', 'instagram'] if contact.get(k))
 
+            if contract.source_document:
+                original = contract.source_document['pages'][idx]
+                page_obj.update(title=SourceDocumentContext.page_title(original), subtitle='', label='', content='', quote='', folio=str(p_num))
+
             # Se houver textos verbatim do usuário
-            if p_map.verbatim_blocks:
+            if p_map.verbatim_blocks and not contract.source_document:
                 page_obj["content"] = "\n\n".join(p_map.verbatim_blocks)
-            elif is_one_pager:
+            elif is_one_pager and not contract.source_document:
                 page_obj["content"] = summary
                 page_obj["quote"] = "Apresentação comercial e técnica estruturada em página única."
 
@@ -551,7 +597,7 @@ class EditorialGenerationPipeline:
                     sanitized_p = CommercialIntegrityGuard.sanitize_supplied_product(pr, default_index=p_idx + 1)
                     formatted_prods.append({
                         **sanitized_p,
-                        "category": sanitized_p.get("category") or category,
+                        "category": sanitized_p.get("category") if contract.source_document else sanitized_p.get("category") or category,
                         "index": f"{p_idx + 1:02d}",
                         "image": None if "NO_IMAGES" in contract.constraints.negative else sanitized_p.get("image"),
                     })
@@ -559,16 +605,26 @@ class EditorialGenerationPipeline:
 
             # ETAPA GENERATIVA: PROJEÇÃO ESPACIAL DE BLOCOS (COMPOSITION PLANNER)
             if GENERATIVE_COMPOSITION_ENGINE and visual_dna and creative_direction and p_narrative:
-                comp_result = CompositionPlanner.compose_page(
-                    narrative=p_narrative,
-                    visual_dna=visual_dna,
-                    direction=creative_direction,
-                    contract=contract,
-                    page_dict=page_obj,
-                    palette=palette,
-                    creative_seed=creative_seed,
-                    previous_pages=assembled_pages,
-                )
+                try:
+                    comp_result = CompositionPlanner.compose_page(
+                        narrative=p_narrative,
+                        visual_dna=visual_dna,
+                        direction=creative_direction,
+                        contract=contract,
+                        page_dict=page_obj,
+                        palette=palette,
+                        creative_seed=creative_seed,
+                        previous_pages=assembled_pages,
+                    )
+                except ValueError as error:
+                    if not contract.source_document:
+                        raise
+                    reason = str(error)
+                    if not reason.startswith('SOURCE_'):
+                        reason = 'SOURCE_COMPOSITION_REQUIRES_REVIEW'
+                    page_obj = SourceDocumentContext.fallback_page(contract.source_document, p_num, reason, page_obj)
+                    assembled_pages.append(page_obj)
+                    continue
                 page_obj["composition"] = comp_result["composition"]
                 page_obj["safeArea"] = comp_result["safeArea"]
                 page_obj["blocks"] = comp_result["blocks"]

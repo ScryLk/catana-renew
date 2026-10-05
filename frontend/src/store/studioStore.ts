@@ -1,11 +1,13 @@
 import { normalizeCatalogDocument, QualityGate } from '../data/editorialCatalog.mock';
 import { parseSuppliedPrice } from '../utils/commercialProduct';
 import { create } from 'zustand';
-import axios from 'axios';
+import axios, {type AxiosResponse} from 'axios';
 import api, { getAuthToken, setInMemoryAccessToken, API_BASE_URL } from '../services/api';
 import { toast } from 'sonner';
 import { brandService, catalogBrandSnapshot, groupBrandCatalogs, pendingLegacyBrands, readBrandCache, writeBrandCache } from '../services/brandService';
 import type { BrandAsset, BrandColor, BrandInference, BrandRule, BrandSnapshotState } from '../services/brandService';
+import { documentImportService } from '../services/documentImportService';
+import type { DocumentImportMetadata, DocumentImportMode } from '../types/documentImport';
 import { organizationService } from '../services/organizationService';
 import {
   CatalogPageData,
@@ -475,6 +477,7 @@ export const saveStoredUnlinkedCatalogs = (catalogs: RecentCatalogItem[], userId
 };
 
 export interface StoredProjectSession {
+  importMetadata?: DocumentImportMetadata;
   qualityGate?: QualityGate;
   brandContext?: BrandSnapshotState;
   organization?: number | null;
@@ -540,6 +543,7 @@ export const syncActiveCatalogStorage = (state: {
   activeUserId?: string | number | null;
   qualityGate?: QualityGate;
   catalogBrandContext?: BrandSnapshotState;
+  importMetadata?: DocumentImportMetadata;
   activeOrganizationId?: number | null;
 }) => {
   if (typeof window === 'undefined' || !state.activeCatalogId) return;
@@ -551,6 +555,7 @@ export const syncActiveCatalogStorage = (state: {
     currentSpread: state.currentSpread,
     pages: state.pages,
     qualityGate: state.qualityGate,
+    importMetadata: state.importMetadata,
     brandContext: state.catalogBrandContext, organization: state.activeOrganizationId,
     totalPages: state.totalPages,
   }, state.activeUserId);
@@ -558,6 +563,11 @@ export const syncActiveCatalogStorage = (state: {
 
 export interface StudioState {
   qualityGate?: QualityGate;
+  importMetadata?: DocumentImportMetadata;
+  confirmDocumentImport: (importId: string, options: {title: string; mode: DocumentImportMode; brandId?: string | null}) => Promise<boolean>;
+  cancelDocumentImport: () => void;
+  updateDocumentText: (pageNumber: number, elementId: string, text: string) => void;
+  resetDocumentText: (pageNumber: number, elementId: string) => void;
   // Session & Workspace Mode
   hasStartedSession: boolean;
   startSession: (initialPrompt?: string, categoryName?: string, attachments?: ChatAttachment[]) => void;
@@ -907,8 +917,13 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   let brandEpoch = 0;
   let generationOperation = 0;
   let spreadSaveOperation = 0;
+  let catalogLoadOperation = 0;
+  let documentEpoch = 0;
+  let activeImportOperation: number | null = null;
   const captureBrandScope = () => ({user: get().activeUserId, org: get().activeOrganizationId, epoch: brandEpoch});
   const isCurrentBrandScope = (scope: ReturnType<typeof captureBrandScope>) => scope.user === get().activeUserId && scope.org === get().activeOrganizationId && scope.epoch === brandEpoch && scope.org === organizationService.getActiveOrganizationId();
+  const captureDocumentScope = () => ({...captureBrandScope(), catalog: get().activeCatalogId, documentEpoch});
+  const isCurrentDocumentScope = (scope: ReturnType<typeof captureDocumentScope>) => isCurrentBrandScope(scope) && scope.catalog === get().activeCatalogId && scope.documentEpoch === documentEpoch;
   const requireBrandScope = () => {
     const scope = captureBrandScope();
     if (scope.user == null || scope.user === 'anonymous' || scope.org == null || !isCurrentBrandScope(scope) || get().brandLoadStatus !== 'ready') throw new Error('Selecione uma organização e sincronize as marcas antes de salvar.');
@@ -924,11 +939,162 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   };
   const set = (update: Partial<StudioState> | ((state: StudioState) => Partial<StudioState>)) => rawSet(state => {
     const next = typeof update === 'function' ? update(state) : update;
+    if (Object.prototype.hasOwnProperty.call(next, 'activeCatalogId') && next.activeCatalogId !== state.activeCatalogId) documentEpoch += 1;
     if (!next.pages) return next;
     const gate = next.qualityGate ?? (next.activeCatalogId && next.activeCatalogId !== state.activeCatalogId ? undefined : state.qualityGate);
     const normalized = normalizeCatalogDocument({pages:next.pages, qualityGate:gate});
-    return {...next, pages:normalized.pages, qualityGate:normalized.qualityGate};
+    return {...next, ...(next.activeCatalogId && next.activeCatalogId !== state.activeCatalogId && !Object.prototype.hasOwnProperty.call(next, 'importMetadata') ? {importMetadata: undefined} : {}), pages:normalized.pages, qualityGate:normalized.qualityGate};
   });
+  const hydrateBackendCatalog = (catData: AxiosResponse['data']) => {
+    const s = get();
+    const rawSpreads = Array.isArray(catData.spreads) ? catData.spreads : [];
+    const hydratedPages: CatalogPageData[] = [];
+
+    rawSpreads.forEach((sp: any) => {
+      const spreadIdx = typeof sp.spread_index === 'number' ? sp.spread_index : 0;
+      const leftPageNum = spreadIdx * 2 + 1;
+      const rightPageNum = spreadIdx * 2 + 2;
+
+      const leftRaw = sp.left_page || (Array.isArray(sp.left_page_elements) && sp.left_page_elements[0]) || {};
+      const rightRaw = sp.right_page || (Array.isArray(sp.right_page_elements) && sp.right_page_elements[0]) || {};
+
+      const leftPage: CatalogPageData = {
+        ...leftRaw,
+        id: leftRaw.id || `p-${catData.id}-${leftPageNum}`,
+        pageNumber: leftRaw.pageNumber || leftPageNum,
+        type: leftRaw.type || (leftPageNum === 1 ? 'cover' : 'hero'),
+        title: leftRaw.title,
+        subtitle: leftRaw.subtitle,
+        label: leftRaw.label,
+        quote: leftRaw.quote,
+        content: leftRaw.content,
+        backgroundColor: leftRaw.backgroundColor || catData.primary_color || '#1A1817',
+        textColor: leftRaw.textColor || catData.secondary_color || '#F5F1EA',
+        accentColor: leftRaw.accentColor || catData.accent_color || '#B08D57',
+        editorialImage: leftRaw.editorialImage,
+        folio: leftRaw.folio,
+        products: Array.isArray(leftRaw.products) ? leftRaw.products : [],
+        mirrored: Boolean(leftRaw.mirrored),
+        overlays: Array.isArray(leftRaw.overlays) ? leftRaw.overlays : [],
+      };
+
+      const rightPage: CatalogPageData = {
+        ...rightRaw,
+        id: rightRaw.id || `p-${catData.id}-${rightPageNum}`,
+        pageNumber: rightRaw.pageNumber || rightPageNum,
+        type: rightRaw.type || (rightPageNum === (catData.total_pages || 6) ? 'backcover' : 'duo'),
+        title: rightRaw.title,
+        subtitle: rightRaw.subtitle,
+        label: rightRaw.label,
+        quote: rightRaw.quote,
+        content: rightRaw.content,
+        backgroundColor: rightRaw.backgroundColor || catData.secondary_color || '#F5F1EA',
+        textColor: rightRaw.textColor || catData.primary_color || '#1A1817',
+        accentColor: rightRaw.accentColor || catData.accent_color || '#B08D57',
+        editorialImage: rightRaw.editorialImage,
+        folio: rightRaw.folio,
+        products: Array.isArray(rightRaw.products) ? rightRaw.products : [],
+        mirrored: Boolean(rightRaw.mirrored),
+        overlays: Array.isArray(rightRaw.overlays) ? rightRaw.overlays : [],
+      };
+
+      if (Object.keys(leftRaw).length) hydratedPages.push(catData.import_metadata?.importId ? leftRaw : leftPage);
+      if (Object.keys(rightRaw).length && rightPageNum <= (catData.total_pages || Infinity)) hydratedPages.push(catData.import_metadata?.importId ? rightRaw : rightPage);
+    });
+
+    if (catData.import_metadata?.importId && hydratedPages.length !== catData.total_pages) throw new Error('O catálogo importado não contém todas as páginas de origem.');
+
+    // Determina a paleta a partir de palette_data ou presets
+    let paletteToUse: StudioPalette = STUDIO_PALETTE_PRESETS[0];
+    if (catData.palette_data && catData.palette_data.name) {
+      paletteToUse = {
+        ...catData.palette_data,
+        locked: Boolean(catData.brand_lock),
+      };
+    } else {
+      const foundPreset = STUDIO_PALETTE_PRESETS.find((p) => p.name === catData.style_preset);
+      if (foundPreset) {
+        paletteToUse = { ...foundPreset, locked: Boolean(catData.brand_lock) };
+      } else {
+        paletteToUse = {
+          name: catData.style_preset || 'Personalizada',
+          primary: catData.primary_color || '#1A1817',
+          background: catData.secondary_color || '#F5F1EA',
+          accent: catData.accent_color || '#B08D57',
+          locked: Boolean(catData.brand_lock),
+        };
+      }
+    }
+
+    let threadsToUse: ChatThread[] = [];
+    if (Array.isArray(catData.threads) && catData.threads.length > 0) {
+      threadsToUse = catData.threads;
+    } else {
+      threadsToUse = [
+        {
+          id: `thread-${catData.id}`,
+          title: catData.title,
+          mode: 'orchestrator',
+          roleId: 'orchestrator',
+          createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          messages: [
+            {
+              id: `msg-backend-${Date.now()}`,
+              role: 'assistant',
+              content: `Catálogo **${catData.title}** sincronizado do banco de dados. ${hydratedPages.length} páginas ativas na prancheta.`,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            },
+          ],
+        },
+      ];
+    }
+
+    const activeThread = threadsToUse[0];
+    const activeRole = activeThread.roleId || activeThread.mode || 'orchestrator';
+
+    documentEpoch += 1;
+    generationOperation += 1;
+    set({
+      hasStartedSession: true,
+      isGeneratingCatalog: false, generationTargetCatalog: null, isDemoLoading: false,
+      generationProgress: 0, generationStage: 1, generationLogs: [],
+      activeCatalogId: String(catData.id),
+      importMetadata: catData.import_metadata || undefined,
+      historyStack: [], redoStack: [], canUndo: false, canRedo: false,
+      selectedElementId: null, activeAgentCursors: [], executionPlan: [],
+      catalogBrandContext: catalogBrandSnapshot(catData),
+      activeBrandId: catalogBrandSnapshot(catData).brandId,
+      catalogTitle: catData.title,
+      pages: hydratedPages.length > 0 ? hydratedPages : generateCatalogFromPrompt(catData.title).pages,
+      qualityGate: catData.qualityGate || undefined,
+      totalPages: catData.total_pages || (hydratedPages.length > 0 ? hydratedPages.length : 6),
+      activePalette: paletteToUse,
+      currentSpread: [1, hydratedPages.length > 1 ? 2 : 1],
+      unassignedProducts: Array.isArray(catData.unassigned_products) && catData.unassigned_products.length > 0
+        ? catData.unassigned_products
+        : [],
+      threads: threadsToUse,
+      activeThreadId: activeThread.id,
+      messages: activeThread.messages || [],
+      activeRoleId: activeRole,
+      activeMode: activeRole,
+      agentStatus: 'idle',
+    });
+
+    saveStoredProjectSession(String(catData.id), {
+      threads: threadsToUse,
+      activeThreadId: activeThread.id,
+      catalogTitle: catData.title,
+      brandContext: catalogBrandSnapshot(catData), organization: catData.organization, qualityGate: catData.qualityGate || undefined,
+      importMetadata: catData.import_metadata || undefined,
+      activePalette: paletteToUse,
+      currentSpread: [1, hydratedPages.length > 1 ? 2 : 1],
+      pages: hydratedPages,
+      totalPages: catData.total_pages || hydratedPages.length,
+    }, s.activeUserId);
+
+  };
+
   return ({
   theme: getInitialTheme(),
   toggleTheme: () =>
@@ -1050,6 +1216,9 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   },
   resetStudioState: () => {
     brandEpoch += 1;
+    documentEpoch += 1;
+    activeImportOperation = null;
+    catalogLoadOperation += 1;
     generationOperation += 1;
     if (typeof window !== 'undefined') {
       try {
@@ -1066,7 +1235,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       activeCatalogId: null,
       catalogTitle: 'Novo Catálogo',
       pages: [],
-      qualityGate: undefined,
+      qualityGate: undefined, importMetadata: undefined,
       totalPages: 0,
       executionPlan: [],
       messages: [],
@@ -1185,6 +1354,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   closeNewCatalogModal: () => set({ isNewCatalogModalOpen: false }),
   createBlankCatalog: async (title, pagesCount = 6, paletteName) => {
     const blankScope = captureBrandScope();
+    const blankOperation = ++catalogLoadOperation;
     if (get().activeBrandId && get().brandLoadStatus !== 'ready') { toast.error('Sincronize a marca antes de criar este catálogo. Use Tentar novamente.'); return; }
     const catalogTitle = title?.trim() || 'Novo Catálogo';
     const activeBrand = get().brands.find((b) => b.id === get().activeBrandId);
@@ -1274,7 +1444,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         brand_lock: Boolean(palette.locked),
         palette_data: palette,
       });
-      if (!isCurrentBrandScope(blankScope)) return;
+      if (blankOperation !== catalogLoadOperation || !isCurrentBrandScope(blankScope)) return;
       if (res.data && res.data.id) {
         realCatalogId = String(res.data.id);
         blankBrandContext = catalogBrandSnapshot(res.data);
@@ -1283,7 +1453,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         }
       }
     } catch (e) {
-      if (!isCurrentBrandScope(blankScope)) return;
+      if (blankOperation !== catalogLoadOperation || !isCurrentBrandScope(blankScope)) return;
       if (activeBrand) { toast.error('Não foi possível salvar o catálogo com a marca. Tente novamente.'); return; }
       console.warn('Falha ao persistir catalogo no backend, utilizando ID local:', e);
     }
@@ -1307,8 +1477,11 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       ],
     };
 
+    generationOperation += 1;
     set({
       hasStartedSession: true,
+      isGeneratingCatalog: false, generationTargetCatalog: null, isDemoLoading: false,
+      generationProgress: 0, generationStage: 1, generationLogs: [],
       activeCatalogId: realCatalogId,
       catalogBrandContext: blankBrandContext,
       catalogTitle,
@@ -1376,10 +1549,21 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   // Export Catalog Modal
   isExportModalOpen: false,
   exportModalTab: 'pdf',
-  openExportModal: (tab = 'pdf') => {
+  openExportModal: async (tab = 'pdf') => {
     if (get().qualityGate?.publishable === false) {
       toast.error('Catálogo precisa de revisão antes da publicação.');
       return;
+    }
+    if (tab === 'share' && get().importMetadata && get().activeCatalogId) {
+      const scope = captureBrandScope();
+      const catalogId = get().activeCatalogId;
+      try {
+        await get().flushSaveSpread();
+        if (!isCurrentBrandScope(scope) || get().activeCatalogId !== catalogId) return;
+        const response = await api.put(`/api/v2/studio/catalogs/${catalogId}/`, {share_import: true});
+        if (!isCurrentBrandScope(scope) || get().activeCatalogId !== catalogId) return;
+        set({importMetadata: response.data.import_metadata || {...get().importMetadata, share_enabled: true}});
+      } catch { toast.error('Não foi possível autorizar o compartilhamento deste documento.'); return; }
     }
     set({ isExportModalOpen: true, exportModalTab: tab });
   },
@@ -1515,6 +1699,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   closeExcelImportModal: () => set({ isExcelImportModalOpen: false }),
 
   importProductsFromExcel: async (items, options = {}) => {
+    const documentScope = captureDocumentScope();
     if (!items || items.length === 0) return;
 
     const newProducts: ProductItem[] = items.map((item, idx) => {
@@ -1549,6 +1734,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         products: newProducts,
         catalog_id: !isNaN(numericCatId) ? numericCatId : undefined,
       });
+      if (!isCurrentDocumentScope(documentScope)) return;
       if (resp.data && Array.isArray(resp.data.products)) {
         const backendProducts: ProductItem[] = resp.data.products;
         set((s) => {
@@ -1564,6 +1750,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       console.warn('[importProductsFromExcel] Falha ao persistir no PostgreSQL:', err);
     }
 
+    if (!isCurrentDocumentScope(documentScope)) return;
     toast.success(`${newProducts.length} produtos importados com sucesso para o acervo!`);
 
     if (options.openDrawer) {
@@ -1578,12 +1765,14 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   },
 
   generateAIProductImage: async (productId, name, category, description) => {
+    const documentScope = captureDocumentScope();
     try {
       const response = await api.post(`/api/v2/studio/products/generate-image/`, {
         name,
         category: category || '',
         description: description || '',
       });
+      if (!isCurrentDocumentScope(documentScope)) return null;
       const imageUrl = response.data?.image_url;
       if (imageUrl) {
         get().updateProduct(productId, { image: imageUrl });
@@ -1591,6 +1780,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         return imageUrl;
       }
     } catch (err: any) {
+      if (!isCurrentDocumentScope(documentScope)) return null;
       console.warn('[generateAIProductImage] Falha ao gerar imagem com IA:', err);
       if (err?.response?.status === 401) {
         const hasClerkSession = typeof window !== 'undefined' && Boolean((window as any).Clerk?.session);
@@ -1806,6 +1996,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
   finishCatalogGeneration: () => {
     const finishScope = captureBrandScope();
+    const finishOperation = generationOperation;
     let target = get().generationTargetCatalog;
     if (!target) {
       const fallbackPrompt = get().lastGenerationPrompt || 'Catalogo Editorial';
@@ -1899,7 +2090,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         palette_data: target.palette,
         unassigned_products: get().unassignedProducts,
       }).then((res) => {
-        if (!isCurrentBrandScope(finishScope)) return;
+        if (finishOperation !== generationOperation || !isCurrentBrandScope(finishScope)) return;
         if (res.data && res.data.id) {
           const realId = String(res.data.id);
           set({ activeCatalogId: realId });
@@ -1946,9 +2137,43 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     });
   },
 
+  cancelDocumentImport: () => {
+    if (activeImportOperation === catalogLoadOperation) catalogLoadOperation += 1;
+    activeImportOperation = null;
+  },
+  confirmDocumentImport: async (importId, options) => {
+    const scope = captureBrandScope();
+    if (scope.user == null || scope.user === 'anonymous' || scope.org == null || !isCurrentBrandScope(scope)) throw new Error('Selecione uma organização para importar.');
+    const operation = ++catalogLoadOperation;
+    activeImportOperation = operation;
+    set({isDemoLoading: false});
+    try {
+    if (get().activeCatalogId && get().hasStartedSession) {
+      syncActiveCatalogStorage(get());
+      await get().flushSaveSpread();
+      if (operation !== catalogLoadOperation || !isCurrentBrandScope(scope)) return false;
+      if (get().saveStatus === 'error') throw new Error('Não foi possível salvar o catálogo atual. Tente novamente antes de confirmar a importação.');
+    }
+    const result = await documentImportService.confirm(importId, {...options, organization: scope.org});
+    if (operation !== catalogLoadOperation || !isCurrentBrandScope(scope)) return false;
+    if (!result.catalog_id) throw new Error('A confirmação não retornou um catálogo salvo.');
+    const response = await api.get(`/api/v2/studio/catalogs/${result.catalog_id}/`);
+    if (operation !== catalogLoadOperation || !isCurrentBrandScope(scope)) return false;
+    if (response.data.organization !== scope.org) throw new Error('O catálogo pertence a outra organização.');
+    if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+    hydrateBackendCatalog(response.data);
+    syncActiveCatalogStorage(get());
+    await get().syncUserCatalogs();
+    return operation === catalogLoadOperation && isCurrentBrandScope(scope);
+    } finally {
+      if (activeImportOperation === operation) activeImportOperation = null;
+    }
+  },
+
   loadExistingCatalog: async (catalogId: string) => {
     const s = get();
     const loadScope = captureBrandScope();
+    const loadOperation = ++catalogLoadOperation;
 
     // 1. Persiste o catálogo que está saindo se houver sessão ativa
     if (s.activeCatalogId && s.threads && s.threads.length > 0) {
@@ -1978,149 +2203,16 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         set({ agentStatus: 'thinking' });
         const res = await api.get(`/api/v2/studio/catalogs/${numericCatalogId}/`);
         const catData = res.data;
-        if (!isCurrentBrandScope(loadScope) || (s.activeOrganizationId != null && catData.organization != null && catData.organization !== s.activeOrganizationId)) {
+        if (loadOperation !== catalogLoadOperation || !isCurrentBrandScope(loadScope)) return;
+        if (s.activeOrganizationId != null && catData.organization != null && catData.organization !== s.activeOrganizationId) {
           set({agentStatus: 'idle'}); return;
         }
         if (catData && catData.id) {
-          const rawSpreads = Array.isArray(catData.spreads) ? catData.spreads : [];
-          const hydratedPages: CatalogPageData[] = [];
-
-          rawSpreads.forEach((sp: any) => {
-            const spreadIdx = typeof sp.spread_index === 'number' ? sp.spread_index : 0;
-            const leftPageNum = spreadIdx * 2 + 1;
-            const rightPageNum = spreadIdx * 2 + 2;
-
-            const leftRaw = sp.left_page || (Array.isArray(sp.left_page_elements) && sp.left_page_elements[0]) || {};
-            const rightRaw = sp.right_page || (Array.isArray(sp.right_page_elements) && sp.right_page_elements[0]) || {};
-
-            const leftPage: CatalogPageData = {
-              ...leftRaw,
-              id: leftRaw.id || `p-${catData.id}-${leftPageNum}`,
-              pageNumber: leftRaw.pageNumber || leftPageNum,
-              type: leftRaw.type || (leftPageNum === 1 ? 'cover' : 'hero'),
-              title: leftRaw.title,
-              subtitle: leftRaw.subtitle,
-              label: leftRaw.label,
-              quote: leftRaw.quote,
-              content: leftRaw.content,
-              backgroundColor: leftRaw.backgroundColor || catData.primary_color || '#1A1817',
-              textColor: leftRaw.textColor || catData.secondary_color || '#F5F1EA',
-              accentColor: leftRaw.accentColor || catData.accent_color || '#B08D57',
-              editorialImage: leftRaw.editorialImage,
-              folio: leftRaw.folio,
-              products: Array.isArray(leftRaw.products) ? leftRaw.products : [],
-              mirrored: Boolean(leftRaw.mirrored),
-              overlays: Array.isArray(leftRaw.overlays) ? leftRaw.overlays : [],
-            };
-
-            const rightPage: CatalogPageData = {
-              ...rightRaw,
-              id: rightRaw.id || `p-${catData.id}-${rightPageNum}`,
-              pageNumber: rightRaw.pageNumber || rightPageNum,
-              type: rightRaw.type || (rightPageNum === (catData.total_pages || 6) ? 'backcover' : 'duo'),
-              title: rightRaw.title,
-              subtitle: rightRaw.subtitle,
-              label: rightRaw.label,
-              quote: rightRaw.quote,
-              content: rightRaw.content,
-              backgroundColor: rightRaw.backgroundColor || catData.secondary_color || '#F5F1EA',
-              textColor: rightRaw.textColor || catData.primary_color || '#1A1817',
-              accentColor: rightRaw.accentColor || catData.accent_color || '#B08D57',
-              editorialImage: rightRaw.editorialImage,
-              folio: rightRaw.folio,
-              products: Array.isArray(rightRaw.products) ? rightRaw.products : [],
-              mirrored: Boolean(rightRaw.mirrored),
-              overlays: Array.isArray(rightRaw.overlays) ? rightRaw.overlays : [],
-            };
-
-            hydratedPages.push(leftPage);
-            hydratedPages.push(rightPage);
-          });
-
-          // Determina a paleta a partir de palette_data ou presets
-          let paletteToUse: StudioPalette = STUDIO_PALETTE_PRESETS[0];
-          if (catData.palette_data && catData.palette_data.name) {
-            paletteToUse = {
-              ...catData.palette_data,
-              locked: Boolean(catData.brand_lock),
-            };
-          } else {
-            const foundPreset = STUDIO_PALETTE_PRESETS.find((p) => p.name === catData.style_preset);
-            if (foundPreset) {
-              paletteToUse = { ...foundPreset, locked: Boolean(catData.brand_lock) };
-            } else {
-              paletteToUse = {
-                name: catData.style_preset || 'Personalizada',
-                primary: catData.primary_color || '#1A1817',
-                background: catData.secondary_color || '#F5F1EA',
-                accent: catData.accent_color || '#B08D57',
-                locked: Boolean(catData.brand_lock),
-              };
-            }
-          }
-
-          let threadsToUse: ChatThread[] = [];
-          if (Array.isArray(catData.threads) && catData.threads.length > 0) {
-            threadsToUse = catData.threads;
-          } else {
-            threadsToUse = [
-              {
-                id: `thread-${catData.id}`,
-                title: catData.title,
-                mode: 'orchestrator',
-                roleId: 'orchestrator',
-                createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                messages: [
-                  {
-                    id: `msg-backend-${Date.now()}`,
-                    role: 'assistant',
-                    content: `Catálogo **${catData.title}** sincronizado do banco de dados. ${hydratedPages.length} páginas ativas na prancheta.`,
-                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                  },
-                ],
-              },
-            ];
-          }
-
-          const activeThread = threadsToUse[0];
-          const activeRole = activeThread.roleId || activeThread.mode || 'orchestrator';
-
-          set({
-            hasStartedSession: true,
-            activeCatalogId: String(catData.id),
-            catalogBrandContext: catalogBrandSnapshot(catData),
-            activeBrandId: catalogBrandSnapshot(catData).brandId,
-            catalogTitle: catData.title,
-            pages: hydratedPages.length > 0 ? hydratedPages : generateCatalogFromPrompt(catData.title).pages,
-            qualityGate: catData.qualityGate || undefined,
-            totalPages: catData.total_pages || (hydratedPages.length > 0 ? hydratedPages.length : 6),
-            activePalette: paletteToUse,
-            currentSpread: [1, 2],
-            unassignedProducts: Array.isArray(catData.unassigned_products) && catData.unassigned_products.length > 0
-              ? catData.unassigned_products
-              : get().unassignedProducts,
-            threads: threadsToUse,
-            activeThreadId: activeThread.id,
-            messages: activeThread.messages || [],
-            activeRoleId: activeRole,
-            activeMode: activeRole,
-            agentStatus: 'idle',
-          });
-
-          saveStoredProjectSession(String(catData.id), {
-            threads: threadsToUse,
-            activeThreadId: activeThread.id,
-            catalogTitle: catData.title,
-            brandContext: catalogBrandSnapshot(catData), organization: catData.organization, qualityGate: catData.qualityGate || undefined,
-            activePalette: paletteToUse,
-            currentSpread: [1, 2],
-            pages: hydratedPages,
-            totalPages: catData.total_pages || hydratedPages.length,
-          }, s.activeUserId);
-
+          hydrateBackendCatalog(catData);
           return;
         }
       } catch (err: any) {
+        if (loadOperation !== catalogLoadOperation || !isCurrentBrandScope(loadScope)) return;
         console.warn('Falha ao buscar catalogo no backend:', err);
         set({ agentStatus: 'idle' });
         // Anti-IDOR / Anti-vazamento: se o backend retornar 404/403, não faz fallback para mock
@@ -2154,7 +2246,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
     // 3. Tenta carregar a sessão persistida deste projeto isolada por usuário
     const existing = getStoredProjectSession(catalogId, s.activeUserId);
-    if (!isCurrentBrandScope(loadScope) || (s.activeOrganizationId != null && existing?.organization !== s.activeOrganizationId && /^\d+$/.test(catalogId))) { set({agentStatus: 'idle'}); return; }
+    if (loadOperation !== catalogLoadOperation || !isCurrentBrandScope(loadScope) || (s.activeOrganizationId != null && existing?.organization !== s.activeOrganizationId && /^\d+$/.test(catalogId))) { set({agentStatus: 'idle'}); return; }
 
     if (existing && existing.threads && existing.threads.length > 0) {
       const activeThread =
@@ -2172,6 +2264,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         catalogTitle: existing.catalogTitle || defaultTitle,
         activeCatalogId: catalogId,
         catalogBrandContext: existing.brandContext || catalogBrandSnapshot({}),
+        importMetadata: existing.importMetadata,
         pages: pagesToUse,
         qualityGate: existing.qualityGate,
         totalPages: existing.totalPages || pagesToUse.length,
@@ -2260,6 +2353,9 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
   loadDemoCatalog: async (templateKey: string) => {
     const s = get();
+    const demoScope = captureBrandScope();
+    const demoOperation = ++catalogLoadOperation;
+    const demoIsCurrent = () => demoOperation === catalogLoadOperation && isCurrentBrandScope(demoScope);
     // Flush current spread if active
     if (s.activeCatalogId && s.threads && s.threads.length > 0) {
       get().flushSaveSpread();
@@ -2274,6 +2370,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         template_key: templateKey,
       });
 
+      if (!demoIsCurrent()) return;
       if (res.data && res.data.catalog) {
         const catData = res.data.catalog;
         const rawSpreads = Array.isArray(catData.spreads) ? catData.spreads : [];
@@ -2362,6 +2459,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         return;
       }
     } catch (err) {
+      if (!demoIsCurrent()) return;
       console.warn('Falha ao carregar demo via backend, usando dados locais:', err);
     }
 
@@ -2783,7 +2881,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   totalPages: 10,
   nextSpread: () =>
     set((s) => {
-      const nextLeft = Math.min(s.totalPages - 1, s.currentSpread[0] + 2);
+      const nextLeft = Math.min(Math.max(1, Math.ceil(s.totalPages / 2) * 2 - 1), s.currentSpread[0] + 2);
       const nextRight = Math.min(s.totalPages, nextLeft + 1);
       return { currentSpread: [nextLeft, nextRight] };
     }),
@@ -2795,7 +2893,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     }),
   goToSpread: (spreadIndex) =>
     set((s) => {
-      const left = Math.max(1, Math.min(s.totalPages - 1, spreadIndex * 2 + 1));
+      const left = Math.max(1, Math.min(Math.max(1, Math.ceil(s.totalPages / 2) * 2 - 1), spreadIndex * 2 + 1));
       const right = Math.min(s.totalPages, left + 1);
       return { currentSpread: [left, right] };
     }),
@@ -2823,10 +2921,24 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   pages: [],
   setPages: (pages) => set({ pages, totalPages: pages.length }),
 
+  updateDocumentText: (pageNumber, elementId, text) => {
+    const page = get().pages.find(item => item.pageNumber === pageNumber);
+    const element = page?.documentPage?.elements.find(item => item.id === elementId);
+    if (!page?.documentPage || !element?.editable || element.type !== 'text' || page.documentPage.visibility === 'source_only') return;
+    get().pushHistorySnapshot();
+    set(state => ({pages: state.pages.map(item => item.pageNumber !== pageNumber || !item.documentPage ? item : {...item, documentPage: {...item.documentPage,
+      elements: item.documentPage.elements.map(entry => entry.id === elementId ? {...entry, text, edited: text !== entry.provenance?.sourceText} : entry)}}), saveStatus: 'unsaved'}));
+    get().debouncedSaveCurrentSpread();
+  },
+  resetDocumentText: (pageNumber, elementId) => {
+    const element = get().pages.find(item => item.pageNumber === pageNumber)?.documentPage?.elements.find(item => item.id === elementId);
+    if (typeof element?.provenance?.sourceText === 'string') get().updateDocumentText(pageNumber, elementId, element.provenance.sourceText);
+  },
+
   updatePage: (pageNumber, updates) => {
     get().pushHistorySnapshot();
     set((s) => ({
-      pages: s.pages.map((p) => (p.pageNumber === pageNumber ? { ...p, ...updates } : p)),
+      pages: s.pages.map((p) => (p.pageNumber === pageNumber ? { ...p, ...updates, ...(p.documentPage ? {documentPage: p.documentPage} : {}) } : p)),
       saveStatus: 'unsaved',
     }));
     get().debouncedSaveCurrentSpread();
@@ -2908,6 +3020,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   },
 
   generateSprite: async (prompt, targetPage, options = {}) => {
+    const documentScope = captureDocumentScope();
     get().triggerAgentCursor('director', `Sintetizando sprite IA: "${prompt.slice(0, 30)}..."`, { x: options.x ?? 50, y: options.y ?? 50 });
     const toastId = toast.loading(`Sintetizando elemento visual com IA: "${prompt.slice(0, 40)}"...`);
 
@@ -2921,6 +3034,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         palette: paletteColors,
       });
 
+      if (!isCurrentDocumentScope(documentScope)) { toast.dismiss(toastId); return null; }
       const spriteUrl = response.data?.sprite_url;
       if (spriteUrl) {
         get().addPageOverlay(targetPage, {
@@ -2939,6 +3053,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       toast.error('Não foi possível sintetizar a sprite.', { id: toastId });
       return null;
     } catch (err: any) {
+      if (!isCurrentDocumentScope(documentScope)) { toast.dismiss(toastId); return null; }
       console.error('[GenerateSprite] Falha:', err);
       toast.error('Erro na síntese da sprite por IA.', { id: toastId });
       return null;
@@ -3130,6 +3245,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   },
 
   removeProductBackground: async (pageNumber, productId) => {
+    const documentScope = captureDocumentScope();
     let prod: ProductItem | undefined;
     if (pageNumber) {
       const page = get().pages.find((p) => p.pageNumber === pageNumber);
@@ -3149,6 +3265,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       if (prod.image.startsWith('blob:')) {
         const blobRes = await fetch(prod.image);
         const blobData = await blobRes.blob();
+        if (!isCurrentDocumentScope(documentScope)) return;
         const formData = new FormData();
         formData.append('image', blobData, 'product.png');
         res = await api.post(`/api/v2/studio/media/remove-background/`, formData);
@@ -3159,11 +3276,13 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         );
       }
 
+      if (!isCurrentDocumentScope(documentScope)) return;
       if (res.data && res.data.processed_url) {
         get().updateProduct(productId, { image: res.data.processed_url });
         toast.success('Fundo do produto removido com sucesso!');
       }
     } catch (err: any) {
+      if (!isCurrentDocumentScope(documentScope)) return;
       console.warn('Falha na remoção de fundo:', err);
       if (err?.response?.status === 401) {
         const hasClerkSession = typeof window !== 'undefined' && Boolean((window as any).Clerk?.session);
@@ -3271,7 +3390,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     }
     const [leftPageNum, rightPageNum] = state.currentSpread;
     const leftPage = state.pages.find((p) => p.pageNumber === leftPageNum);
-    const rightPage = state.pages.find((p) => p.pageNumber === rightPageNum);
+    const rightPage = rightPageNum === leftPageNum ? undefined : state.pages.find((p) => p.pageNumber === rightPageNum);
 
     set({ saveStatus: 'saving' });
 
@@ -3292,6 +3411,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
           // Publication approval belongs to the server document, including after edits.
           set({pages: get().pages, qualityGate: response.data.qualityGate as QualityGate});
         }
+        if (response.data?.import_metadata) set({importMetadata: response.data.import_metadata});
       }
       if (saveIsCurrent()) set({ saveStatus: 'saved' });
     } catch {
@@ -4229,6 +4349,8 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
   sendMessageToAgent: async (prompt, attachments) => {
     const state = get();
+    const documentScope = captureDocumentScope();
+    const streamIsCurrent = () => isCurrentDocumentScope(documentScope) && get().activeThreadId === state.activeThreadId;
     const userPrompt = prompt.trim();
     if (!userPrompt && (!attachments || attachments.length === 0)) return;
 
@@ -4309,6 +4431,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
     try {
       let activeToken = await getAuthToken();
+      if (!streamIsCurrent()) return;
       let response = await fetch(`${API_BASE_URL}/api/v2/studio/chat/stream/`, {
         method: 'POST',
         headers: {
@@ -4319,9 +4442,11 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         body: JSON.stringify(payload),
       });
 
+      if (!streamIsCurrent()) { await response.body?.cancel(); return; }
       if (!response.ok && response.status === 401) {
         try {
           let newAccess = await getAuthToken(true);
+          if (!streamIsCurrent()) return;
           if (!newAccess) {
             const storedRefresh = localStorage.getItem('refresh_token');
             if (storedRefresh) {
@@ -4330,6 +4455,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
                 { refresh: storedRefresh },
                 { withCredentials: true }
               );
+              if (!streamIsCurrent()) return;
               newAccess = refreshRes.data?.access;
               if (newAccess && typeof newAccess === 'string') {
                 setInMemoryAccessToken(newAccess);
@@ -4358,6 +4484,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         }
       }
 
+      if (!streamIsCurrent()) { await response.body?.cancel(); return; }
       if (!response.ok) {
         if (response.status === 401) {
           const hasClerkSession = typeof window !== 'undefined' && Boolean((window as any).Clerk?.session);
@@ -4484,6 +4611,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
       while (true) {
         const { done, value } = await reader.read();
+        if (!streamIsCurrent()) { await reader.cancel(); return; }
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
@@ -4528,6 +4656,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         }
       }
 
+      if (!streamIsCurrent()) return;
       // Se nao veio evento de patch explicito mas o texto acumulado tem json:patch
       if (!appliedPatch && accumulatedContent.includes('json:patch')) {
         const match = accumulatedContent.match(/```(?:json:patch|json)?\s*(\{[\s\S]*?(?:"updates"|"actions")[\s\S]*?\})\s*```/);
@@ -4610,6 +4739,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       await get().flushSaveSpread();
 
     } catch (err) {
+      if (!streamIsCurrent()) return;
       console.warn('Fallback para orquestracao local:', err);
       state.executeCopilotCommand(userPrompt, attachments);
     }

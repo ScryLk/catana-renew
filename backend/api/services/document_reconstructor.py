@@ -1,373 +1,462 @@
+"""One source-first import coordinator: analysis, preview, then atomic confirmation.
+
+Geometry adapters own extraction. Source data never becomes a prompt or an
+invented product, and private source files never enter the public Media alias.
+"""
+import copy
+import hashlib
 import io
+import logging
+import math
 import os
 import re
-import uuid
-import logging
-from typing import List, Dict, Any, Optional
-from django.conf import settings
-from PIL import Image
+from datetime import timedelta
+from pathlib import Path
+from urllib.parse import urlsplit
 
-from api.models import StudioCatalog, CatalogSpread
-from api.services.background_removal import BackgroundRemovalService
+from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.files.base import ContentFile
+from django.db import transaction
+from django.utils import timezone
+from PIL import Image
+from rest_framework.exceptions import NotFound, ValidationError
+
+from api.models import DocumentImport, DocumentImportAsset, StudioCatalog, CatalogSpread, ChatThread
+from api.services.brand_intelligence import (assert_organization_access, get_brand_for_user,
+    visible_organizations, BrandContextResolver, snapshot_hash)
 
 logger = logging.getLogger(__name__)
+MODES = {'preserve', 'editable', 'redesign'}
+RENDER_ASSET_KINDS = {'source_snapshot', 'raster_fallback', 'element_appearance', 'image'}
 
-try:
-    import pypdf
-    HAS_PYPDF = True
-except ImportError:
-    HAS_PYPDF = False
+
+def normalize_import_mode(mode):
+    if not isinstance(mode, str):
+        raise ValidationError({'mode': 'Escolha preservar, reconstruir ou redesenhar.'})
+    mode = {'faithful': 'preserve', 'preserve_original': 'preserve', 'editable_reconstruction': 'editable'}.get(mode, mode)
+    if mode not in MODES:
+        raise ValidationError({'mode': 'Escolha preservar, reconstruir ou redesenhar.'})
+    return mode
+
+
+def import_quality_passed(metadata):
+    quality = metadata.get('quality', {}) if isinstance(metadata, dict) else {}
+    return isinstance(quality, dict) and quality.get('passed') is True and quality.get('sourceRetained') is True
+
+
+def _render_fields(value, fields):
+    return {key: copy.deepcopy(value[key]) for key in fields if key in value}
+
+
+def _public_snapshot(snapshot):
+    return _render_fields(snapshot, ('url', 'hash', 'assetId', 'mediaId', 'widthPixels', 'heightPixels')) if isinstance(snapshot, dict) else None
+
+
+def _visible_rectangle(value):
+    if not isinstance(value, dict):
+        return False
+    numbers = [value.get(key) for key in ('x', 'y', 'width', 'height')]
+    if not all(type(number) in (int, float) and math.isfinite(number) for number in numbers):
+        return False
+    x, y, width, height = numbers
+    return x >= 0 and y >= 0 and width > 0 and height > 0 and x + width <= 1.001 and y + height <= 1.001
+
+
+def public_import_page(page):
+    """Publish render data, never hidden PDF text, source boxes or extraction evidence."""
+    if not isinstance(page, dict):
+        return None
+    original = page.get('documentPage')
+    if not isinstance(original, dict):
+        return None
+    document = _render_fields(original, ('pageNumber', 'width', 'height', 'unit'))
+    document.update(sourceSnapshot=_public_snapshot(original.get('sourceSnapshot')),
+                    visibility='source_only', elements=[])
+    is_generative = page.get('renderMode') == 'generative'
+    candidates = [element for element in original.get('elements', []) if isinstance(element, dict)
+                  and element.get('type') == 'text' and element.get('editable') is True]
+    reconstructs = (not is_generative and page.get('sourceVisibility') != 'source_only'
+                    and original.get('visibility') in ('hybrid', 'reconstructed')
+                    and bool(original.get('fallbackSnapshot'))
+                    and all(_visible_rectangle(element) and (element.get('appearance') or element.get('snapshot'))
+                            and (not element.get('appearance') or _visible_rectangle(element['appearance']))
+                            for element in candidates))
+    if reconstructs:
+        document['visibility'] = original['visibility']
+        document['fallbackSnapshot'] = _public_snapshot(original.get('fallbackSnapshot'))
+        for element in candidates:
+            projected = _render_fields(element, ('id', 'type', 'editable', 'edited', 'x', 'y', 'width', 'height',
+                'resolvedFont', 'fontSize', 'fontWeight', 'fontStyle', 'color', 'zIndex'))
+            if element.get('edited') is True:
+                projected.update(_render_fields(element, ('text', 'content')))
+            if element.get('appearance'):
+                appearance = _render_fields(element['appearance'], ('x', 'y', 'width', 'height'))
+                appearance['asset'] = _public_snapshot(element['appearance'].get('asset'))
+                projected['appearance'] = appearance
+            if element.get('snapshot'):
+                projected['snapshot'] = _public_snapshot(element['snapshot'])
+            document['elements'].append(projected)
+    result = _render_fields(page, ('id', 'pageNumber', 'renderMode', 'pageWidth', 'pageHeight', 'sourceUnit'))
+    result['documentPage'] = document
+    if is_generative:
+        result.update(_render_fields(page, ('type', 'contentRole', 'backgroundColor', 'textColor',
+                                           'accentColor', 'folio', 'safeArea')))
+        block_fields = ('id', 'type', 'role', 'x', 'y', 'width', 'height', 'rotation', 'opacity', 'zIndex',
+            'alignment', 'fontRole', 'fontFamily', 'fontSize', 'fontWeight', 'letterSpacing', 'lineHeight',
+            'textTransform', 'colorToken', 'content', 'productId', 'imageUrl', 'cropMode', 'bleed',
+            'allowOverlap', 'intentionalCrop', 'marginExempt')
+        result['blocks'] = [_render_fields(block, block_fields) for block in page.get('blocks', []) if isinstance(block, dict)]
+        # Only commercial fields required by actually rendered product blocks cross
+        # the public boundary; technical candidate evidence remains private.
+        required = {}
+        for block in result['blocks']:
+            product_id = block.get('productId')
+            field = (block['type'] if block.get('type') in ('price', 'sku') else
+                     'name' if block.get('role') == 'product_name' else
+                     'description' if block.get('role') == 'product_description' else
+                     'image' if block.get('type') == 'product_image' else None)
+            if product_id is not None and field:
+                required.setdefault(str(product_id), {'id'}).add(field)
+        result['products'] = [_render_fields(product, required[str(product['id'])])
+                              for product in page.get('products', []) if isinstance(product, dict)
+                              and str(product.get('id')) in required]
+    else:
+        result['renderMode'] = 'document'
+        result['products'] = []
+    return result
+
+
+def public_import_asset_ids(catalog):
+    """A shared job does not make unused/off-crop extracted images public."""
+    identifiers = set()
+
+    def inspect(value):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key in ('url', 'imageUrl') and isinstance(child, str):
+                    try:
+                        match = re.fullmatch(r'/api/v2/studio/catalogs/import-document/assets/([a-fA-F0-9-]{36})/', urlsplit(child).path)
+                    except ValueError:
+                        match = None
+                    if match:
+                        identifiers.add(match.group(1).lower())
+                inspect(child)
+        elif isinstance(value, list):
+            for child in value:
+                inspect(child)
+
+    for spread in catalog.spreads.all():
+        for elements in (spread.left_page_elements, spread.right_page_elements):
+            if isinstance(elements, list) and elements:
+                inspect(public_import_page(elements[0]))
+    return identifiers
 
 
 class DocumentReconstructorService:
-    """
-    Servico de Engenharia Reversa e Reconstrucao de Documentos (PDF / Word)
-    para o Living Canvas do Catana 2.0.
-    """
+    @staticmethod
+    def get_import(user, identifier, write=False, allow_expired=False):
+        try:
+            job = DocumentImport.objects.select_related('organization', 'catalog', 'brand').filter(
+                pk=identifier, organization__in=visible_organizations(user)).first()
+        except (DjangoValidationError, ValueError, TypeError):
+            job = None
+        if job is None:
+            raise NotFound('Importação não encontrada.')
+        assert_organization_access(user, job.organization, write=write)
+        if job.status != 'confirmed' and job.expires_at <= timezone.now() and not allow_expired:
+            raise ValidationError({'import_id': 'Esta prévia expirou. Analise o documento novamente.'})
+        return job
+
+    @staticmethod
+    def _asset(job, raw, filename, kind):
+        if kind not in RENDER_ASSET_KINDS | {'source'}:
+            raise ValidationError('Tipo de ativo de importação inválido.')
+        width = height = None
+        if kind in RENDER_ASSET_KINDS:
+            with Image.open(io.BytesIO(raw)) as image:
+                image.verify()
+                if image.format != 'PNG' or image.width * image.height > 12_000_000:
+                    raise ValidationError('A imagem da página excede os limites de importação.')
+                width, height = image.size
+        clean_name = re.sub(r'[^a-zA-Z0-9_.-]', '_', os.path.basename(filename))[-150:] or 'source'
+        asset = DocumentImportAsset.objects.create(
+            document_import=job, file=ContentFile(raw, name=f'{job.pk}-{clean_name}'), kind=kind,
+            source_hash=hashlib.sha256(raw).hexdigest(), width_pixels=width, height_pixels=height)
+        return asset, {'url': f'/api/v2/studio/catalogs/import-document/assets/{asset.pk}/',
+                       'mediaId': str(asset.pk), 'assetId': str(asset.pk), 'hash': asset.source_hash,
+                       'widthPixels': width, 'heightPixels': height}
 
     @classmethod
-    def extract_pdf_data(cls, file_bytes: bytes, remove_bg: bool = True) -> List[Dict[str, Any]]:
-        """
-        Extrai textos, metadados e imagens por pagina de um documento PDF.
-        """
-        pages_data = []
-
-        if not HAS_PYPDF:
-            logger.warning("[DocumentReconstructor] pypdf nao encontrado.")
-            return pages_data
-
+    def analyze_file(cls, file_bytes, filename, user, organization, content_type='application/pdf',
+                     title=None, mode='preserve', brand=None, brief=''):
+        mode = normalize_import_mode(mode)
+        if title is not None and not isinstance(title, str):
+            raise ValidationError({'title': 'Informe um título em texto.'})
+        assert_organization_access(user, organization, write=True)
+        from api.services.document_preflight import DocumentImportError, validate_source_file
+        validate_source_file(file_bytes, filename, content_type=content_type)
+        if brand:
+            assert_organization_access(user, brand.organization, write=True)
+            if brand.organization_id != organization.pk or brand.status != 'active':
+                raise ValidationError({'brand_id': 'Selecione uma marca ativa desta organização.'})
+        created_files = []
         try:
-            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-            total_pages = len(reader.pages)
+            with transaction.atomic():
+                # Keep the UUID in memory while the isolated worker parses and
+                # renders. SQLite must not hold a write lock for that entire time.
+                job = DocumentImport(
+                    organization=organization, created_by=user, source_fingerprint=hashlib.sha256(file_bytes).hexdigest(),
+                    filename=os.path.basename(filename)[:255], title=(title or Path(filename).stem).strip()[:255], mode=mode,
+                    expires_at=timezone.now() + timedelta(hours=getattr(settings, 'DOCUMENT_IMPORT_PREVIEW_TTL_HOURS', 24)))
 
-            media_root = getattr(settings, 'MEDIA_ROOT', os.path.join(settings.BASE_DIR, 'media'))
-            extracted_dir = os.path.join(media_root, 'studio', 'extracted')
-            os.makedirs(extracted_dir, exist_ok=True)
-            media_url = getattr(settings, 'MEDIA_URL', '/media/')
+                def sink(raw, name, kind):
+                    if job._state.adding:
+                        job.save(force_insert=True)
+                    asset, data = cls._asset(job, raw, name, kind)
+                    created_files.append(asset.file)
+                    return data
 
-            for page_idx, page in enumerate(reader.pages):
-                text_content = page.extract_text() or ""
-                image_urls = []
-
-                # Extrai imagens embutidas na pagina do PDF
+                # The adapter isolates untrusted PDF parsing/rendering and only sinks
+                # files once all accepted pages have a faithful visual snapshot.
+                from api.services.pdf_import_adapter import PdfImportAdapter
+                document = PdfImportAdapter.analyze(file_bytes, filename, sink)
+                if not document.get('pages') or document.get('pageCount') != len(document['pages']):
+                    raise DocumentImportError('source_not_preserved', 'Não foi possível preservar todas as páginas.', 422)
+                cls._validate_ir_assets(job, document)
+                source, _ = cls._asset(job, file_bytes, filename, 'source')
+                created_files.append(source.file)
+                job.source_asset = source
+                job.document_ir = document
+                job.report = copy.deepcopy(document.get('report', {}))
+                job.status = 'ready'
+                cls.prepare_preview(job, mode, brand=brand, brief=brief)
+                job.save()
+                logger.info('document_import analyzed id=%s fingerprint=%s pages=%s adapter=%s mode=%s',
+                            job.pk, job.source_fingerprint, len(document['pages']), document.get('adapter'), mode)
+                return job
+        except Exception:
+            for file in created_files:
                 try:
-                    for img_file in page.images:
-                        img_bytes = img_file.data
-                        img_name = img_file.name
+                    file.storage.delete(file.name)
+                except OSError:
+                    logger.warning('document_import temporary asset cleanup failed')
+            raise
 
-                        if remove_bg:
-                            try:
-                                processed_info = BackgroundRemovalService.process_and_save(
-                                    img_bytes, original_filename=img_name
-                                )
-                                image_urls.append(processed_info["processed_url"])
-                            except Exception as bg_err:
-                                logger.warning(f"Erro ao remover fundo da imagem {img_name}: {bg_err}")
-                                # Salva imagem original
-                                unique_name = f"ext-{uuid.uuid4().hex[:8]}-{img_name}"
-                                out_path = os.path.join(extracted_dir, unique_name)
-                                with open(out_path, "wb") as f:
-                                    f.write(img_bytes)
-                                image_urls.append(f"{media_url}studio/extracted/{unique_name}")
-                        else:
-                            unique_name = f"ext-{uuid.uuid4().hex[:8]}-{img_name}"
-                            out_path = os.path.join(extracted_dir, unique_name)
-                            with open(out_path, "wb") as f:
-                                f.write(img_bytes)
-                            image_urls.append(f"{media_url}studio/extracted/{unique_name}")
-                except Exception as img_exc:
-                    logger.warning(f"Falha ao extrair imagens da pagina {page_idx + 1}: {img_exc}")
+    @staticmethod
+    def _validate_ir_assets(job, document):
+        stored = {str(asset.pk): asset for asset in job.assets.all()}
+        for page in document['pages']:
+            snapshot = page.get('sourceSnapshot') or {}
+            asset = stored.get(str(snapshot.get('assetId') or snapshot.get('mediaId')))
+            if asset is None or asset.kind != 'source_snapshot' or snapshot.get('hash') != asset.source_hash:
+                raise ValidationError('A página não possui uma representação original válida.')
+            if not all(type(page.get(key)) in (int, float) and page[key] > 0 for key in ('width', 'height')):
+                raise ValidationError('A geometria da página é inválida.')
 
-                pages_data.append({
-                    "page_number": page_idx + 1,
-                    "text": text_content.strip(),
-                    "images": image_urls,
-                })
-
-        except Exception as exc:
-            logger.error(f"[DocumentReconstructor] Erro durante leitura do PDF: {exc}")
-
-        return pages_data
+    @staticmethod
+    def _document_pages(document, mode):
+        pages = []
+        for source in document['pages']:
+            page = copy.deepcopy(source)
+            if mode == 'preserve':
+                page['visibility'] = 'source_only'
+            elif page.get('visibility') not in ('reconstructed', 'hybrid'):
+                page['visibility'] = 'source_only'
+            pages.append({'id': f"import-page-{page['pageNumber']}", 'pageNumber': page['pageNumber'],
+                          'renderMode': 'document', 'documentPage': page, 'pageWidth': page['width'],
+                          'pageHeight': page['height'], 'sourceUnit': 'pt', 'products': []})
+        return pages
 
     @classmethod
-    def parse_page_elements(cls, raw_text: str, images: List[str], page_num: int, total_pages: int) -> Dict[str, Any]:
-        """
-        Decompoe o texto bruto e as imagens da pagina em uma estrutura CatalogPageData.
-        """
-        lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
-
-        # 1. Deteccao de Precos e Moedas (R$ 99,00 ou $ 99.00)
-        price_matches = re.findall(r'(?:R\$\s*[\d\.,]+|\$\s*[\d\.,]+)', raw_text)
-
-        # 2. Deteccao de Codigos SKU
-        sku_matches = re.findall(r'(?:SKU|REF|COD|CODIGO)[:\s\-]*([A-Z0-9\-_]{3,15})', raw_text, flags=re.IGNORECASE)
-
-        # 3. Classificacao do tipo de layout
-        if page_num == 1:
-            layout_type = "cover"
-            title = lines[0] if lines else "Catalogo Reconstruido"
-            subtitle = lines[1] if len(lines) > 1 else "Edicao Digital Catana Studio"
-            products = []
-        elif page_num == total_pages:
-            layout_type = "backcover"
-            title = lines[0] if lines else "Informacoes de Contato"
-            subtitle = "Todos os direitos reservados."
-            products = []
-        elif len(price_matches) >= 3 or len(images) >= 3:
-            layout_type = "grid"
-            title = lines[0] if lines else f"Colecao - Pagina {page_num}"
-            subtitle = ""
-            products = cls._build_product_list(lines, price_matches, sku_matches, images)
-        elif len(price_matches) == 2 or len(images) == 2:
-            layout_type = "duo"
-            title = lines[0] if lines else f"Destaques - Pagina {page_num}"
-            subtitle = ""
-            products = cls._build_product_list(lines, price_matches, sku_matches, images, max_items=2)
-        else:
-            layout_type = "hero"
-            title = lines[0] if lines else f"Peca em Destaque {page_num}"
-            subtitle = lines[1] if len(lines) > 1 else ""
-            products = cls._build_product_list(lines, price_matches, sku_matches, images, max_items=1)
-
-        primary_img = images[0] if images else ""
-
-        return {
-            "id": f"page-{page_num}-{uuid.uuid4().hex[:4]}",
-            "pageNumber": page_num,
-            "type": layout_type,
-            "title": title,
-            "subtitle": subtitle,
-            "label": f"SECAO {page_num:02d}",
-            "editorialImage": primary_img,
-            "products": products,
-        }
-
-    @classmethod
-    def _build_product_list(
-        cls,
-        lines: List[str],
-        prices: List[str],
-        skus: List[str],
-        images: List[str],
-        max_items: int = 4
-    ) -> List[Dict[str, Any]]:
-        """
-        Monta objetos de produto estruturados a partir dos dados extraidos.
-        """
-        num_items = max(1, min(max_items, max(len(prices), len(images), 1)))
-        products = []
-
-        for i in range(num_items):
-            prod_id = f"prod-ext-{uuid.uuid4().hex[:6]}"
-            price = prices[i] if i < len(prices) else "Sob consulta"
-            sku = skus[i] if i < len(skus) else f"CAT-{page_idx_str(i + 1)}"
-            img = images[i] if i < len(images) else ""
-
-            # Tenta pegar uma linha de texto correspondente
-            line_idx = i + 1 if i + 1 < len(lines) else 0
-            name = lines[line_idx] if lines else f"Item em Destaque {i + 1}"
-            if len(name) > 60:
-                name = name[:57] + "..."
-
-            products.append({
-                "id": prod_id,
-                "name": name,
-                "sku": sku,
-                "price": price,
-                "description": "Especificacao extraida do documento original.",
-                "image": img,
-                "tag": "Importado",
-                "details": ["Acabamento premium", "Verificar disponibilidade"],
-            })
-
-        return products
+    def prepare_preview(cls, job, mode, brand=None, brief=''):
+        mode = normalize_import_mode(mode)
+        if not isinstance(brief, str) or len(brief) > 20000:
+            raise ValidationError({'brief': 'Informe um briefing em texto com até 20000 caracteres.'})
+        if job.status == 'confirmed':
+            raise ValidationError('A importação já foi confirmada.')
+        if brand and (brand.organization_id != job.organization_id or brand.status != 'active'):
+            raise ValidationError({'brand_id': 'Selecione uma marca ativa da mesma organização.'})
+        document = job.document_ir
+        job.mode = mode
+        job.brand = brand
+        job.brand_snapshot = BrandContextResolver.resolve(brand) if brand else {}
+        job.brand_snapshot_hash = snapshot_hash(job.brand_snapshot) if brand else ''
+        job.previews = cls._document_pages(document, mode)
+        job.report = copy.deepcopy(document.get('report', {}))
+        if mode == 'redesign':
+            from api.ai.catalog_builder import generate_catalog_from_gemini
+            kwargs = {'prompt': brief.strip() or 'Redesenhar a composição deste documento preservando integralmente os fatos da origem.',
+                      'products': copy.deepcopy(document.get('candidates', [])), 'source_document': copy.deepcopy(document)}
+            if brand:
+                kwargs['brand_context'] = copy.deepcopy(job.brand_snapshot)
+            try:
+                result = generate_catalog_from_gemini(**kwargs)
+                if not isinstance(result, dict) or not isinstance(result.get('qualityGate', {}), dict):
+                    raise ValueError('invalid_redesign_result')
+            except Exception:
+                # A design failure never rolls back the faithful source capture.
+                # Exceptions may contain document text: log only the job identifier.
+                logger.warning('document_import redesign failed id=%s', job.pk)
+                result = {'qualityGate': {'passed': False, 'publishable': False,
+                          'status': 'needs_review', 'errors': ['REDESIGN_UNAVAILABLE']}}
+            gate = result.get('qualityGate') or {}
+            job.report['redesignQualityGate'] = gate
+            generated = result.get('pages') or []
+            approved = gate.get('passed') is True and gate.get('publishable') is True
+            from api.ai.requirement_contract import RequirementContract
+            from api.ai.source_context import SourceIntegrityGuard
+            from api.ai.design_grammar import validate_runtime_block
+            try:
+                safe_source = (not SourceIntegrityGuard.verify(RequirementContract(source_document=copy.deepcopy(document)), result)
+                               and all(validate_runtime_block(block)[0] for page in generated for block in page.get('blocks', [])))
+            except (ValueError, TypeError, KeyError, AttributeError):
+                safe_source = False
+            if safe_source and len(generated) == len(document['pages']):
+                for generated_page, source in zip(generated, document['pages']):
+                    generated_page['documentPage'] = copy.deepcopy(source)
+                    generated_page['pageWidth'] = source['width']
+                    generated_page['pageHeight'] = source['height']
+                    generated_page['sourceUnit'] = 'pt'
+                    generated_page['sourceSnapshot'] = copy.deepcopy(source['sourceSnapshot'])
+                job.previews = generated
+            if not approved or not safe_source or len(generated) != len(document['pages']):
+                job.report['redesignFallback'] = True
+                job.report['warnings'] = list(job.report.get('warnings', [])) + ['O redesenho requer revisão; a representação original foi preservada.']
+        job.report['mode'] = mode
+        job.report['pagesPreserved'] = len(document['pages'])
+        job.report['commercialValuesInvented'] = 0
+        geometry_valid = all(page.get('quality', {}).get('geometryValidated') is True for page in document['pages'])
+        has_editable = any(page.get('quality', {}).get('editableCount', 0) > 0 for page in document['pages'])
+        job.report['quality'] = {'passed': geometry_valid, 'sourceRetained': True, 'pageCountRetained': True,
+                                 'geometryRetained': geometry_valid,
+                                 'status': ('faithful' if mode == 'preserve' else ('hybrid' if has_editable else 'preserved'))
+                                           if geometry_valid else 'needs_review'}
+        if mode == 'redesign' and job.report.get('redesignFallback'):
+            job.report['quality']['status'] = 'needs_review'
+            job.report['quality']['passed'] = False
+        return job
 
     @classmethod
-    def extract_palette_from_images(cls, image_urls: List[str], doc_title: str) -> Dict[str, Any]:
-        """
-        Extrai cores dominantes das imagens do documento para compor uma paleta harmoniosa.
-        """
-        clean_title = (doc_title or "Catálogo").strip()
-        default_palette = {
-            "name": f"Extraída · {clean_title[:16]}",
-            "primary": "#18181B",
-            "background": "#FAFAFA",
-            "accent": "#71717A",
-            "secondary": "#27272A",
-            "surface": "#F4F4F5",
-            "contrastRatio": "14.2:1 (WCAG AAA)",
-            "locked": False,
-        }
-
-        if not image_urls:
-            return default_palette
-
-        media_url = getattr(settings, 'MEDIA_URL', '/media/')
-        media_root = getattr(settings, 'MEDIA_ROOT', os.path.join(settings.BASE_DIR, 'media'))
-
-        colors_sampled = []
+    def validate_catalog_source(cls, catalog):
+        """Sharing certifies the captured preview, including its private asset scope."""
         try:
-            for url in image_urls[:6]:
-                if url.startswith(media_url):
-                    rel = url[len(media_url):]
-                    local_path = os.path.join(media_root, rel)
-                else:
-                    local_path = url
+            job = catalog.source_import
+        except DocumentImport.DoesNotExist:
+            raise ValidationError({'share_import': 'O histórico de origem está indisponível.'})
+        if (job.status != 'confirmed' or job.organization_id != catalog.organization_id
+                or catalog.import_metadata.get('sourceFingerprint') != job.source_fingerprint):
+            raise ValidationError({'share_import': 'A origem do catálogo é inválida.'})
+        cls._validate_ir_assets(job, job.document_ir)
+        pages = []
+        for spread in catalog.spreads.order_by('spread_index'):
+            for values in (spread.left_page_elements, spread.right_page_elements):
+                if values:
+                    if not isinstance(values, list) or len(values) != 1 or not isinstance(values[0], dict):
+                        raise ValidationError({'share_import': 'A composição deve ser revisada antes de compartilhar.'})
+                    pages.append(values[0])
+        if (catalog.total_pages != len(job.document_ir['pages']) or pages != job.previews):
+            raise ValidationError({'share_import': 'A composição mudou e deve ser revisada antes de compartilhar.'})
+        return True
 
-                if not os.path.exists(local_path):
-                    continue
-
-                with Image.open(local_path) as img:
-                    img_small = img.convert("RGBA").resize((48, 48))
-                    for x in range(0, 48, 4):
-                        for y in range(0, 48, 4):
-                            r, g, b, a = img_small.getpixel((x, y))
-                            # Ignora pixels transparentes, brancos puros ou pretos puros
-                            if a > 150 and not (r > 240 and g > 240 and b > 240) and not (r < 20 and g < 20 and b < 20):
-                                colors_sampled.append((r, g, b))
-
-            if colors_sampled:
-                def saturation(c):
-                    r, g, b = c
-                    mx = max(r, g, b)
-                    mn = min(r, g, b)
-                    return (mx - mn) / mx if mx > 0 else 0
-
-                # Cor com maior saturacao para o acento da marca
-                colors_by_sat = sorted(colors_sampled, key=saturation, reverse=True)
-                accent_rgb = colors_by_sat[0]
-                accent_hex = f"#{accent_rgb[0]:02x}{accent_rgb[1]:02x}{accent_rgb[2]:02x}"
-
-                # Cor com menor luminancia para o primario escuro
-                def luminance(c):
-                    return c[0] * 0.299 + c[1] * 0.587 + c[2] * 0.114
-
-                colors_by_lum = sorted(colors_sampled, key=luminance)
-                primary_rgb = colors_by_lum[0]
-                primary_hex = f"#{primary_rgb[0]:02x}{primary_rgb[1]:02x}{primary_rgb[2]:02x}"
-
-                return {
-                    "name": f"Extraída · {clean_title[:16]}",
-                    "primary": primary_hex,
-                    "background": "#FAFAFA",
-                    "accent": accent_hex,
-                    "secondary": "#3F3F46",
-                    "surface": "#F4F4F5",
-                    "contrastRatio": "9.2:1 (WCAG AA)",
-                    "locked": False,
-                }
-        except Exception as exc:
-            logger.warning(f"[DocumentReconstructor] Falha ao extrair paleta do documento: {exc}")
-
-        return default_palette
+    @staticmethod
+    def validate_page_update(catalog, elements, source_index):
+        """Editable text is a customer revision; retained source evidence is immutable."""
+        if not catalog.import_metadata:
+            return
+        job = catalog.source_import
+        if source_index >= len(job.previews):
+            return  # A separately added customer page has no original to overwrite.
+        original = job.previews[source_index]
+        if not isinstance(elements, list) or len(elements) != 1 or not isinstance(elements[0], dict):
+            raise ValidationError({'documentPage': 'As páginas originais devem ser preservadas.'})
+        requested = elements[0]
+        for field in ('pageWidth', 'pageHeight', 'sourceUnit', 'sourceSnapshot'):
+            if requested.get(field) != original.get(field):
+                raise ValidationError({'documentPage': 'A geometria e os ativos de origem são imutáveis.'})
+        before, after = original.get('documentPage'), requested.get('documentPage')
+        if not isinstance(after, dict) or not isinstance(before, dict):
+            raise ValidationError({'documentPage': 'A página original deve acompanhar a composição.'})
+        normalized = copy.deepcopy(after)
+        before_elements, after_elements = before.get('elements', []), normalized.get('elements', [])
+        if not isinstance(after_elements, list) or len(after_elements) != len(before_elements):
+            raise ValidationError({'documentPage': 'Os elementos e a proveniência de origem são imutáveis.'})
+        for source, edited in zip(before_elements, after_elements):
+            if not isinstance(edited, dict):
+                raise ValidationError({'documentPage': 'Elemento inválido.'})
+            if edited.get('text') != source.get('text'):
+                if source.get('type') != 'text' or source.get('editable') is not True or edited.get('edited') is not True or not isinstance(edited.get('text'), str):
+                    raise ValidationError({'documentPage': 'Somente textos editáveis podem ser alterados explicitamente.'})
+                if len(edited['text']) > 20000:
+                    raise ValidationError({'documentPage': 'O texto editado excede o limite permitido.'})
+                edited['text'] = source.get('text')
+            edited.pop('edited', None)
+        if normalized != before:
+            raise ValidationError({'documentPage': 'A representação original e sua proveniência são imutáveis.'})
 
     @classmethod
-    def reconstruct_from_file(
-        cls,
-        file_bytes: bytes,
-        filename: str,
-        title: Optional[str] = None,
-        brand_name: Optional[str] = None,
-        style_preset: str = "editorial_clean",
-        remove_bg: bool = True,
-        mode: str = "redesign",
-        user = None,
-    ) -> Dict[str, Any]:
-        """
-        Executa o pipeline completo de engenharia reversa e cria o catalogo no banco de dados.
-        """
-        doc_title = title.strip() if title and title.strip() else os.path.splitext(filename)[0]
-        brand = brand_name.strip() if brand_name and brand_name.strip() else "Marca Comercial"
-
-        # 1. Extrai dados do arquivo
-        is_pdf = filename.lower().endswith(".pdf")
-        pages_raw = cls.extract_pdf_data(file_bytes, remove_bg=remove_bg)
-
-        # Se o PDF nao gerou paginas legiveis (ex: arquivo em branco ou corrompido), gera estrutura minima
-        if not pages_raw:
-            pages_raw = [
-                {"page_number": 1, "text": doc_title, "images": []},
-                {"page_number": 2, "text": "Produtos e Destaques", "images": []},
-            ]
-
-        # Garante numero par de paginas para spreads completos
-        if len(pages_raw) % 2 != 0:
-            pages_raw.append({
-                "page_number": len(pages_raw) + 1,
-                "text": "Contatos e Distribuicao",
-                "images": [],
-            })
-
-        total_pages = len(pages_raw)
-
-        # 2. Extrai paleta e cores dinamicamente a partir das imagens do documento
-        all_doc_images = []
-        for p in pages_raw:
-            all_doc_images.extend(p.get("images", []))
-
-        extracted_palette = cls.extract_palette_from_images(all_doc_images, doc_title)
-
-        # 3. Converte em CatalogPageData aplicando as cores extraidas
-        pages_processed = []
-        for p in pages_raw:
-            p_elem = cls.parse_page_elements(
-                raw_text=p["text"],
-                images=p["images"],
-                page_num=p["page_number"],
-                total_pages=total_pages
-            )
-            # Aplica paleta extraida do documento
-            p_elem["backgroundColor"] = extracted_palette["primary"] if p_elem["type"] in ["cover", "backcover"] else extracted_palette["background"]
-            p_elem["textColor"] = extracted_palette["background"] if p_elem["type"] in ["cover", "backcover"] else extracted_palette["primary"]
-            p_elem["accentColor"] = extracted_palette["accent"]
-            pages_processed.append(p_elem)
-
-        # 4. Cria StudioCatalog no Django
-        user_org = None
-        if user and user.is_authenticated:
-            user_org = user.organizations.first()
-
+    @transaction.atomic
+    def confirm_import(cls, job, user, title=None, mode=None, brand=None, brand_explicit=False):
+        job = DocumentImport.objects.select_for_update(of=('self',)).select_related('organization', 'catalog', 'brand').get(pk=job.pk)
+        assert_organization_access(user, job.organization, write=True)
+        if job.catalog_id is not None:
+            return job, False
+        from api.guards.quota_guard import check_catalog_creation_guard
+        check_catalog_creation_guard(user)
+        if job.status != 'ready' or job.expires_at <= timezone.now():
+            raise ValidationError('A prévia não está disponível para confirmação.')
+        if title is not None and not isinstance(title, str):
+            raise ValidationError({'title': 'Informe um título em texto.'})
+        selected_mode = normalize_import_mode(mode or job.mode)
+        selected_brand = brand if brand_explicit else job.brand
+        if selected_brand:
+            assert_organization_access(user, selected_brand.organization, write=True)
+            if selected_brand.organization_id != job.organization_id or selected_brand.status != 'active':
+                raise ValidationError({'brand_id': 'Selecione uma marca ativa da mesma organização.'})
+        if selected_mode == 'redesign' and (job.mode != 'redesign' or (brand_explicit and job.brand_id != getattr(brand, 'pk', None))):
+            raise ValidationError({'mode': 'Analise a prévia do redesenho antes de confirmar.', 'code': 'preview_required'})
+        if selected_mode != 'redesign':
+            cls.prepare_preview(job, selected_mode, brand=selected_brand)
+        first_page = job.document_ir['pages'][0]
         catalog = StudioCatalog.objects.create(
-            title=doc_title,
-            brand_name=brand,
-            style_preset=style_preset,
-            primary_color=extracted_palette["primary"],
-            secondary_color=extracted_palette.get("secondary", "#4A4846"),
-            accent_color=extracted_palette["accent"],
-            page_width=794,
-            page_height=1123,
-            organization=user_org,
-            created_by=user if user and user.is_authenticated else None,
-        )
+            title=(title or job.title).strip()[:255], organization=job.organization, created_by=user,
+            brand=selected_brand, brand_name=selected_brand.name if selected_brand else '',
+            brand_snapshot=job.brand_snapshot if selected_brand else {},
+            brand_snapshot_hash=job.brand_snapshot_hash if selected_brand else '',
+            brand_version=(job.brand_snapshot.get('meta') or {}).get('brand_version') if selected_brand else None,
+            style_preset='document_import', page_width=max(1, round(first_page['width'])),
+            page_height=max(1, round(first_page['height'])), total_pages=len(job.previews),
+            import_metadata={'importId': str(job.pk), 'mode': job.mode, 'sourceFingerprint': job.source_fingerprint,
+                             'report': job.report, 'quality': job.report['quality'], 'share_enabled': False})
+        for offset in range(0, len(job.previews), 2):
+            left = job.previews[offset]
+            right = job.previews[offset + 1] if offset + 1 < len(job.previews) else None
+            CatalogSpread.objects.create(catalog=catalog, spread_index=offset // 2,
+                                         title=f'Páginas {offset + 1}–{min(offset + 2, len(job.previews))}',
+                                         left_page_elements=[left], right_page_elements=[right] if right else [])
+        ChatThread.objects.create(catalog=catalog, user=user, title=f'Chat: {catalog.title}')
+        job.catalog = catalog
+        job.status = 'confirmed'
+        job.title = catalog.title
+        job.save()
+        logger.info('document_import confirmed id=%s catalog=%s pages=%s mode=%s', job.pk, catalog.pk, len(job.previews), job.mode)
+        return job, True
 
-        # 5. Agrupa paginas em Spreads duplos (left, right) e persiste
-        spreads_created = []
-        num_spreads = len(pages_processed) // 2
+    @staticmethod
+    def response(job):
+        return {'import_id': str(job.pk), 'status': job.status, 'title': job.title, 'mode': job.mode,
+                'source_fingerprint': job.source_fingerprint, 'total_pages': len(job.document_ir.get('pages', [])),
+                'pages': job.previews, 'document_ir': job.document_ir, 'report': job.report,
+                'expires_at': job.expires_at.isoformat(),
+                **({'catalog_id': job.catalog_id, 'spreads_count': job.catalog.spreads.count()} if job.catalog_id else {})}
 
-        for spread_idx in range(num_spreads):
-            left_p = pages_processed[spread_idx * 2]
-            right_p = pages_processed[spread_idx * 2 + 1]
-
-            spread_obj = CatalogSpread.objects.create(
-                catalog=catalog,
-                spread_index=spread_idx,
-                title=f"Spread {left_p['pageNumber']}-{right_p['pageNumber']}",
-                left_page_elements=[left_p],
-                right_page_elements=[right_p],
-            )
-            spreads_created.append(spread_obj)
-
-        return {
-            "catalog_id": catalog.id,
-            "title": catalog.title,
-            "brand_name": catalog.brand_name,
-            "total_pages": total_pages,
-            "spreads_count": len(spreads_created),
-            "pages": pages_processed,
-            "palette": extracted_palette,
-            "message": f"Catalogo '{catalog.title}' reconstruido com sucesso ({total_pages} paginas).",
-        }
-
-
-def page_idx_str(n: int) -> str:
-    return f"{n:03d}"
+    @staticmethod
+    @transaction.atomic
+    def cancel_import(job, user):
+        job = DocumentImport.objects.select_for_update().select_related('organization').get(pk=job.pk)
+        assert_organization_access(user, job.organization, write=True)
+        if job.status == 'confirmed':
+            raise ValidationError('O histórico de origem de um catálogo confirmado deve ser preservado.')
+        files = [(asset.file.storage, asset.file.name) for asset in job.assets.all()]
+        job.delete()
+        transaction.on_commit(lambda: [storage.delete(name) for storage, name in files])

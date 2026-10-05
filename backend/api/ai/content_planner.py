@@ -65,6 +65,9 @@ class ContentPlanner:
         synthesis_data: Optional[Dict[str, Any]] = None,
     ) -> DocumentContentPlan:
         """Elabora o plano global de conteúdo e o mapa por prancheta."""
+        if contract.source_document:
+            from .source_context import SourceDocumentContext
+            return SourceDocumentContext.content_plan(contract, slots, products)
         synthesis = synthesis_data or {}
         doc_title = synthesis.get("title") or (products[0].get("category") if products else "Coleção Editorial")
         doc_category = synthesis.get("category") or contract.detected_industry.replace("_", " ").title()

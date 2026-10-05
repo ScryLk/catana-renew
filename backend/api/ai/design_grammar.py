@@ -119,6 +119,7 @@ class GenerativeBlock:
     cropMode: str = "cover"                # "cover", "contain", "editorial"
     bleed: bool = False                    # Se ultrapassa intencionalmente as margens
     allowOverlap: bool = False             # Se a sobreposição é intencional
+    provenance: Optional[Dict[str, Any]] = None
     intentionalCrop: bool = False          # Se o corte do elemento é intencional
 
     def __post_init__(self):

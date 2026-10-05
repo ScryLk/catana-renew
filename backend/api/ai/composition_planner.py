@@ -57,14 +57,18 @@ class CompositionPlanner:
         balance = "axial" if visual_dna.symmetry > 0.65 else "asymmetric"
         grid_cols = 12 if visual_dna.grid_rigidity > 0.6 else 8
         base_blocks: List[GenerativeBlock] = []
-        cls._dispatch_composition(
-            role=role, page_num=page_num, blocks=base_blocks, title=title, subtitle=subtitle,
-            content=content, quote=quote, folio=folio_str, visual_dna=visual_dna,
-            direction=direction, font_p=font_p, palette=palette,
-            rng=random.Random(creative_seed + page_num * 101), has_images=has_images,
-            page_dict=page_dict, is_one_pager=(role == "one_pager"), prods=prods,
-            axis_override=narrative.layout_axis,
-        )
+        if contract.source_document:
+            from .source_context import SourceDocumentContext
+            base_blocks = SourceDocumentContext.blocks(contract, page_dict, direction)
+        else:
+            cls._dispatch_composition(
+                role=role, page_num=page_num, blocks=base_blocks, title=title, subtitle=subtitle,
+                content=content, quote=quote, folio=folio_str, visual_dna=visual_dna,
+                direction=direction, font_p=font_p, palette=palette,
+                rng=random.Random(creative_seed + page_num * 101), has_images=has_images,
+                page_dict=page_dict, is_one_pager=(role == "one_pager"), prods=prods,
+                axis_override=narrative.layout_axis,
+            )
         for block in base_blocks:
             fit_block_to_safe_area(block.__dict__, cls.SAFE_AREA)
             if block.productId is not None and block.type == 'text':
@@ -103,7 +107,8 @@ class CompositionPlanner:
         for b in winner_blocks:
             fit_block_to_safe_area(b.__dict__, cls.SAFE_AREA)
 
-        cls._place_brand_logo(winner_blocks, contract, page_dict, previous_pages or [], creative_seed)
+        if not contract.source_document:
+            cls._place_brand_logo(winner_blocks, contract, page_dict, previous_pages or [], creative_seed)
 
         final_meta = GenerativeCompositionMeta(
             grid=GenerativeGridSpec(columns=grid_cols, rows=16, gutter=0.02),

@@ -77,7 +77,7 @@ export const PageFilmstrip: React.FC = () => {
   };
 
   const leftPageObj = pages.find((p) => p.pageNumber === selectedLeft) || pages[0];
-  const rightPageObj = pages.find((p) => p.pageNumber === selectedRight) || pages[1] || pages[0];
+  const rightPageObj = selectedRight === selectedLeft ? undefined : pages.find((p) => p.pageNumber === selectedRight) || pages[1] || pages[0];
 
   if (isCompact) return <nav aria-label="Páginas do catálogo" className={`flex h-20 shrink-0 snap-x gap-2 overflow-x-auto border-t px-3 py-2 ${isDark ? 'bg-[#09090b] border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'}`}>
     {pages.map((page) => <button key={page.id} type="button" aria-label={`Abrir página ${page.pageNumber}`} aria-current={pageNumber === page.pageNumber ? 'page' : undefined}

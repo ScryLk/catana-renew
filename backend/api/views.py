@@ -1,4 +1,5 @@
 from rest_framework import viewsets, permissions, status, filters, exceptions
+from rest_framework.exceptions import NotFound
 from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -934,7 +935,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=False, methods=['post'], url_path='import-json',
-            permission_classes=[permissions.AllowAny])
+            permission_classes=[permissions.IsAuthenticated])
     def import_json(self, request):
         """
         Ingest de um catálogo no formato catalogIO v1.0 (o JSON que o editor
@@ -947,9 +948,8 @@ class CatalogViewSet(viewsets.ModelViewSet):
         'import' é palavra reservada em Python, por isso o método chama-se
         import_json (rota /api/catalogs/import-json/).
 
-        AllowAny + fallback de dev para organization/sede/created_by, como o resto
-        da API em dev. NB: reintroduz um atalho de dev (ver SEG-02) — apertar antes
-        de prod.
+        O escopo explícito é validado; substituições autorizam o catálogo alvo
+        antes de remover qualquer página.
         """
         from .catalog_ingest import importar_catalogo_json, IngestError
 
@@ -967,7 +967,19 @@ class CatalogViewSet(viewsets.ModelViewSet):
         if not user or not getattr(user, 'is_authenticated', False):
             return Response({'error': 'Autenticação obrigatória para importar catálogos.'},
                             status=status.HTTP_401_UNAUTHORIZED)
-        organization = user.organizations.first() or user.owned_organizations.first()
+        from .services.brand_intelligence import visible_organizations, assert_organization_access
+        organization_id = body.get('organization') if isinstance(body, dict) else None
+        organization = None
+        if organization_id is not None:
+            try:
+                organization = visible_organizations(user).filter(pk=organization_id).first()
+            except (TypeError, ValueError):
+                organization = None
+            if organization is None:
+                raise NotFound('Organização não encontrada.')
+            assert_organization_access(user, organization, write=True)
+        elif mode != 'replace':
+            organization = user.organizations.first() or user.owned_organizations.first()
         sede = None
         if organization:
             sede = organization.default_sede or organization.sedes.first()

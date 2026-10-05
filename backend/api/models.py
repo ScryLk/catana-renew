@@ -680,6 +680,7 @@ class StudioCatalog(models.Model):
     brand_snapshot = models.JSONField(default=dict, blank=True)
     brand_snapshot_hash = models.CharField(max_length=64, blank=True)
     generation_metadata = models.JSONField(default=dict, blank=True)
+    import_metadata = models.JSONField(default=dict, blank=True)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     brand_name = models.CharField(max_length=255, blank=True, null=True)
@@ -935,3 +936,46 @@ class BrandMemory(models.Model):
     supporting_actions = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class DocumentImport(models.Model):
+    """An authorized preview becomes a catalog only after explicit confirmation."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='document_imports')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='document_imports')
+    source_asset = models.ForeignKey('DocumentImportAsset', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    source_fingerprint = models.CharField(max_length=64, db_index=True)
+    filename = models.CharField(max_length=255)
+    title = models.CharField(max_length=255)
+    document_ir = models.JSONField(default=dict)
+    report = models.JSONField(default=dict)
+    previews = models.JSONField(default=list)
+    mode = models.CharField(max_length=20, default='preserve')
+    status = models.CharField(max_length=20, default='analyzing')
+    brand = models.ForeignKey(Brand, on_delete=models.PROTECT, null=True, blank=True, related_name='document_imports')
+    brand_snapshot = models.JSONField(default=dict, blank=True)
+    brand_snapshot_hash = models.CharField(max_length=64, blank=True)
+    catalog = models.OneToOneField(StudioCatalog, on_delete=models.SET_NULL, null=True, blank=True, related_name='source_import')
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def delete(self, *args, **kwargs):
+        if self.status == 'confirmed':
+            from django.db.models.deletion import ProtectedError
+            raise ProtectedError('Confirmed source history must be retained.', [self])
+        return super().delete(*args, **kwargs)
+
+
+from .document_storage import private_document_storage
+
+
+class DocumentImportAsset(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document_import = models.ForeignKey(DocumentImport, on_delete=models.CASCADE, related_name='assets')
+    file = models.FileField(storage=private_document_storage, upload_to='document_imports/')
+    kind = models.CharField(max_length=40)
+    source_hash = models.CharField(max_length=64)
+    width_pixels = models.PositiveIntegerField(null=True, blank=True)
+    height_pixels = models.PositiveIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)

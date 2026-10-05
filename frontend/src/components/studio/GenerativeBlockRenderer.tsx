@@ -1,6 +1,8 @@
 import React from 'react';
 import { CatalogPageData, GenerativeBlock, validateGenerativeBlock, normalizeCatalogDocument } from '../../data/editorialCatalog.mock';
 import { resolveSafeFontFamily } from '../../utils/fontRegistry';
+import { ProtectedDocumentImage } from './ProtectedDocumentImage';
+import { protectedDocumentAssetPath } from '../../services/documentImportService';
 
 interface GenerativeBlockRendererProps {
   block: GenerativeBlock;
@@ -85,7 +87,14 @@ export const GenerativeBlockRenderer: React.FC<GenerativeBlockRendererProps> = (
           interactive ? 'cursor-pointer hover:ring-1 hover:ring-zinc-400' : ''
         }`}
       >
-        {hasValidImage ? (
+        {hasValidImage && block.imageUrl && protectedDocumentAssetPath(block.imageUrl) ? (
+          <ProtectedDocumentImage
+            snapshot={{url: block.imageUrl}}
+            alt={String(block.content || 'Elemento do documento')}
+            className="w-full h-full object-center"
+            style={{objectFit}}
+          />
+        ) : hasValidImage ? (
           <img
             src={block.imageUrl}
             alt={String(block.content || 'Editorial element')}

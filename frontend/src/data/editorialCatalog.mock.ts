@@ -1,5 +1,6 @@
 import { GENERATIVE_CONTRACT } from '../generated/generativeContract.generated';
 import { isSafeImageUrl } from '../utils/imagePolicy';
+import { normalizeDocumentPage, type DocumentPageIR } from '../types/documentImport';
 /**
  * Catálogo Editorial — Showcase de Design e Tipografia Editorial
  * 
@@ -89,7 +90,7 @@ export interface PageOverlayElement {
   zIndex?: number;
 }
 
-export type PageRenderMode = typeof GENERATIVE_CONTRACT.renderModes[number];
+export type PageRenderMode = typeof GENERATIVE_CONTRACT.renderModes[number] | 'document';
 export type GenerativeBlockType = typeof GENERATIVE_CONTRACT.blockTypes[number];
 export const VALID_GENERATIVE_BLOCK_TYPES: readonly GenerativeBlockType[] = GENERATIVE_CONTRACT.blockTypes;
 
@@ -177,9 +178,15 @@ export function normalizeCatalogDocument<T extends { pages?: CatalogPageData[]; 
   let invalid = document.pages !== undefined && !Array.isArray(document.pages);
   const pages = (Array.isArray(document?.pages) ? document.pages : []).filter(page => {if (!page || typeof page !== 'object') {invalid=true; return false;} return true;}).map(page => {
     let pageInvalid = false;
+    if (page.renderMode === 'document') {
+      const documentPage = normalizeDocumentPage(page.documentPage);
+      if (!documentPage) { invalid = true; pageInvalid = true; }
+      return {...page, documentPage: documentPage || undefined, renderMode: 'document' as const, ...(page.blocks ? {blocks: []} : {}), products: [],
+        qualityGate: pageInvalid ? blockedGate : qualityGate || normalizeGate(page.qualityGate)};
+    }
     const products = (Array.isArray(page.products) ? page.products : []).filter(product => product && typeof product === 'object').map(product => ({ ...product,
-      ...Object.fromEntries(GENERATIVE_CONTRACT.nullableProductFields.map(field => [field, (product as any)[field] ?? null])),
-      image: isSafeImageUrl(product.image) ? product.image : null,
+      ...(page.documentPage ? {} : Object.fromEntries(GENERATIVE_CONTRACT.nullableProductFields.map(field => [field, (product as any)[field] ?? null]))),
+      ...(page.documentPage && product.image == null ? {} : {image: isSafeImageUrl(product.image) ? product.image : null}),
     })) as ProductItem[];
     const blocks = (Array.isArray(page.blocks) ? page.blocks : []).flatMap(raw => {
       const block = validateGenerativeBlock(raw);
@@ -222,6 +229,10 @@ export interface GenerativeCompositionMeta {
 }
 
 export interface CatalogPageData {
+  documentPage?: DocumentPageIR;
+  pageWidth?: number;
+  pageHeight?: number;
+  sourceUnit?: 'pt' | 'px';
   qualityGate?: QualityGate;
   id: string;
   pageNumber: number;
