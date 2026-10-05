@@ -116,7 +116,9 @@ class CompositionMutator:
         Garante determinismo via creative_seed do documento e conformidade imediata com Safe Area.
         """
         mutated_page = copy.deepcopy(page_dict)
-        blocks = mutated_page.get("blocks", [])
+        all_blocks = mutated_page.get("blocks", [])
+        # Approved logo geometry is not a generic photograph or typographic mass.
+        blocks = [b for b in all_blocks if b.get("role") != "brand_hallmark"]
         page_num = mutated_page.get("pageNumber", 1)
         safe_area = mutated_page.get("safeArea") or DEFAULT_SAFE_AREA
 
@@ -161,18 +163,18 @@ class CompositionMutator:
         if no_diagonals:
             for block in blocks:
                 block['rotation'] = 0
-        for before, after in zip(page_dict.get('blocks', []), blocks):
+        for before, after in zip(page_dict.get('blocks', []), all_blocks):
             for key in set(before) | set(after):
                 if key not in cls.VISUAL_MUTABLE_FIELDS and before.get(key) != after.get(key):
                     raise ValueError('MUTATION_COMMERCIAL_FIELD_VIOLATION: ' + key)
-        if len(blocks) != len(page_dict.get('blocks', [])) or mutated_page.get('products') != page_dict.get('products'):
+        if len(all_blocks) != len(page_dict.get('blocks', [])) or mutated_page.get('products') != page_dict.get('products'):
             raise ValueError('MUTATION_COMMERCIAL_FIELD_VIOLATION')
 
         # Atualiza metadata da composição
         comp = mutated_page.get("composition", {})
         if no_diagonals and 'diagonal' in str(comp.get('axis','')).lower():
             comp['axis'] = 'asymmetric_left'
-        for block in blocks:
+        for block in all_blocks:
             valid, errors = validate_runtime_block(block)
             if not valid:
                 raise ValueError('INVALID_RUNTIME_BLOCK: ' + ';'.join(errors))

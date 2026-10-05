@@ -113,6 +113,7 @@ const StudioLayout: React.FC = () => {
     toggleProductDrawer,
     loadExistingCatalog,
     syncUserCatalogs,
+    syncBrands,
     setActiveUserId,
   } = useStudioStore();
 
@@ -122,9 +123,9 @@ const StudioLayout: React.FC = () => {
   useEffect(() => {
     if (isAuthenticated && user?.id) {
       setActiveUserId(user.id);
-      syncUserCatalogs();
+      syncBrands().then(() => syncUserCatalogs());
     }
-  }, [isAuthenticated, user?.id, setActiveUserId, syncUserCatalogs]);
+  }, [isAuthenticated, user?.id, setActiveUserId, syncUserCatalogs, syncBrands]);
 
   // Trata retorno de checkout do AbacatePay (?billing=success ou ?billing=canceled)
   useEffect(() => {

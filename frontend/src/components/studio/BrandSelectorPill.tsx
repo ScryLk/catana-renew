@@ -18,6 +18,7 @@ export const BrandSelectorPill: React.FC<BrandSelectorPillProps> = ({
     activeBrandId,
     setActiveBrandId,
     openBrandModal,
+    brandLoadStatus, brandLoadError, syncBrands,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -58,6 +59,8 @@ export const BrandSelectorPill: React.FC<BrandSelectorPillProps> = ({
 
   return (
     <div className={`relative inline-flex items-center ${className}`} ref={dropdownRef}>
+      {brandLoadStatus === 'loading' && <span role="status" className="text-[11px] text-zinc-500 mr-2">Carregando marcas…</span>}
+      {brandLoadStatus === 'error' && <button type="button" title={brandLoadError || undefined} onClick={() => syncBrands().then(() => useStudioStore.getState().syncUserCatalogs())} className="text-[11px] text-amber-600 mr-2 underline">Tentar novamente</button>}
       {/* Pill Container com hover group para exibir o botão X */}
       <div
         className={`group/brand-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all select-none ${
@@ -159,13 +162,14 @@ export const BrandSelectorPill: React.FC<BrandSelectorPillProps> = ({
 
           {/* Lista de Marcas Cadastradas */}
           <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-0.5">
-            {brands.map((brand) => {
+            {brands.filter(brand => brand.status !== 'archived').map((brand) => {
               const isSelected = activeBrandId === brand.id;
               return (
                 <button
                   key={brand.id}
                   type="button"
                   role="menuitem"
+                  disabled={brandLoadStatus !== 'ready'}
                   onClick={() => {
                     setActiveBrandId(brand.id);
                     setIsOpen(false);

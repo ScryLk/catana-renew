@@ -18,7 +18,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useStudioStore } from '../../store/studioStore';
-import { StudioPalette, STUDIO_PALETTE_PRESETS } from '../../data/editorialCatalog.mock';
+import { brandVisualUpdate, readLegacyBrands } from '../../services/brandService';
+import type { BrandRule } from '../../services/brandService';
+import { STUDIO_PALETTE_PRESETS } from '../../data/editorialCatalog.mock';
 import { LogoAreaSelectorModal } from './LogoAreaSelectorModal';
 import { parseBrandMarkdown, generateBrandTemplateMarkdown } from '../../utils/brandMarkdownParser';
 import {
@@ -49,7 +51,7 @@ export const BrandModal: React.FC = () => {
     addBrand,
     updateBrand,
     deleteBrand,
-    theme,
+    theme, brandLoadStatus, legacyBrandCount, activeOrganizationId, activeUserId, migrateLegacyBrands, decideBrandEvidence, addBrandRule,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -58,6 +60,7 @@ export const BrandModal: React.FC = () => {
   const primaryColorRef = useRef<HTMLInputElement>(null);
   const secondaryColorRef = useRef<HTMLInputElement>(null);
   const tertiaryColorRef = useRef<HTMLInputElement>(null);
+  const initializedFormRef = useRef<string | null>(null);
 
   const editingBrand = brandModalEditingId
     ? brands.find((b) => b.id === brandModalEditingId)
@@ -74,6 +77,15 @@ export const BrandModal: React.FC = () => {
   const [brandMarkdown, setBrandMarkdown] = useState('');
   const [showMarkdownPreview, setShowMarkdownPreview] = useState(false);
   const [isAreaSelectorOpen, setIsAreaSelectorOpen] = useState(false);
+  const [section, setSection] = useState<'identity' | 'guidelines' | 'intelligence'>('identity');
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [confirmLegacyImport, setConfirmLegacyImport] = useState(false);
+  const [ruleText, setRuleText] = useState('');
+  const [ruleType, setRuleType] = useState<BrandRule['type']>('PREFER');
+  const [ruleCategory, setRuleCategory] = useState('composition');
+  const [ruleKind, setRuleKind] = useState<'guidelines' | 'memories'>('guidelines');
+  const [colorSource, setColorSource] = useState('user_input');
 
   // 3 Cores da Paleta da Marca
   const [primaryColor, setPrimaryColor] = useState('#18181B');
@@ -81,6 +93,10 @@ export const BrandModal: React.FC = () => {
   const [tertiaryColor, setTertiaryColor] = useState('#B08D57');
 
   useEffect(() => {
+    if (!isBrandModalOpen) { initializedFormRef.current = null; return; }
+    const key = editingBrand?.id || 'new';
+    if (initializedFormRef.current === key) return;
+    initializedFormRef.current = key;
     if (editingBrand) {
       setName(editingBrand.name);
       setSegment(editingBrand.segment || SEGMENTS[0]);
@@ -119,6 +135,7 @@ export const BrandModal: React.FC = () => {
       setTertiaryColor('#B08D57');
     }
     setShowMarkdownPreview(false);
+    setSection('identity'); setError(''); setColorSource('user_input');
   }, [editingBrand, isBrandModalOpen]);
 
   if (!isBrandModalOpen) return null;
@@ -127,6 +144,7 @@ export const BrandModal: React.FC = () => {
     palette: { primary: string; secondary: string; accent: string },
     croppedDataUrl?: string
   ) => {
+    setColorSource('logo_analysis');
     setPrimaryColor(palette.primary);
     setSecondaryColor(palette.secondary);
     setTertiaryColor(palette.accent);
@@ -148,6 +166,7 @@ export const BrandModal: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'].includes(file.type)) { toast.error('Selecione um PNG, JPEG, WEBP ou SVG.'); return; }
     if (file.size > 3 * 1024 * 1024) {
       toast.error('O logotipo deve ter no máximo 3MB.');
       return;
@@ -168,6 +187,7 @@ export const BrandModal: React.FC = () => {
   const handleMarkdownUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 256 * 1024) { toast.error('O BRAND.md deve ter no máximo 256KB.'); return; }
 
     const reader = new FileReader();
     reader.onload = () => {
@@ -175,6 +195,7 @@ export const BrandModal: React.FC = () => {
         const text = reader.result;
         const parsed = parseBrandMarkdown(text);
         setBrandMarkdown(text);
+        setColorSource('brand_markdown');
 
         if (parsed.name) setName(parsed.name);
         if (parsed.segment) {
@@ -215,7 +236,7 @@ export const BrandModal: React.FC = () => {
     toast.success('Modelo BRAND.md baixado com sucesso!');
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const brandName = name.trim();
     if (!brandName) {
@@ -223,16 +244,8 @@ export const BrandModal: React.FC = () => {
       return;
     }
 
-    const customPalette: StudioPalette = {
-      name: `Paleta ${brandName}`,
-      primary: primaryColor,
-      secondary: secondaryColor,
-      accent: tertiaryColor,
-      background: '#F6F5F2',
-      surface: '#FFFFFF',
-      contrastRatio: '9.2:1 (AAA)',
-      locked: true,
-    };
+    if (![primaryColor, secondaryColor, tertiaryColor].every(color => /^#[0-9a-f]{6}$/i.test(color))) { setError('Informe cores em formato hexadecimal, como #102A43.'); return; }
+    const {customPalette, colors} = brandVisualUpdate(editingBrand, brandName, {primary: primaryColor, secondary: secondaryColor, accent: tertiaryColor}, colorSource);
 
     const brandData = {
       name: brandName,
@@ -242,6 +255,7 @@ export const BrandModal: React.FC = () => {
       brandMarkdown: brandMarkdown.trim() || undefined,
       toneOfVoice: toneOfVoice.trim() || undefined,
       logoUrl: logoUrl || undefined,
+      colors,
       commercialContact: {
         whatsapp: whatsapp.trim() || undefined,
         email: email.trim() || undefined,
@@ -250,23 +264,54 @@ export const BrandModal: React.FC = () => {
       },
     };
 
-    if (editingBrand) {
-      updateBrand(editingBrand.id, brandData);
-    } else {
-      addBrand(brandData);
-    }
+    setIsSaving(true); setError('');
+    try {
+      if (editingBrand) await updateBrand(editingBrand.id, brandData);
+      else await addBrand(brandData);
+    } catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível salvar a marca. Tente novamente.'); }
+    finally { setIsSaving(false); }
   };
 
-  const handleDelete = () => {
-    if (!editingBrand) return;
-    if (confirm(`Deseja realmente remover a marca "${editingBrand.name}"?`)) {
-      deleteBrand(editingBrand.id);
-      closeBrandModal();
-    }
+  const handleDelete = async () => {
+    if (!editingBrand || !confirm(`Arquivar a marca "${editingBrand.name}"? Os catálogos existentes serão preservados.`)) return;
+    setIsSaving(true); setError('');
+    try { await deleteBrand(editingBrand.id); closeBrandModal(); }
+    catch { setError('Não foi possível arquivar a marca. Tente novamente.'); }
+    finally { setIsSaving(false); }
   };
+  const handleRuleSave = async () => {
+    if (!editingBrand || !ruleText.trim()) return;
+    setIsSaving(true); setError('');
+    try {
+      await addBrandRule(editingBrand.id, ruleKind, {type: ruleType, category: ruleCategory, rule: ruleText.trim(), source: 'user_input', status: 'user_supplied'});
+      setRuleText('');
+    } catch { setError('Não foi possível salvar a regra.'); }
+    finally { setIsSaving(false); }
+  };
+  const handleDecision = async (kind: 'guideline' | 'memory' | 'intelligence' | 'color', key: string, status: 'confirmed' | 'rejected') => {
+    if (!editingBrand) return;
+    setIsSaving(true); setError('');
+    try { await decideBrandEvidence(editingBrand.id, {kind, ...(kind === 'intelligence' ? {key} : {id: key}), status}); }
+    catch { setError('Não foi possível registrar a decisão.'); }
+    finally { setIsSaving(false); }
+  };
+  const legacyBrands = activeUserId != null ? readLegacyBrands(activeUserId) : [];
+  let organizationName = `Organização ${activeOrganizationId || ''}`;
+  try { organizationName = JSON.parse(localStorage.getItem('active_organization') || '{}').name || organizationName; } catch { /* Context label fallback. */ }
+  const evidenceLabel = (status: string) => ({confirmed: 'Confirmado', user_supplied: 'Informado por você', inferred: 'Precisa de confirmação', rejected: 'Rejeitado'}[status] || 'Precisa de confirmação');
+  const renderRule = (rule: BrandRule, kind: 'guideline' | 'memory') => (
+    <li key={rule.id} className="rounded-lg border border-zinc-500/25 p-3 space-y-2">
+      <p><strong>{rule.type}</strong> · {rule.category}: {rule.rule}</p>
+      <p className="text-[11px] text-zinc-500">{evidenceLabel(rule.status)} · Fonte: {rule.source}</p>
+      {rule.status === 'inferred' && <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={isSaving || brandLoadStatus !== 'ready'} onClick={() => handleDecision(kind, rule.id, 'confirmed')} aria-label={`Confirmar ${rule.rule}`} className="px-3 py-2 rounded-lg border border-zinc-500/30">Confirmar</button>
+        <button type="button" disabled={isSaving || brandLoadStatus !== 'ready'} onClick={() => handleDecision(kind, rule.id, 'rejected')} aria-label={`Rejeitar ${rule.rule}`} className="px-3 py-2 rounded-lg border border-zinc-500/30">Rejeitar</button>
+      </div>}
+    </li>
+  );
 
   return (
-    <ResponsiveModal label="Marca" onDismiss={closeBrandModal}
+    <ResponsiveModal label="Marca" onDismiss={closeBrandModal} dismissible={!isSaving && !confirmLegacyImport && !isAreaSelectorOpen}
       role="dialog"
       aria-modal="true"
       aria-labelledby="brand-modal-title"
@@ -303,7 +348,7 @@ export const BrandModal: React.FC = () => {
                 {editingBrand ? 'Editar Marca & Brand Kit' : 'Nova Marca'}
               </h2>
               <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                Identidade visual e dados corporativos centralizados.
+                {editingBrand ? `${organizationName} · Versão ${editingBrand.currentVersion || 1}` : `Marca persistente em ${organizationName}`}
               </p>
             </div>
           </div>
@@ -323,9 +368,16 @@ export const BrandModal: React.FC = () => {
           </button>
         </div>
 
+        <div className="px-5 pt-3 flex flex-wrap gap-2" role="group" aria-label="Seções da marca">
+          {([['identity', 'Identidade'], ['guidelines', 'Diretrizes'], ['intelligence', 'Inteligência']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={section === value} onClick={() => setSection(value)} className={`px-3 py-2 rounded-lg border text-xs ${section === value ? 'border-emerald-600 text-emerald-600' : 'border-zinc-500/25'}`}>{label}</button>)}
+        </div>
+        {legacyBrandCount > 0 && <div className="mx-5 mt-3 p-3 rounded-lg border border-amber-500/30 text-xs space-y-2">
+          <p>{legacyBrandCount} marca(s) deste usuário estão salvas somente neste navegador. Escolha a organização antes de importar.</p>
+          <button type="button" disabled={brandLoadStatus !== 'ready' || isSaving} onClick={() => setConfirmLegacyImport(true)} className="px-3 py-2 rounded-lg border border-amber-500/40">Importar marcas deste navegador</button>
+        </div>}
         {/* Sub-Header: Barra de Ações BRAND.md */}
         <div
-          className={`px-5 py-2 border-b flex items-center justify-between gap-2 shrink-0 ${
+          className={`px-5 py-2 border-b flex flex-wrap items-center justify-between gap-2 shrink-0 ${
             isDark ? 'border-zinc-800/60 bg-zinc-950/40 text-zinc-400' : 'border-zinc-200 bg-zinc-100/50 text-zinc-600'
           }`}
         >
@@ -400,6 +452,7 @@ export const BrandModal: React.FC = () => {
 
         {/* Form Body */}
         <form onSubmit={handleSave} className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4 text-xs">
+          <div hidden={section !== 'identity'} className="space-y-4">
           {/* Linha 1: Nome da Marca & Segmento lado a lado */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -408,6 +461,7 @@ export const BrandModal: React.FC = () => {
               </label>
               <input
                 type="text"
+                aria-label="Nome da Marca"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -441,7 +495,7 @@ export const BrandModal: React.FC = () => {
                       : 'bg-white/95 border-zinc-200 text-zinc-900 shadow-zinc-300/50'
                   }`}
                 >
-                  {SEGMENTS.map((seg) => (
+                  {[...SEGMENTS, ...(segment && !SEGMENTS.includes(segment) ? [segment] : [])].map((seg) => (
                     <SelectItem
                       key={seg}
                       value={seg}
@@ -472,7 +526,7 @@ export const BrandModal: React.FC = () => {
               className="hidden"
             />
             <div
-              className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 ${
+              className={`p-2.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
                 isDark ? 'bg-zinc-900/40 border-zinc-800/80' : 'bg-zinc-50 border-zinc-200'
               }`}
             >
@@ -499,7 +553,17 @@ export const BrandModal: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0">
-                {logoUrl && (
+                {confirmLegacyImport && <ResponsiveModal label="Importar marcas deste navegador" dismissible={!isSaving} onDismiss={() => setConfirmLegacyImport(false)} className="fixed inset-0 z-[80] bg-black/70 flex items-center justify-center p-4">
+        <div className={`w-full max-w-md rounded-xl p-5 space-y-4 ${isDark ? 'bg-zinc-950 text-zinc-100' : 'bg-white text-zinc-900'}`}>
+          <h2 className="font-semibold">Importar marcas deste navegador</h2>
+          <p>Destino: <strong>{organizationName}</strong>. O armazenamento antigo não registra a organização; confirme que estas marcas pertencem a este destino.</p>
+          <ul className="max-h-40 overflow-auto list-disc pl-5">{legacyBrands.map(brand => <li key={brand.id}>{brand.name}</li>)}</ul>
+          <p className="text-sm">Logo, paleta, contatos, tom e BRAND.md serão preservados. A cópia original permanecerá no navegador.</p>
+          {error && <p role="alert" className="text-rose-500">{error}</p>}
+          <div className="flex flex-wrap gap-2"><button type="button" disabled={isSaving} onClick={() => setConfirmLegacyImport(false)} className="px-3 py-2 rounded border border-zinc-500/30">Cancelar importação</button><button type="button" disabled={isSaving} className="px-3 py-2 rounded bg-emerald-700 text-white" onClick={async () => {setIsSaving(true); setError(''); try {await migrateLegacyBrands(); setConfirmLegacyImport(false); toast.success('Marcas importadas. A cópia original foi preservada.');} catch (err) {setError(err instanceof Error ? err.message : 'A importação falhou. Seus dados foram preservados.');} finally {setIsSaving(false);}}}>Confirmar importação</button></div>
+        </div>
+      </ResponsiveModal>}
+      {logoUrl && (
                   <>
                     <button
                       type="button"
@@ -551,7 +615,7 @@ export const BrandModal: React.FC = () => {
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* 1. Cor Primária */}
               <div
                 className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-2 transition-all ${
@@ -702,6 +766,7 @@ export const BrandModal: React.FC = () => {
             </label>
             <input
               type="text"
+              aria-label="Tom de voz"
               value={toneOfVoice}
               onChange={(e) => setToneOfVoice(e.target.value)}
               placeholder="Ex: Sóbrio, sofisticado, contemporâneo e sem superlativos..."
@@ -781,6 +846,38 @@ export const BrandModal: React.FC = () => {
             </div>
           </div>
 
+          </div>
+          {section === 'guidelines' && <section className="space-y-3" aria-label="Diretrizes confirmadas">
+            <p className="text-zinc-500">O documento é uma fonte de dados. Linhas MUST, PREFER e AVOID são sugestões até serem confirmadas. Ex.: AVOID [color]: Evitar dourado.</p>
+            <label className="block space-y-2"><span>Diretrizes BRAND.md</span><textarea aria-label="Diretrizes BRAND.md" value={brandMarkdown} onChange={event => setBrandMarkdown(event.target.value)} rows={7} className="w-full rounded-lg p-3 border border-zinc-500/30 bg-transparent font-mono" /></label>
+            {!editingBrand ? <p>Salve a marca para adicionar regras e memórias.</p> : <>
+              <ul className="space-y-2">{(editingBrand.guidelines || []).map(rule => renderRule(rule, 'guideline'))}{(editingBrand.memories || []).map(rule => renderRule(rule, 'memory'))}</ul>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <label>Salvar como<select aria-label="Salvar como" value={ruleKind} onChange={event => setRuleKind(event.target.value as typeof ruleKind)} className="w-full bg-transparent p-2 rounded border border-zinc-500/30"><option value="guidelines">Diretriz</option><option value="memories">Memória explícita</option></select></label>
+                <label>Regra<select aria-label="Tipo de regra" value={ruleType} onChange={event => setRuleType(event.target.value as typeof ruleType)} className="w-full bg-transparent p-2 rounded border border-zinc-500/30"><option value="MUST">MUST · Obrigatório</option><option value="PREFER">PREFER · Preferir</option><option value="AVOID">AVOID · Evitar</option></select></label>
+              </div>
+              <label className="block">Categoria<select aria-label="Categoria da regra" value={ruleCategory} onChange={event => setRuleCategory(event.target.value)} className="w-full bg-transparent p-2 rounded border border-zinc-500/30">{['logo', 'color', 'typography', 'photography', 'voice', 'composition', 'commercial', 'other'].map(category => <option key={category}>{category}</option>)}</select></label>
+              <textarea aria-label="Texto da regra" value={ruleText} onChange={event => setRuleText(event.target.value)} placeholder="Ex.: Evitar dourado; preservar proporções do logo" className="w-full rounded-lg p-3 border border-zinc-500/30 bg-transparent" />
+              <button type="button" disabled={!ruleText.trim() || isSaving || brandLoadStatus !== 'ready'} onClick={handleRuleSave} className="px-3 py-2 rounded-lg border border-emerald-600">Salvar regra</button>
+            </>}
+          </section>}
+          {section === 'intelligence' && <section className="space-y-3" aria-label="O que Catana entende sobre esta marca">
+            <h3 className="font-semibold">O que Catana entende sobre esta marca</h3>
+            <p className="text-zinc-500">Sugestões não são regras oficiais. Somente a sua confirmação promove uma interpretação a preferência da marca.</p>
+            <p>Nome, logo, paleta, contatos e tom salvos na seção Identidade: <strong>Informados por você</strong>.</p>
+            {(editingBrand?.colors || []).map((color, index) => <div key={`${color.role}-${index}`} className="space-y-2"><p className="flex items-center gap-2"><span className="size-4 rounded-full border border-zinc-500/30" style={{backgroundColor: color.hex}} />{color.role}: {color.hex} · {evidenceLabel(color.status)} · {color.source}</p>{color.status === 'inferred' && <div className="flex flex-wrap gap-2"><button type="button" disabled={isSaving || brandLoadStatus !== 'ready'} aria-label={`Confirmar cor ${color.role}`} onClick={() => handleDecision('color', String(index), 'confirmed')} className="px-3 py-2 rounded-lg border border-zinc-500/30">Confirmar cor</button><button type="button" disabled={isSaving || brandLoadStatus !== 'ready'} aria-label={`Rejeitar cor ${color.role}`} onClick={() => handleDecision('color', String(index), 'rejected')} className="px-3 py-2 rounded-lg border border-zinc-500/30">Rejeitar cor</button></div>}</div>)}
+            {Object.entries(editingBrand?.intelligence || {}).map(([key, evidence]) => <div key={key} className="rounded-lg border border-zinc-500/25 p-3 space-y-2">
+              <p className="break-words"><strong>{key}</strong>: {typeof evidence.value === 'string' ? evidence.value : JSON.stringify(evidence.value)}</p>
+              <p className="text-zinc-500">{evidenceLabel(evidence.status)} · Fonte: {evidence.source}</p>
+              {evidence.status === 'inferred' && <div className="flex flex-wrap gap-2">
+                <button type="button" disabled={isSaving || brandLoadStatus !== 'ready'} onClick={() => handleDecision('intelligence', key, 'confirmed')} aria-label={`Confirmar ${key}`} className="px-3 py-2 rounded-lg border border-zinc-500/30">Confirmar</button>
+                <button type="button" disabled={isSaving || brandLoadStatus !== 'ready'} onClick={() => handleDecision('intelligence', key, 'rejected')} aria-label={`Rejeitar ${key}`} className="px-3 py-2 rounded-lg border border-zinc-500/30">Rejeitar</button>
+              </div>}
+            </div>)}
+            {!Object.keys(editingBrand?.intelligence || {}).length && <p className="text-zinc-500">Nenhuma interpretação pendente. O contexto usa os dados confirmados da marca.</p>}
+          </section>}
+          {error && <p role="alert" className="text-rose-500 break-words">{error}</p>}
+          {brandLoadStatus !== 'ready' && <p role="status" className="text-amber-600">Aguarde a sincronização para salvar. O cache não substitui o servidor.</p>}
           {/* Action Footer */}
           <div
             className={`pt-3 border-t flex items-center justify-between shrink-0 ${
@@ -792,10 +889,11 @@ export const BrandModal: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleDelete}
+                  disabled={isSaving || brandLoadStatus !== 'ready'}
                   className="px-2 py-1 rounded-lg text-xs text-zinc-500 hover:text-rose-400 transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <Trash2 className="size-3.5" />
-                  <span>Excluir Marca</span>
+                  <span>Arquivar Marca</span>
                 </button>
               )}
             </div>
@@ -813,6 +911,7 @@ export const BrandModal: React.FC = () => {
 
               <button
                 type="submit"
+                disabled={isSaving || brandLoadStatus !== 'ready'}
                 className={`px-4 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer ${
                   isDark
                     ? 'bg-zinc-100 hover:bg-white text-zinc-950'
@@ -820,7 +919,7 @@ export const BrandModal: React.FC = () => {
                 }`}
               >
                 <Check className="size-3.5" />
-                <span>{editingBrand ? 'Salvar Alterações' : 'Cadastrar Marca'}</span>
+                <span>{isSaving ? 'Salvando…' : editingBrand ? 'Salvar Alterações' : 'Cadastrar Marca'}</span>
               </button>
             </div>
           </div>

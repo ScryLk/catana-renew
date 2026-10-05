@@ -6,6 +6,7 @@ import logging
 import re
 import time
 import base64
+import copy
 import socket
 import ipaddress
 import urllib.parse
@@ -16,10 +17,12 @@ from django.conf import settings
 from api.services.image_validator import validate_image_file, validate_image_bytes
 from django.http import StreamingHttpResponse, JsonResponse
 from django.db.models import Q
+from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.exceptions import NotFound, ValidationError, NotAuthenticated
 from drf_spectacular.utils import extend_schema
 
 from api.models import (
@@ -53,6 +56,83 @@ from api.services.background_removal import BackgroundRemovalService
 from api.services.document_reconstructor import DocumentReconstructorService
 
 logger = logging.getLogger(__name__)
+
+
+def _studio_catalogs_for(user):
+    """Keep legacy personal drafts while requiring current tenant access for Brand data."""
+    from api.services.brand_intelligence import visible_organizations
+    organizations = visible_organizations(user)
+    return StudioCatalog.objects.filter(
+        Q(brand__isnull=True) & (Q(created_by=user) | Q(organization__in=organizations))
+        | Q(brand__isnull=False, organization__in=organizations,
+            brand__organization__in=organizations)
+    )
+
+
+def _brand_catalog_metadata(catalog):
+    # Only private Studio responses use this helper. Public readers keep an allowlist.
+    return {
+        'organization': catalog.organization_id,
+        'brand': str(catalog.brand_id) if catalog.brand_id else None,
+        'brand_version': catalog.brand_version,
+        'brand_snapshot': catalog.brand_snapshot,
+        'brand_snapshot_hash': catalog.brand_snapshot_hash,
+        'qualityGate': (catalog.generation_metadata or {}).get('qualityGate'),
+    }
+
+
+def _assert_brand_catalog_write(user, catalog):
+    if catalog.brand_id:
+        from api.services.brand_intelligence import assert_organization_access
+        assert_organization_access(user, catalog.organization, write=True)
+
+
+def _invalidate_generation_approval(catalog, reason):
+    """An approval certifies generated content, not later customer edits."""
+    if not catalog.generation_metadata:
+        return
+    previous = catalog.generation_metadata.get('qualityGate') or {}
+    catalog.generation_metadata = {
+        **catalog.generation_metadata,
+        'generationStatus': 'needs_review',
+        'qualityGate': {
+            **previous, 'status': 'needs_review', 'passed': False, 'publishable': False,
+            'errors': list(dict.fromkeys([*previous.get('errors', []), reason])),
+        },
+    }
+
+
+def _studio_threads_for(user):
+    return ChatThread.objects.filter(
+        Q(catalog__in=_studio_catalogs_for(user)) | Q(catalog__isnull=True, user=user)
+    ).distinct()
+
+
+def _requested_brand(user, data):
+    from api.services.brand_intelligence import get_brand_for_user, assert_organization_access
+    brand_id = data.get('brand_id', data.get('brand'))
+    if not brand_id:
+        return None
+    brand = get_brand_for_user(user, brand_id, organization_id=data.get('organization'))
+    assert_organization_access(user, brand.organization, write=True)
+    return brand
+
+
+def _requested_organization(user, data, brand=None):
+    from api.services.brand_intelligence import visible_organizations, assert_organization_access
+    organization_id = data.get('organization')
+    if brand is not None:
+        return brand.organization
+    if organization_id is not None:
+        try:
+            organization = visible_organizations(user).filter(pk=organization_id).first()
+        except (TypeError, ValueError):
+            organization = None
+        if organization is None:
+            raise NotFound('Organização não encontrada.')
+        assert_organization_access(user, organization, write=True)
+        return organization
+    return user.organizations.first()
 
 class StudioAgentsListView(APIView):
     """
@@ -103,13 +183,18 @@ class StudioCatalogListView(APIView):
 
     def get(self, request):
         user = request.user
-        catalogs = StudioCatalog.objects.filter(
-            Q(created_by=user) | Q(organization__in=user.organizations.all())
-        ).distinct().order_by("-updated_at")
+        catalogs = _studio_catalogs_for(user).order_by("-updated_at")
+        organization_id = request.query_params.get('organization')
+        if organization_id is not None:
+            try:
+                catalogs = catalogs.filter(organization_id=int(organization_id))
+            except (ValueError, TypeError):
+                raise ValidationError({'organization': 'Organização inválida.'})
         results = []
         for cat in catalogs:
             spread_count = cat.spreads.count()
             results.append({
+                **_brand_catalog_metadata(cat),
                 "id": cat.id,
                 "title": cat.title,
                 "description": cat.description or "",
@@ -128,6 +213,7 @@ class StudioCatalogListView(APIView):
             })
         return Response(results)
 
+    @transaction.atomic
     def post(self, request):
         user = request.user
         try:
@@ -137,6 +223,7 @@ class StudioCatalogListView(APIView):
             return Response(detail_data, status=status.HTTP_403_FORBIDDEN)
 
         data = request.data
+        brand = _requested_brand(user, data)
         title = data.get("title", "Novo Catalogo Studio")
         brand_name = data.get("brand_name", "")
         style_preset = data.get("style_preset", "editorial_clean")
@@ -154,11 +241,11 @@ class StudioCatalogListView(APIView):
         palette_data = data.get("palette_data", {})
         unassigned_products = data.get("unassigned_products", [])
 
-        org = user.organizations.first()
+        org = _requested_organization(user, data, brand)
 
         catalog = StudioCatalog.objects.create(
             title=title,
-            brand_name=brand_name,
+            brand_name=brand.name if brand else brand_name,
             style_preset=style_preset,
             primary_color=primary_color,
             secondary_color=secondary_color,
@@ -171,6 +258,10 @@ class StudioCatalogListView(APIView):
             organization=org,
             created_by=user,
         )
+        if brand is not None:
+            from api.services.brand_intelligence import bind_catalog_brand
+            bind_catalog_brand(catalog, brand, user)
+            catalog.save(update_fields=['brand', 'brand_version', 'brand_snapshot', 'brand_snapshot_hash'])
 
         # Cria automaticamente o primeiro spread A4 vazio
         CatalogSpread.objects.create(
@@ -190,6 +281,7 @@ class StudioCatalogListView(APIView):
         )
 
         return Response({
+            **_brand_catalog_metadata(catalog),
             "id": catalog.id,
             "title": catalog.title,
             "brand_name": catalog.brand_name,
@@ -211,10 +303,7 @@ class StudioCatalogDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_catalog(self, user, pk):
-        return StudioCatalog.objects.filter(
-            Q(created_by=user) | Q(organization__in=user.organizations.all()),
-            pk=pk
-        ).first()
+        return _studio_catalogs_for(user).filter(pk=pk).first()
 
     def get(self, request, pk):
         catalog = self.get_catalog(request.user, pk)
@@ -260,6 +349,7 @@ class StudioCatalogDetailView(APIView):
             })
 
         return Response({
+            **_brand_catalog_metadata(catalog),
             "id": catalog.id,
             "title": catalog.title,
             "description": catalog.description or "",
@@ -282,17 +372,43 @@ class StudioCatalogDetailView(APIView):
             "updated_at": catalog.updated_at.isoformat(),
         })
 
+    @transaction.atomic
     def put(self, request, pk):
-        catalog = self.get_catalog(request.user, pk)
+        catalog = _studio_catalogs_for(request.user).select_for_update(of=('self',)).filter(pk=pk).first()
         if not catalog:
             return Response({"error": "Catalogo nao encontrado"}, status=status.HTTP_404_NOT_FOUND)
+        _assert_brand_catalog_write(request.user, catalog)
 
         data = request.data
+        presentation_fields = ('title', 'description', 'style_preset', 'primary_color',
+                               'secondary_color', 'accent_color', 'font_family',
+                               'total_pages', 'palette_data')
+        previous_presentation = {field: copy.deepcopy(getattr(catalog, field)) for field in presentation_fields}
+        if any(field in data for field in ('brand_version', 'brand_snapshot', 'brand_snapshot_hash',
+                                          'generation_metadata', 'qualityGate', 'generationStatus')):
+            raise ValidationError({'brand_snapshot': 'A identidade histórica é controlada pelo servidor.'})
+        if 'brand' in data or 'brand_id' in data:
+            requested_id = data.get('brand_id', data.get('brand'))
+            current_id = str(catalog.brand_id) if catalog.brand_id else None
+            if (str(requested_id) if requested_id else None) != current_id or data.get('update_brand_identity') is True:
+                if data.get('update_brand_identity') is not True:
+                    raise ValidationError({'brand': 'Confirme explicitamente a atualização da identidade do catálogo.'})
+                brand = _requested_brand(request.user, data)
+                if brand is not None:
+                    from api.services.brand_intelligence import bind_catalog_brand
+                    bind_catalog_brand(catalog, brand, request.user, refresh_snapshot=True)
+                    catalog.brand_name = brand.name
+                else:
+                    catalog.brand = None
+                    catalog.brand_version = None
+                    catalog.brand_snapshot = {}
+                    catalog.brand_snapshot_hash = ''
+                _invalidate_generation_approval(catalog, 'BRAND_IDENTITY_UPDATED')
         if "title" in data:
             catalog.title = data["title"]
         if "description" in data:
             catalog.description = data["description"]
-        if "brand_name" in data:
+        if "brand_name" in data and not catalog.brand_id:
             catalog.brand_name = data["brand_name"]
         if "style_preset" in data:
             catalog.style_preset = data["style_preset"]
@@ -312,9 +428,12 @@ class StudioCatalogDetailView(APIView):
             catalog.palette_data = data["palette_data"]
         if "unassigned_products" in data:
             catalog.unassigned_products = data["unassigned_products"]
+        if any(previous_presentation[field] != getattr(catalog, field) for field in presentation_fields):
+            _invalidate_generation_approval(catalog, 'GENERATED_CONTENT_UPDATED')
         catalog.save()
 
         return Response({
+            **_brand_catalog_metadata(catalog),
             "status": "updated",
             "id": catalog.id,
             "title": catalog.title,
@@ -328,6 +447,7 @@ class StudioCatalogDetailView(APIView):
         catalog = self.get_catalog(request.user, pk)
         if not catalog:
             return Response({"error": "Catalogo nao encontrado"}, status=status.HTTP_404_NOT_FOUND)
+        _assert_brand_catalog_write(request.user, catalog)
 
         catalog.delete()
         return Response({"status": "deleted"}, status=status.HTTP_204_NO_CONTENT)
@@ -339,15 +459,14 @@ class StudioSpreadManageView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, catalog_id):
         user = request.user
-        catalog = StudioCatalog.objects.filter(
-            Q(created_by=user) | Q(organization__in=user.organizations.all()),
-            pk=catalog_id
-        ).first()
+        catalog = _studio_catalogs_for(user).select_for_update(of=('self',)).filter(pk=catalog_id).first()
 
         if not catalog:
             return Response({"error": "Catalogo nao encontrado"}, status=status.HTTP_404_NOT_FOUND)
+        _assert_brand_catalog_write(user, catalog)
 
         data = request.data
         try:
@@ -373,6 +492,8 @@ class StudioSpreadManageView(APIView):
         elif right_elements is None:
             right_elements = []
 
+        existing = catalog.spreads.filter(spread_index=spread_index).first()
+        content_changed = existing is None or existing.left_page_elements != left_elements or existing.right_page_elements != right_elements
         spread, created = CatalogSpread.objects.update_or_create(
             catalog=catalog,
             spread_index=spread_index,
@@ -382,8 +503,12 @@ class StudioSpreadManageView(APIView):
                 "right_page_elements": right_elements,
             }
         )
+        if content_changed:
+            _invalidate_generation_approval(catalog, 'GENERATED_CONTENT_UPDATED')
+            catalog.save(update_fields=['generation_metadata', 'updated_at'])
 
         return Response({
+            'qualityGate': (catalog.generation_metadata or {}).get('qualityGate'),
             "id": spread.id,
             "catalog_id": catalog.id,
             "spread_index": spread.spread_index,
@@ -398,15 +523,14 @@ class StudioSpreadBulkSyncView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, catalog_id):
         user = request.user
-        catalog = StudioCatalog.objects.filter(
-            Q(created_by=user) | Q(organization__in=user.organizations.all()),
-            pk=catalog_id
-        ).first()
+        catalog = _studio_catalogs_for(user).select_for_update(of=('self',)).filter(pk=catalog_id).first()
 
         if not catalog:
             return Response({"error": "Catalogo nao encontrado"}, status=status.HTTP_404_NOT_FOUND)
+        _assert_brand_catalog_write(user, catalog)
 
         spreads_data = request.data.get("spreads", [])
         if not isinstance(spreads_data, list):
@@ -414,6 +538,7 @@ class StudioSpreadBulkSyncView(APIView):
 
         from django.db import transaction
         saved_spreads = []
+        content_changed = False
         with transaction.atomic():
             for item in spreads_data:
                 try:
@@ -439,6 +564,8 @@ class StudioSpreadBulkSyncView(APIView):
                 elif right_elements is None:
                     right_elements = []
 
+                existing = catalog.spreads.filter(spread_index=spread_index).first()
+                content_changed = content_changed or existing is None or existing.left_page_elements != left_elements or existing.right_page_elements != right_elements
                 spread, _ = CatalogSpread.objects.update_or_create(
                     catalog=catalog,
                     spread_index=spread_index,
@@ -455,12 +582,17 @@ class StudioSpreadBulkSyncView(APIView):
                 try:
                     t_pages_int = int(total_pages)
                     if t_pages_int > 0:
+                        content_changed = content_changed or catalog.total_pages != t_pages_int
                         catalog.total_pages = t_pages_int
                         catalog.save(update_fields=["total_pages", "updated_at"])
                 except (ValueError, TypeError):
                     pass
+            if content_changed:
+                _invalidate_generation_approval(catalog, 'GENERATED_CONTENT_UPDATED')
+                catalog.save(update_fields=['generation_metadata', 'updated_at'])
 
         return Response({
+            'qualityGate': (catalog.generation_metadata or {}).get('qualityGate'),
             "status": "success",
             "catalog_id": catalog.id,
             "synced_spreads": saved_spreads,
@@ -476,10 +608,7 @@ class StudioThreadMessagesView(APIView):
 
     def get(self, request, thread_id):
         user = request.user
-        thread = ChatThread.objects.filter(
-            Q(user=user) | Q(catalog__created_by=user) | Q(catalog__organization__in=user.organizations.all()),
-            pk=thread_id
-        ).first()
+        thread = _studio_threads_for(user).filter(pk=thread_id).first()
 
         if not thread:
             return Response({"error": "Sessao nao encontrada"}, status=status.HTTP_404_NOT_FOUND)
@@ -562,17 +691,14 @@ class StudioChatStreamView(APIView):
         # 3. Contexto do Catalogo e Thread (com isolamento estrito de proprietario)
         catalog = None
         if catalog_id:
-            catalog = StudioCatalog.objects.filter(
-                Q(created_by=user) | Q(organization__in=user.organizations.all()),
-                pk=catalog_id
-            ).first()
+            catalog = _studio_catalogs_for(user).filter(pk=catalog_id).first()
             if not catalog:
                 return Response(
                     {"error": "Catalogo nao encontrado ou sem permissao de acesso"},
                     status=status.HTTP_404_NOT_FOUND
                 )
 
-        if not catalog and not catalog_id:
+        if not catalog and not catalog_id and not thread_id:
             # Se nao informou catalogo, cria rascunho vinculado exclusivamente ao usuario autenticado
             org = user.organizations.first()
             catalog = StudioCatalog.objects.create(
@@ -583,15 +709,18 @@ class StudioChatStreamView(APIView):
 
         thread = None
         if thread_id:
-            thread = ChatThread.objects.filter(
-                Q(user=user) | Q(catalog__created_by=user) | Q(catalog__organization__in=user.organizations.all()),
-                pk=thread_id
-            ).first()
+            thread = _studio_threads_for(user).filter(pk=thread_id).first()
             if not thread:
                 return Response(
                     {"error": "Sessao de chat nao encontrada ou sem permissao de acesso"},
                     status=status.HTTP_404_NOT_FOUND
                 )
+            if catalog_id and thread.catalog_id != catalog.id:
+                raise ValidationError({'thread_id': 'A sessão deve pertencer ao catálogo informado.'})
+            catalog = thread.catalog
+
+        if catalog:
+            _assert_brand_catalog_write(user, catalog)
 
         if not thread:
             thread = ChatThread.objects.create(
@@ -651,6 +780,9 @@ class StudioChatStreamView(APIView):
             "catalog_skeleton": catalog_skeleton,
             "selected_element_id": selected_element_id,
         }
+        if catalog and catalog.brand_id:
+            # Chat uses the catalog's historical identity, never today's Brand state.
+            catalog_context['brand_context'] = copy.deepcopy(catalog.brand_snapshot)
 
         # 7. Gerador de Eventos SSE
         def sse_event_stream() -> Generator[str, None, None]:
@@ -1089,7 +1221,10 @@ class StudioCatalogGenerateView(APIView):
     def post(self, request):
         from api.ai.catalog_builder import generate_catalog_from_gemini
 
-        prompt = request.data.get("prompt", "").strip()
+        prompt = request.data.get("prompt", "")
+        if not isinstance(prompt, str):
+            raise ValidationError({'prompt': 'O briefing deve ser texto.'})
+        prompt = prompt.strip()
         products = request.data.get("products", [])
         creative_seed = request.data.get('creativeSeed')
         if not isinstance(products, list) or not all(isinstance(product, dict) for product in products):
@@ -1103,8 +1238,87 @@ class StudioCatalogGenerateView(APIView):
             first_cat = products[0].get("category") or "Produtos"
             prompt = f"Catálogo comercial para a linha {first_cat} com {len(products)} itens cadastrados."
 
+        brand = None
+        brand_context = None
+        brand_id = request.data.get('brand_id', request.data.get('brand'))
+        source_catalog_id = request.data.get('catalog_id')
+        if brand_id or source_catalog_id:
+            if not request.user or not request.user.is_authenticated:
+                raise NotAuthenticated('Entre na sua conta para utilizar uma marca persistida.')
+            from api.services.brand_intelligence import (
+                BrandContextResolver, snapshot_hash, assert_organization_access,
+            )
+            if source_catalog_id:
+                try:
+                    source_catalog = _studio_catalogs_for(request.user).filter(pk=source_catalog_id).first()
+                except (ValueError, TypeError):
+                    raise ValidationError({'catalog_id': 'Identificador de catálogo inválido.'})
+                if source_catalog is None:
+                    raise NotFound('Catálogo não encontrado.')
+                _assert_brand_catalog_write(request.user, source_catalog)
+                if brand_id and str(source_catalog.brand_id) != str(brand_id):
+                    raise ValidationError({'brand': 'A marca deve corresponder à identidade histórica do catálogo.'})
+                if request.data.get('organization') is not None and str(source_catalog.organization_id) != str(request.data['organization']):
+                    raise ValidationError({'organization': 'A organização deve corresponder ao catálogo.'})
+                brand = source_catalog.brand
+                if brand:
+                    brand_context = copy.deepcopy(source_catalog.brand_snapshot)
+                    if not brand_context:
+                        raise ValidationError({'catalog_id': 'O catálogo não possui identidade histórica persistida.'})
+            else:
+                brand = _requested_brand(request.user, request.data)
+                brand_context = BrandContextResolver.resolve(brand, products=products, user_request=prompt)
+            if brand:
+                assert_organization_access(request.user, brand.organization, write=True)
+                # Preserve the exact version resolved before an expensive AI request.
+                captured_hash = snapshot_hash(brand_context)
+                captured_version = brand_context['meta']['brand_version']
+                check_catalog_creation_guard(request.user)
+
         try:
-            result = generate_catalog_from_gemini(prompt=prompt, products=products, creative_seed=creative_seed)
+            kwargs = {'prompt': prompt, 'products': products, 'creative_seed': creative_seed}
+            if brand_context is not None:
+                kwargs['brand_context'] = copy.deepcopy(brand_context)
+            result = generate_catalog_from_gemini(**kwargs)
+            if brand:
+                # The backend owns the snapshot and persists the generated draft in one transaction.
+                # A later Brand edit or a client-supplied snapshot cannot alter this catalog.
+                palette = result.get('palette') if isinstance(result.get('palette'), dict) else {}
+                pages = result.get('pages')
+                if not isinstance(pages, list) or not all(isinstance(page, dict) for page in pages):
+                    raise ValueError('Generation returned an invalid page envelope.')
+                with transaction.atomic():
+                    catalog = StudioCatalog.objects.create(
+                        title=str(result.get('title') or 'Novo Catálogo')[:255],
+                        created_by=request.user, organization=brand.organization, brand=brand,
+                        brand_name=brand_context['identity']['name'], brand_version=captured_version,
+                        brand_snapshot=brand_context, brand_snapshot_hash=captured_hash,
+                        palette_data=palette, total_pages=len(pages),
+                        primary_color=palette.get('primary', '#111827'),
+                        secondary_color=palette.get('background', '#FFFFFF'),
+                        accent_color=palette.get('accent', '#6366f1'),
+                        generation_metadata={
+                            'qualityGate': copy.deepcopy(result.get('qualityGate')),
+                            'generationStatus': result.get('generationStatus'),
+                        },
+                    )
+                    CatalogSpread.objects.bulk_create([
+                        CatalogSpread(
+                            catalog=catalog, spread_index=index // 2,
+                            title=f'Spread {index + 1}–{min(index + 2, len(pages))}',
+                            left_page_elements=[pages[index]],
+                            right_page_elements=[pages[index + 1]] if index + 1 < len(pages) else [],
+                        ) for index in range(0, len(pages), 2)
+                    ])
+                    ChatThread.objects.create(catalog=catalog, user=request.user, title=f'Chat: {catalog.title}'[:255])
+                result.update({
+                    'studioCatalogId': str(catalog.pk), 'brandId': str(brand.pk),
+                    'brandVersion': captured_version, 'brandSnapshot': copy.deepcopy(brand_context),
+                    'brandSnapshotHash': captured_hash,
+                })
+                logger.info('Brand generation brand_id=%s version=%s snapshot_hash=%s schema=%s guidelines=%s assets=%s',
+                            brand.pk, captured_version, captured_hash, brand_context['meta'].get('schema_version'),
+                            len(brand_context.get('guidelines', [])), len(brand_context.get('assets', [])))
             return Response(result, status=status.HTTP_200_OK)
         except Exception as err:
             logger.error(f"[StudioCatalogGenerate] Falha ao gerar catalogo: {err}")
@@ -2362,6 +2576,13 @@ class StudioPublicCatalogView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        if catalog.generation_metadata:
+            gate = catalog.generation_metadata.get('qualityGate') or {}
+            if not (isinstance(gate, dict) and gate.get('passed') is True
+                    and gate.get('publishable') is True and gate.get('status') == 'passed'):
+                return Response({'error': 'Este catálogo requer revisão antes do compartilhamento.',
+                                 'code': 'brand_catalog_not_publishable'}, status=status.HTTP_403_FORBIDDEN)
+
         # Recupera as laminas ordenadas
         spreads_qs = catalog.spreads.all().order_by("spread_index")
         spreads_data = []
@@ -2390,4 +2611,3 @@ class StudioPublicCatalogView(APIView):
             "created_at": catalog.created_at.isoformat() if hasattr(catalog, "created_at") and catalog.created_at else None,
             "is_demo": False,
         }, status=status.HTTP_200_OK)
-

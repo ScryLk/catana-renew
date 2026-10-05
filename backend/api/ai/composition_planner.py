@@ -15,6 +15,7 @@ from .narrative_planner import PageNarrativePlan
 from .design_grammar import GenerativeBlock, GenerativeCompositionMeta, GenerativeGridSpec
 from .composition_mutator import fit_block_to_safe_area, DEFAULT_SAFE_AREA
 from .composition_candidates import CompositionCandidateGenerator
+from .constraint_engine import ConstraintEngine
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,8 @@ class CompositionPlanner:
         for b in winner_blocks:
             fit_block_to_safe_area(b.__dict__, cls.SAFE_AREA)
 
+        cls._place_brand_logo(winner_blocks, contract, page_dict, previous_pages or [], creative_seed)
+
         final_meta = GenerativeCompositionMeta(
             grid=GenerativeGridSpec(columns=grid_cols, rows=16, gutter=0.02),
             balance=balance,
@@ -119,6 +122,63 @@ class CompositionPlanner:
             "safeArea": cls.SAFE_AREA,
             "blocks": [b.to_dict() for b in winner_blocks],
         }
+
+    @classmethod
+    def _place_brand_logo(cls, blocks, contract, page, previous_pages, seed):
+        """Place a known asset only in collision-free space, never as a fixed page stamp."""
+        context = contract.brand_context
+        if not context or 'NO_IMAGES' in contract.constraints.negative:
+            return
+        from .visual_critic import VisualCritic
+        role = ConstraintEngine.brand_page_role(page.get('contentRole') or page.get('type'))
+        assets = ConstraintEngine.logo_assets(context)
+        # Prefer supplied variants; no remote image analysis/fetch is needed here.
+        rng = random.Random(seed + page.get('pageNumber', 1) * 709)
+        for asset in assets:
+            if not asset.get('width') or not asset.get('height'):
+                continue
+            policy = asset.get('policy') or {}
+            allowed = policy.get('allowed_page_roles') or ['cover', 'back_cover', 'institutional', 'one_pager']
+            if role not in [ConstraintEngine.brand_page_role(r) for r in allowed]:
+                continue
+            used = [b for p in previous_pages for b in p.get('blocks', []) if b.get('role') == 'brand_hallmark']
+            if len(used) >= ConstraintEngine.logo_maximum(policy, contract.output.page_count or len(previous_pages)+1):
+                continue
+            preferred_bg = policy.get('preferred_background', 'light')
+            background = page.get('backgroundColor', '#FFFFFF')
+            white_contrast = VisualCritic._calculate_color_contrast(background, '#FFFFFF')
+            if preferred_bg == 'light' and white_contrast > 2:
+                continue
+            if preferred_bg == 'dark' and white_contrast < 4.5:
+                continue
+            if isinstance(preferred_bg, str) and preferred_bg.startswith('#') and preferred_bg.lower() != background.lower():
+                continue
+            minimum = float(policy.get('minimum_width', 48))
+            minimum = minimum / 490 if minimum > 1 else minimum
+            width = max(minimum, .12 + rng.random() * .055)
+            if width > .30:
+                continue
+            height = width * 490 / 693 * asset['height'] / asset['width']
+            if height > .22 or width * height > .08:
+                continue
+            clearance = max(0, float(policy.get('safe_space', .5))) * min(width, height)
+            margin = .04 + clearance
+            positions = [(margin, margin), (1-margin-width, margin),
+                         (margin, 1-margin-height-.045), (1-margin-width, 1-margin-height-.045),
+                         ((1-width)/2, 1-margin-height-.045)]
+            rng.shuffle(positions)
+            # Previously used coordinates lose priority, preserving intentional brand presence.
+            positions.sort(key=lambda xy: any(abs(b.get('x',0)-xy[0]) < .03 and abs(b.get('y',0)-xy[1]) < .03 for b in used))
+            for x, y in positions:
+                collision = any(min(x+width+clearance, b.x+b.width) > max(x-clearance, b.x)
+                                and min(y+height+clearance, b.y+b.height) > max(y-clearance, b.y) for b in blocks)
+                if collision:
+                    continue
+                blocks.append(GenerativeBlock(id=f"p{page.get('pageNumber', 1)}-brand-logo", type='image',
+                              role='brand_hallmark', x=x, y=y, width=width, height=height,
+                              cropMode='contain', imageUrl=asset['url'], content=context.get('identity', {}).get('name', 'Marca'),
+                              colorToken='primary', opacity=1, rotation=0, zIndex=4))
+                return
 
     @classmethod
     def _dispatch_composition(

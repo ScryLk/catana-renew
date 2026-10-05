@@ -2,6 +2,11 @@ import { QualityGate, CatalogPageData, StudioPalette, STUDIO_PALETTE_PRESETS } f
 import { ChatAttachment } from '../store/studioStore';
 
 export interface GeneratedCatalogResult {
+  studioCatalogId?: string | number;
+  brandId?: string | null;
+  brandVersion?: number | null;
+  brandSnapshot?: Record<string, unknown> | null;
+  brandSnapshotHash?: string | null;
   qualityGate?: QualityGate;
   catalogId: string;
   title: string;

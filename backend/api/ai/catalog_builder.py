@@ -282,7 +282,7 @@ def _run_gemini_or_contingency_synthesis(prompt: str, clean_products: List[Dict[
     return synthesis_data
 
 
-def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, Any]]] = None, creative_seed: Optional[int] = None) -> Dict[str, Any]:
+def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, Any]]] = None, creative_seed: Optional[int] = None, brand_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Gera um catalogo editorial desacoplado e governado por restricoes via EditorialGenerationPipeline.
     Executa o fluxo completo de 12 camadas:
@@ -309,6 +309,7 @@ def generate_catalog_from_gemini(prompt: str, products: Optional[List[Dict[str, 
         products=clean_products,
         synthesis_generator_func=None,
         creative_seed=creative_seed,
+        brand_context=brand_context,
     )
 
     # 4. Enriquecimento dos metadados de conselho editorial e contingencia para compatibilidade total

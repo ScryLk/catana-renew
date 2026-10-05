@@ -50,10 +50,10 @@ class EditorialGenerationPipeline:
 
     @classmethod
     def execute(cls, prompt, products=None, attachments=None, synthesis_generator_func=None,
-                creative_seed=None, creativity_level=0.5):
+                creative_seed=None, creativity_level=0.5, brand_context=None):
         try:
             return cls._execute(prompt, products, attachments, synthesis_generator_func,
-                                creative_seed, creativity_level)
+                                creative_seed, creativity_level, brand_context)
         except Exception as exc:
             # A failed subsystem cannot turn a safe renderer fallback into approval.
             logger.error('[EditorialPipeline] Controlled failure: %s', type(exc).__name__)
@@ -62,6 +62,7 @@ class EditorialGenerationPipeline:
                 if product['id'] is None:
                     product['id'] = f'input-product-{idx + 1}'
             contract = RequirementParser.parse(prompt=prompt, products=clean, attachments=attachments)
+            contract = ConstraintEngine.apply_brand_context(contract, brand_context)
             slots = PageBudgetEngine.calculate_and_allocate_slots(contract, clean)
             pages = [{'id': f'fallback-p{i+1}', 'pageNumber':i+1, 'type':'single',
                       'renderMode':'legacy', 'blocks':[], 'products':copy.deepcopy(slot.allocated_products),
@@ -73,8 +74,9 @@ class EditorialGenerationPipeline:
                     for product in page['products']:
                         product['image'] = None
             seed = creative_seed if isinstance(creative_seed, int) else derive_creative_seed(prompt=prompt, products=clean)
-            fingerprint = compute_generation_fingerprint(prompt=prompt, products=clean, seed=seed)
-            return {'catalogId':'cat-' + fingerprint[:12], 'generationFingerprint':fingerprint,
+            fingerprint = compute_generation_fingerprint(prompt=prompt, products=clean, seed=seed,
+                                                         brand_snapshot_hash=ConstraintEngine.brand_snapshot_hash(brand_context) if brand_context else None)
+            fallback = {'catalogId':'cat-' + fingerprint[:12], 'generationFingerprint':fingerprint,
                     'title':'CATÁLOGO', 'category':'EDITORIAL', 'summary':'', 'reasoning':'Generation requires review.',
                     'initialPrompt':prompt, 'councilDelegations':[],
                     'palette':{'name':'Safe legacy', 'primary':'#141416','background':'#FFFFFF','accent':'#141416'},
@@ -83,6 +85,10 @@ class EditorialGenerationPipeline:
                                    'reasons':['GENERATION_SUBSYSTEM_FAILURE:' + type(exc).__name__]},
                     'observability':{'fallbackUsed':True, 'fallbackPages':list(range(1,len(pages)+1)),
                                      'qualityGateStatus':'blocked', 'runtimeSecurityPass':False}}
+            if brand_context and isinstance(exc, ValueError) and str(exc) in {'BRAND_FONT_CONFLICT', 'BRAND_PALETTE_CONFLICT'}:
+                fallback['qualityGate']['reasons'].append(str(exc))
+            cls._attach_brand_snapshot(fallback, brand_context)
+            return fallback
 
     @classmethod
     def _execute(
@@ -93,6 +99,7 @@ class EditorialGenerationPipeline:
         synthesis_generator_func: Optional[Any] = None,
         creative_seed: Optional[int] = None,
         creativity_level: float = 0.5,
+        brand_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Executa as etapas completas do pipeline generativo com validação, crítica e auto-reparo.
@@ -104,6 +111,7 @@ class EditorialGenerationPipeline:
         # ETAPA 1 & 2: INTENT PARSER & REQUIREMENT CONTRACT
         t0 = time.time()
         contract = RequirementParser.parse(prompt=prompt, products=products, attachments=attachments)
+        contract = ConstraintEngine.apply_brand_context(contract, brand_context)
         timings["requirement_parser_ms"] = int((time.time() - t0) * 1000)
 
         # ETAPA 3: CONSTRAINT ENGINE & FEASIBILITY CHECK
@@ -147,6 +155,7 @@ class EditorialGenerationPipeline:
             products=clean_products,
             seed=seed,
             constraints=contract.constraints.__dict__ if hasattr(contract.constraints, "__dict__") else {},
+            brand_snapshot_hash=ConstraintEngine.brand_snapshot_hash(brand_context) if brand_context else None,
         )
 
         # ETAPA 4: PAGE BUDGET ENGINE (Criação de N slots com orçamentos espaciais)
@@ -162,11 +171,26 @@ class EditorialGenerationPipeline:
 
         # ETAPA 6: CONTENT PLANNER (WHAT TO SAY)
         t0 = time.time()
+        synthesis_data = rag_context.get("synthesis_data")
+        if brand_context:
+            identity, tone = brand_context.get('identity', {}), brand_context.get('tone', {})
+            name = str(identity.get('name', '')).strip()[:180]
+            dimensions = tone.get('dimensions') or {}
+            tone_text = ConstraintEngine._rule_text(tone.get('text', ''))
+            summary = f"Portfólio {name}: seleção, especificações e atendimento comercial."
+            if dimensions.get('directness', 0) > .6 or any(word in tone_text for word in ['direto', 'objetivo', 'conciso']):
+                summary = f"{name}. Produtos, especificações e contato."
+            elif dimensions.get('formality', 0) > .6 or any(word in tone_text for word in ['formal', 'institucional']):
+                summary = f"Apresentação institucional do portfólio {name}, com informações comerciais e atendimento especializado."
+            for expression in tone.get('forbidden_expressions', []):
+                if isinstance(expression, str) and expression:
+                    summary = summary.replace(expression, '')
+            synthesis_data = {**(synthesis_data or {}), 'title': name or (synthesis_data or {}).get('title', 'Coleção Editorial'), 'summary': summary}
         content_plan = ContentPlanner.plan(
             contract=contract,
             slots=page_slots,
             products=clean_products,
-            synthesis_data=rag_context.get("synthesis_data"),
+            synthesis_data=synthesis_data,
         )
         timings["content_planner_ms"] = int((time.time() - t0) * 1000)
 
@@ -184,6 +208,7 @@ class EditorialGenerationPipeline:
             visual_dna=visual_dna,
             rag_context=rag_context,
             creative_seed=seed,
+            brand_context=brand_context,
         )
         timings["creative_director_ms"] = int((time.time() - t0) * 1000)
 
@@ -221,6 +246,7 @@ class EditorialGenerationPipeline:
             generation_fingerprint=gen_fingerprint,
             clean_products=clean_products,
         )
+        cls._attach_brand_snapshot(raw_document, brand_context)
         timings["composition_planner_ms"] = int((time.time() - t0) * 1000)
 
         # ETAPA 10: VALIDATOR (DETERMINÍSTICO, SEMÂNTICO E GEOMÉTRICO)
@@ -275,6 +301,7 @@ class EditorialGenerationPipeline:
             reasons.append('VISUAL_CRITIC_FAILED')
         if not runtime_passed:
             reasons.append('RUNTIME_SECURITY_FAILED')
+        cls._attach_brand_snapshot(final_doc, brand_context)
         final_doc['qualityGate'] = {
             'passed': gate_passed, 'publishable': gate_passed,
             'status': 'passed' if gate_passed else ('blocked' if not comm_passed or not runtime_passed or not final_val.passed else 'needs_review'),
@@ -377,6 +404,13 @@ class EditorialGenerationPipeline:
             },
         }
 
+        if brand_context:
+            final_doc["observability"].update({
+                "brandId": final_doc["brandId"], "brandVersion": final_doc["brandVersion"],
+                "brandSnapshotHash": final_doc["brandSnapshotHash"], "brandContextVersion": brand_context.get("meta", {}).get("schema_version", 1),
+                "brandGuidelineCount": len(brand_context.get("guidelines", [])), "brandAssetCount": len(brand_context.get("assets", [])),
+            })
+
         logger.info(
             f"[EditorialPipeline] Geração concluída em {elapsed_ms}ms com {len(final_doc.get('pages', []))} páginas "
             f"(EffectiveMode={effective_render_mode}, Seed={seed}, Novelty={final_doc['designSystem']['noveltyScore']:.2f}, "
@@ -384,6 +418,19 @@ class EditorialGenerationPipeline:
         )
 
         return final_doc
+
+    @classmethod
+    def _attach_brand_snapshot(cls, document, context):
+        if context:
+            metadata = context.get('meta', {})
+            document.update(brandId=metadata.get('brand_id') or context.get('identity', {}).get('id'),
+                            brandVersion=metadata.get('brand_version'),
+                            brandSnapshot=copy.deepcopy(context),
+                            brandSnapshotHash=ConstraintEngine.brand_snapshot_hash(context))
+            if 'observability' in document:
+                document['observability'].update(brandId=document['brandId'], brandVersion=document['brandVersion'],
+                                                 brandSnapshotHash=document['brandSnapshotHash'])
+        return document
 
     @classmethod
     def _generate_document(
@@ -443,6 +490,11 @@ class EditorialGenerationPipeline:
             bg_color = palette.get("primary", "#141416") if is_dark else palette.get("background", "#F6F5F2")
             text_color = palette.get("background", "#F6F5F2") if is_dark else palette.get("primary", "#141416")
             accent_color = palette.get("accent", "#C5A059")
+            if contract.brand_context:
+                choices = [text_color, palette.get('primary'), '#141416', '#FFFFFF', '#000000']
+                rules = ConstraintEngine.brand_rules(contract.brand_context)
+                text_color = next((color for color in choices if color and not ConstraintEngine.color_forbidden(color, rules)
+                                   and VisualCritic._calculate_color_contrast(bg_color, color) >= 4.5), text_color)
 
             # Canonical structural type expected by tests & studio
             if slot and slot.role == "one_pager":
@@ -480,6 +532,10 @@ class EditorialGenerationPipeline:
                 "blocks": [],
                 "negativeConstraints": list(contract.constraints.negative),
             }
+
+            if contract.brand_context and (page_type in {'backcover', 'back_cover'} or (p_narrative and p_narrative.content_role == 'closing')):
+                contact = contract.brand_context.get('identity', {}).get('commercial_contact', {})
+                page_obj['content'] = ' · '.join(str(contact[k])[:300] for k in ['whatsapp', 'email', 'website', 'instagram'] if contact.get(k))
 
             # Se houver textos verbatim do usuário
             if p_map.verbatim_blocks:

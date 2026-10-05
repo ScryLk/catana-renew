@@ -190,3 +190,24 @@ class CanViewResource(permissions.BasePermission):
                 return True
 
         return False
+
+
+class IsOrganizationResourceEditor(IsSedeEditor):
+    """Existing editor convention with read access and organization-owner exception."""
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return super().has_permission(request, view) or user.owned_organizations.exists()
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        organization = getattr(obj, 'organization', None)
+        if not user or not user.is_authenticated or organization is None:
+            return False
+        if user.is_superuser or organization.owner_id == user.pk:
+            return True
+        member = user.organizations.filter(pk=organization.pk).exists()
+        return member and (request.method in permissions.SAFE_METHODS or user.role in ('admin', 'editor'))

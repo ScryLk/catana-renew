@@ -84,11 +84,15 @@ class RequirementContract:
     constraints: ConstraintSet = field(default_factory=ConstraintSet)
     assets: AssetInventory = field(default_factory=AssetInventory)
     raw_prompt: str = ""
+    brand_context: Dict[str, Any] = field(default_factory=dict)
     detected_industry: str = "general_retail"
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializa o contrato para dicionário legível por JSON."""
-        return asdict(self)
+        result = asdict(self)
+        if not self.brand_context:
+            result.pop('brand_context')
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "RequirementContract":
@@ -106,5 +110,6 @@ class RequirementContract:
             constraints=ConstraintSet(**constraints_data) if isinstance(constraints_data, dict) else ConstraintSet(),
             assets=AssetInventory(**assets_data) if isinstance(assets_data, dict) else AssetInventory(),
             raw_prompt=data.get("raw_prompt", ""),
+            brand_context=data.get("brand_context", {}) if isinstance(data.get("brand_context", {}), dict) else {},
             detected_industry=data.get("detected_industry", "general_retail"),
         )

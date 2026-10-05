@@ -68,7 +68,10 @@ from .views_system_design import (
     StudioCustomAgentCreateDeleteView,
 )
 
+from .views_brand import BrandViewSet
+
 router = DefaultRouter()
+router.register(r'brands', BrandViewSet, basename='brand')
 router.register(r'users', UserViewSet)
 router.register(r'organizations', OrganizationViewSet)
 router.register(r'sedes', SedeViewSet)
