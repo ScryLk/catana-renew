@@ -1,7 +1,6 @@
 import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
-import { SignIn, SignUp } from '@clerk/clerk-react';
 import { useAuthStore } from '../../store/authStore';
 import { useStudioStore } from '../../store/studioStore';
 import { GoogleLoginButton } from './GoogleLoginButton';
@@ -10,14 +9,6 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
-
-const CLERK_PUBLISHABLE_KEY =
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
-  import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-const isClerkConfigured =
-  Boolean(CLERK_PUBLISHABLE_KEY) &&
-  (CLERK_PUBLISHABLE_KEY.startsWith('pk_test_') || CLERK_PUBLISHABLE_KEY.startsWith('pk_live_')) &&
-  !CLERK_PUBLISHABLE_KEY.includes('placeholder');
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -194,64 +185,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Lado Esquerdo - Area de Formulario */}
         <div className="w-full lg:w-5/12 p-7 sm:p-10 flex flex-col justify-center relative overflow-y-auto">
-          {isClerkConfigured ? (
-            <div className="flex flex-col items-center justify-center py-2 w-full">
-              <div className="mb-4 text-center">
-                <img
-                  src={isDark ? '/logo/catana_logo_white.png' : '/logo/catana_logo_dark.png'}
-                  alt="Catana"
-                  className="h-8 w-auto object-contain mx-auto mb-2"
-                />
-                <h2 className="text-xl font-bold tracking-tight mb-1">
-                  {isRegisterView ? 'Criar sua conta' : 'Acessar o Katana Studio'}
-                </h2>
-                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  Autenticação segura e criptografada.
-                </p>
-              </div>
-              {isRegisterView ? (
-                <SignUp
-                  routing="hash"
-                  signInUrl="#/login"
-                  fallbackRedirectUrl="/"
-                  forceRedirectUrl="/"
-                  appearance={{
-                    elements: {
-                      rootBox: 'w-full',
-                      card: 'bg-transparent shadow-none border-0 p-0 w-full',
-                      header: 'hidden',
-                      headerTitle: 'hidden',
-                      headerSubtitle: 'hidden',
-                      footer: 'bg-transparent border-0 shadow-none',
-                      footerAction: 'bg-transparent border-0',
-                      footerPages: 'bg-transparent border-0',
-                    },
-                  }}
-                />
-              ) : (
-                <SignIn
-                  routing="hash"
-                  signUpUrl="#/register"
-                  fallbackRedirectUrl="/"
-                  forceRedirectUrl="/"
-                  appearance={{
-                    elements: {
-                      rootBox: 'w-full',
-                      card: 'bg-transparent shadow-none border-0 p-0 w-full',
-                      header: 'hidden',
-                      headerTitle: 'hidden',
-                      headerSubtitle: 'hidden',
-                      footer: 'bg-transparent border-0 shadow-none',
-                      footerAction: 'bg-transparent border-0',
-                      footerPages: 'bg-transparent border-0',
-                    },
-                  }}
-                />
-              )}
-            </div>
-          ) : (
-            <>
-              {/* Cabecalho e Logotipo Cursivo Oficial */}
+          {/* Cabecalho e Logotipo Cursivo Oficial */}
               <div className="mb-5 text-center">
                 <div className="flex justify-center mb-3">
                   <img
@@ -626,8 +560,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   )}
                 </p>
               </div>
-            </>
-          )}
         </div>
 
         {/* Lado Direito - Vitrine dos Multi-Agentes de IA */}
