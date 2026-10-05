@@ -134,6 +134,27 @@ class VisualDNABuilder:
             drama_target = max(drama_target, 0.75)
             crop_target = max(crop_target, 0.60)
 
+        # Brand baseline anchors expression while the brief and creative seed retain variation.
+        baseline = contract.brand_context.get('visual_dna', {})
+        def anchored(name, value):
+            supplied = baseline.get(name)
+            if not isinstance(supplied, (int, float)) or isinstance(supplied, bool) or not 0 <= supplied <= 1:
+                return value
+            return .65 * supplied + .35 * value
+        base_density = anchored('density', base_density)
+        base_whitespace = anchored('whitespace', base_whitespace)
+        base_symmetry = anchored('symmetry', base_symmetry)
+        base_energy = anchored('visual_energy', base_energy)
+        base_grid = anchored('grid_rigidity', base_grid)
+        base_image = anchored('image_dominance', base_image)
+        drama_target = anchored('typographic_drama', drama_target)
+        decor_target = anchored('decorative_intensity', decor_target)
+        scale_contrast_target = anchored('scale_contrast', scale_contrast_target)
+        crop_target = anchored('crop_aggressiveness', crop_target)
+        from .constraint_engine import ConstraintEngine
+        if ConstraintEngine.brand_rules(contract.brand_context)['prefer_whitespace']:
+            base_whitespace = max(base_whitespace, .60)
+
         # 3. Influência do Creative Seed (variação controlada proporcional a creativity_level)
         # Variance scale: de +/- 0.05 (conservador) a +/- 0.25 (experimental)
         variance = 0.05 + (creativity_level * 0.20)

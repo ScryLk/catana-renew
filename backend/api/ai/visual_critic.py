@@ -11,6 +11,7 @@ import logging
 from .requirement_contract import RequirementContract
 from .novelty_engine import NoveltyEngine, PageFingerprint
 from .visual_dna import VisualDNA
+from .constraint_engine import ConstraintEngine
 
 logger = logging.getLogger(__name__)
 
@@ -191,8 +192,17 @@ class VisualCritic:
         if legibility_metric < .5:
             cliches.append('INSUFFICIENT_LEGIBILITY')
 
+        brand_errors = ConstraintEngine.validate_brand_expression(contract, document)
+        if brand_errors:
+            cliches.extend(brand_errors)
+            recommendations.append('Revisar a identidade confirmada e a política dos ativos da marca.')
+        logo_positions = [(round(b.get('x', 0), 2), round(b.get('y', 0), 2))
+                          for p in pages for b in p.get('blocks', []) if b.get('role') == 'brand_hallmark']
+        if len(logo_positions) >= 3 and len(set(logo_positions)) == 1:
+            cliches.append('BRAND_IDENTICAL_LOGO_PLACEMENT')
+            generic_risk_score += .35
         final_risk = round(min(1.0, generic_risk_score), 3)
-        passed = final_risk < cls.GENERIC_RISK_THRESHOLD and contrast_ratio >= 4.5 and legibility_metric >= .5
+        passed = final_risk < cls.GENERIC_RISK_THRESHOLD and contrast_ratio >= 4.5 and legibility_metric >= .5 and not brand_errors
 
         logger.info(
             f"[VisualCritic] Auditoria concluída: generic_risk={final_risk:.2f}, "
@@ -201,7 +211,7 @@ class VisualCritic:
 
         return VisualCriticReport(
             contrast_ratio=round(contrast_ratio, 3),
-            diagnostics={"pages": page_metrics},
+            diagnostics={"pages": page_metrics, **({"brandPolicyErrors": brand_errors} if contract.brand_context else {})},
             hierarchy=hierarchy_metric,
             legibility=legibility_metric,
             rhythm=rhythm_metric,

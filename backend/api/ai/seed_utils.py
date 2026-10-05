@@ -59,6 +59,7 @@ def compute_generation_fingerprint(
     products: Optional[List[Dict[str, Any]]] = None,
     constraints: Optional[Dict[str, Any]] = None,
     engine_version: str = "2.0.0-generative",
+    brand_snapshot_hash: Optional[str] = None,
 ) -> str:
     """
     Calcula a impressão digital criptográfica imutável da geração (generationFingerprint).
@@ -75,4 +76,6 @@ def compute_generation_fingerprint(
         f"prods={serialized_prods}\n"
         f"constraints={serialized_constraints}"
     )
+    if brand_snapshot_hash:
+        payload += "\nbrand=" + brand_snapshot_hash
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()

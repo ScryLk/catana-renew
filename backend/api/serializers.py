@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from .services.brand_intelligence import (assert_organization_access, bind_catalog_brand, visible_organizations)
+from django.db import transaction
 from .models import (
     User, Product, Media, MediaFolder, Theme, Catalog, Page, Component, PageComponent, Comment, Activity, Organization, Sede, SedeSharing, Category, UserPreferences, Conversation, Message, Notification, ProductMedia,
     PublicProfile, ProfileFollow, ProfileSave, CatalogLike, CatalogView, BlockedUser
@@ -93,6 +95,24 @@ class ProductSerializer(serializers.ModelSerializer):
             return obj.saves.filter(id=request.user.id).exists()
         return False
 
+    def validate(self, attrs):
+        if self.instance is not None and self.instance.brand_id:
+            assert_organization_access(self.context['request'].user, self.instance.brand.organization, write=True)
+        brand = attrs.get('brand', getattr(self.instance, 'brand', None))
+        organization = attrs.get('organization', getattr(self.instance, 'organization', None))
+        if brand:
+            assert_organization_access(self.context['request'].user, brand.organization, write=True)
+            if organization is None or organization.pk != brand.organization_id:
+                raise serializers.ValidationError({'brand': 'Marca e produto devem pertencer à mesma organização.'})
+            category = attrs.get('category', getattr(self.instance, 'category', None))
+            if category and category.organization_id != brand.organization_id:
+                raise serializers.ValidationError({'category': 'Categoria e produto devem pertencer à mesma organização.'})
+            for field in ('image', 'cover_image'):
+                media = attrs.get(field, getattr(self.instance, field, None))
+                if media and media.organization_id != brand.organization_id:
+                    raise serializers.ValidationError({field: 'Imagem e produto devem pertencer à mesma organização.'})
+        return attrs
+
     def validate_specs(self, value):
         # DIV-07: specs é uma lista de especificações.
         if not isinstance(value, list):
@@ -135,6 +155,16 @@ class MediaSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['uploaded_by']
 
+    def validate(self, attrs):
+        if self.instance is not None and self.instance.brand_assets.exists():
+            user = self.context['request'].user
+            assert_organization_access(user, self.instance.organization, write=True)
+            if 'organization' in attrs and (attrs['organization'] is None or attrs['organization'].pk != self.instance.organization_id):
+                raise serializers.ValidationError({'organization': 'Ativos de marca não podem ser transferidos de organização.'})
+            if 'file' in attrs:
+                raise serializers.ValidationError({'file': 'Envie um novo ativo para preservar as versões anteriores.'})
+        return attrs
+
 class ThemeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Theme
@@ -166,7 +196,47 @@ class CatalogSerializer(serializers.ModelSerializer):
     class Meta:
         model = Catalog
         fields = '__all__'
-        read_only_fields = ['created_by', 'created_at', 'updated_at']
+        read_only_fields = ['created_by', 'created_at', 'updated_at', 'brand_version', 'brand_snapshot', 'brand_snapshot_hash']
+
+    def validate(self, attrs):
+        if self.instance is not None and self.instance.brand_id:
+            assert_organization_access(self.context['request'].user, self.instance.brand.organization, write=True)
+        brand = attrs.get('brand', getattr(self.instance, 'brand', None))
+        organization = attrs.get('organization', getattr(self.instance, 'organization', None))
+        if brand:
+            assert_organization_access(self.context['request'].user, brand.organization, write=True)
+            if organization is None or organization.pk != brand.organization_id:
+                raise serializers.ValidationError({'brand': 'Marca e catálogo devem pertencer à mesma organização.'})
+            if self.instance is not None and self.instance.brand_snapshot and self.instance.brand_id != brand.pk:
+                raise serializers.ValidationError({'brand': 'A identidade histórica requer atualização explícita.'})
+        elif self.instance is not None and self.instance.brand_snapshot and 'brand' in attrs:
+            raise serializers.ValidationError({'brand': 'A identidade histórica deve ser preservada.'})
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        catalog = super().create(validated_data)
+        if catalog.brand:
+            bind_catalog_brand(catalog, catalog.brand, self.context['request'].user)
+            catalog.save(update_fields=['brand_version', 'brand_snapshot', 'brand_snapshot_hash'])
+        return catalog
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        catalog = super().update(instance, validated_data)
+        if catalog.brand and not catalog.brand_snapshot:
+            bind_catalog_brand(catalog, catalog.brand, self.context['request'].user)
+            catalog.save(update_fields=['brand_version', 'brand_snapshot', 'brand_snapshot_hash'])
+        return catalog
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        private = request is not None and request.user.is_authenticated and instance.organization_id is not None and visible_organizations(request.user).filter(pk=instance.organization_id).exists()
+        if self.context.get('public_brand_fields') or not private:
+            for key in ('brand', 'brand_version', 'brand_snapshot', 'brand_snapshot_hash'):
+                data.pop(key, None)
+        return data
 
     def get_cover_image(self, obj):
         # Primeiro tenta usar a capa definida no catálogo

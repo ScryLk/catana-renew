@@ -13,6 +13,7 @@ from .visual_dna import VisualDNA
 from .content_planner import DocumentContentPlan
 from .font_registry import ALL_VERIFIED_FONTS, DEFAULT_FONT_REGISTRY, load_font_registry
 from .rag_principle_extractor import RAGPrincipleExtractor
+from .constraint_engine import ConstraintEngine
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +37,13 @@ class CreativeDirection:
     avoid: List[str] = field(default_factory=list)
     font_pairing: Dict[str, str] = field(default_factory=dict)
     palette_behavior: Dict[str, str] = field(default_factory=dict)
+    brand_voice: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        result = asdict(self)
+        if not self.brand_voice:
+            result.pop('brand_voice')
+        return result
 
 
 class CreativeDirector:
@@ -99,11 +104,14 @@ class CreativeDirector:
         visual_dna: VisualDNA,
         rag_context: Optional[Dict[str, Any]] = None,
         creative_seed: int = 42,
+        brand_context: Optional[Dict[str, Any]] = None,
     ) -> CreativeDirection:
         """Elabora a direção criativa combinatória para o catálogo."""
         load_font_registry()  # An unavailable/corrupt canonical registry fails closed.
         rng = random.Random(creative_seed)
         negatives = set(contract.constraints.negative)
+        brand_context = brand_context or contract.brand_context
+        brand_rules = ConstraintEngine.brand_rules(brand_context)
 
         # 1. Extração de princípios via RAGPrincipleExtractor
         rag_principles = RAGPrincipleExtractor.extract_principles(rag_context)
@@ -149,6 +157,8 @@ class CreativeDirector:
             typo_pool = ["disciplined_grotesque", "heavy_sans_against_mono"]
         else:
             typo_pool = cls.TYPOGRAPHIC_STRATEGIES
+        if brand_rules['avoid_serif']:
+            typo_pool = [t for t in typo_pool if 'serif' not in t and 'didone' not in t] or ['disciplined_grotesque']
         typo_beh = rng.choice(typo_pool)
 
         # 2.6 Linguagem Gráfica e Ornamentos
@@ -208,6 +218,24 @@ class CreativeDirector:
 
         metadata_font = rng.choice(mono_options)
 
+        if brand_context:
+            fonts = brand_context.get('typography') or {}
+            safe_sans = [f for f in sans_options if not ConstraintEngine.font_forbidden(f, brand_rules)]
+            if not safe_sans:
+                raise ValueError('BRAND_FONT_CONFLICT')
+            for role, key in [('display', 'heading_font'), ('body', 'body_font')]:
+                requested = fonts.get(key)
+                if requested in ALL_VERIFIED_FONTS and not ConstraintEngine.font_forbidden(requested, brand_rules):
+                    if role == 'display': display_font = requested
+                    else: body_font = requested
+            if ConstraintEngine.font_forbidden(display_font, brand_rules): display_font = rng.choice(safe_sans)
+            if ConstraintEngine.font_forbidden(body_font, brand_rules): body_font = rng.choice(safe_sans)
+            if ConstraintEngine.font_forbidden(metadata_font, brand_rules): metadata_font = rng.choice(safe_sans)
+            if brand_rules['required_font']:
+                if ConstraintEngine.font_forbidden(brand_rules['required_font'], brand_rules):
+                    raise ValueError('BRAND_FONT_CONFLICT')
+                display_font = body_font = metadata_font = brand_rules['required_font']
+
         font_pairing = {
             "display": display_font,
             "body": body_font,
@@ -227,6 +255,12 @@ class CreativeDirector:
             dominant_tone = rng.choice(["deep_slate_cyan", "monochrome_steel", "pure_graphite"])
         else:
             dominant_tone = rng.choice(["organic_stone", "editorial_alabaster", "graphite_linen"])
+
+        if 'gold' in brand_rules['forbidden_colors'] and dominant_tone == 'noir_and_gold':
+            dominant_tone = 'pure_graphite'
+        if brand_context:
+            avoid.extend(str(g.get('rule', ''))[:240] for g in brand_context.get('negative_constraints', [])
+                         if g.get('status') in {'confirmed', 'user_supplied'})
 
         palette_behavior = {
             "contrast_strategy": "high_contrast_editorial" if visual_dna.contrast_ratio > 0.6 else "harmonious_soft",
@@ -248,4 +282,5 @@ class CreativeDirector:
             avoid=avoid,
             font_pairing=font_pairing,
             palette_behavior=palette_behavior,
+            brand_voice=brand_context.get('tone', {}) if brand_context else {},
         )

@@ -9,6 +9,7 @@ import logging
 from .requirement_contract import RequirementContract
 from .content_planner import DocumentContentPlan, PageContentPlan
 from .style_interpreter import StyleInterpreter
+from .constraint_engine import ConstraintEngine
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +158,8 @@ class DesignPlanner:
             "accent": "#C5A059" if contract.design.allowed_color_space != "monochrome" else "#141416",
             "muted": "#71717A",
         }
+
+        palette_spec = ConstraintEngine.brand_palette(palette_spec, contract.brand_context)
 
         return DocumentDesignPlan(
             layout_archetype=style_info["macro_structure"],

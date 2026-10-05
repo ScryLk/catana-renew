@@ -13,6 +13,7 @@ import { organizationService } from '@/services/organizationService';
 import type { Organization, Sede } from '@/types/api';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useStudioStore } from '@/store/studioStore';
 
 export const ContextSelector: FC = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -68,6 +69,9 @@ export const ContextSelector: FC = () => {
 
   const handleSelectOrganization = (org: Organization) => {
     localStorage.setItem('active_organization', JSON.stringify(org));
+    // Clear the old tenant immediately, before the context reload is scheduled.
+    const studio = useStudioStore.getState();
+    studio.setActiveUserId(studio.activeUserId);
     setActiveOrg(org);
 
     // Auto-select default sede if available

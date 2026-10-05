@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from .requirement_contract import RequirementContract
 from .design_grammar import validate_runtime_block
+from .constraint_engine import ConstraintEngine
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,8 @@ class GenerationValidator:
     ) -> ValidationResult:
         """Executa a bateria completa de validações determinísticas e semânticas."""
         res = ValidationResult()
+        for error in ConstraintEngine.validate_brand_expression(contract, document):
+            res.add_error(error)
 
         pages = []
         for raw_page in document.get("pages", []):

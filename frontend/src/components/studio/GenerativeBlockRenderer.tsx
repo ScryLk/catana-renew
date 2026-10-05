@@ -70,7 +70,8 @@ export const GenerativeBlockRenderer: React.FC<GenerativeBlockRendererProps> = (
 
   // 1. Bloco de Imagem de Produto / Fotografia com URL Sanitizada (Item 50)
   if (block.type === 'product_image' || block.type === 'image') {
-    const objectFit = block.cropMode === 'contain' ? 'contain' : 'cover';
+    const isBrandAsset = ['brand_hallmark', 'brand_logo', 'logo', 'brand_asset'].includes(block.role || '');
+    const objectFit = isBrandAsset || block.cropMode === 'contain' ? 'contain' : 'cover';
     const hasValidImage = isSafeImageUrl(block.imageUrl);
 
     return (
@@ -88,7 +89,7 @@ export const GenerativeBlockRenderer: React.FC<GenerativeBlockRendererProps> = (
           <img
             src={block.imageUrl}
             alt={String(block.content || 'Editorial element')}
-            className="w-full h-full object-center transition-transform duration-500 group-hover:scale-105"
+            className={`w-full h-full object-center${isBrandAsset ? '' : ' transition-transform duration-500 group-hover:scale-105'}`}
             style={{ objectFit }}
             loading="lazy"
           />

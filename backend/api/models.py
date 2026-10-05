@@ -1,4 +1,6 @@
+import uuid
 from django.contrib.auth.models import AbstractUser
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 
 class Organization(models.Model):
@@ -149,6 +151,7 @@ class Category(models.Model):
         return self.name
 
 class Product(models.Model):
+    brand = models.ForeignKey('Brand', on_delete=models.PROTECT, null=True, blank=True, related_name='products')
     name = models.CharField(max_length=255)
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -204,6 +207,10 @@ class Theme(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 class Catalog(models.Model):
+    brand = models.ForeignKey('Brand', on_delete=models.PROTECT, null=True, blank=True, related_name='catalogs')
+    brand_version = models.PositiveIntegerField(null=True, blank=True)
+    brand_snapshot = models.JSONField(default=dict, blank=True)
+    brand_snapshot_hash = models.CharField(max_length=64, blank=True)
     title = models.CharField(max_length=255)
     description = models.TextField()
     cover_image = models.ForeignKey(Media, on_delete=models.SET_NULL, null=True, blank=True, related_name='catalog_covers')
@@ -668,6 +675,11 @@ class StudioCatalog(models.Model):
     """
     Catalogo interativo do Studio com suporte a spreads e geracao por IA
     """
+    brand = models.ForeignKey('Brand', on_delete=models.PROTECT, null=True, blank=True, related_name='studio_catalogs')
+    brand_version = models.PositiveIntegerField(null=True, blank=True)
+    brand_snapshot = models.JSONField(default=dict, blank=True)
+    brand_snapshot_hash = models.CharField(max_length=64, blank=True)
+    generation_metadata = models.JSONField(default=dict, blank=True)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     brand_name = models.CharField(max_length=255, blank=True, null=True)
@@ -827,3 +839,99 @@ class UserCustomAgent(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.role}) - {self.user.username}"
+
+
+class Brand(models.Model):
+    """Customer-owned identity; interpreted proposals live separately in intelligence."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='brands')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_brands')
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255, blank=True)
+    description = models.TextField(blank=True)
+    segment = models.CharField(max_length=255, blank=True)
+    website = models.URLField(max_length=2048, blank=True)
+    logo_url = models.TextField(blank=True)
+    palette_name = models.CharField(max_length=255, blank=True)
+    custom_palette = models.JSONField(default=dict, blank=True)
+    colors = models.JSONField(default=list, blank=True)
+    typography = models.JSONField(default=dict, blank=True)
+    visual_dna = models.JSONField(default=dict, blank=True)
+    tone_of_voice = models.TextField(blank=True)
+    commercial_contact = models.JSONField(default=dict, blank=True)
+    brand_markdown = models.TextField(blank=True)
+    intelligence = models.JSONField(default=dict, blank=True)
+    intelligence_fingerprint = models.CharField(max_length=64, blank=True)
+    status = models.CharField(max_length=20, choices=[('active', 'Active'), ('archived', 'Archived')], default='active')
+    current_version = models.PositiveIntegerField(default=0)
+    legacy_id = models.CharField(max_length=255, blank=True)
+    legacy_source = models.JSONField(default=dict, blank=True)
+    migration_version = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name', 'id']
+        constraints = [models.UniqueConstraint(fields=['organization', 'created_by', 'legacy_id'], condition=~models.Q(legacy_id=''), name='brand_legacy_owner_unique')]
+
+    def __str__(self):
+        return self.name
+
+
+class BrandVersion(models.Model):
+    brand = models.ForeignKey(Brand, on_delete=models.PROTECT, related_name='versions')
+    number = models.PositiveIntegerField()
+    snapshot = models.JSONField(default=dict)
+    snapshot_hash = models.CharField(max_length=64)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            from django.core.exceptions import ValidationError
+            raise ValidationError('As versões de marca são imutáveis.')
+        return super().save(*args, **kwargs)
+
+    class Meta:
+        ordering = ['-number']
+        constraints = [models.UniqueConstraint(fields=['brand', 'number'], name='brand_version_number_unique')]
+
+
+class BrandAsset(models.Model):
+    ASSET_TYPES = [(kind, kind) for kind in ('logo_primary', 'logo_horizontal', 'logo_vertical', 'symbol', 'wordmark', 'logo_monochrome', 'brand_manual', 'moodboard', 'institutional_image', 'font_reference', 'brand_document')]
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='assets')
+    media = models.ForeignKey(Media, on_delete=models.PROTECT, related_name='brand_assets')
+    asset_type = models.CharField(max_length=40, choices=ASSET_TYPES)
+    active = models.BooleanField(default=True)
+    width = models.PositiveIntegerField(null=True, blank=True)
+    height = models.PositiveIntegerField(null=True, blank=True)
+    policy = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class BrandGuideline(models.Model):
+    STATUS_CHOICES = [(value, value) for value in ('user_supplied', 'inferred', 'confirmed', 'rejected')]
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='guidelines')
+    type = models.CharField(max_length=10, choices=[('MUST', 'Must'), ('PREFER', 'Prefer'), ('AVOID', 'Avoid')], default='PREFER')
+    category = models.CharField(max_length=40, default='other')
+    rule = models.TextField()
+    source = models.CharField(max_length=50, default='user_input')
+    source_text = models.TextField(blank=True)
+    confidence = models.FloatField(default=1, validators=[MinValueValidator(0), MaxValueValidator(1)])
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='user_supplied')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class BrandMemory(models.Model):
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='memories')
+    type = models.CharField(max_length=10, choices=[('MUST', 'Must'), ('PREFER', 'Prefer'), ('AVOID', 'Avoid')], default='PREFER')
+    category = models.CharField(max_length=40, default='other')
+    rule = models.TextField()
+    source = models.CharField(max_length=50, default='user_input')
+    confidence = models.FloatField(default=1, validators=[MinValueValidator(0), MaxValueValidator(1)])
+    status = models.CharField(max_length=20, choices=BrandGuideline.STATUS_CHOICES, default='user_supplied')
+    supporting_catalogs = models.ManyToManyField('StudioCatalog', blank=True, related_name='supported_brand_memories')
+    supporting_actions = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

@@ -4,6 +4,9 @@ import { create } from 'zustand';
 import axios from 'axios';
 import api, { getAuthToken, setInMemoryAccessToken } from '../services/api';
 import { toast } from 'sonner';
+import { brandService, catalogBrandSnapshot, groupBrandCatalogs, pendingLegacyBrands, readBrandCache, writeBrandCache } from '../services/brandService';
+import type { BrandAsset, BrandColor, BrandInference, BrandRule, BrandSnapshotState } from '../services/brandService';
+import { organizationService } from '../services/organizationService';
 import {
   CatalogPageData,
   ProductItem,
@@ -225,6 +228,14 @@ export interface RecentCatalogItem {
 
 export interface Brand {
   id: string;
+  organization?: number;
+  currentVersion?: number;
+  status?: string;
+  colors?: BrandColor[];
+  guidelines?: BrandRule[];
+  memories?: BrandRule[];
+  intelligence?: Record<string, BrandInference>;
+  assets?: BrandAsset[];
   name: string;
   segment?: string;
   logoUrl?: string;
@@ -465,6 +476,8 @@ export const saveStoredUnlinkedCatalogs = (catalogs: RecentCatalogItem[], userId
 
 export interface StoredProjectSession {
   qualityGate?: QualityGate;
+  brandContext?: BrandSnapshotState;
+  organization?: number | null;
   threads: ChatThread[];
   activeThreadId: string;
   catalogTitle?: string;
@@ -501,7 +514,11 @@ export const saveStoredProjectSession = (catalogId: string, session: StoredProje
   if (typeof window === 'undefined' || !catalogId) return;
   const uid = userId ?? getCurrentUserId();
   try {
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}${uid}_${catalogId}`, JSON.stringify(session));
+    const key = `${STORAGE_KEY_PREFIX}${uid}_${catalogId}`;
+    const previous = JSON.parse(localStorage.getItem(key) || '{}');
+    localStorage.setItem(key, JSON.stringify({...session,
+      brandContext: session.brandContext ?? previous.brandContext,
+      organization: session.organization ?? previous.organization}));
     localStorage.setItem(`katana_studio_last_active_catalog:${uid}`, catalogId);
     // Remove chaves legadas globais
     localStorage.removeItem(`${STORAGE_KEY_PREFIX}${catalogId}`);
@@ -522,6 +539,8 @@ export const syncActiveCatalogStorage = (state: {
   totalPages: number;
   activeUserId?: string | number | null;
   qualityGate?: QualityGate;
+  catalogBrandContext?: BrandSnapshotState;
+  activeOrganizationId?: number | null;
 }) => {
   if (typeof window === 'undefined' || !state.activeCatalogId) return;
   saveStoredProjectSession(state.activeCatalogId, {
@@ -532,6 +551,7 @@ export const syncActiveCatalogStorage = (state: {
     currentSpread: state.currentSpread,
     pages: state.pages,
     qualityGate: state.qualityGate,
+    brandContext: state.catalogBrandContext, organization: state.activeOrganizationId,
     totalPages: state.totalPages,
   }, state.activeUserId);
 };
@@ -608,11 +628,20 @@ export interface StudioState {
 
   // Brands / Marcas Management (Antigravity Projects style)
   brands: Brand[];
+  activeOrganizationId: number | null;
+  brandLoadStatus: 'idle' | 'loading' | 'ready' | 'error';
+  brandLoadError: string | null;
+  legacyBrandCount: number;
+  catalogBrandContext: BrandSnapshotState;
+  syncBrands: () => Promise<void>;
+  migrateLegacyBrands: () => Promise<void>;
+  decideBrandEvidence: (id: string, decision: Parameters<typeof brandService.decide>[1]) => Promise<void>;
+  addBrandRule: (id: string, kind: 'guidelines' | 'memories', rule: Omit<BrandRule, 'id'>) => Promise<void>;
   activeBrandId: string | null;
   setActiveBrandId: (id: string | null) => void;
-  addBrand: (data: Omit<Brand, 'id' | 'createdAt' | 'catalogs'>) => Brand;
-  updateBrand: (id: string, updates: Partial<Brand>) => void;
-  deleteBrand: (id: string) => void;
+  addBrand: (data: Omit<Brand, 'id' | 'createdAt' | 'catalogs'>) => Promise<Brand>;
+  updateBrand: (id: string, updates: Partial<Brand>) => Promise<void>;
+  deleteBrand: (id: string) => Promise<void>;
   isBrandModalOpen: boolean;
   brandModalEditingId: string | null;
   openBrandModal: (brandId?: string) => void;
@@ -875,6 +904,24 @@ const saveCustomRoles = (roles: StudioRole[], userId?: string | number | null) =
 };
 
 export const useStudioStore = create<StudioState>((rawSet, get) => {
+  let brandEpoch = 0;
+  let generationOperation = 0;
+  let spreadSaveOperation = 0;
+  const captureBrandScope = () => ({user: get().activeUserId, org: get().activeOrganizationId, epoch: brandEpoch});
+  const isCurrentBrandScope = (scope: ReturnType<typeof captureBrandScope>) => scope.user === get().activeUserId && scope.org === get().activeOrganizationId && scope.epoch === brandEpoch && scope.org === organizationService.getActiveOrganizationId();
+  const requireBrandScope = () => {
+    const scope = captureBrandScope();
+    if (scope.user == null || scope.user === 'anonymous' || scope.org == null || !isCurrentBrandScope(scope) || get().brandLoadStatus !== 'ready') throw new Error('Selecione uma organização e sincronize as marcas antes de salvar.');
+    return {...scope, user: scope.user as string | number, org: scope.org as number};
+  };
+  const acceptBrand = (brand: Brand, scope: ReturnType<typeof captureBrandScope>) => {
+    if (!isCurrentBrandScope(scope) || brand.organization !== scope.org) return false;
+    const previous = get().brands.find(item => item.id === brand.id);
+    const brands = previous ? get().brands.map(item => item.id === brand.id ? {...brand, catalogs: item.catalogs} : item) : [brand, ...get().brands];
+    set({brands});
+    writeBrandCache(scope.user!, scope.org!, brands);
+    return true;
+  };
   const set = (update: Partial<StudioState> | ((state: StudioState) => Partial<StudioState>)) => rawSet(state => {
     const next = typeof update === 'function' ? update(state) : update;
     if (!next.pages) return next;
@@ -993,21 +1040,17 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
   activeUserId: null,
   setActiveUserId: (userId) => {
-    const currentUid = get().activeUserId;
-    if (currentUid !== null && currentUid !== userId) {
+    const org = userId == null ? null : organizationService.getActiveOrganizationId();
+    if (get().activeUserId !== userId || get().activeOrganizationId !== org) {
       get().resetStudioState();
+      set({activeUserId: userId, activeOrganizationId: org,
+        brands: userId != null && org != null ? readBrandCache(userId, org) : [],
+        legacyBrandCount: userId != null && org != null ? pendingLegacyBrands(userId, org).length : 0});
     }
-    const uid = userId ?? 'anonymous';
-    const userBrands = getStoredBrands(uid);
-    const userUnlinked = getStoredUnlinkedCatalogs(uid);
-    set({
-      activeUserId: userId,
-      brands: userBrands,
-      unlinkedCatalogs: userUnlinked,
-      activeBrandId: userBrands[0]?.id || null,
-    });
   },
   resetStudioState: () => {
+    brandEpoch += 1;
+    generationOperation += 1;
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('katana_studio_last_active_catalog');
@@ -1017,6 +1060,8 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     }
     set({
       activeUserId: null,
+      activeOrganizationId: null, brandLoadStatus: 'idle', brandLoadError: null, legacyBrandCount: 0,
+      catalogBrandContext: catalogBrandSnapshot({}),
       hasStartedSession: false,
       activeCatalogId: null,
       catalogTitle: 'Novo Catálogo',
@@ -1043,46 +1088,72 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     });
   },
 
-  // Brands / Marcas Management (Antigravity Projects style)
-  brands: getStoredBrands(),
+  // Backend Brands are authoritative; the old browser shape is only an adapter.
+  brands: [],
+  activeOrganizationId: null,
+  brandLoadStatus: 'idle',
+  brandLoadError: null,
+  legacyBrandCount: 0,
+  catalogBrandContext: catalogBrandSnapshot({}),
   activeBrandId: null,
-  setActiveBrandId: (id) => set({ activeBrandId: id }),
-  addBrand: (data) => {
-    const newBrand: Brand = {
-      ...data,
-      id: `brand-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      catalogs: [],
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [newBrand, ...get().brands];
-    saveStoredBrands(updated, get().activeUserId);
-    set({
-      brands: updated,
-      activeBrandId: newBrand.id,
-      isBrandModalOpen: false,
-      brandModalEditingId: null,
-    });
-    toast.success(`Marca "${newBrand.name}" cadastrada com sucesso!`);
-    return newBrand;
+  setActiveBrandId: (id) => set({activeBrandId: id}),
+  syncBrands: async () => {
+    const scope = captureBrandScope();
+    if (scope.user == null || scope.org == null) {
+      set({brands: [], activeBrandId: null, brandLoadStatus: 'error', brandLoadError: 'Selecione uma organização para usar marcas persistentes.'});
+      return;
+    }
+    set({brandLoadStatus: 'loading', brandLoadError: null});
+    try {
+      const loaded = await brandService.list(scope.org);
+      if (!isCurrentBrandScope(scope)) return;
+      const brands = loaded.filter(brand => brand.organization === scope.org);
+      set({brands, brandLoadStatus: 'ready', brandLoadError: null,
+        activeBrandId: brands.some(brand => brand.id === get().activeBrandId && brand.status !== 'archived') ? get().activeBrandId : null,
+        legacyBrandCount: pendingLegacyBrands(scope.user, scope.org).length});
+      writeBrandCache(scope.user, scope.org, brands);
+    } catch {
+      if (isCurrentBrandScope(scope)) set({brandLoadStatus: 'error', brandLoadError: 'Não foi possível sincronizar as marcas. A cópia em cache é somente leitura.'});
+    }
   },
-  updateBrand: (id, updates) => {
-    const updated = get().brands.map((b) => (b.id === id ? { ...b, ...updates } : b));
-    saveStoredBrands(updated, get().activeUserId);
-    set({
-      brands: updated,
-      isBrandModalOpen: false,
-      brandModalEditingId: null,
-    });
+  migrateLegacyBrands: async () => {
+    const scope = requireBrandScope();
+    await brandService.migrate(scope.user, scope.org);
+    if (!isCurrentBrandScope(scope)) return;
+    await get().syncBrands();
+    if (isCurrentBrandScope(scope)) await get().syncUserCatalogs();
+  },
+  addBrand: async (data) => {
+    const scope = requireBrandScope();
+    const brand = await brandService.create(data, scope.org);
+    if (!acceptBrand(brand, scope)) throw new Error('O contexto mudou. A marca foi salva na organização original.');
+    set({activeBrandId: brand.id, isBrandModalOpen: false, brandModalEditingId: null});
+    toast.success(`Marca "${brand.name}" cadastrada com sucesso!`);
+    return brand;
+  },
+  updateBrand: async (id, updates) => {
+    const scope = requireBrandScope();
+    const brand = await brandService.update(id, updates, scope.org);
+    if (!acceptBrand(brand, scope)) return;
+    set({isBrandModalOpen: false, brandModalEditingId: null});
     toast.success('Marca atualizada com sucesso!');
   },
-  deleteBrand: (id) => {
-    const remaining = get().brands.filter((b) => b.id !== id);
-    saveStoredBrands(remaining, get().activeUserId);
-    set((s) => ({
-      brands: remaining,
-      activeBrandId: s.activeBrandId === id ? (remaining[0]?.id || null) : s.activeBrandId,
-    }));
-    toast.success('Marca removida.');
+  deleteBrand: async (id) => {
+    const scope = requireBrandScope();
+    await brandService.archive(id);
+    if (!isCurrentBrandScope(scope)) return;
+    set({activeBrandId: get().activeBrandId === id ? null : get().activeBrandId});
+    await get().syncBrands();
+    await get().syncUserCatalogs();
+    toast.success('Marca arquivada. O histórico dos catálogos foi preservado.');
+  },
+  decideBrandEvidence: async (id, decision) => {
+    const scope = requireBrandScope();
+    acceptBrand(await brandService.decide(id, decision), scope);
+  },
+  addBrandRule: async (id, kind, rule) => {
+    const scope = requireBrandScope();
+    acceptBrand(await brandService.addRule(id, kind, rule), scope);
   },
   isBrandModalOpen: false,
   brandModalEditingId: null,
@@ -1113,8 +1184,11 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   openNewCatalogModal: () => set({ isNewCatalogModalOpen: true }),
   closeNewCatalogModal: () => set({ isNewCatalogModalOpen: false }),
   createBlankCatalog: async (title, pagesCount = 6, paletteName) => {
+    const blankScope = captureBrandScope();
+    if (get().activeBrandId && get().brandLoadStatus !== 'ready') { toast.error('Sincronize a marca antes de criar este catálogo. Use Tentar novamente.'); return; }
     const catalogTitle = title?.trim() || 'Novo Catálogo';
     const activeBrand = get().brands.find((b) => b.id === get().activeBrandId);
+    if (activeBrand?.status === 'archived') { toast.error('Escolha uma marca ativa ou um catálogo avulso.'); return; }
     const palette =
       (paletteName && STUDIO_PALETTE_PRESETS.find((p) => p.name === paletteName)) ||
       activeBrand?.customPalette ||
@@ -1185,10 +1259,13 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
     let realCatalogId = tempId;
     let threadId = `thread-${Date.now()}`;
+    let blankBrandContext = catalogBrandSnapshot({});
     try {
       const res = await api.post('/api/v2/studio/catalogs/', {
         title: catalogTitle,
         brand_name: activeBrand?.name || '',
+        brand_id: get().brandLoadStatus === 'ready' ? activeBrand?.id || null : null,
+        organization: get().activeOrganizationId,
         style_preset: palette.name,
         primary_color: palette.primary,
         secondary_color: palette.background,
@@ -1197,13 +1274,17 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         brand_lock: Boolean(palette.locked),
         palette_data: palette,
       });
+      if (!isCurrentBrandScope(blankScope)) return;
       if (res.data && res.data.id) {
         realCatalogId = String(res.data.id);
+        blankBrandContext = catalogBrandSnapshot(res.data);
         if (res.data.thread_id) {
           threadId = `thread-${res.data.thread_id}`;
         }
       }
     } catch (e) {
+      if (!isCurrentBrandScope(blankScope)) return;
+      if (activeBrand) { toast.error('Não foi possível salvar o catálogo com a marca. Tente novamente.'); return; }
       console.warn('Falha ao persistir catalogo no backend, utilizando ID local:', e);
     }
 
@@ -1229,6 +1310,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     set({
       hasStartedSession: true,
       activeCatalogId: realCatalogId,
+      catalogBrandContext: blankBrandContext,
       catalogTitle,
       pages,
       totalPages: pagesCount,
@@ -1286,37 +1368,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       totalPages: pagesCount,
     });
 
-    const activeBrandId = get().activeBrandId;
-    if (activeBrandId) {
-      const updatedBrands = get().brands.map((b) => {
-        if (b.id === activeBrandId) {
-          return {
-            ...b,
-            catalogs: [
-              {
-                id: realCatalogId,
-                title: catalogTitle,
-                totalPages: pagesCount,
-                category: b.segment || 'Editorial',
-                updatedAt: 'Agora',
-              },
-              ...b.catalogs,
-            ],
-          };
-        }
-        return b;
-      });
-      saveStoredBrands(updatedBrands);
-      set({ brands: updatedBrands });
-    } else {
-      get().addUnlinkedCatalog({
-        title: catalogTitle,
-        totalPages: pagesCount,
-        category: 'Avulso',
-        updatedAt: 'Agora',
-        brandId: null,
-      });
-    }
+    await get().syncUserCatalogs();
 
     toast.success(`Catálogo "${catalogTitle}" pronto para edição!`);
   },
@@ -1564,6 +1616,12 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   lastGenerationPrompt: undefined,
 
   triggerCatalogGeneration: async (prompt: string, attachments?: ChatAttachment[], products?: ProductItem[]) => {
+    if (get().activeBrandId && get().brandLoadStatus !== 'ready') { toast.error('Sincronize a marca antes de gerar. Use Tentar novamente.'); return; }
+    if (get().brands.find(brand => brand.id === get().activeBrandId)?.status === 'archived') { toast.error('Escolha uma marca ativa ou um catálogo avulso.'); return; }
+    const generationScope = captureBrandScope();
+    const operation = ++generationOperation;
+    const generationIsCurrent = () => operation === generationOperation && isCurrentBrandScope(generationScope) && get().isGeneratingCatalog;
+    const generationBrandId = get().brandLoadStatus === 'ready' ? get().activeBrandId : null;
     const nowTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const shortPrompt = prompt.length > 55 ? `${prompt.slice(0, 52)}...` : prompt;
     const hasProducts = products && products.length > 0;
@@ -1588,7 +1646,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     });
 
     const timer2 = setTimeout(() => {
-      if (!get().isGeneratingCatalog) return;
+      if (!generationIsCurrent()) return;
       set((s) => ({
         generationStage: 2,
         generationProgress: 42,
@@ -1608,7 +1666,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     }, 800);
 
     const timer3 = setTimeout(() => {
-      if (!get().isGeneratingCatalog) return;
+      if (!generationIsCurrent()) return;
       set((s) => ({
         generationStage: 3,
         generationProgress: 68,
@@ -1628,14 +1686,14 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     try {
       const response = await api.post(
         `/api/v2/studio/catalogs/generate/`,
-        { prompt, products },
+        { prompt, products, brand_id: generationBrandId, organization: generationScope.org },
         { timeout: 60000 }
       );
 
       clearTimeout(timer2);
       clearTimeout(timer3);
 
-      if (!get().isGeneratingCatalog) return;
+      if (!generationIsCurrent()) return;
 
       const generated: GeneratedCatalogResult = normalizeCatalogDocument(response.data);
       if (!generated || !generated.pages || generated.pages.length === 0) {
@@ -1643,6 +1701,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       }
 
       generated.initialPrompt = prompt;
+      if (generated.studioCatalogId) generated.catalogId = String(generated.studioCatalogId);
 
       set((s) => ({
         generationStage: 4,
@@ -1669,7 +1728,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
       // Stage 5: Finalizacao e Auditoria
       setTimeout(() => {
-        if (!get().isGeneratingCatalog) return;
+        if (!generationIsCurrent()) return;
         set((s) => ({
           generationStage: 5,
           generationProgress: 98,
@@ -1686,7 +1745,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         }));
 
         setTimeout(() => {
-          if (!get().isGeneratingCatalog) return;
+          if (!generationIsCurrent()) return;
           get().finishCatalogGeneration();
         }, 600);
       }, 700);
@@ -1696,7 +1755,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       clearTimeout(timer2);
       clearTimeout(timer3);
 
-      if (!get().isGeneratingCatalog) return;
+      if (!generationIsCurrent()) return;
 
       const fallback = generateCatalogFromPrompt(prompt, attachments);
       fallback.initialPrompt = prompt;
@@ -1721,7 +1780,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       }));
 
       setTimeout(() => {
-        if (!get().isGeneratingCatalog) return;
+        if (!generationIsCurrent()) return;
         set((s) => ({
           generationStage: 5,
           generationProgress: 98,
@@ -1738,7 +1797,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         }));
 
         setTimeout(() => {
-          if (!get().isGeneratingCatalog) return;
+          if (!generationIsCurrent()) return;
           get().finishCatalogGeneration();
         }, 600);
       }, 700);
@@ -1746,6 +1805,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   },
 
   finishCatalogGeneration: () => {
+    const finishScope = captureBrandScope();
     let target = get().generationTargetCatalog;
     if (!target) {
       const fallbackPrompt = get().lastGenerationPrompt || 'Catalogo Editorial';
@@ -1792,6 +1852,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       generationProgress: 100,
       hasStartedSession: true,
       activeCatalogId: target.catalogId,
+      catalogBrandContext: catalogBrandSnapshot(target as unknown as Record<string, unknown>),
       catalogTitle: target.title,
       pages: target.pages,
       qualityGate: target.qualityGate,
@@ -1827,6 +1888,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     if (isNaN(numericTargetId)) {
       api.post('/api/v2/studio/catalogs/', {
         title: target.title,
+        organization: finishScope.org,
         brand_name: (target as any).brandName || target.category || '',
         style_preset: target.palette.name,
         primary_color: target.palette.primary,
@@ -1837,6 +1899,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         palette_data: target.palette,
         unassigned_products: get().unassignedProducts,
       }).then((res) => {
+        if (!isCurrentBrandScope(finishScope)) return;
         if (res.data && res.data.id) {
           const realId = String(res.data.id);
           set({ activeCatalogId: realId });
@@ -1866,42 +1929,13 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       }).catch((err) => console.warn('Falha ao criar catalogo gerado no backend:', err));
     }
 
-    const activeBrandId = get().activeBrandId;
-    if (activeBrandId) {
-      const updatedBrands = get().brands.map((b) => {
-        if (b.id === activeBrandId) {
-          return {
-            ...b,
-            catalogs: [
-              {
-                id: target.catalogId,
-                title: target.title,
-                totalPages: target.totalPages,
-                category: b.segment || target.category || 'Editorial',
-                updatedAt: 'Agora',
-              },
-              ...b.catalogs,
-            ],
-          };
-        }
-        return b;
-      });
-      saveStoredBrands(updatedBrands);
-      set({ brands: updatedBrands });
-    } else {
-      get().addUnlinkedCatalog({
-        title: target.title,
-        totalPages: target.totalPages,
-        category: target.category || 'Avulso',
-        updatedAt: 'Agora',
-        brandId: null,
-      });
-    }
+    void get().syncUserCatalogs();
 
     toast.success(`Catálogo "${target.title}" gerado com sucesso!`);
   },
 
   cancelCatalogGeneration: () => {
+    generationOperation += 1;
     set({
       isGeneratingCatalog: false,
       generationProgress: 0,
@@ -1914,6 +1948,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
   loadExistingCatalog: async (catalogId: string) => {
     const s = get();
+    const loadScope = captureBrandScope();
 
     // 1. Persiste o catálogo que está saindo se houver sessão ativa
     if (s.activeCatalogId && s.threads && s.threads.length > 0) {
@@ -1943,6 +1978,9 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         set({ agentStatus: 'thinking' });
         const res = await api.get(`/api/v2/studio/catalogs/${numericCatalogId}/`);
         const catData = res.data;
+        if (!isCurrentBrandScope(loadScope) || (s.activeOrganizationId != null && catData.organization != null && catData.organization !== s.activeOrganizationId)) {
+          set({agentStatus: 'idle'}); return;
+        }
         if (catData && catData.id) {
           const rawSpreads = Array.isArray(catData.spreads) ? catData.spreads : [];
           const hydratedPages: CatalogPageData[] = [];
@@ -1956,6 +1994,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
             const rightRaw = sp.right_page || (Array.isArray(sp.right_page_elements) && sp.right_page_elements[0]) || {};
 
             const leftPage: CatalogPageData = {
+              ...leftRaw,
               id: leftRaw.id || `p-${catData.id}-${leftPageNum}`,
               pageNumber: leftRaw.pageNumber || leftPageNum,
               type: leftRaw.type || (leftPageNum === 1 ? 'cover' : 'hero'),
@@ -1975,6 +2014,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
             };
 
             const rightPage: CatalogPageData = {
+              ...rightRaw,
               id: rightRaw.id || `p-${catData.id}-${rightPageNum}`,
               pageNumber: rightRaw.pageNumber || rightPageNum,
               type: rightRaw.type || (rightPageNum === (catData.total_pages || 6) ? 'backcover' : 'duo'),
@@ -2048,8 +2088,11 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
           set({
             hasStartedSession: true,
             activeCatalogId: String(catData.id),
+            catalogBrandContext: catalogBrandSnapshot(catData),
+            activeBrandId: catalogBrandSnapshot(catData).brandId,
             catalogTitle: catData.title,
             pages: hydratedPages.length > 0 ? hydratedPages : generateCatalogFromPrompt(catData.title).pages,
+            qualityGate: catData.qualityGate || undefined,
             totalPages: catData.total_pages || (hydratedPages.length > 0 ? hydratedPages.length : 6),
             activePalette: paletteToUse,
             currentSpread: [1, 2],
@@ -2068,6 +2111,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
             threads: threadsToUse,
             activeThreadId: activeThread.id,
             catalogTitle: catData.title,
+            brandContext: catalogBrandSnapshot(catData), organization: catData.organization, qualityGate: catData.qualityGate || undefined,
             activePalette: paletteToUse,
             currentSpread: [1, 2],
             pages: hydratedPages,
@@ -2110,6 +2154,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
     // 3. Tenta carregar a sessão persistida deste projeto isolada por usuário
     const existing = getStoredProjectSession(catalogId, s.activeUserId);
+    if (!isCurrentBrandScope(loadScope) || (s.activeOrganizationId != null && existing?.organization !== s.activeOrganizationId && /^\d+$/.test(catalogId))) { set({agentStatus: 'idle'}); return; }
 
     if (existing && existing.threads && existing.threads.length > 0) {
       const activeThread =
@@ -2126,6 +2171,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         hasStartedSession: true,
         catalogTitle: existing.catalogTitle || defaultTitle,
         activeCatalogId: catalogId,
+        catalogBrandContext: existing.brandContext || catalogBrandSnapshot({}),
         pages: pagesToUse,
         qualityGate: existing.qualityGate,
         totalPages: existing.totalPages || pagesToUse.length,
@@ -2145,6 +2191,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         catalogTitle: existing.catalogTitle || defaultTitle,
         activePalette: paletteToUse,
         currentSpread: existing.currentSpread || [1, 2],
+        brandContext: existing.brandContext, organization: existing.organization,
         pages: pagesToUse,
         qualityGate: existing.qualityGate,
         totalPages: existing.totalPages || pagesToUse.length,
@@ -2200,68 +2247,15 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   },
 
   syncUserCatalogs: async () => {
+    const scope = captureBrandScope();
+    if (scope.user == null || scope.org == null) return;
     try {
-      const activeUid = get().activeUserId ?? getCurrentUserId();
-      const res = await api.get('/api/v2/studio/catalogs/');
-      const serverCatalogs = res.data;
-      if (Array.isArray(serverCatalogs)) {
-        const existingBrands = getStoredBrands(activeUid);
-        // Inicializa as marcas para este usuário com array de catálogos zerado para evitar herdar dados de sessões anteriores
-        const updatedBrands = existingBrands.map((b) => ({ ...b, catalogs: [] as RecentCatalogItem[] }));
-        const unlinkedList: RecentCatalogItem[] = [];
-
-        serverCatalogs.forEach((sc: any) => {
-          const scId = String(sc.id);
-          const brandName = (sc.brand_name || '').trim();
-
-          let targetBrand = brandName
-            ? updatedBrands.find((b) => b.name.toLowerCase() === brandName.toLowerCase() || b.name.toLowerCase().includes(brandName.toLowerCase()))
-            : null;
-
-          if (!targetBrand && brandName) {
-            targetBrand = {
-              id: `brand-user-${sc.brand_name.toLowerCase().replace(/\s+/g, '-')}`,
-              name: brandName,
-              segment: sc.style_preset || 'Editorial',
-              paletteName: sc.style_preset || 'Minimaliste',
-              catalogs: [],
-              createdAt: sc.created_at || new Date().toISOString(),
-            };
-            updatedBrands.push(targetBrand);
-          }
-
-          if (targetBrand) {
-            const alreadyExists = targetBrand.catalogs.some((c) => String(c.id) === scId);
-            if (!alreadyExists) {
-              targetBrand.catalogs.push({
-                id: scId,
-                title: sc.title,
-                totalPages: sc.total_pages || (sc.spread_count * 2) || 6,
-                category: sc.style_preset || 'Editorial',
-                updatedAt: 'Salvo no banco',
-              });
-            }
-          } else {
-            const alreadyExists = unlinkedList.some((c) => String(c.id) === scId);
-            if (!alreadyExists) {
-              unlinkedList.push({
-                id: scId,
-                title: sc.title,
-                totalPages: sc.total_pages || (sc.spread_count * 2) || 6,
-                category: sc.style_preset || 'Geral',
-                updatedAt: 'Salvo no banco',
-              });
-            }
-          }
-        });
-
-        set({ brands: updatedBrands, unlinkedCatalogs: unlinkedList });
-        saveStoredBrands(updatedBrands, activeUid);
-        saveStoredUnlinkedCatalogs(unlinkedList, activeUid);
-      }
-    } catch (err) {
-      console.warn('Erro ao sincronizar catalogos do usuario do backend:', err);
-    }
+      const {data} = await api.get(`/api/v2/studio/catalogs/?organization=${scope.org}`);
+      if (!isCurrentBrandScope(scope) || !Array.isArray(data)) return;
+      const grouped = groupBrandCatalogs(get().brands, data);
+      set(grouped);
+      writeBrandCache(scope.user, scope.org, grouped.brands);
+    } catch { /* Studio remains usable; server Brand errors have an explicit retry. */ }
   },
 
   loadDemoCatalog: async (templateKey: string) => {
@@ -3267,6 +3261,9 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     }
 
     const state = get();
+    const saveScope = captureBrandScope();
+    const operation = ++spreadSaveOperation;
+    const saveIsCurrent = () => operation === spreadSaveOperation && isCurrentBrandScope(saveScope) && get().activeCatalogId === state.activeCatalogId;
     const catalogId = state.activeCatalogId;
     if (!catalogId) {
       set({ saveStatus: 'saved' });
@@ -3281,7 +3278,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     try {
       const numericCatalogId = parseInt(catalogId, 10);
       if (!isNaN(numericCatalogId)) {
-        await api.post(
+        const response = await api.post(
           `/api/v2/studio/catalogs/${numericCatalogId}/spreads/`,
           {
             spread_index: Math.floor((leftPageNum - 1) / 2),
@@ -3290,10 +3287,15 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
             right_page_elements: rightPage ? [rightPage] : [],
           }
         );
+        if (!saveIsCurrent()) return;
+        if (response.data?.qualityGate != null) {
+          // Publication approval belongs to the server document, including after edits.
+          set({pages: get().pages, qualityGate: response.data.qualityGate as QualityGate});
+        }
       }
-      set({ saveStatus: 'saved' });
+      if (saveIsCurrent()) set({ saveStatus: 'saved' });
     } catch {
-      set({ saveStatus: 'error' });
+      if (saveIsCurrent()) set({ saveStatus: 'error' });
     }
   },
 

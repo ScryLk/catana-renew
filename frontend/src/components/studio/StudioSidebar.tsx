@@ -51,6 +51,7 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
     unlinkedCatalogs,
     loadDemoCatalog,
     isDemoLoading,
+    brandLoadStatus, brandLoadError, syncBrands, legacyBrandCount, catalogBrandContext,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
@@ -261,6 +262,10 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
 
       {/* Seções de Navegação (Estilo Antigravity IDE: Marcas, Projetos Não Vinculados e Templates Demo) */}
       <div className="flex-1 overflow-y-auto custom-scrollbar px-2 py-2 space-y-2">
+        {brandLoadStatus === 'loading' && <p role="status" className="px-2 text-xs text-zinc-500">Carregando marcas…</p>}
+        {brandLoadStatus === 'error' && <div className="px-2 space-y-2 text-xs text-amber-600"><p>{brandLoadError}</p><button type="button" onClick={() => syncBrands().then(() => useStudioStore.getState().syncUserCatalogs())} className="underline">Tentar novamente</button></div>}
+        {legacyBrandCount > 0 && <button type="button" onClick={() => openBrandModal()} className="w-full text-left p-2 rounded-lg border border-amber-500/30 text-xs text-amber-600">{legacyBrandCount} marca(s) neste navegador · Importar</button>}
+        {catalogBrandContext.brandVersion != null && brands.some(brand => brand.id === catalogBrandContext.brandId && (brand.currentVersion || 1) > catalogBrandContext.brandVersion!) && <p role="status" className="px-2 text-xs text-amber-600">Este catálogo usa a versão {catalogBrandContext.brandVersion}. A marca está na versão {brands.find(brand => brand.id === catalogBrandContext.brandId)?.currentVersion}. A identidade original foi preservada.</p>}
         {/* 1. Seção: MARCAS */}
         <div className="px-2.5 py-1 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
@@ -313,7 +318,7 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <Folder className={`size-3.5 shrink-0 ${isBrandActive ? 'text-zinc-200' : 'text-zinc-500'}`} />
-                    <span className="truncate font-medium">{brand.name}</span>
+                    <span className="truncate font-medium">{brand.name}{brand.status === 'archived' ? ' · Arquivada' : ''}</span>
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">

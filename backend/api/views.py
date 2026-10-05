@@ -24,6 +24,7 @@ from .serializers import (
     PublicProfileSettingsSerializer, ProfileFollowSerializer, PublicCatalogSerializer, CatalogLikeSerializer
 )
 from .permissions import IsOrganizationAdmin, CanCreateSede
+from .services.brand_intelligence import visible_organizations, assert_organization_access
 
 from rest_framework import serializers
 
@@ -210,7 +211,10 @@ class ProductViewSet(viewsets.ModelViewSet):
         if not user.is_authenticated:
             return queryset.none()
         if not user.is_superuser:
-            queryset = queryset.filter(Q(organization__in=user.organizations.all()) | Q(created_by=user))
+            queryset = queryset.filter(
+                Q(brand__isnull=False, organization__in=visible_organizations(user))
+                | Q(brand__isnull=True) & (Q(organization__in=user.organizations.all()) | Q(created_by=user))
+            ).distinct()
 
         org_id = self.request.query_params.get('organization')
         sede_id = self.request.query_params.get('sede')
@@ -475,7 +479,10 @@ class MediaViewSet(viewsets.ModelViewSet):
             return queryset.none()
         if not user.is_superuser:
             # Users can only see media from their organizations or uploaded by them
-            queryset = queryset.filter(Q(organization__in=user.organizations.all()) | Q(uploaded_by=user))
+            queryset = queryset.filter(
+                Q(brand_assets__isnull=False, organization__in=visible_organizations(user))
+                | Q(brand_assets__isnull=True) & (Q(organization__in=user.organizations.all()) | Q(uploaded_by=user))
+            ).distinct()
 
         folder = self.request.query_params.get('folder')
         org_id = self.request.query_params.get('organization')
@@ -515,6 +522,12 @@ class MediaViewSet(viewsets.ModelViewSet):
 
         serializer.save(uploaded_by=user)
 
+    def perform_destroy(self, instance):
+        if instance.brand_assets.exists():
+            assert_organization_access(self.request.user, instance.organization, write=True)
+            raise serializers.ValidationError({'media': 'Este arquivo é usado pelo histórico de uma marca e deve ser preservado.'})
+        instance.delete()
+
     @action(detail=False, methods=['get'])
     def stats(self, request):
         folder_param = request.query_params.get('folder')
@@ -528,7 +541,10 @@ class MediaViewSet(viewsets.ModelViewSet):
         user = request.user
         # Security: Always restrict to user's scope first (unless superuser)
         if not user.is_superuser:
-            media_qs = media_qs.filter(Q(organization__in=user.organizations.all()) | Q(uploaded_by=user))
+            media_qs = media_qs.filter(
+                Q(brand_assets__isnull=False, organization__in=visible_organizations(user))
+                | Q(brand_assets__isnull=True) & (Q(organization__in=user.organizations.all()) | Q(uploaded_by=user))
+            ).distinct()
             folder_qs = folder_qs.filter(Q(organization__in=user.organizations.all()) | Q(created_by=user))
 
         # Apply Organization/Sede filter
@@ -754,7 +770,7 @@ class CatalogViewSet(viewsets.ModelViewSet):
         if search:
             queryset = queryset.filter(Q(title__icontains=search) | Q(description__icontains=search))
             
-        serializer = self.get_serializer(queryset, many=True)
+        serializer = self.get_serializer(queryset, many=True, context={**self.get_serializer_context(), 'public_brand_fields': True})
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])

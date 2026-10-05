@@ -1,4 +1,5 @@
 import { StudioPalette } from '../data/editorialCatalog.mock';
+import type { BrandRule } from '../services/brandService';
 
 export interface ParsedBrandData {
   name?: string;
@@ -12,6 +13,7 @@ export interface ParsedBrandData {
     instagram?: string;
   };
   rawMarkdown: string;
+  guidelines: Array<Omit<BrandRule, 'id'> & {source_text: string}>;
 }
 
 /**
@@ -23,6 +25,7 @@ export const parseBrandMarkdown = (markdown: string): ParsedBrandData => {
   const result: ParsedBrandData = {
     commercialContact: {},
     rawMarkdown: markdown,
+    guidelines: [],
   };
 
   let currentSection = '';
@@ -31,6 +34,12 @@ export const parseBrandMarkdown = (markdown: string): ParsedBrandData => {
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i];
     const line = rawLine.trim();
+    const guideline = line.match(/^\s*[-*]?\s*\*{0,2}(MUST|PREFER|AVOID)\*{0,2}\s+(?:\[([a-z]+)\]\s*)?:?\s*(.+)$/i);
+    if (guideline) {
+      const category = guideline[2]?.toLowerCase() || 'other';
+      result.guidelines.push({type: guideline[1].toUpperCase() as BrandRule['type'], category, rule: guideline[3].trim(), source: 'brand_markdown', status: 'inferred', source_text: rawLine});
+      continue;
+    }
 
     // Deteccao de secoes H1 / H2 / H3
     if (line.startsWith('# ')) {
@@ -48,7 +57,7 @@ export const parseBrandMarkdown = (markdown: string): ParsedBrandData => {
     // Extracao chave: valor
     const match = line.match(/^\s*[-*]?\s*\*{0,2}([^:*]+)\*{0,2}\s*:\s*(.+)$/);
     if (match) {
-      const key = match[1].trim().toLowerCase();
+      const key = match[1].trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const val = match[2].replace(/^\*{0,2}/, '').replace(/\*{0,2}$/, '').trim();
 
       if (key.includes('marca') || key.includes('nome') || key.includes('empresa') || key.includes('razao')) {
@@ -132,6 +141,9 @@ export const generateBrandTemplateMarkdown = (brandName = 'Minha Marca'): string
 Sóbrio, sofisticado e contemporâneo. Comunicação precisa, focada na qualidade dos materiais, exclusividade e durabilidade. Evitar hipérboles vazias ou superlativos promocionais agressivos.
 
 ## Regras de Apresentação de Produtos
+- MUST [logo]: Preservar as proporções do logo.
+- PREFER [composition]: Composições visuais com respiro negativo generoso.
+- AVOID [voice]: Hipérboles promocionais agressivas.
 - Sempre incluir referência SKU legível.
 - Nomes de produtos em versalete ou caixa alta discreta.
 - Composições visuais com respiro negativo generoso.

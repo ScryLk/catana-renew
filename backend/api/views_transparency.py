@@ -52,14 +52,21 @@ class StudioDataExportView(APIView):
             })
 
         # 3. Catalogos do Studio
-        catalogs = StudioCatalog.objects.filter(created_by=user).order_by("-updated_at")
+        from django.db.models import Q
+        from .services.brand_intelligence import visible_organizations
+        catalogs = StudioCatalog.objects.filter(
+            Q(created_by=user, brand__isnull=True) | Q(created_by=user, brand__isnull=False, organization__in=visible_organizations(user))
+        ).order_by('-updated_at')
         catalogs_data = []
         for cat in catalogs:
             catalogs_data.append({
                 "id": cat.id,
                 "title": cat.title,
-                "category": cat.category,
-                "status": cat.status,
+                "category": cat.style_preset,
+                "brand": str(cat.brand_id) if cat.brand_id else None,
+                "brand_version": cat.brand_version,
+                "brand_snapshot": cat.brand_snapshot,
+                "brand_snapshot_hash": cat.brand_snapshot_hash,
                 "total_spreads": cat.spreads.count(),
                 "created_at": cat.created_at.isoformat() if cat.created_at else None,
                 "updated_at": cat.updated_at.isoformat() if cat.updated_at else None,
@@ -88,6 +95,11 @@ class StudioDataExportView(APIView):
                     "paid_at": inv.paid_at.isoformat() if inv.paid_at else None,
                 })
 
+        from .models import Brand
+        from .serializers_brand import BrandSerializer
+        from .services.brand_intelligence import visible_organizations
+        brands = Brand.objects.filter(organization__in=visible_organizations(user))
+
         export_payload = {
             "export_metadata": {
                 "system": "Catana Studio 2.0",
@@ -98,6 +110,7 @@ class StudioDataExportView(APIView):
             "user_profile": user_info,
             "organizations": orgs_data,
             "catalogs": catalogs_data,
+            "brands": BrandSerializer(brands, many=True, context={"request": request}).data,
             "ai_quota": quota_data,
             "billing_invoices": invoices_data,
         }
