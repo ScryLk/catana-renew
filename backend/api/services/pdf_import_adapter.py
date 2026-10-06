@@ -166,26 +166,47 @@ def _fill_color(obj, raw):
 def _font_details(obj, matrix):
     font = obj.get_font()
     name = font.get_base_name()
-    canonical = name.split("+", 1)[-1]
-    normalized = canonical.lower().replace("-", "").replace(" ", "")
-    resolved = None
-    if normalized.startswith(("helvetica", "arial")):
-        resolved = "Arial"
-    elif normalized.startswith(("times", "timesnewroman")):
-        resolved = "Times New Roman"
-    elif normalized.startswith(("courier", "couriernew")):
-        resolved = "Courier New"
-    weight = font.get_weight()
-    if weight <= 0:
-        weight = 900 if "black" in normalized else 600 if "semibold" in normalized else 700 if "bold" in normalized else 300 if "light" in normalized else 500 if "medium" in normalized else 400
+    from api.ai.font_registry import resolve_pdf_font
+    resolution = resolve_pdf_font(name, font.get_weight())
     scale_x = math.hypot(matrix[0], matrix[1])
     scale_y = math.hypot(matrix[2], matrix[3])
-    return {"fontFamily": name, "resolvedFont": resolved,
+    return {**resolution, "fontFamily": name,
             "fontSize": obj.get_font_size() * scale_y, "sourceFontSize": obj.get_font_size(),
             "fontScaleX": scale_x, "fontScaleY": scale_y,
-            "fontWeight": weight, "fontStyle": "italic" if "italic" in normalized or "oblique" in normalized else "normal",
-            "fontEmbedded": font.is_embedded, "fontFallback": resolved != canonical,
-            "fontAvailable": resolved is not None}
+            "fontEmbedded": font.is_embedded,
+            "fontAvailable": resolution["fontResolutionStatus"] in ("exact", "registry_alias"),
+            "resolvedFontAvailable": bool(resolution["resolvedFont"])}
+
+
+
+def _clip_details(clip, bounds, raw):
+    """Admit only an axis-aligned rectangle containing the entire text box."""
+    if not clip or raw.FPDFClipPath_CountPaths(clip) <= 0:
+        return {'clipped': False, 'clippingType': 'none', 'clipSafe': True}
+    result = {'clipped': True, 'clippingType': 'complex', 'clipSafe': False}
+    if raw.FPDFClipPath_CountPaths(clip) != 1:
+        return result
+    count = raw.FPDFClipPath_CountPathSegments(clip, 0)
+    if count not in (4, 5):
+        return result
+    points = []
+    for index in range(count):
+        segment = raw.FPDFClipPath_GetPathSegment(clip, 0, index)
+        if raw.FPDFPathSegment_GetType(segment) not in (0, 2):
+            return result
+        x, y = ctypes.c_float(), ctypes.c_float()
+        if not raw.FPDFPathSegment_GetPoint(segment, ctypes.byref(x), ctypes.byref(y)):
+            return result
+        points.append((x.value, y.value))
+    corners = set(points)
+    xs, ys = {x for x, _ in corners}, {y for _, y in corners}
+    if len(corners) != 4 or len(xs) != 2 or len(ys) != 2:
+        return result
+    if any(a[0] != b[0] and a[1] != b[1] for a, b in zip(points, points[1:] + points[:1])):
+        return result
+    left, right, bottom, top = min(xs), max(xs), min(ys), max(ys)
+    return {'clipped': True, 'clippingType': 'simple_rectangular',
+            'clipSafe': left <= bounds[0] and bottom <= bounds[1] and right >= bounds[2] and top >= bounds[3]}
 
 
 def _objects(page, textpage, page_number, width, height, rotation, warnings):
@@ -215,14 +236,18 @@ def _objects(page, textpage, page_number, width, height, rotation, warnings):
                        "semanticRole": "unknown", "matrix": matrix, "nested": obj.level > 0,
                        "sourceBounds": list(source_box), "coordinateSpace": "normalized_top_left"}
             clip = raw.FPDFPageObj_GetClipPath(obj)
-            element["clipped"] = bool(clip and raw.FPDFClipPath_CountPaths(clip) > 0)
+            element.update(_clip_details(clip, source_box, raw))
             element["color"], element["opacity"] = _fill_color(obj, raw)
             text = None
             if kind == "text":
                 text = obj.extract()
                 element.update(text=text, **_font_details(obj, matrix))
                 element["textRenderMode"] = raw.FPDFTextObj_GetTextRenderMode(obj)
-                element["confidence"] = 0.96 if element["fontAvailable"] and obj.level == 0 else 0.6
+                element["textExtractionConfidence"] = .96 if text and "\ufffd" not in text else .5
+                element["geometryConfidence"] = 1.0 if obj.level == 0 else .5
+                element["visibilityConfidence"] = 0.0
+                element["semanticConfidence"] = 0.0
+                element["confidence"] = min(element["textExtractionConfidence"], element["geometryConfidence"])
                 if element["textRenderMode"] == 3 or (element["textRenderMode"] == 0 and element["opacity"] == 0):
                     element["sourceVisible"] = False
             if box[2] <= 0 or box[3] <= 0 or box[0] >= width or box[1] >= height:
@@ -252,6 +277,39 @@ def _objects(page, textpage, page_number, width, height, rotation, warnings):
         except Exception:
             warnings.append("object_geometry_unavailable_source_preserved")
     return objects, elements
+
+
+def _group_text_lines(objects, elements):
+    """Group consecutive, aligned spans only; preserve each source provenance.
+
+    No paragraph inference and no invented whitespace: distant labels and
+    different styles remain separate editing targets.
+    """
+    grouped = []
+    for obj, element, box in objects:
+        previous = grouped[-1] if grouped else None
+        eligible = element['type'] == 'text' and not element['nested'] and not element['clipped'] and element['rotation'] == 0
+        if previous and eligible:
+            members, prior, bounds = previous
+            gap = box[0] - bounds[2]
+            aligned = (prior['type'] == 'text' and not prior['nested'] and not prior['clipped']
+                       and prior['rotation'] == 0 and abs(box[1] - bounds[1]) < .5
+                       and abs(box[3] - bounds[3]) < .5 and 0 <= gap <= element.get('fontSize', 0) * .15
+                       and all(prior.get(key) == element.get(key) for key in
+                               ('fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'color', 'opacity', 'textRenderMode'))
+                       and len(prior.get('text', '') + element.get('text', '')) <= 2000)
+            if aligned:
+                prior.setdefault('sourceElements', [dict(prior['provenance'])]).append(dict(element['provenance']))
+                prior['text'] += element.get('text', '')
+                bounds[2] = box[2]
+                prior['width'] = element['x'] + element['width'] - prior['x']
+                prior['sourceElementCount'] = len(prior['sourceElements'])
+                prior['provenance'] = provenance(prior['provenance']['sourcePage'], prior['id'], bounds, prior['text'], prior['confidence'])
+                members.append(obj)
+                continue
+        grouped.append(([obj], element, list(box)))
+    elements[:] = [element for _, element, _ in grouped]
+    return [(members if len(members) > 1 else members[0], element, box) for members, element, box in grouped]
 
 
 def _classify_semantics(elements):
@@ -309,16 +367,19 @@ def _text_ink_mask(page, obj, page_number, scale, pixel_box):
     glyph as proof that every extracted character was visible.
     """
     import pypdfium2 as pdfium
-    pointer = ctypes.cast(obj.raw, ctypes.c_void_p).value
-    direct_index = next(index for index, other in enumerate(page.get_objects(max_depth=0))
-                        if ctypes.cast(other.raw, ctypes.c_void_p).value == pointer)
+    members = obj if isinstance(obj, list) else [obj]
+    pointers = {ctypes.cast(member.raw, ctypes.c_void_p).value for member in members}
+    direct_indices = {index for index, other in enumerate(page.get_objects(max_depth=0))
+                      if ctypes.cast(other.raw, ctypes.c_void_p).value in pointers}
+    if len(direct_indices) != len(members):
+        raise ValueError('Text grouping is not direct-page geometry')
     isolated_pdf = pdfium.PdfDocument.new()
     try:
         isolated_pdf.import_pages(page.pdf, [page_number - 1])
         isolated_page = isolated_pdf[0]
         try:
             for index, other in enumerate(list(isolated_page.get_objects(max_depth=0))):
-                if index != direct_index:
+                if index not in direct_indices:
                     isolated_page.remove_obj(other)
                     other.close()
             isolated_page.gen_content()
@@ -335,7 +396,7 @@ def _text_ink_mask(page, obj, page_number, scale, pixel_box):
         isolated_pdf.close()
 
 
-def _reconstruct(page, source, objects, width, height, scale, assets, page_number):
+def _reconstruct(page, source, objects, width, height, scale, assets, page_number, deadline=None):
     """Admit simple direct text only; preserve all remaining visuals as a raster base.
 
     Original appearances are crops of the immutable source snapshot, including
@@ -345,12 +406,12 @@ def _reconstruct(page, source, objects, width, height, scale, assets, page_numbe
     """
     selected = []
     for obj, element, box in objects:
-        if (element["type"] != "text" or element["nested"] or element["clipped"]
+        if (element["type"] != "text" or element["nested"] or (element["clipped"] and not element.get("clipSafe"))
                 or element["confidence"] < 0.9 or not element.get("text", "").strip()
                 or len(element["text"]) > 2000 or element["opacity"] != 1
                 or element.get("textRenderMode") != 0 or element["rotation"] not in (0, 360)
                 or not 0 < element.get("fontSize", 0) <= 500
-                or abs(element.get("fontScaleX", 0) - element.get("fontScaleY", 0)) > 1e-5
+                or not .2 <= element.get("fontScaleX", 0) / max(element.get("fontScaleY", 0), 1e-9) <= 5
                 or not all(math.isfinite(value) for value in element["matrix"])
                 or abs(element["matrix"][1]) > 1e-6 or abs(element["matrix"][2]) > 1e-6
                 or min(box) < 0 or box[2] > width or box[3] > height):
@@ -360,63 +421,77 @@ def _reconstruct(page, source, objects, width, height, scale, assets, page_numbe
             continue
         if any(_overlap(pixel_box, candidate[3]) for candidate in selected):
             continue
-        # Later complex objects must retain their stacking precedence after edits.
-        if any(other["zIndex"] > element["zIndex"] and not other["nested"]
-               and _overlap(box, other_box) for _, other, other_box in objects):
-            continue
         selected.append((obj, element, box, pixel_box))
-        if len(selected) == 8:
+        # Existing element, asset, byte, process-time and memory budgets apply.
+        if len(selected) >= min(MAX_ELEMENTS_PER_PAGE, MAX_ASSETS - len(assets.items) - 1):
             break
     if not selected:
         return None, 0, None
-    masks = []
-    verified = []
-    for candidate in selected:
-        try:
-            masks.append(_text_ink_mask(page, candidate[0], page_number, scale, candidate[3]))
-            verified.append(candidate)
-        except Exception:
-            # Uncertain visibility remains private; the untouched object stays
-            # in the source raster rather than being promoted into source facts.
-            candidate[1]["sourceVisible"] = None
-    selected = verified
-    if not selected:
-        return None, 0, None
-    # Close textpage handles before removing their objects (required by PDFium).
-    for obj, _, _, _ in selected:
-        page.remove_obj(obj)
-        obj.close()
-    page.gen_content()
-    background = _render(page, scale)
     from PIL import ImageChops, ImageStat
-    visible_selected = []
-    for (obj, element, box, pixel_box), mask in zip(selected, masks):
-        # Removing this non-overlapping object must actually change its source
-        # pixels. White-on-white or fully occluded text is private extraction
-        # metadata, never an editable/visible source fact for recomposition.
-        difference = ImageChops.difference(source.crop(pixel_box), background.crop(pixel_box))
-        changed_channel = ImageChops.lighter(ImageChops.lighter(difference.getchannel("R"), difference.getchannel("G")), difference.getchannel("B"))
-        changed_pixels = changed_channel.point(lambda value: 255 if value else 0)
-        expected_ink = mask.point(lambda value: 255 if value else 0)
-        fully_painted = expected_ink.getbbox() is not None and ImageChops.subtract(expected_ink, changed_pixels).getbbox() is None
-        element["sourceVisible"] = fully_painted
-        if fully_painted:
-            visible_selected.append((obj, element, box, pixel_box))
-    selected = visible_selected
+    background = source.copy()
+    admitted = []
+    rejected_verification = None
+    for obj, element, box, pixel_box in selected:
+        if deadline is not None and time.monotonic() >= deadline:
+            break
+        removed = False
+        try:
+            mask = _text_ink_mask(page, obj, page_number, scale, pixel_box)
+            members = obj if isinstance(obj, list) else [obj]
+            for member in members:
+                page.remove_obj(member)
+            removed = True
+            page.gen_content()
+            trial = _render(page, scale)
+            difference = ImageChops.difference(background.crop(pixel_box), trial.crop(pixel_box))
+            changed = ImageChops.lighter(ImageChops.lighter(difference.getchannel("R"), difference.getchannel("G")), difference.getchannel("B"))
+            # Require evidence for every ink pixel: hidden OCR and concealed
+            # characters must never be exposed as visible source facts.
+            changed_pixels = changed.point(lambda value: 255 if value else 0)
+            # PDFium transparent isolation may emit alpha <= 15 at glyph
+            # edges where the opaque renderer rounds to the background. Ignore
+            # only those low-alpha edges; every stronger ink pixel must change.
+            # Final source/crop composition still requires exact pixel equality.
+            expected_ink = mask.point(lambda value: 255 if value >= 16 else 0)
+            painted = expected_ink.getbbox() is not None and ImageChops.subtract(expected_ink, changed_pixels).getbbox() is None
+            element["visibilityStatus"] = "sourceVisible" if painted else "partiallyOccluded" if changed.getbbox() else "fullyOccluded"
+            element["sourceVisible"] = painted
+            element["visibilityConfidence"] = 1.0
+            # Validate each removal independently. Damage outside this crop
+            # rejects only this candidate, and the original object is reinserted.
+            composed = trial.copy()
+            composed.paste(background.crop(pixel_box), (pixel_box[0], pixel_box[1]))
+            residual = ImageChops.difference(background, composed)
+            if residual.getbbox() is not None:
+                rejected_verification = {"method": "per_element_source_pixel_comparison", "exactPixels": False,
+                    "meanAbsoluteChannelError": round(sum(ImageStat.Stat(residual).mean) / 3, 6)}
+            if painted and residual.getbbox() is None:
+                background = trial
+                admitted.append((obj, element, box, pixel_box))
+                for member in members:
+                    member.close()
+                removed = False
+                continue
+        except Exception:
+            element["sourceVisible"] = None
+            element["visibilityStatus"] = "unknown"
+        finally:
+            if removed:
+                for member in members:
+                    page.insert_obj(member)
+                page.gen_content()
+    selected = admitted
     if not selected:
-        return None, 0, None
+        return None, 0, rejected_verification
     reconstructed = background.copy()
     for _, _, _, pixel_box in selected:
         reconstructed.paste(source.crop(pixel_box), (pixel_box[0], pixel_box[1]))
     difference = ImageChops.difference(source, reconstructed)
     exact = difference.getbbox() is None
-    mean_error = sum(ImageStat.Stat(difference).mean) / 3
-    verification = {"method": "source_pixel_comparison", "exactPixels": exact,
-                    "meanAbsoluteChannelError": round(mean_error, 6),
-                    "widthPixels": source.width, "heightPixels": source.height}
+    verification = {"method": "per_element_source_pixel_comparison", "exactPixels": exact,
+                    "meanAbsoluteChannelError": round(sum(ImageStat.Stat(difference).mean) / 3, 6),
+                    "widthPixels": source.width, "heightPixels": source.height, "inkAlphaThreshold": 16}
     if not exact:
-        for _, element, _, _ in selected:
-            element["sourceVisible"] = None
         return None, 0, verification
     fallback = assets.image(background, f"page-{page_number}-fallback.png", "raster_fallback")
     for _, element, _, pixel_box in selected:
@@ -472,6 +547,7 @@ def _extract_images(objects, assets, page_number, warnings):
 
 
 def _analyze_pdf(file_bytes, filename):
+    reconstruction_deadline = time.monotonic() + MAX_PROCESSING_SECONDS * .8
     preflight = validate_pdf(file_bytes, filename)
     import pypdfium2 as pdfium
     assets = _Assets()
@@ -529,11 +605,12 @@ def _analyze_pdf(file_bytes, filename):
                 text = textpage.get_text_bounded()
                 result["sourceText"] = text
                 objects, elements = _objects(page, textpage, index + 1, result["width"], result["height"], result["rotation"], warnings)
+                objects = _group_text_lines(objects, elements)
                 result["elements"] = elements
                 _classify_semantics(elements)
-                if any(e["type"] == "text" and not e.get("fontAvailable") for e in elements):
-                    warnings.append("font_unavailable_source_preserved")
-                if any(e.get("clipped") for e in elements):
+                if any(e["type"] == "text" and e.get("fontFallback") for e in elements):
+                    warnings.append("font_substitute_required_for_editing")
+                if any(e.get("clipped") and not e.get("clipSafe") for e in elements):
                     warnings.append("clipping_preserved_as_raster")
                 image_coverage = sum(max(0, min(1, e["width"])) * max(0, min(1, e["height"])) for e in elements if e["type"] == "image")
                 _extract_images(objects, assets, index + 1, warnings)
@@ -550,7 +627,7 @@ def _analyze_pdf(file_bytes, filename):
                     source = Image.open(io.BytesIO(base64.b64decode(assets.items[result["sourceSnapshot"]["assetRef"]]["data"]))).convert("RGB")
                     try:
                         fallback, editable_count, verification = _reconstruct(page, source, objects,
-                            result["width"], result["height"], source_scales[index], assets, index + 1)
+                            result["width"], result["height"], source_scales[index], assets, index + 1, deadline=reconstruction_deadline)
                     finally:
                         source.close()
                     if verification is not None:
@@ -577,6 +654,26 @@ def _analyze_pdf(file_bytes, filename):
                     textpage.close()
                 page.close()
                 warnings[:] = list(dict.fromkeys(warnings))
+        for result in document["pages"]:
+            texts = [e for e in result["elements"] if e["type"] == "text"]
+            editable = [e for e in texts if e.get("editable")]
+            visible = [e for e in texts if e.get("sourceVisible") is True]
+            characters = sum(len(e.get("text", "")) for e in visible)
+            result["quality"].update(
+                liveTextElementCount=sum(e.get("sourceElementCount", 1) for e in texts), editableTextElementCount=len(editable),
+                editableSourceTextElementCount=sum(e.get("sourceElementCount", 1) for e in editable),
+                editableTextCoverage=sum(e.get("sourceElementCount", 1) for e in editable) / max(1, sum(e.get("sourceElementCount", 1) for e in texts)),
+                visibleCharacterCount=characters,
+                editableCharacterCount=sum(len(e.get("text", "")) for e in editable),
+                fontFallbackTextCount=sum(bool(e.get("fontFallback")) for e in editable),
+                clippedTextCount=sum(bool(e.get("clipped")) and not e.get("editable") for e in texts),
+                unsafeTextCount=len(texts) - len(editable))
+            if any(e.get('editable') and abs(e.get('fontScaleX', 1) - e.get('fontScaleY', 1)) > 1e-5 for e in texts):
+                result['warnings'].append('text_metrics_may_change_after_edit')
+            if time.monotonic() >= reconstruction_deadline and texts:
+                result['warnings'].append('reconstruction_budget_source_preserved')
+            if texts and not editable and result["pageType"] == "born_digital":
+                result["warnings"].append("BORN_DIGITAL_TEXT_EXTRACTION_DEGRADED")
         report = document["report"]
         report.update(pageCount=len(document["pages"]), sourcePreservedCount=len(document["pages"]),
                       editableCount=sum(page["quality"]["editableCount"] for page in document["pages"]),
@@ -586,6 +683,11 @@ def _analyze_pdf(file_bytes, filename):
                       ocrAvailable=False, assetCount=len(assets.items), assetBytes=assets.bytes,
                       snapshotDpi=SNAPSHOT_SCALE * 72, status="preserved", adapterVersion=str(pdfium.PYPDFIUM_INFO),
                       candidateDetection="not_established", warnings=list(dict.fromkeys(warning for page in document["pages"] for warning in page["warnings"])))
+        for key in ("liveTextElementCount", "editableTextElementCount", "editableSourceTextElementCount", "visibleCharacterCount",
+                    "editableCharacterCount", "fontFallbackTextCount", "clippedTextCount", "unsafeTextCount"):
+            report[key] = sum(page["quality"].get(key, 0) for page in document["pages"])
+        report["editableTextCoverage"] = report["editableSourceTextElementCount"] / max(1, report["liveTextElementCount"])
+        report["editableCharacterCoverage"] = report["editableCharacterCount"] / max(1, report["visibleCharacterCount"])
         return document, assets.items
     finally:
         pdf.close()

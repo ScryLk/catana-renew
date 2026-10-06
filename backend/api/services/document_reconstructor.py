@@ -402,7 +402,7 @@ class DocumentReconstructorService:
         if job.catalog_id is not None:
             return job, False
         from api.guards.quota_guard import check_catalog_creation_guard
-        check_catalog_creation_guard(user)
+        check_catalog_creation_guard(user, job.organization)
         if job.status != 'ready' or job.expires_at <= timezone.now():
             raise ValidationError('A prévia não está disponível para confirmação.')
         if title is not None and not isinstance(title, str):

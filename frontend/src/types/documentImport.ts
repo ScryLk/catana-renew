@@ -26,6 +26,14 @@ export interface DocumentElement {
   fontWeight?: number;
   fontStyle?: string;
   fontFallback?: boolean;
+  sourceFont?: string;
+  sourceFamily?: string;
+  fontResolutionStatus?: 'exact' | 'registry_alias' | 'compatible_family' | 'generic_fallback' | 'unresolved';
+  textExtractionConfidence?: number;
+  geometryConfidence?: number;
+  visibilityConfidence?: number;
+  fontResolutionConfidence?: number;
+  semanticConfidence?: number;
   color?: string;
   rotation?: number;
   zIndex?: number;

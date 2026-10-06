@@ -8,6 +8,7 @@ import { normalizeDocumentPage, type DocumentPageIR } from '../types/documentImp
 import { normalizeCatalogDocument, type CatalogPageData } from '../data/editorialCatalog.mock';
 import { useStudioStore } from '../store/studioStore';
 import { DocumentPageRenderer } from '../components/studio/DocumentPageRenderer';
+import { fitDocumentText } from '../utils/documentTextFit';
 import { ProtectedDocumentImage } from '../components/studio/ProtectedDocumentImage';
 import * as importService from './documentImportService';
 
@@ -19,7 +20,7 @@ const detail = (count = 7) => ({id: 51, organization: 1, title: 'Documento de or
   spreads: Array.from({length: Math.ceil(count / 2)}, (_, index) => ({spread_index: index, left_page: page(index * 2 + 1), right_page: index * 2 + 2 <= count ? page(index * 2 + 2) : null}))});
 const setScope = (organization = 1) => {localStorage.setItem('active_organization', JSON.stringify({id: organization})); useStudioStore.getState().setActiveUserId(101);};
 const deferred = <T,>() => {let resolve!: (value: T) => void; const promise = new Promise<T>(yes => {resolve = yes;}); return {promise, resolve};};
-beforeEach(() => {vi.useFakeTimers(); localStorage.clear(); useStudioStore.getState().resetStudioState(); useStudioStore.setState({isExportModalOpen: false}); setScope();});
+beforeEach(() => {vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({font: '', measureText: (value: string) => ({width: value.length * 7})} as unknown as CanvasRenderingContext2D); vi.useFakeTimers(); localStorage.clear(); useStudioStore.getState().resetStudioState(); useStudioStore.setState({isExportModalOpen: false}); setScope();});
 afterEach(() => {useStudioStore.getState().resetStudioState(); vi.clearAllTimers(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('Private analysis and explicit confirmation', () => {
@@ -216,4 +217,24 @@ describe('Source identity, safe images and progressive editing', () => {
     setScope(2); pending.resolve({data: {import_metadata: {share_enabled: true}}}); await sharing;
     expect(useStudioStore.getState().isExportModalOpen).toBe(false); expect(useStudioStore.getState().importMetadata).toBeUndefined();
   });
+});
+
+it('keeps structured quota recovery separate from transient retries', () => {
+  expect(importService.documentImportFailure({response: {status: 403, data: {code: 'catalog_limit_exceeded', error: 'Full'}}})).toEqual({code: 'catalog_limit_exceeded', message: 'Full', retryable: false});
+  expect(importService.documentImportFailure({code: 'ERR_NETWORK'}).retryable).toBe(true);
+  expect(importService.documentImportFailure({response: {status: 409, data: {code: 'document_import_retry_conflict'}}}).retryable).toBe(true);
+});
+
+it('fits edited text and detects overflow instead of silently clipping', () => {
+  const context = {font: '', measureText: (value: string) => ({width: value.length * 10})};
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D);
+  expect(fitDocumentText('short', 'Arial', 20, 100, 10)).toEqual({size: 10, overflow: false});
+  expect(fitDocumentText('verylongword', 'Arial', 20, 10, 10).overflow).toBe(true);
+});
+
+it('does not turn an authoritative quota denial into an offline blank catalog', async () => {
+  vi.spyOn(api, 'post').mockRejectedValue({response: {status: 403, data: {code: 'catalog_limit_exceeded'}}});
+  await useStudioStore.getState().createBlankCatalog('Blocked blank', 2);
+  expect(useStudioStore.getState().activeCatalogId).toBeNull();
+  expect(useStudioStore.getState().hasStartedSession).toBe(false);
 });

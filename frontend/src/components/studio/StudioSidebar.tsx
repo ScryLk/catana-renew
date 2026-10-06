@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useStudioStore, Brand } from '../../store/studioStore';
 import { useAuthStore } from '../../store/authStore';
+import { CatalogLifecycleManager } from './CatalogLifecycleManager';
 import api from '../../services/api';
 
 export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNavigate?: () => void }> = ({ mobile = false, compact = false, onNavigate }) => {
@@ -33,6 +34,7 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
   } | null>(null);
 
   const {
+    activeOrganizationId,
     isStudioSidebarOpen,
     toggleStudioSidebar,
     hasStartedSession,
@@ -77,7 +79,7 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
     let isMounted = true;
     const fetchQuota = async () => {
       try {
-        const res = await api.get('/api/v2/studio/quotas/');
+        const res = await api.get('/api/v2/studio/quotas/', {params: {organization: activeOrganizationId}});
         if (res.data && isMounted) {
           setQuotaData(res.data);
         }
@@ -96,7 +98,7 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
       isMounted = false;
       window.removeEventListener('catana:subscription-updated', handleSubUpdated);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, activeOrganizationId]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -445,6 +447,7 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
 
           {/* Lista Plana de Projetos Independentes */}
           <div className="space-y-0.5 mt-1">
+            {activeOrganizationId != null && <details className="p-2 text-xs"><summary className="cursor-pointer py-2">Gerenciar catálogos e arquivados</summary><CatalogLifecycleManager organization={activeOrganizationId} /></details>}
             {filteredUnlinkedCatalogs.length === 0 ? (
               <div className="px-2.5 py-1.5 text-[11px] text-zinc-500 italic select-none">
                 Nenhum projeto avulso

@@ -3,11 +3,12 @@ import { FileUp, Loader2, UploadCloud, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import { useStudioStore } from '../../store/studioStore';
-import { documentImportError, documentImportService, documentImportWarning, validateDocumentFile } from '../../services/documentImportService';
+import { documentImportError, documentImportFailure, getCatalogQuota, type CatalogQuota, documentImportService, documentImportWarning, validateDocumentFile } from '../../services/documentImportService';
 import type { DocumentImportAnalysis, DocumentImportMode } from '../../types/documentImport';
 import type { CatalogPageData } from '../../data/editorialCatalog.mock';
 import { DocumentPageRenderer } from './DocumentPageRenderer';
 import { GenerativePageRenderer } from './GenerativePageRenderer';
+import { CatalogLifecycleManager } from './CatalogLifecycleManager';
 import { getPageGeometry } from '../../utils/pageGeometry';
 
 interface ImportCatalogModalProps { isOpen: boolean; onClose: () => void }
@@ -32,6 +33,11 @@ export function ImportCatalogModal({isOpen, onClose}: ImportCatalogModalProps) {
   const [processing, setProcessing] = useState<'analyze' | 'prepare' | 'confirm' | null>(null);
   const [failedAction, setFailedAction] = useState<'analyze' | 'prepare' | 'confirm'>('analyze');
   const [error, setError] = useState<string | null>(null);
+  const [quota, setQuota] = useState<CatalogQuota | null>(null);
+  const [quotaError, setQuotaError] = useState('');
+  const [errorCode, setErrorCode] = useState('');
+  const [manager, setManager] = useState(false);
+  const [quotaRevision, setQuotaRevision] = useState(0);
   const [view, setView] = useState<'original' | 'reconstructed' | 'comparison'>('original');
   const [pageIndex, setPageIndex] = useState(0);
   const [stateScope, setStateScope] = useState(`${user}:${organization}`);
@@ -44,12 +50,29 @@ export function ImportCatalogModal({isOpen, onClose}: ImportCatalogModalProps) {
   useEffect(() => {
     operation.current += 1; controller.current?.abort();
     setStateScope(scope);
-    setFile(null); setTitle(''); setAnalysis(null); setProcessing(null); setError(null); setBrandId(''); setPageIndex(0);
+    setFile(null); setTitle(''); setAnalysis(null); setProcessing(null); setError(null); setErrorCode(''); setManager(false); setQuota(null); setBrandId(''); setPageIndex(0);
     return () => {operation.current += 1; controller.current?.abort();};
   }, [scope]);
   useEffect(() => {
     if (!isOpen) {operation.current += 1; controller.current?.abort(); setProcessing(null);}
   }, [isOpen]);
+  useEffect(() => {
+    if (!isOpen || organization == null) return;
+    let current = true;
+    setQuota(null); setQuotaError('');
+    getCatalogQuota(organization).then(result => {if (current) setQuota(result);})
+      .catch(() => {if (current) setQuotaError('Não foi possível consultar o limite. Atualize antes de salvar.');});
+    const refresh = () => setQuotaRevision(value => value + 1);
+    window.addEventListener('catana:catalog-quota-updated', refresh);
+    window.addEventListener('catana:subscription-updated', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      current = false;
+      window.removeEventListener('catana:catalog-quota-updated', refresh);
+      window.removeEventListener('catana:subscription-updated', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [isOpen, scope, organization, quotaRevision]);
   if (!isOpen || stateScope !== scope) return null;
   const isDark = theme === 'dark';
   const panel = isDark ? 'bg-[#101013] border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900';
@@ -82,10 +105,11 @@ export function ImportCatalogModal({isOpen, onClose}: ImportCatalogModalProps) {
     controller.current?.abort(); const request = new AbortController(); controller.current = request;
     const capturedScope = scope;
     const current = () => currentOperation === operation.current && `${useStudioStore.getState().activeUserId}:${useStudioStore.getState().activeOrganizationId}` === capturedScope;
-    setProcessing(action); setFailedAction(action); setError(null);
+    setProcessing(action); setFailedAction(action); setError(null); setErrorCode('');
     try {
       const options = {title: title.trim() || file?.name || 'Documento importado', mode, brandId: brandId || null};
       if (action === 'confirm') {
+        if (!analysis?.catalog_id && (!quota || quota.remaining_catalog_slots <= 0)) return;
         if (!analysis || outdated) throw new Error('Atualize e revise a prévia antes de confirmar.');
         const loaded = await confirmImport(analysis.import_id, options);
         if (!current() || !loaded) return;
@@ -99,7 +123,18 @@ export function ImportCatalogModal({isOpen, onClose}: ImportCatalogModalProps) {
         if (!result.import_id || !Array.isArray(result.pages) || !result.pages.length) throw new Error('A análise não retornou uma representação válida do documento.');
         setAnalysis(result); setPrepared({mode, brandId}); setPageIndex(0); setView('original');
       }
-    } catch (failure) {if (current() && !request.signal.aborted) setError(documentImportError(failure));}
+    } catch (failure) {if (current() && !request.signal.aborted) {
+      const result = documentImportFailure(failure); setError(result.message); setErrorCode(result.code);
+      if (result.code === 'catalog_limit_exceeded') setQuotaRevision(value => value + 1);
+      // A lost response may already have filled the final slot. Recover the
+      // committed job before applying save eligibility to a subsequent retry.
+      if (action === 'confirm' && analysis && result.code !== 'catalog_limit_exceeded') {
+        try {
+          const recovered = await documentImportService.get(analysis.import_id);
+          if (current() && recovered.catalog_id) setAnalysis(recovered);
+        } catch { /* The same import ID remains available for a transient retry. */ }
+      }
+    }}
     finally {if (current()) setProcessing(null);}
   };
   const preview = (item: CatalogPageData, original: boolean) => {
@@ -115,6 +150,16 @@ export function ImportCatalogModal({isOpen, onClose}: ImportCatalogModalProps) {
         <button type="button" onClick={dismiss} aria-label="Fechar importação" className="p-2 shrink-0"><X className="size-4" /></button>
       </div>
       <div className="p-4 overflow-y-auto min-h-0 space-y-4">
+        {validScope && <section aria-label="Limite de catálogos" className="text-sm border border-zinc-500/30 rounded-lg p-3 space-y-2">
+          <p role="status">{quota ? `${quota.active_catalogs} de ${quota.max_active_catalogs} catálogos ativos` : quotaError || 'Consultando limite de catálogos…'}</p>
+          {quota && quota.remaining_catalog_slots <= 0 && <p>Você pode analisar este documento, mas precisará arquivar um catálogo ou alterar o plano antes de salvar.</p>}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="underline min-h-11" onClick={() => setManager(value => !value)}>Gerenciar catálogos</button>
+            <button type="button" className="underline min-h-11" onClick={() => window.dispatchEvent(new CustomEvent('catana:open-billing-modal'))}>Ver planos</button>
+            <button type="button" className="underline min-h-11" onClick={() => {setError(null); setErrorCode(''); setQuotaRevision(value => value + 1);}}>Atualizar limite</button>
+          </div>
+          {manager && organization != null && <CatalogLifecycleManager organization={organization} />}
+        </section>}
         {!validScope && <p role="alert" className="text-sm text-amber-600">Selecione uma organização para importar o documento.</p>}
         {!analysis && <div>
           <input ref={input} type="file" aria-label="Arquivo PDF" accept=".pdf,application/pdf" className="sr-only" disabled={Boolean(processing)} onChange={event => {const selected = event.target.files?.[0]; if (selected) selectFile(selected);}} />
@@ -138,13 +183,20 @@ export function ImportCatalogModal({isOpen, onClose}: ImportCatalogModalProps) {
         </fieldset>
         <p className="text-xs text-zinc-500">Imagens e fundos são preservados. Isolamento de produto indisponível nesta etapa: nenhum recorte automático será aplicado.</p>
         {processing && <div role="status" className="flex items-center gap-2 text-sm"><Loader2 className="size-4 animate-spin shrink-0" />{processing === 'confirm' ? 'Salvando catálogo…' : processing === 'prepare' ? 'Atualizando prévia…' : 'Analisando documento…'}</div>}
-        {error && <div role="alert" className="rounded-lg p-3 text-sm border border-red-500/30 space-y-2"><p>{error}</p><button type="button" onClick={() => void run(failedAction)} disabled={Boolean(processing)} className="underline">Tentar novamente</button></div>}
+        {error && <div role="alert" className="rounded-lg p-3 text-sm border border-red-500/30 space-y-2"><p>{error}</p>{!['catalog_limit_exceeded', 'quota_exceeded', 'permission_denied'].includes(errorCode) && <button type="button" onClick={() => void run(failedAction)} disabled={Boolean(processing)} className="underline">Tentar novamente</button>}</div>}
         {analysis && <>
           <section aria-label="Relatório de importação" className="text-xs border border-zinc-500/20 rounded-lg p-3 space-y-1">
-            <p className="font-semibold">{pages.length} páginas preservadas • {editableCount} textos editáveis</p>
+            <p className="font-semibold">{prepared.mode === 'preserve' ? `${pages.length} páginas preservadas com fidelidade` : prepared.mode === 'redesign' ? `${pages.length} páginas de origem preservadas • proposta pronta para revisão` : `${pages.length} páginas preservadas • ${editableCount} textos editáveis`}</p>
             <p>A geometria de origem é mantida. O documento original permanece disponível para comparação.</p>
             {quality.status === 'needs_review' && <p className="text-amber-600">A proposta precisa de revisão; o original foi preservado.</p>}
-            {!editableCount && <p>Esta análise preserva as páginas como imagens. Não há textos seguros para edição.</p>}
+            {prepared.mode === 'editable' && !editableCount && <p>Esta análise preserva as páginas como imagens. Não há textos seguros para edição.</p>}
+            <details><summary>Detalhes da análise</summary>
+              <p>Textos detectados: {Number(report.liveTextElementCount || 0)}</p>
+              <p>Textos editáveis: {editableCount}</p>
+              <p>Textos com fonte substituta: {Number(report.fontFallbackTextCount || 0)}</p>
+              <p>Textos preservados por clipping: {Number(report.clippedTextCount || 0)}</p>
+              <p>Textos não seguros: {Number(report.unsafeTextCount || 0)}</p>
+            </details>
             {warnings.map((warning, index) => <p key={index} className="text-amber-600">{documentImportWarning(warning)}</p>)}
           </section>
           {outdated && <p role="status" className="text-xs text-amber-600">Atualize a prévia para revisar o modo e a marca escolhidos.</p>}
@@ -161,7 +213,7 @@ export function ImportCatalogModal({isOpen, onClose}: ImportCatalogModalProps) {
         <button type="button" onClick={dismiss} className="rounded-lg px-3 py-2 text-sm border border-zinc-500/30">{analysis || processing ? 'Cancelar análise' : 'Cancelar'}</button>
         {!analysis ? <button type="button" disabled={!file || !validScope || Boolean(processing)} onClick={() => void run('analyze')} className="rounded-lg px-4 py-2 text-sm bg-sky-600 text-white disabled:opacity-40">Analisar documento</button>
           : outdated ? <button type="button" disabled={Boolean(processing)} onClick={() => void run('prepare')} className="rounded-lg px-4 py-2 text-sm bg-sky-600 text-white disabled:opacity-40">Atualizar prévia</button>
-          : <button type="button" disabled={Boolean(processing)} onClick={() => void run('confirm')} className="rounded-lg px-4 py-2 text-sm bg-sky-600 text-white disabled:opacity-40">Confirmar importação</button>}
+          : <button type="button" disabled={Boolean(processing) || (!analysis.catalog_id && (!quota || quota.remaining_catalog_slots <= 0))} onClick={() => void run('confirm')} className="rounded-lg px-4 py-2 text-sm bg-sky-600 text-white disabled:opacity-40">{analysis.catalog_id ? 'Abrir catálogo importado' : quota && quota.remaining_catalog_slots <= 0 ? 'Sem vagas para novos catálogos' : 'Confirmar importação'}</button>}
       </div>
     </div>
   </ResponsiveModal>;

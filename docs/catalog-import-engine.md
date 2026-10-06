@@ -279,3 +279,89 @@ The full/focused logs are `/tmp/catana-codeql-full-backend.log`, `/tmp/catana-pr
 - `frontend/src/types/documentImport.ts`
 - `frontend/src/utils/pageGeometry.test.ts`
 - `frontend/src/utils/pageGeometry.ts`
+
+
+## Import hardening: text editing and catalog slots
+
+The importer remains source-first. Supported text retains its exact source crop
+until an explicit edit; restoring clears `edited`, restores the original string,
+and displays that crop again. Font resolution uses `shared/font_registry.json`
+through the existing backend registry, with Base-14/PostScript aliases and
+explicit sans/serif/mono fallback. A missing exact browser font lowers
+`fontResolutionConfidence`, never `textExtractionConfidence`. Extraction,
+geometry, visibility, font resolution and semantic confidence are independent.
+Registry matching identifies a supported family, not byte identity with a PDF font.
+
+Text is admitted independently using source-removal and isolated ink evidence.
+Antialiasing edges with alpha below 16 are excluded from visibility evidence;
+every stronger ink pixel must contribute to the source. Initial composition must
+still equal the source pixels exactly. One rejected candidate is reinserted while
+other candidates remain editable. Later bounding-box overlap alone does not reject
+text. Fully containing rectangular clips can be safe (PDFium may elide them);
+partial, complex or uncertain clips remain raster. Consecutive same-style,
+aligned spans can form one target, with each source provenance retained and no
+invented whitespace. Nested objects, unsupported rotations/transforms, invisible
+OCR layers and uncertain objects remain preserved. Reasonable horizontal font
+scaling can be admitted because original appearances remain exact; edits warn
+that metrics can change.
+
+The eight-text cap is removed. Element, asset count/bytes, process-time, total
+pixel and memory limits remain in force. Reconstruction has a deadline within the
+existing worker budget, so optional text recovery can stop while retaining source
+pages. Reports include live objects, editable targets, source-object coverage,
+visible-character coverage, fallback targets, clipped and unsafe targets. Zero
+editable text on a born-digital page produces a diagnostic. Preserve mode reports
+faithful pages; editable mode reports editable text; redesign reports a reviewable
+proposal. Changing mode or Brand still requires a new preview.
+
+Edited text is measured in its fixed source box, shrunk only to a bounded minimum,
+and explicitly rejected by the editor when it cannot fit. Rendered overflow is
+visible and labelled, rather than silently clipped. Font loading triggers a new
+measurement. Source assets, provenance and original text remain immutable.
+
+### Catalog lifecycle and quota
+
+`StudioCatalog.status` is `active` or `archived`; `archived_at` records archiving.
+Migration 0035 marks existing rows active and indexes `(organization, status)`.
+Archived catalogs retain spreads, private source assets, Brand snapshots and
+history, do not consume active slots, and are excluded from the default list.
+`GET /api/v2/studio/catalogs/?organization=ID&status=active|archived|all` supports
+management. `PUT /api/v2/studio/catalogs/ID/` with `{"status":"archived"}` archives;
+`{"status":"active"}` restores subject to quota. DELETE retains its existing
+permanent deletion behavior. Archived catalogs and their source assets are not
+publicly shared, although authorized tenant users retain access.
+
+The canonical catalog guard receives the actual destination organization and
+must run inside the creation/restore transaction. It locks the Organization row
+before checking active count, including when the quota row does not exist yet.
+Manual creation, Brand generation, document confirmation, demo cloning and
+restore share this rule. Legacy `organization=null` catalogs consume a separate
+personal scope, locked on their creator's User row; they never consume any
+organization's slots. Existing omitted-organization requests resolve the user's
+first membership/owned organization for backward compatibility. Studio sends its
+explicit active organization. Standalone chat creates a thread without creating
+an empty active catalog.
+
+`GET /api/v2/studio/quotas/?organization=ID` retains token fields and includes
+organization, plan name/tier, active count, maximum and remaining slots. Structured
+`catalog_limit_exceeded` includes the same counters. A quota query does not reserve
+a slot: the transactional server guard remains authoritative at save time.
+
+Analysis/prepare/preview create no StudioCatalog. Confirmation atomically creates
+one catalog, spreads, source association and Brand snapshot. A confirmed import
+returns its existing catalog before checking quota, including when it occupied
+the final slot. SQLite does not provide the PostgreSQL row-lock guarantee;
+competing import writes return the existing transient retry-conflict response.
+Production concurrency is verified against PostgreSQL.
+
+The import modal loads organization quota before save, permits analysis while
+full, and distinguishes analysis status from save eligibility. Its active/archive
+manager is the same component exposed in the Studio sidebar. Archiving requires
+confirmation; archived catalogs offer Restore. Recovery does not clear the file,
+analysis, selected page, comparison view, mode or Brand. Billing reuses
+`catana:open-billing-modal`; quota updates and focus refresh preflight. A lost
+confirmation response checks the import status so an already committed catalog
+can be reopened even when its creation filled the final slot.
+
+See [hardening audit and validation](document-import-hardening.md) for measured
+coverage, regression evidence, commands and known limits.

@@ -221,7 +221,7 @@ api.interceptors.response.use(
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('catana:open-billing-modal', { detail: { reason: 'quota_exceeded' } }));
         }
-      } else if (respStatus === 403 && code === 'catalog_limit_exceeded') {
+      } else if (respStatus === 403 && code === 'catalog_limit_exceeded' && !error.config?.url?.includes('/import-document/')) {
         toast.error('Limite de catalogos atingido.', {
           description: 'Voce atingiu o maximo de catalogos ativos do seu plano. Faca upgrade para criar mais.',
         });

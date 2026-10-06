@@ -33,6 +33,8 @@ User = get_user_model()
 
 class AbacatePayBillingTests(TestCase):
     def setUp(self):
+        from api.guards.quota_guard import rate_limiter
+        rate_limiter._requests.clear()
         self.client = APIClient()
         self.user = User.objects.create_user(
             username="lucas_test",
@@ -333,7 +335,7 @@ class AbacatePayBillingTests(TestCase):
             )
 
         with self.assertRaises(CatalogLimitExceededException):
-            check_catalog_creation_guard(self.user)
+            check_catalog_creation_guard(self.user, self.org)
 
     def test_council_guard_locked_on_free_tier(self):
         """

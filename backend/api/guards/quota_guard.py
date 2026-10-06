@@ -46,6 +46,12 @@ class CatalogLimitExceededException(APIException):
     }
     default_code = "catalog_limit_exceeded"
 
+    def __init__(self, detail=None, code=None):
+        super().__init__(detail=detail, code=code)
+        if isinstance(detail, dict):
+            # DRF coerces exception leaves to strings; retain quota counters as numbers.
+            self.detail.update({key: value for key, value in detail.items() if type(value) in (int, float) or value is None})
+
 
 class CouncilFeatureLockedException(APIException):
     status_code = status.HTTP_403_FORBIDDEN
@@ -175,7 +181,7 @@ def get_or_create_default_plan(tier: str = "free") -> SubscriptionPlan:
     return plan
 
 
-def get_user_quota(user: Optional[User]) -> Tuple[Optional[OrganizationQuota], SubscriptionPlan]:
+def get_user_quota(user: Optional[User], organization=None) -> Tuple[Optional[OrganizationQuota], SubscriptionPlan]:
     """
     Obtem ou instancia a cota correspondente para o usuario / organizacao.
     """
@@ -184,7 +190,10 @@ def get_user_quota(user: Optional[User]) -> Tuple[Optional[OrganizationQuota], S
     if not user or not user.is_authenticated:
         return None, plan
 
-    org = user.organizations.first() or user.owned_organizations.first()
+    org = organization or user.organizations.first() or user.owned_organizations.first()
+    if organization is not None:
+        from api.services.brand_intelligence import assert_organization_access
+        assert_organization_access(user, organization)
     if not org:
         org, _ = Organization.objects.get_or_create(
             name=f"Workspace de {user.username}",
@@ -247,22 +256,43 @@ def check_chat_guard(user: Optional[User], agent_role: str = "orchestrator", cli
             )
 
 
-def check_catalog_creation_guard(user: Optional[User]):
-    """
-    Bloqueia criacao de novos catalogos se a cota de catalogos ativos do plano for atingida.
+def catalog_slot_status(user, organization=None):
+    """Organization catalogs and legacy personal catalogs have separate scopes."""
+    quota, plan = get_user_quota(user, organization)
+    if organization is not None:
+        catalogs = StudioCatalog.objects.filter(organization=organization, status='active')
+    else:
+        catalogs = StudioCatalog.objects.filter(organization__isnull=True, created_by=user, status='active')
+    count = catalogs.count() if user and user.is_authenticated else 0
+    return {'organization': organization.pk if organization else None,
+            'active_catalogs': count, 'max_active_catalogs': plan.max_active_catalogs,
+            'remaining_catalog_slots': max(0, plan.max_active_catalogs - count),
+            'remaining': max(0, plan.max_active_catalogs - count),
+            'plan_tier': plan.tier, 'plan_name': plan.name}
+
+
+def check_catalog_creation_guard(user: Optional[User], organization=None):
+    """Call inside the transaction that creates/restores a catalog.
+
+    A stable owner row serializes slot consumption even when no quota row
+    exists yet. PostgreSQL READ COMMITTED sees the previous creator's commit
+    after acquiring this lock. Legacy personal catalogs lock their owner user.
     """
     if not user or not user.is_authenticated:
         return
-
-    _, plan = get_user_quota(user)
-    if not plan:
-        return
-
-    active_count = StudioCatalog.objects.filter(
-        Q(created_by=user) | Q(organization__in=user.organizations.all())
-    ).distinct().count()
-    if active_count >= plan.max_active_catalogs:
-        raise CatalogLimitExceededException()
+    from django.db import connection
+    if not connection.in_atomic_block:
+        raise RuntimeError('Catalog slot consumption requires transaction.atomic')
+    if organization is not None:
+        from api.services.brand_intelligence import assert_organization_access
+        assert_organization_access(user, organization, write=True)
+        Organization.objects.select_for_update().get(pk=organization.pk)
+    else:
+        User.objects.select_for_update().get(pk=user.pk)
+    data = catalog_slot_status(user, organization)
+    if data['remaining_catalog_slots'] == 0:
+        raise CatalogLimitExceededException(detail={**data, 'code': 'catalog_limit_exceeded',
+            'error': f"Você está usando {data['active_catalogs']} de {data['max_active_catalogs']} catálogos ativos. Arquive um catálogo ou altere seu plano para criar outro."})
 
 
 def check_council_guard(user: Optional[User]):
