@@ -58,3 +58,21 @@ Run with local development settings and an isolated PostgreSQL database; no paid
 The text index has a 32,000-character budget, at most 500 entries and 2,000 characters per entry; selected and visible text come first. Envelopes bound user input to 20,000 and presentation data to 48,000 characters. Very long blocks or omitted index entries may require selection/manual editing. Fuzzy replacement and implicit mass replacement are intentionally absent. Numeric/commercial detection is conservative and can reject editorial copy containing numbers; validated commercial workflows remain separate.
 
 Recognized context-injection patterns are quarantined, and all remaining model context is treated as data. Live Gemini behavior was checked through SDK contract/failure fixtures, not a paid external call. General model-driven creative edits still require review under existing action and commercial policies. The change introduces no migration and does not rewrite retained source assets.
+
+## PR publication
+
+Implementation commit: `0d3fcff`, pushed on `fix/ai-guardrail-context-separation` from current `main`. Final security/provider/creative checks passed 48 tests; the latest focused backend run passed 67 and frontend run passed 122. Targeted ESLint for the new helper, tests and browser spec passed.
+
+Both publication attempts were rejected by GitHub API access:
+
+```text
+gh pr create --repo ScryLk/catana-renew --base main --head fix/ai-guardrail-context-separation --title "Separate AI intent guards and safely edit imported catalog text" --body-file /tmp/catana-ai-command-pr.md
+Post "https://api.github.com/graphql": Forbidden
+
+gh api --method POST repos/ScryLk/catana-renew/pulls --input /tmp/catana-ai-command-pr.json --jq '.html_url'
+Post "https://api.github.com/repos/ScryLk/catana-renew/pulls": Forbidden
+```
+
+No PR was created, merged or deployed; GitHub CI status could not be verified. Prepared PR title: **Separate AI intent guards and safely edit imported catalog text**. The implementation summary and validation above supply the review body. Open the published comparison at:
+
+https://github.com/ScryLk/catana-renew/compare/main...fix/ai-guardrail-context-separation?expand=1
