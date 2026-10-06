@@ -2,7 +2,7 @@ import re
 import logging
 from typing import Dict, Any, Optional, List, Tuple
 from api.ai.agents.base import BaseAgent
-from api.ai.guardrails import KatanaGuardrailEngine, ThreatCategory
+from api.ai.guardrails import KatanaGuardrailEngine, ThreatCategory, COMPILED_POLITICS
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class OrchestratorAgent(BaseAgent):
             "Voce e o Editor-Chefe e Orquestrador Central do Katana Studio 2.0, responsavel pela coordenacao "
             "estrategica, direcao criativa e execucao operacional de catalogos corporativos, B2B e de alta costura.\n\n"
             "Sua missao e coordenar o Conselho Editorial composto por quatro especialistas tecnicos:\n"
-            "1. Diretor de Arte: Proporcoes A4 (794x1123 px), respiro negativo de 96px, ritmo visual e hierarquia tipografica.\n"
+            "1. Diretor de Arte: Geometria nativa do documento; A4 apenas para novas paginas, respiro negativo de 96px, ritmo visual e hierarquia tipografica.\n"
             "2. Redator Publicitario: Headlines de impacto, narrativa sensorial de valor, manifestos e descricoes persuasivas.\n"
             "3. Tabela Comercial / B2B: Estrutura de precos em Reais (R$), condicoes de atacado, markups, codigos SKU e pedidos minimos (MOQ).\n"
             "4. Auditor de Branding: Conformidade com o Brand Lock, contraste cromático WCAG AA/AAA e margens de monograma.\n\n"
@@ -32,8 +32,8 @@ class OrchestratorAgent(BaseAgent):
             "- Responda sempre em Portugues do Brasil com precisao profissional, objetividade e elegancia editorial.\n"
             "- Regra Estrita: Nao utilize nenhum emoji sob qualquer hipotese em suas mensagens, respostas ou blocos de codigo.\n"
             "- Formato da Resposta:\n"
-            "  1. Acao Realizada (Texto Principal): Escreva estritamente em UMA frase concisa e direta apenas a ACAO EXECUTADA na prancheta (ex: 'Segunda página removida e diagramação reorganizada pelo Conselho Editorial.'). NUNCA escreva relatórios longos ou listas enumeradas de agentes no texto principal.\n"
-            "  2. Pareceres dos Especialistas: O parecer detalhado de cada especialista (Diretor de Arte, Redator, Comercial, Branding) DEVE estar obrigatoriamente no array 'delegations' do bloco ```json:patch.\n\n"
+            "  1. Acao Proposta (Texto Principal): Escreva UMA frase concisa descrevendo a proposta; a camada de execucao confirma o resultado. Nunca afirme que a prancheta mudou antes da validacao. NUNCA escreva relatórios longos ou listas enumeradas de agentes no texto principal.\n"
+            "  2. Pareceres dos Especialistas: Em tarefas complexas, pareceres podem ficar no array 'delegations'; omita delegacoes em edicoes triviais. Use o bloco ```json:patch.\n\n"
             "PROTOCOLO OBRIGATORIO DE MODIFICACAO DO CANVAS (JSON DELTA PATCH):\n"
             "Toda solicitacao que demandar adicao, remocao, troca de produto, alteracao de preco, mudanca de layout, geracao de SKU, "
             "edicao de texto, remocao de fundo, fotografia com IA ou governanca de marca DEVE ser finalizada com um bloco delimitado estritamente por ```json:patch e ```.\n\n"
@@ -68,6 +68,7 @@ class OrchestratorAgent(BaseAgent):
             "- Mudar layout: action 'change_layout', target 'page:5', params {'type': 'grid_4' | 'hero' | 'duo' | 'manifesto' | 'divider'}\n"
             "- Reajustar precos: action 'adjust_pricing', target 'global', params {'mode': 'percentage', 'amount': 15}\n"
             "- Gerar SKUs: action 'generate_skus', target 'catalog:products', params {'prefix': 'ART-', 'format': '000'}\n"
+            "- Texto importado: action 'update_text', target 'page:1/element:<id_estavel>' ou 'element:<id_estavel>', params {'text': '...'}; preserve tipografia, geometria e origem. Nunca use campos de pagina para texto importado.\n"
             "- Editar texto: action 'update_text', target 'page:2', params {'quote': '...', 'title': '...', 'content': '...'}\n"
             "- Alterar cor da página / capa: action 'set_page_color', target 'page:1', params {'backgroundColor': '#000000'}\n"
             "- Remover fundo: action 'remove_background', target 'page:4', params {'slotIndex': 0}\n"
@@ -145,13 +146,18 @@ class OrchestratorAgent(BaseAgent):
         # 2. Se falhou na inspecao, avalia se ha intencao genuina de catalogo recuperavel
         has_intent, clean_text, actions = KatanaGuardrailEngine.sanitize_and_extract_intent(raw_text)
 
-        if has_intent and clean_text:
+        if (
+            guard_result.threat_category == ThreatCategory.TOXICITY
+            and not any(pattern.search(raw_text) for pattern in COMPILED_POLITICS)
+            and has_intent and clean_text
+            and KatanaGuardrailEngine.inspect_prompt(clean_text, agent_role=effective_role).is_safe
+        ):
             # Reformata o prompt para um padrao editorial nobre e polido
             formatted_prompt = self._reformat_to_editorial_directive(clean_text, effective_role)
             actions.append("ALIGNED_TO_CATALOG_CONTEXT")
 
             logger.info(
-                f"[OrchestratorGateway] Prompt reformatado com sucesso: '{raw_text[:60]}...' -> '{formatted_prompt[:60]}...'"
+                "[OrchestratorGateway] User intent normalized"
             )
 
             return {
@@ -222,7 +228,7 @@ class OrchestratorAgent(BaseAgent):
 
         # Adiciona orientacao profissional conforme o especialista
         role_suffixes = {
-            "director": " Assegurar proporcoes A4 (794x1123 px), respiro visual adequado e hierarquia tipografica.",
+            "director": " Preservar geometria nativa do documento, respiro visual adequado e hierarquia tipografica.",
             "copywriter": " Destacar atributos sensoriais, clareza dos diferenciais tecnicos e apelo comercial.",
             "commercial": " Organizar codigos SKU, precos em Reais (R$), pedidos minimos e condicoes de fornecimento.",
             "branding": " Garantir conformidade com as diretrizes de identidade visual e espacamento de seguranca do logotipo.",
