@@ -3,6 +3,7 @@ from typing import Iterator, Dict, Any, Optional, List
 from api.ai.provider import get_ai_provider, AIResponseChunk
 from api.services.template_rag import TemplateRAGService
 from api.ai.guardrails import KatanaGuardrailEngine
+from api.ai.prompt_envelope import PromptEnvelope
 
 class BaseAgent:
     """
@@ -23,7 +24,7 @@ class BaseAgent:
             "Seu foco e auxiliar na criacao, refinamento e producao de catalogos comerciais e editoriais de alto padrao.\n\n"
             "Diretrizes Gerais:\n"
             "1. Responda sempre em Portugues do Brasil com precisao profissional, objetividade e clareza editorial.\n"
-            "2. Proporcao Padrao: Paginas A4 (794x1123 px por pagina), organizadas em pares de spreads duplos.\n"
+            "2. Proporcao Padrao: Geometria nativa para documentos importados; A4 para novas paginas, organizadas em pares de spreads duplos.\n"
             "3. Protocolo de Modificacao do Canvas (JSON Delta Patch):\n"
             "   Quando a solicitacao do usuario demandar criacao, atualizacao ou estilizacao de elementos no spread atual, "
             "finalize sua resposta com um bloco JSON delimitado exatamente por ```json:patch e ``` no formato:\n"
@@ -45,6 +46,7 @@ class BaseAgent:
         user_message: str,
         catalog_context: Optional[Dict[str, Any]] = None,
         attachments: Optional[List[Dict[str, Any]]] = None,
+        include_request: bool = True,
     ) -> str:
         """
         Monta o prompt enriquecido com metadados do catalogo, spread ativo e anexos.
@@ -57,7 +59,7 @@ class BaseAgent:
             spread_idx = catalog_context.get("spread_index", 0)
             context_parts.append(
                 f"[CONTEXTO DO PROJETO]: Catalogo: '{title}' | Marca: '{brand}' | "
-                f"Estilo: '{style}' | Spread Ativo: {spread_idx} (A4 794x1123 px)."
+                f"Estilo: '{style}' | Spread Ativo: {spread_idx} (geometria nativa para documentos importados)."
             )
 
             brand_context = catalog_context.get('brand_context')
@@ -157,9 +159,9 @@ class BaseAgent:
 
         if context_parts:
             header = "\n\n".join(context_parts) + "\n\n"
-            return f"{header}Solicitacao do Usuario: {user_message}"
+            return f"{header}Solicitacao do Usuario: {user_message}" if include_request else header
         
-        return user_message
+        return user_message if include_request else ""
 
     def process_stream(
         self,
@@ -177,10 +179,12 @@ class BaseAgent:
             user_message=user_message,
             catalog_context=catalog_context,
             attachments=attachments,
+            include_request=False,
         )
 
         return provider.generate_stream(
-            prompt=final_prompt,
+            prompt=user_message,
+            envelope=PromptEnvelope.build(user_message, {"catalog": catalog_context or {}, "retrieved_presentation": final_prompt}, history, attachments),
             system_instruction=system_prompt,
             agent_role=self.role,
             history=history,

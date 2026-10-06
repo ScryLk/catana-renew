@@ -123,15 +123,6 @@ class MockGeminiProvider:
         attachments: Optional[List[Dict[str, Any]]] = None,
         context: Optional[Dict[str, Any]] = None,
     ) -> str:
-        brand = (context or {}).get("brand_name", "Marca Exemplo")
-        catalog_title = (context or {}).get("catalog_title", "Catálogo Comercial")
-        
-        has_files = bool(attachments and len(attachments) > 0)
-        file_summary = ""
-        if has_files:
-            file_names = ", ".join([a.get("name", "arquivo") for a in attachments])
-            file_summary = f"\n\nArquivos analisados com sucesso: {file_names}."
-
         # Extrai a mensagem real do usuário caso venha empacotada com contexto
         clean_user_prompt = prompt
         if "Solicitacao do Usuario:" in prompt:
@@ -139,6 +130,11 @@ class MockGeminiProvider:
         elif "Solicitação do Usuário:" in prompt:
             clean_user_prompt = prompt.split("Solicitação do Usuário:", 1)[1].strip()
 
+        if isinstance(context, dict) and 'editable_text_index' in context:
+            from api.ai.text_commands import plan_text_replacement, planner_response
+            plan = plan_text_replacement(clean_user_prompt, context)
+            if plan is not None:
+                return planner_response(plan)
         lower = clean_user_prompt.lower()
 
         remove_requested = any(k in lower for k in ["retire", "remover", "remova", "tire", "apague", "limpar"])
@@ -151,8 +147,6 @@ class MockGeminiProvider:
 
         # Detecção de Ações Funcionais (para garantir execução mesmo em modo fallback)
         actions = []
-        delegations = []
-        summary_parts = []
 
         # 1. Remoção de produto
         if remove_requested:
@@ -163,11 +157,6 @@ class MockGeminiProvider:
                 "target": f"page:{rm_page}",
                 "page": rm_page,
                 "params": {"slotIndex": 0, "returnToDrawer": True}
-            })
-            summary_parts.append(f"Remoção de produto da Página {rm_page}")
-            delegations.append({
-                "role": "director",
-                "action": f"Liberou o slot da Página {rm_page} preservando o respiro de 96px."
             })
 
         # 2. Mudança de Layout
@@ -193,11 +182,6 @@ class MockGeminiProvider:
                 "layout": target_layout,
                 "params": {"type": target_layout, "layout": target_layout}
             })
-            summary_parts.append(f"Conversão da Página {lo_page} para layout {target_layout}")
-            delegations.append({
-                "role": "director",
-                "action": f"Reconfigurou a Página {lo_page} para o template {target_layout.upper()}."
-            })
 
         # 3. Reajuste de Preços
         if pricing_requested:
@@ -214,111 +198,11 @@ class MockGeminiProvider:
                     "amount": -pct if is_discount else pct
                 }
             })
-            summary_parts.append(f"Reajuste de {pct}% nos preços")
-            delegations.append({
-                "role": "commercial",
-                "action": f"Aplicou calibragem de {pct}% na matriz de preços e markups comerciais."
-            })
 
-        # Se identificou ações operacionais a executar no canvas
         if actions:
-            delegations.append({
-                "role": "branding",
-                "action": "Validou consistência geométrica, alinhamentos e contraste sob WCAG AA."
-            })
-            delegations.append({
-                "role": "copywriter",
-                "action": "Harmonizou a hierarquia de claims e descrições sensoriais."
-            })
-
-            patch_obj = {
-                "spread_index": 1,
-                "actions": actions,
-                "summary": ", ".join(summary_parts) + ".",
-                "delegations": delegations
-            }
-
-            patch_json = json.dumps(patch_obj, ensure_ascii=False, indent=2)
-
-            return (
-                f"### Relatório Editorial Executivo\n\n"
-                f"Como Editor-Chefe e Orquestrador Central do Katana Studio, confirmo o recebimento e a execução técnica "
-                f"das modificações solicitadas pelo usuário com o respaldo do Conselho Editorial:\n\n"
-                + "\n".join([f"• **{d['role'].title()}**: {d['action']}" for d in delegations]) +
-                f"\n\nAs pranchetas do catálogo foram sincronizadas e os parâmetros operacionais foram atualizados.{file_summary}\n\n"
-                f"```json:patch\n{patch_json}\n```"
-            )
-
-        if agent_role == "director":
-            return (
-                f"Análise de Direção de Arte para {catalog_title} ({brand}):\n\n"
-                f"1. Hierarquia e Grid Visual: Para a página dupla (A4 794x1123 px), recomendo organizar "
-                f"o spread com uma área nobre de 60% na página esquerda para imagem heroica de impacto, "
-                f"e a página direita estruturada em grid modular de 2x3 para exposição limpa dos produtos.\n"
-                f"2. Paleta Editorial: Mantendo o padrão clean com tipografia refinada, contraste equilibrado "
-                f"entre espaços em branco e blocos de conteúdo.\n"
-                f"3. Elementos Sugeridos: Banner institucional superior, bloco de destaque do produto principal "
-                f"e tabela de variações com margens de segurança de 32px.{file_summary}\n\n"
-                f"Deseja que eu aplique este layout estrutural diretamente nas páginas do catálogo?"
-            )
-        elif agent_role == "copywriter":
-            return (
-                f"Proposta de Redação Publicitária para {catalog_title}:\n\n"
-                f"Título de Abertura: 'Elegância e Precisão em Cada Detalhe.'\n"
-                f"Subtítulo: Desenvolvido para superar as expectativas mais rigorosas do mercado corporativo.\n\n"
-                f"Texto de Apoio:\n"
-                f"Apresentamos uma coleção concebida sob o equilíbrio exato entre funcionalidade e design atemporal. "
-                f"Cada peça reflete processos fabris refinados, materiais nobres e acabamento impecável, garantindo "
-                f"posicionamento exclusivo e alto valor percebido aos seus clientes.\n\n"
-                f"Chamadas em Destaque (Call to Action):\n"
-                f"- 'Solicite agora a grade completa para distribuição B2B.'\n"
-                f"- 'Disponibilidade imediata para pronta-entrega.'{file_summary}\n\n"
-                f"Podemos consolidar estas redações nos blocos de texto da sua página?"
-            )
-        elif agent_role == "commercial":
-            return (
-                f"Estruturação da Tabela Comercial e Dados B2B para {catalog_title}:\n\n"
-                f"Tabela de Itens e Escala de Preços Sugerida:\n"
-                f"| Código (SKU) | Descrição Técnica | Qtd Mínima | Preço Unitário (R$) | Preço Atacado (R$) |\n"
-                f"|---|---|---|---|---|\n"
-                f"| CT-101 | Modelo Master Premium A4 | 10 un | R$ 189,90 | R$ 142,50 |\n"
-                f"| CT-102 | Edição Executiva Prime | 20 un | R$ 249,00 | R$ 186,75 |\n"
-                f"| CT-103 | Pack Distribuição Corporativa | 50 un | R$ 129,50 | R$ 97,00 |\n\n"
-                f"Condições Comerciais:\n"
-                f"- Faturamento: 28/42 dias via boleto bancário.\n"
-                f"- Frete: CIF para capitais nas compras acima do pedido mínimo.{file_summary}\n\n"
-                f"Deseja importar estes dados em formato tabular na página direita do seu catálogo?"
-            )
-        elif agent_role == "branding":
-            return (
-                f"Auditoria de Branding e Conformidade Visual:\n\n"
-                f"Diagnóstico da Identidade da Marca '{brand}':\n"
-                f"1. Consistência de Voz: A linguagem respeita o tom institucional e corporativo, sem excessos ou jargões descartáveis.\n"
-                f"2. Integridade Tipográfica: A combinação de famílias sem serifa para rótulos e serifa para editoriais garante alta legibilidade.\n"
-                f"3. Respeito ao Respiro e Zonas de Proteção: O logotipo principal deve manter o espaçamento mínimo equivalente a 1/2 de sua altura nas bordas do A4.\n"
-                f"4. Aderência às Diretrizes: Aprovado para continuidade no fluxo de publicação.{file_summary}\n\n"
-                f"Recomendo avançar com o fechamento do spread."
-            )
-        elif agent_role == "council":
-            return (
-                f"Parecer Executivo do Conselho Editorial (Mesa Redonda):\n\n"
-                f"Avaliamos o projeto '{catalog_title}' sob as quatro perspectivas de especialistas:\n\n"
-                f"1. Direção de Arte: Layout harmônico e pronto para distribuição digital e impressa em proporção A4.\n"
-                f"2. Redação Comercial: Mensagem clara, persuasiva e com forte apelo de valor B2B.\n"
-                f"3. Tabela de Vendas: Grade técnica organizada com codificação SKU e preços transparentes.\n"
-                f"4. Auditoria de Marca: Fidelidade estética confirmada, transmitindo solidez e credibilidade.{file_summary}\n\n"
-                f"Conclusão do Conselho: O material atinge grau profissional de excelência e está pronto para validação final."
-            )
-        else: # orchestrator / default
-            return (
-                f"Olá! Sou o Editor-Chefe do Katana Studio. Recebi sua solicitação: '{clean_user_prompt}'.\n\n"
-                f"Para este catálogo de '{brand}', organizei a equipe de especialistas nos seguintes eixos:\n"
-                f"1. Direção de Arte: Configuração da grade visual e harmonia das páginas duplas.\n"
-                f"2. Redação Publicitária: Desenvolvimento de textos de alto impacto comercial.\n"
-                f"3. Tabela Comercial: Inclusão de dados de produtos, códigos e condições de venda.\n"
-                f"4. Auditoria de Branding: Validação de consistência de marca e padrão visual.{file_summary}\n\n"
-                f"Como prefere começar? Posso sugerir a primeira página dupla ou detalhar a grade de produtos."
-            )
+            patch_obj = {"actions": actions, "summary": "Proposta operacional para validação na prancheta."}
+            return "Proposta do Diretor de Arte / Conselho Editorial; nenhuma execução confirmada.\n```json:patch\n" + json.dumps(patch_obj, ensure_ascii=False) + "\n```"
+        return "O provedor simulado está ativo. O Diretor de Arte e os demais especialistas não executaram alterações; esta solicitação requer o provedor de IA disponível ou uma edição manual."
 
 
 class GeminiAIProvider:
@@ -344,10 +228,20 @@ class GeminiAIProvider:
                 self.client = genai.Client(api_key=self.api_key.strip(), http_options=http_opts)
                 logger.info(f"GeminiAIProvider inicializado com sucesso (modelo: {self.default_model}).")
             except Exception as exc:
-                logger.warning(f"Nao foi possivel inicializar cliente Gemini: {exc}. Usando fallback mock.")
+                logger.warning(f"Nao foi possivel inicializar cliente Gemini: {type(exc).__name__}. Usando fallback mock.")
                 self.client = None
         else:
             logger.info("GEMINI_API_KEY nao fornecida. Operando em modo Mock inteligente.")
+
+    def _mock_stream(self, diagnostics, **kwargs):
+        for chunk in self.mock_provider.generate_stream(**kwargs):
+            if chunk.done:
+                chunk.metadata.update(diagnostics)
+                chunk.metadata["mock"] = True
+                chunk.metadata["model"] = "mock-operational-planner"
+                chunk.metadata["action_planner"] = "mock-operational"
+                chunk.metadata["execution_status"] = "proposed"
+            yield chunk
 
     @property
     def is_mock(self) -> bool:
@@ -361,40 +255,44 @@ class GeminiAIProvider:
         history: Optional[List[Dict[str, str]]] = None,
         attachments: Optional[List[Dict[str, Any]]] = None,
         context: Optional[Dict[str, Any]] = None,
+        envelope=None,
     ) -> Iterator[AIResponseChunk]:
         """
         Executa a chamada streaming. Se o cliente real estiver disponivel, consome do Gemini;
         caso contrario, entrega a resposta estruturada do MockGeminiProvider.
         """
-        # Verificacao de Seguranca e Protecao de Prompts (Katana Guard)
         from api.ai.guardrails import KatanaGuardrailEngine
-        guard_result = KatanaGuardrailEngine.inspect_prompt(prompt, agent_role=agent_role)
-        if not guard_result.is_safe:
-            logger.warning(
-                f"[GeminiAIProvider] Prompt bloqueado por seguranca ({guard_result.threat_category}): "
-                f"{guard_result.threat_detail}"
-            )
-            refusal_text = guard_result.refusal_response or (
-                "Esta solicitacao viola as diretrizes de seguranca e conformidade do Katana Studio. "
-                "Por favor, formule uma demanda voltada ao catalogo de produtos."
-            )
-            yield AIResponseChunk(text=refusal_text, done=False)
-            yield AIResponseChunk(
-                text="",
-                done=True,
-                usage={"prompt_tokens": 10, "completion_tokens": len(refusal_text.split()), "total_tokens": 20},
-                metadata={
-                    "provider": "katana-guard",
-                    "guardrail_status": "BLOCKED",
-                    "threat_category": guard_result.threat_category,
-                    "threat_detail": guard_result.threat_detail,
-                    "risk_score": guard_result.risk_score,
-                }
-            )
+        from api.ai.agents.orchestrator import OrchestratorAgent
+        from api.ai.prompt_envelope import PromptEnvelope, DATA_BOUNDARY_DIRECTIVE
+        from api.ai.text_commands import plan_text_replacement, planner_response
+        # No caller may supply an approval flag. Every entry path validates literal input.
+        if envelope is not None and (not isinstance(envelope, PromptEnvelope) or envelope.current_user != prompt):
+            raise ValueError("invalid_prompt_boundary")
+        envelope = envelope or PromptEnvelope.build(prompt, context, history, attachments)
+        envelope.validate()
+        gateway = OrchestratorAgent().format_and_guard_request(envelope.current_user, target_role=agent_role)
+        diagnostics = {"user_guard_status": gateway["status"], "context_guard_status": envelope.context_guard_status,
+                       "guard_stage": "current_user_gateway", "matched_category": gateway.get("threat_category"),
+                       "fallback_used": False}
+        if not gateway["is_safe"]:
+            yield AIResponseChunk(text=gateway["refusal_response"])
+            yield AIResponseChunk(done=True, metadata={**diagnostics, "provider": "katana-guard", "guardrail_status": "BLOCKED"})
             return
-
+        literal_prompt = gateway["formatted_prompt"]
+        if gateway["status"] == "NORMALIZED":
+            literal_prompt = KatanaGuardrailEngine.sanitize_and_extract_intent(envelope.current_user)[1]
+        plan = plan_text_replacement(literal_prompt, context)
+        if plan is not None:
+            yield AIResponseChunk(text=planner_response(plan))
+            yield AIResponseChunk(done=True, metadata={**diagnostics, "provider": "local-command-planner", "model": "deterministic", "planner_status": plan[1]["planner_status"], "action_planner": "normalized-text-replacement"})
+            return
+        # Mock receives only literal intent, never serialized customer context.
+        prompt = literal_prompt
+        history = None
+        attachments = None
+        system_instruction = (system_instruction or "Voce e um assistente profissional do Catana Studio para criacao e edicao de catalogos.") + KatanaGuardrailEngine.UNIVERSAL_SYSTEM_GUARDRAIL_DIRECTIVE + DATA_BOUNDARY_DIRECTIVE
         if self.is_mock:
-            yield from self.mock_provider.generate_stream(
+            yield from self._mock_stream(diagnostics,
                 prompt=prompt,
                 system_instruction=system_instruction,
                 agent_role=agent_role,
@@ -408,37 +306,9 @@ class GeminiAIProvider:
         try:
             from google.genai import types
 
-            # Constrói o conteúdo contextual
-            contents = []
-            if history:
-                for msg in history:
-                    role = "user" if msg.get("role") in ["user", "human"] else "model"
-                    contents.append(
-                        types.Content(
-                            role=role,
-                            parts=[types.Part.from_text(text=msg.get("content", ""))]
-                        )
-                    )
-
-            # Informações de contexto e anexos anexadas ao prompt final
-            full_prompt = prompt
-            if attachments:
-                attachment_info = "\n\n[ANEXOS PROCESSADOS]:\n"
-                for att in attachments:
-                    att_name = att.get("name", "arquivo")
-                    att_text = att.get("extracted_text", "")
-                    if att_text:
-                        attachment_info += f"- Arquivo: {att_name}\nConteudo extraido:\n{att_text[:3000]}\n"
-                    else:
-                        attachment_info += f"- Arquivo: {att_name}\n"
-                full_prompt += attachment_info
-
-            contents.append(
-                types.Content(
-                    role="user",
-                    parts=[types.Part.from_text(text=full_prompt)]
-                )
-            )
+            # History and attachments remain quoted DATA in the single request envelope.
+            full_prompt = envelope.render(literal_prompt)
+            contents = [types.Content(role="user", parts=[types.Part.from_text(text=full_prompt)])]
 
             safety_settings = [
                 types.SafetySetting(
@@ -479,7 +349,6 @@ class GeminiAIProvider:
                     ordered_models.append(m)
 
             success = False
-            last_exc = None
 
             for current_model in ordered_models:
                 try:
@@ -489,6 +358,7 @@ class GeminiAIProvider:
                         config=config,
                     )
 
+                    candidate_text = []
                     total_prompt_tokens = 0
                     total_completion_tokens = 0
 
@@ -496,12 +366,15 @@ class GeminiAIProvider:
                         if chunk.text:
                             clean_chunk = KatanaGuardrailEngine.sanitize_output(chunk.text)
                             if clean_chunk:
-                                yield AIResponseChunk(text=clean_chunk, done=False)
+                                candidate_text.append(clean_chunk)
 
                         # Se metadados de tokens estiverem disponiveis no chunk
                         if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
                             total_prompt_tokens = getattr(chunk.usage_metadata, "prompt_token_count", total_prompt_tokens)
                             total_completion_tokens = getattr(chunk.usage_metadata, "candidates_token_count", total_completion_tokens)
+
+                    for clean_chunk in candidate_text:
+                        yield AIResponseChunk(text=clean_chunk, done=False)
 
                     # Fallback de contagem aproximada se a API nao retornar metadata
                     if total_prompt_tokens == 0:
@@ -518,6 +391,7 @@ class GeminiAIProvider:
                             "total_tokens": total_prompt_tokens + total_completion_tokens,
                         },
                         metadata={
+                            **diagnostics,
                             "provider": "google-gemini",
                             "model": current_model,
                             "agent_role": agent_role,
@@ -526,16 +400,16 @@ class GeminiAIProvider:
                     success = True
                     break
                 except Exception as model_err:
-                    last_exc = model_err
                     logger.warning(
-                        f"[GeminiAIProvider] Modelo '{current_model}' falhou ({model_err}). "
+                        f"[GeminiAIProvider] Modelo '{current_model}' falhou ({type(model_err).__name__}). "
                         "Tentando próximo modelo candidato..."
                     )
 
             if not success:
-                logger.error(f"Todos os modelos Gemini falharam. Último erro: {last_exc}. Alternando para fallback mock.")
+                logger.error("All Gemini models failed; using explicit mock fallback")
+                diagnostics["fallback_used"] = True
                 # Fallback seguro caso ocorra erro em tempo de execucao (ex: chave revogada, limite da Google atingido)
-                yield from self.mock_provider.generate_stream(
+                yield from self._mock_stream(diagnostics,
                     prompt=prompt,
                     system_instruction=system_instruction,
                     agent_role=agent_role,
@@ -544,8 +418,9 @@ class GeminiAIProvider:
                     context=context,
                 )
         except Exception as e:
-            logger.error(f"[GeminiAIProvider] Falha geral na chamada Gemini: {e}. Alternando para mock.")
-            yield from self.mock_provider.generate_stream(
+            logger.error("Gemini gateway failure: %s", type(e).__name__)
+            diagnostics["fallback_used"] = True
+            yield from self._mock_stream(diagnostics,
                 prompt=prompt,
                 system_instruction=system_instruction,
                 agent_role=agent_role,

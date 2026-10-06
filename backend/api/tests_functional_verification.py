@@ -432,7 +432,7 @@ class SystemDesignAndFunctionalVerificationTests(TestCase):
         """
         MODULO 7: Orquestrador como Gateway de Requisicao Unica e Formatacao de Prompts:
         1. Neutralizacao de palavras ofensivas em prompts com demanda comercial valida.
-        2. Extracao de ruidos politicos mantendo o escopo editorial de catalogo.
+        2. Bloqueio de pedidos politicos explicitos mesmo quando acompanhados de uma demanda editorial.
         3. Encaminhamento do prompt higienizado ao especialista sem bloqueio indevido.
         4. Preservacao estrita de bloqueio em ataques puros irrecuperaveis (jailbreak).
         """
@@ -460,7 +460,7 @@ class SystemDesignAndFunctionalVerificationTests(TestCase):
         self.assertIn("potes", formatted_sent.lower())
         self.assertTrue(res_norm_tox.data.get("audit_metrics", {}).get("zero_emojis_compliant"))
 
-        # 2. Prompt com ruido politico e solicitacao de capa
+        # 2. Pergunta politica explicita acompanhada de solicitacao de capa
         res_norm_pol = self.client.post(
             url_test,
             {
@@ -471,13 +471,11 @@ class SystemDesignAndFunctionalVerificationTests(TestCase):
         )
         self.assertEqual(res_norm_pol.status_code, status.HTTP_200_OK)
         og_pol = res_norm_pol.data.get("orchestrator_gateway", {})
-        self.assertTrue(og_pol.get("was_reformatted"))
-        self.assertIn("REMOVED_OFF_TOPIC_NOISE", og_pol.get("reformatting_actions", []))
-        
-        formatted_pol_sent = res_norm_pol.data.get("formatted_prompt_sent", "")
-        self.assertNotIn("votar", formatted_pol_sent.lower())
-        self.assertNotIn("presidente", formatted_pol_sent.lower())
-        self.assertIn("capa", formatted_pol_sent.lower())
+        # A direct voting question is genuine political intent, not recoverable context noise.
+        self.assertFalse(og_pol.get("was_reformatted"))
+        self.assertEqual(og_pol.get("status"), "BLOCKED")
+        self.assertEqual(res_norm_pol.data.get("audit_metrics", {}).get("threat_category"), "POLITICS")
+        self.assertNotIn("json:patch", res_norm_pol.data.get("response", ""))
 
         # 3. Ataque puro sem qualquer demanda de catalogo (deve manter o bloqueio)
         res_attack = self.client.post(

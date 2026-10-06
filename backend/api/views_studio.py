@@ -718,8 +718,13 @@ class StudioChatStreamView(APIView):
             client_ip = client_ip.split(",")[0].strip()
 
         # Extrai parametros do corpo (JSON ou FormData)
-        message = request.data.get("message", "").strip()
-        agent_role = request.data.get("agent_role", "orchestrator").strip().lower()
+        from api.ai.prompt_envelope import MAX_USER
+        message = request.data.get("message", "")
+        agent_role = request.data.get("agent_role", "orchestrator")
+        if not isinstance(message, str) or len(message) > MAX_USER or not isinstance(agent_role, str) or len(agent_role) > 100:
+            return Response({"code": "invalid_user_boundary", "error": "Informe uma mensagem de texto dentro do limite permitido."}, status=status.HTTP_400_BAD_REQUEST)
+        message = message.strip()
+        agent_role = agent_role.strip().lower()
         catalog_id = request.data.get("catalog_id")
         thread_id = request.data.get("thread_id")
 
@@ -825,6 +830,7 @@ class StudioChatStreamView(APIView):
             "active_spread_data": active_spread_data,
             "catalog_skeleton": catalog_skeleton,
             "selected_element_id": selected_element_id,
+            "editable_text_index": request.data.get("editable_text_index", []),
         }
         if catalog and catalog.brand_id:
             # Chat uses the catalog's historical identity, never today's Brand state.
@@ -847,21 +853,9 @@ class StudioChatStreamView(APIView):
             metadata = {}
 
             try:
-                # Gateway do Orquestrador (Editor-Chefe): Inspecao e Normalizacao de Prompt
-                from api.ai.agents.orchestrator import OrchestratorAgent
-                orchestrator_agent = get_agent("orchestrator")
-                clean_message = message
-                if isinstance(orchestrator_agent, OrchestratorAgent):
-                    gw_res = orchestrator_agent.format_and_guard_request(message, target_role=agent.role)
-                    if not gw_res.get("is_safe") or gw_res.get("status") == "BLOCKED":
-                        refusal = gw_res.get("refusal_response") or "Solicitacao bloqueada pelo Katana Guard."
-                        yield f"data: {json.dumps({'event': 'token', 'text': refusal})}\n\n"
-                        yield f"data: {json.dumps({'event': 'done', 'usage': final_usage, 'metadata': {'guardrail': 'BLOCKED'}})}\n\n"
-                        return
-                    clean_message = gw_res.get("formatted_prompt", message)
-
+                # Provider gateway owns current-user intent; context is never reclassified.
                 stream_generator = agent.process_stream(
-                    user_message=clean_message,
+                    user_message=message,
                     catalog_context=catalog_context,
                     attachments=attachments_info,
                     history=history,
@@ -920,7 +914,7 @@ class StudioChatStreamView(APIView):
                 yield f"data: {json.dumps(done_payload)}\n\n"
 
             except Exception as stream_err:
-                logger.error(f"Erro no streaming SSE do agente {agent.role}: {stream_err}")
+                logger.error("Agent SSE failure role=%s error=%s", agent.role, type(stream_err).__name__)
                 error_payload = {
                     "event": "error",
                     "error": "Ocorreu um erro no processamento do agente. Tente novamente.",

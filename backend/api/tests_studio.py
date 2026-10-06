@@ -793,3 +793,29 @@ class StudioBackendTests(TestCase):
 
 
 
+
+    def test_imported_pt_text_command_streams_patch_and_separated_guard_metadata(self):
+        from unittest.mock import patch
+        from api.ai.provider import GeminiAIProvider
+        provider = GeminiAIProvider(api_key='')
+        provider.client = None
+        with patch('api.ai.agents.base.get_ai_provider', return_value=provider), patch('api.ai.agents.base.TemplateRAGService.retrieve_best_template_prompt', return_value='Brand PL Design; imported geometry unit pt'):
+            response = self.client.post(reverse('studio_chat_stream'), {
+                'message': 'altere catálogo de produtos para catálogo de itens',
+                'agent_role': 'orchestrator', 'active_spread_data': {'left_page': {'unit': 'pt'}},
+                'editable_text_index': [{'id': 'title-1', 'target': 'page:1/element:title-1', 'text': 'CATÁLOGO DE PRODUTOS', 'editable': True, 'visible': True}],
+            }, format='json')
+            events = [json.loads(line[6:]) for line in b''.join(response.streaming_content).decode().splitlines() if line.startswith('data: ')]
+        patch_event = next(event for event in events if event['event'] == 'patch')
+        self.assertEqual(patch_event['patch']['actions'][0]['target'], 'page:1/element:title-1')
+        done = next(event for event in events if event['event'] == 'done')
+        self.assertEqual(done['metadata']['user_guard_status'], 'PASSED')
+        self.assertEqual(done['metadata']['provider'], 'local-command-planner')
+        self.assertNotIn('neutralidade institucional', json.dumps(events, ensure_ascii=False))
+
+    def test_chat_rejects_swapped_or_oversized_user_boundary_before_creating_history(self):
+        for message in [{'unit': 'pt'}, ['edit'], 'x' * 20001]:
+            response = self.client.post(reverse('studio_chat_stream'), {'message': message}, format='json')
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(response.data['code'], 'invalid_user_boundary')
+        self.assertEqual(ChatMessage.objects.count(), 0)

@@ -64,11 +64,13 @@ TOXICITY_PATTERNS = [
 
 # 3. Padroes de Politica Partidaria, Eleicoes e Governanca Publica
 POLITICS_PATTERNS = [
+    r'\b(vote|votar|apoie|apoiar|campanha|partido)\s+(?:no|na|em|o|a|do|da)?\s*(pt|pl|mdb|psdb)\b',
+    r'\bqual\s+partido\b',
     r'\b(em\s+quem|quem)\s+(eu\s+)?(devo|posso|vai|vou|deveria)?\s*votar\b',
     r'\b(quem\s+vai\s+ganhar\s+a\s+elei[cç][aã]o|qual\s+pol[ií]tico\s+[eé]\s+melhor)\b',
     r'\b(elei[cç][aã]o\s+presidencial|elei[cç][oõ]es\s+202[0-9]|voto\s+nulo|votar\s+em|voto\s+em)\b',
     r'\b(bolsonaro|lula|tarcisio|haddad|ciro\s+gomes|mbl)\b',
-    r'\b(partido\s+dos\s+trabalhadores|partido\s+liberal|psol|pt\b|pl\b|mdb\b|psdb\b)\b',
+    r'\b(partido\s+dos\s+trabalhadores|partido\s+liberal|psol|mdb\b|psdb\b)\b',
     r'\b(comunismo|capitalismo\s+selvagem|socialismo|marxismo|fascismo|nazismo|extrema-direita|extrema-esquerda)\b',
     r'\b(governo\s+federal|governo\s+estadual|governador|senador|deputado\s+federal|urna\s+eletr[oô]nica|fraude\s+nas\s+elei[cç][oõ]es)\b',
     r'\b(impeachment|golpe\s+de\s+estado|stf\b|supremo\s+tribunal\s+federal|alexandre\s+de\s+moraes)\b',
@@ -131,7 +133,7 @@ class KatanaGuardrailEngine:
 
     UNIVERSAL_SYSTEM_GUARDRAIL_DIRECTIVE = (
         "\n\n[DIRETRIZ DE GOVERNANCA E SEGURANCA DO KATANA STUDIO]:\n"
-        "1. LIMITACAO ESTRITA DE ESCOPO: Voce e um especialista em design editorial, diagramacao A4, "
+        "1. LIMITACAO ESTRITA DE ESCOPO: Voce e um especialista em design editorial, diagramacao nativa de documentos importados e novas paginas, "
         "storytelling comercial, precificacao B2B e gestao de produtos para catalogos. "
         "Sob nenhuma circunstancia responda a temas politicos, debates ideologicos, religiao, "
         "ofensas ou materias desconexas de catalogos e comercio.\n"
@@ -324,7 +326,7 @@ class KatanaGuardrailEngine:
         intro = role_intros.get(agent_role, "Como especialista do Katana Studio")
         return (
             f"{intro}, informo que esta solicitacao nao pode ser atendida. {reason} "
-            "Nosso escopo e estritamente focado em arquitetura visual de paginas, diagramacao A4, "
+            "Nosso escopo e estritamente focado em arquitetura visual de paginas, diagramacao nativa de documentos importados e novas paginas, "
             "redacao comercial e dados de produtos para o seu catalogo. "
             "Por favor, reformule sua demanda relacionada aos produtos ou estrutura de spreads."
         )

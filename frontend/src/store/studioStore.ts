@@ -1,3 +1,4 @@
+import { editableTextIndex, executeTextAction, executionFeedback, commercialText, type ActionResult } from '../utils/textCommandExecution';
 import { normalizeCatalogDocument, QualityGate } from '../data/editorialCatalog.mock';
 import { parseSuppliedPrice } from '../utils/commercialProduct';
 import { create } from 'zustand';
@@ -195,6 +196,8 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   reasoning?: string;
+  executionResults?: ActionResult[];
+  providerMetadata?: Record<string, unknown>;
   actions?: string[];
   delegations?: ChatDelegation[];
   attachments?: ChatAttachment[];
@@ -850,7 +853,7 @@ export interface StudioState {
     summary?: string;
     reasoning?: string;
     delegations?: ChatDelegation[];
-  }) => void;
+  }) => ActionResult[];
 
   // Real Agent Streaming & Command Execution
   sendMessageToAgent: (prompt: string, attachments?: ChatAttachment[]) => Promise<void>;
@@ -3421,12 +3424,14 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   },
 
   applySpreadPatch: (patch) => {
-    if (!patch) return;
+    if (!patch) return [];
     const hasUpdates = Array.isArray(patch.updates) && patch.updates.length > 0;
     const hasActions = Array.isArray(patch.actions) && patch.actions.length > 0;
-    if (!hasUpdates && !hasActions && typeof patch.spread_index !== 'number') return;
+    if (!hasUpdates && !hasActions && typeof patch.spread_index !== 'number') return [];
 
+    if ((patch.actions?.length || 0) > 100 || (patch.updates?.length || 0) > 500) return [{action_id: '0', target: 'global', status: 'invalid_target'}];
     const state = get();
+    const results: ActionResult[] = [];
     state.pushHistorySnapshot();
 
     const [leftPageNum, rightPageNum] = state.currentSpread;
@@ -3438,6 +3443,8 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         const actType = rawAction.action || rawAction.type;
         if (!actType) continue;
 
+        const resultCountBefore = results.length;
+        const beforeAction = JSON.stringify({pages: get().pages, products: get().unassignedProducts});
         const targetStr = String(rawAction.target || '');
         const params = rawAction.params || {};
 
@@ -3729,6 +3736,17 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
           }
 
           case 'update_text': {
+            if (targetStr.includes('element:') || targetStr.includes('/field:')) {
+              const execution = executeTextAction(get().pages, targetStr, params);
+              results.push(execution.result);
+              if (execution.result.status === 'applied') set({pages: execution.pages, saveStatus: 'unsaved'});
+              break;
+            }
+            // Imported pages require an explicit stable element target.
+            if (get().pages.find(page => page.pageNumber === (targetPage ?? leftPageNum))?.documentPage) {
+              results.push({action_id: targetStr, target: targetStr, status: 'invalid_target'});
+              break;
+            }
             const finalPage = typeof targetPage === 'number' ? targetPage : leftPageNum;
             const targetPageObj = get().pages.find((p) => p.pageNumber === finalPage);
             const isManifesto = targetPageObj?.type === 'manifesto';
@@ -3785,7 +3803,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
             const explicitField = rawAction.field || params.field;
             const explicitVal = rawAction.value !== undefined ? rawAction.value : params.value;
-            if (explicitField && explicitVal !== undefined) {
+            if (explicitField && ['title', 'quote', 'content', 'subtitle', 'label'].includes(explicitField) && explicitVal !== undefined) {
               updatesToApply[explicitField as keyof CatalogPageData] = explicitVal;
             }
 
@@ -3811,6 +3829,14 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
             }
 
             if (Object.keys(updatesToApply).length > 0) {
+              const protectedEdit = ['title', 'quote', 'content', 'subtitle', 'label'].some(field => {
+                const key = field as keyof CatalogPageData;
+                return updatesToApply[key] !== undefined && (commercialText(String(targetPageObj?.[key] ?? ''), get().pages) || commercialText(String(updatesToApply[key]), get().pages));
+              });
+              if (protectedEdit) {
+                results.push({action_id: targetStr, target: targetStr, status: 'blocked_by_integrity'});
+                break;
+              }
               get().updatePage(finalPage, updatesToApply);
               const targetX = finalPage === rightPageNum ? 72 : 28;
               const textDesc = updatesToApply.title ? 'título' : updatesToApply.quote ? 'citação' : updatesToApply.content ? 'texto editorial' : 'conteúdo';
@@ -4279,6 +4305,10 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
             console.warn('[applySpreadPatch] Ação não reconhecida:', actType);
             break;
         }
+        if (results.length === resultCountBefore) {
+          const changed = beforeAction !== JSON.stringify({pages: get().pages, products: get().unassignedProducts});
+          results.push({action_id: `${results.length}`, target: targetStr, status: changed ? 'applied' : 'unchanged'});
+        }
       }
     }
 
@@ -4289,19 +4319,21 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
         for (const update of patch.updates!) {
           const { target, field, value } = update;
+          if (!['title', 'quote', 'content', 'subtitle', 'label', 'backgroundColor', 'textColor', 'accentColor', 'image'].includes(field)) { results.push({action_id: String(results.length), target, status: 'blocked_by_integrity'}); continue; }
+          const beforeUpdate = JSON.stringify(updatedPages);
 
           if (target === 'left_page' || target === 'left') {
             updatedPages = updatedPages.map((p) =>
-              p.pageNumber === leftPageNum ? { ...p, [field]: value } : p
+              p.pageNumber === leftPageNum && !p.documentPage ? { ...p, [field]: value } : p
             );
           } else if (target === 'right_page' || target === 'right') {
             updatedPages = updatedPages.map((p) =>
-              p.pageNumber === rightPageNum ? { ...p, [field]: value } : p
+              p.pageNumber === rightPageNum && !p.documentPage ? { ...p, [field]: value } : p
             );
           } else if (typeof target === 'string' && target.startsWith('page:')) {
             const targetPageNum = parseInt(target.replace('page:', ''), 10);
             updatedPages = updatedPages.map((p) =>
-              p.pageNumber === targetPageNum ? { ...p, [field]: value } : p
+              p.pageNumber === targetPageNum && !p.documentPage ? { ...p, [field]: value } : p
             );
           } else {
             updatedPages = updatedPages.map((page) => {
@@ -4317,6 +4349,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
               };
             });
           }
+          results.push({action_id: String(results.length), target, status: beforeUpdate !== JSON.stringify(updatedPages) ? 'applied' : 'unchanged'});
         }
 
         const currentProducts = s.pages.flatMap((p) => p.products || []);
@@ -4346,6 +4379,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     }
 
     get().debouncedSaveCurrentSpread();
+    return results.map((result, index) => ({...result, action_id: String(index)}));
   },
 
   sendMessageToAgent: async (prompt, attachments) => {
@@ -4406,8 +4440,8 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
     const activeSpreadData = {
       spread_index: Math.floor((leftPageNum - 1) / 2),
-      left_page: leftPage,
-      right_page: rightPage,
+      left_page: leftPage?.documentPage ? {pageNumber: leftPage.pageNumber, type: leftPage.type, unit: leftPage.documentPage.unit, width: leftPage.documentPage.width, height: leftPage.documentPage.height} : leftPage,
+      right_page: rightPage?.documentPage ? {pageNumber: rightPage.pageNumber, type: rightPage.type, unit: rightPage.documentPage.unit, width: rightPage.documentPage.width, height: rightPage.documentPage.height} : rightPage,
     };
 
     const catalogSkeleton = state.pages.map((p) => ({
@@ -4427,6 +4461,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       spread_index: Math.floor((leftPageNum - 1) / 2),
       active_spread_data: activeSpreadData,
       catalog_skeleton: catalogSkeleton,
+      editable_text_index: editableTextIndex(state.pages, state.currentSpread, state.selectedElementId),
       selected_element_id: state.selectedElementId || undefined,
     };
 
@@ -4507,6 +4542,15 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       let buffer = '';
       let accumulatedContent = '';
       let appliedPatch: any = null;
+
+      let executionResults: ActionResult[] = [];
+      let providerMetadata: Record<string, unknown> = {};
+      const executePatch = (patch: Parameters<StudioState['applySpreadPatch']>[0]) => {
+        executionResults = get().applySpreadPatch(patch);
+        const applied = executionResults.filter(result => result.status === 'applied').length;
+        if (applied) toast.success(`${applied} alteração(ões) aplicada(s)`);
+        else toast.error('Nenhuma alteração aplicada', {description: executionFeedback(executionResults)});
+      };
 
       const resolveActionSummaries = (patchObj: any): string[] => {
         if (!patchObj) return [];
@@ -4636,19 +4680,14 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
             if (data.event === 'patch' && data.patch && !appliedPatch) {
               appliedPatch = data.patch;
-              get().applySpreadPatch(data.patch);
-              toast.success('Prancheta Sincronizada', {
-                description: data.patch.summary || 'Alterações aplicadas com sucesso pelo Conselho Editorial.',
-              });
+              executePatch(data.patch);
             }
 
             if (data.event === 'done') {
+              providerMetadata = data.metadata || {};
               if (data.patch && !appliedPatch) {
                 appliedPatch = data.patch;
-                get().applySpreadPatch(data.patch);
-                toast.success('Prancheta Sincronizada', {
-                  description: data.patch.summary || 'Alterações aplicadas com sucesso pelo Conselho Editorial.',
-                });
+                executePatch(data.patch);
               }
             }
           } catch {
@@ -4665,16 +4704,13 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
           try {
             const parsed = JSON.parse(match[1]);
             appliedPatch = parsed;
-            get().applySpreadPatch(parsed);
-            toast.success('Prancheta Sincronizada', {
-              description: parsed.summary || 'Alterações aplicadas com sucesso pelo Conselho Editorial.',
-            });
+            executePatch(parsed);
           } catch {}
         }
       }
 
       // Extrai açoes e delegaçoes para a mensagem formada
-      const actionSummaries = appliedPatch ? resolveActionSummaries(appliedPatch) : [];
+      const actionSummaries = appliedPatch ? resolveActionSummaries(appliedPatch).filter((_: string, index: number) => executionResults[index]?.status === 'applied') : [];
       const mappedDelegations = resolveDelegations(appliedPatch, accumulatedContent);
 
       // Limpa blocos de patch e tags tecnicas do conteudo apresentado ao usuario
@@ -4698,7 +4734,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
           if (candidate.length > 10) {
             cleanContent = candidate;
           } else {
-            cleanContent = 'Ajuste executado com sucesso e diagramação sincronizada pelo Conselho Editorial.';
+            cleanContent = 'Nenhuma alteração confirmada na prancheta.';
           }
         }
       }
@@ -4707,8 +4743,12 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         cleanContent = appliedPatch.summary;
       }
       if (!cleanContent) {
-        cleanContent = 'Ajuste executado com sucesso pelo Conselho Editorial.';
+        cleanContent = 'Nenhuma alteração confirmada na prancheta.';
       }
+
+      if (appliedPatch) cleanContent = executionFeedback(executionResults);
+
+      if (!appliedPatch && /(?:realizad[oa]|executad[oa]|atualizad[oa]|sincronizad[oa]|conclu[ií]d[oa])/i.test(cleanContent) && providerMetadata.user_guard_status !== 'BLOCKED') cleanContent = 'Nenhuma alteração confirmada na prancheta. ' + (providerMetadata.mock ? 'O provedor simulado está ativo.' : 'Selecione o texto ou reformule a solicitação.');
 
       const assistantMsgId = `msg-agent-${Date.now()}`;
       const assistantMsg: ChatMessage = {
@@ -4717,6 +4757,8 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         content: cleanContent,
         timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         reasoning: appliedPatch?.reasoning,
+        executionResults,
+        providerMetadata,
         actions: actionSummaries.length > 0 ? actionSummaries : undefined,
         delegations: mappedDelegations,
       };
@@ -4741,8 +4783,9 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
     } catch (err) {
       if (!streamIsCurrent()) return;
-      console.warn('Fallback para orquestracao local:', err);
-      state.executeCopilotCommand(userPrompt, attachments);
+      console.warn('Agent request failed:', err instanceof Error ? err.name : 'request_error');
+      const failure: ChatMessage = {id: `msg-error-${Date.now()}`, role: 'assistant', content: 'Provedor indisponível ou falha de execução. Nenhuma nova alteração confirmada; tente novamente.', timestamp: new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}), providerMetadata: {error: 'provider_unavailable'}};
+      set(s => ({agentStatus: 'idle', messages: [...s.messages, failure], threads: s.threads.map(thread => thread.id === s.activeThreadId ? {...thread, messages: [...thread.messages, failure]} : thread)}));
     }
   },
 
