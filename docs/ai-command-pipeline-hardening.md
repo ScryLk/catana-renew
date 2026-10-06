@@ -76,3 +76,13 @@ Post "https://api.github.com/repos/ScryLk/catana-renew/pulls": Forbidden
 No PR was created, merged or deployed; GitHub CI status could not be verified. Prepared PR title: **Separate AI intent guards and safely edit imported catalog text**. The implementation summary and validation above supply the review body. Open the published comparison at:
 
 https://github.com/ScryLk/catana-renew/compare/main...fix/ai-guardrail-context-separation?expand=1
+
+## PR #9 CodeQL follow-up
+
+PR #9 now exists. Its check `112370111141` reported `Polynomial regular expression used on uncontrolled data` at `prompt_envelope.py`'s context scan. The role-tag alternative `<\s*/?\s*...` allowed two whitespace runs to overlap when the optional slash was absent, causing quadratic backtracking on `<` followed by many spaces.
+
+The corrected alternative `<\s*(?:/\s*)?...` requires an actual slash before starting the second whitespace run. Opening/closing role tags, Unicode whitespace, case-insensitive matching, bracketed roles and directive detection retain their behavior. No guard, input limit or CodeQL check was disabled.
+
+The timeout-backed regression failed before the fix at the 3-second bound. It now covers near-limit context, one million spaces, slash/no-slash cases and real quarantine behavior. A separate test preserves injection matches and rejects ordinary tags/technical PT/PL text.
+
+Validation: `SECRET_KEY=local-test DEBUG=True /tmp/catana-venv/bin/python backend/manage.py test api.tests_ai_command_pipeline api.tests_ai_provider_security api.tests_creative_overlays --noinput` — 50 passed; `git diff --check` passed. GitHub CodeQL's new run remains the authority for clearing the alert.

@@ -6,7 +6,9 @@ from api.ai.guardrails import COMPILED_JAILBREAK
 
 MAX_USER = 20000
 MAX_CONTEXT = 48000
-CONTEXT_INJECTION = re.compile(r'(?:<\s*/?\s*(?:system|assistant|developer)\b|\[\s*(?:system|developer)\s*\]|```json:patch|(?:system|developer)\s*:\s*(?:ignore|execute|override)|(?:ignore|override)\s+(?:all\s+)?(?:rules|instructions))', re.I)
+# The slash must be consumed before a second whitespace run can begin.
+# Optional-slash whitespace on both sides would overlap and backtrack quadratically.
+CONTEXT_INJECTION = re.compile(r'(?:<\s*(?:/\s*)?(?:system|assistant|developer)\b|\[\s*(?:system|developer)\s*\]|```json:patch|(?:system|developer)\s*:\s*(?:ignore|execute|override)|(?:ignore|override)\s+(?:all\s+)?(?:rules|instructions))', re.I)
 
 
 def data_section(value):
