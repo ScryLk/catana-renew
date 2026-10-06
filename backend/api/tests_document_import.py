@@ -426,3 +426,25 @@ class DocumentImportTests(TestCase):
                     self.assertIn('Source title', serialized)
                     self.assertFalse(payload['report']['quality']['passed'])
                 self.assertEqual(StudioCatalog.objects.get(pk=confirmed.data['catalog_id']).import_metadata['quality']['passed'], False)
+
+    def test_full_quota_analysis_is_retained_until_archive_and_confirm_retry(self):
+        from api.models import OrganizationQuota
+        from api.guards.quota_guard import get_or_create_default_plan
+        OrganizationQuota.objects.update_or_create(organization=self.org, defaults={'plan': get_or_create_default_plan('free')})
+        catalogs = [StudioCatalog.objects.create(organization=self.org, created_by=self.owner, title=f'Existing {i}') for i in range(5)]
+        data = self.analyze([{}], mode='editable')
+        self.assertEqual(StudioCatalog.objects.filter(organization=self.org).count(), 5)
+        response = self.client.post(self.url, {'action': 'confirm', 'import_id': data['import_id']}, format='json')
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data['code'], 'catalog_limit_exceeded')
+        job = DocumentImport.objects.get(pk=data['import_id'])
+        self.assertEqual(job.status, 'ready'); self.assertIsNone(job.catalog_id)
+        self.assertEqual(job.previews, data['pages'])
+        archived = self.client.put(reverse('studio_catalog_detail', kwargs={'pk': catalogs[0].pk}), {'status': 'archived'}, format='json')
+        self.assertEqual(archived.status_code, 200)
+        saved = self.client.post(self.url, {'action': 'confirm', 'import_id': data['import_id']}, format='json')
+        self.assertEqual(saved.status_code, 201)
+        retried = self.client.post(self.url, {'action': 'confirm', 'import_id': data['import_id']}, format='json')
+        self.assertEqual(retried.status_code, 200)
+        self.assertEqual(retried.data['catalog_id'], saved.data['catalog_id'])
+        self.assertEqual(StudioCatalog.objects.filter(organization=self.org, status='active').count(), 5)

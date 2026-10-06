@@ -124,8 +124,7 @@ class DocumentAdapterTests(SimpleTestCase):
         self.assertIn("Live folio", page["sourceText"])
 
     def test_unsupported_font_and_clipped_text_remain_faithful(self):
-        for spec in ({"font": "ProprietaryMissingFont"},
-                     {"content": "q 30 100 20 20 re W n BT /F1 20 Tf 30 100 Td (Clipped title) Tj ET Q"}):
+        for spec in ({"content": "q 30 100 20 20 re W n BT /F1 20 Tf 30 100 Td (Clipped title) Tj ET Q"},):
             with self.subTest(spec=spec):
                 page = self.analyze([spec])["pages"][0]
                 self.assertEqual(page["visibility"], "source_only")
@@ -376,11 +375,11 @@ class DocumentAdapterTests(SimpleTestCase):
         self.assertFalse(page["quality"]["reconstructionVerification"]["exactPixels"])
         self.assertIn("reconstruction_pixel_mismatch_source_preserved", page["warnings"])
 
-    def test_eight_text_limit_preserves_other_objects_as_raster(self):
+    def test_dense_page_has_no_eight_text_limit(self):
         lines = [f"BT /F1 10 Tf 20 {180 - i * 18} Td (Line {i}) Tj ET" for i in range(10)]
         page = self.analyze([{"content": "\n".join(lines)}])["pages"][0]
         self.assertEqual(len(page["elements"]), 10)
-        self.assertEqual(page["quality"]["editableCount"], 8)
+        self.assertEqual(page["quality"]["editableCount"], 10)
         self.assertTrue(page["quality"]["reconstructionVerification"]["exactPixels"])
 
     def test_visual_fidelity_for_cover_editorial_two_products_grid_and_contact(self):
@@ -405,3 +404,96 @@ class DocumentAdapterTests(SimpleTestCase):
                         reconstructed.paste(self.image(appearance["asset"]),
                                             (round(appearance["x"] * source.width), round(appearance["y"] * source.height)))
                 self.assertIsNone(ImageChops.difference(source, reconstructed).getbbox())
+
+
+class DocumentHardeningTests(SimpleTestCase):
+    setUp = DocumentAdapterTests.setUp
+    sink = DocumentAdapterTests.sink
+    analyze = DocumentAdapterTests.analyze
+    image = DocumentAdapterTests.image
+    # Inherit source-pixel, security and geometry checks for the hardened path.
+    def test_nonstandard_font_eight_pages_recovers_safe_live_text(self):
+        lines = '\n'.join(f'BT /F1 10 Tf 20 {740-i*24} Td (Source line {i}) Tj ET' for i in range(30))
+        document = self.analyze([{'font': 'ABCDEE+Montserrat-Bold', 'size': (400, 800), 'content': lines} for _ in range(8)])
+        self.assertEqual(document['pageCount'], 8)
+        self.assertEqual(document['report']['liveTextElementCount'], 240)
+        self.assertGreater(document['report']['editableTextElementCount'], 200)
+        self.assertGreater(document['report']['fontFallbackTextCount'], 0)
+        for page in document['pages']:
+            self.assertTrue(page['quality']['reconstructionVerification']['exactPixels'])
+            for element in page['elements']:
+                if element['editable']:
+                    self.assertTrue(element['resolvedFont'])
+                    self.assertGreaterEqual(element['textExtractionConfidence'], .9)
+                    self.assertTrue(element['sourceVisible'])
+
+    def test_later_bbox_overlap_without_ink_occlusion_remains_editable(self):
+        page = self.analyze([{'content': 'BT /F1 20 Tf 30 100 Td (Source title) Tj ET\n0 0 1 RG 1 w 20 80 240 60 re S'}])['pages'][0]
+        self.assertEqual(page['quality']['editableCount'], 1)
+        self.assertTrue(page['quality']['reconstructionVerification']['exactPixels'])
+
+    def test_failed_candidate_does_not_invalidate_other_text(self):
+        from api.services.pdf_import_adapter import _analyze_pdf, _text_ink_mask
+        calls = 0
+        def mask(*args):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise ValueError('uncertain object')
+            return _text_ink_mask(*args)
+        content = '\n'.join(f'BT /F1 12 Tf 20 {160-i*40} Td (Text {i}) Tj ET' for i in range(3))
+        with mock.patch('api.services.pdf_import_adapter._text_ink_mask', side_effect=mask):
+            document, _ = _analyze_pdf(synthetic_pdf([{'content': content}]), 'test.pdf')
+        page = document['pages'][0]
+        self.assertEqual(page['quality']['editableCount'], 2)
+        self.assertFalse(page['elements'][1]['editable'])
+        self.assertTrue(page['quality']['reconstructionVerification']['exactPixels'])
+
+    def test_visible_and_concealed_objects_are_validated_independently(self):
+        content = 'BT /F1 12 Tf 20 150 Td (Safe title) Tj ET\n0 0 0 rg 90 0 210 90 re f\nBT /F1 20 Tf 20 40 Td (Visible SECRET) Tj ET'
+        page = self.analyze([{'content': content}])['pages'][0]
+        self.assertTrue(page['elements'][0]['editable'])
+        concealed = next(e for e in page['elements'] if e.get('text') == 'Visible SECRET')
+        self.assertFalse(concealed['editable'])
+        self.assertFalse(concealed['sourceVisible'])
+        self.assertTrue(page['quality']['reconstructionVerification']['exactPixels'])
+
+    def test_font_names_resolve_deterministically(self):
+        from api.ai.font_registry import resolve_pdf_font
+        self.assertEqual(resolve_pdf_font('ABCDEF+Inter-Bold')['resolvedFont'], 'Inter')
+        self.assertEqual(resolve_pdf_font('ABCDEF+Inter-Bold')['fontWeight'], 700)
+        self.assertEqual(resolve_pdf_font('TimesNewRomanPSMT')['resolvedFont'], 'Times New Roman')
+        self.assertEqual(resolve_pdf_font('HelveticaNeueLTStd-Bd')['resolvedFont'], 'Arial')
+        self.assertEqual(resolve_pdf_font('ArialMT')['resolvedFont'], 'Arial')
+        self.assertEqual(resolve_pdf_font('Unknown Serif')['resolvedFont'], 'Cormorant Garamond')
+        self.assertEqual(resolve_pdf_font('Unknown Grotesk')['resolvedFont'], 'Inter')
+
+
+    def test_safe_glyph_spans_are_grouped_without_merging_distant_labels(self):
+        content = '\n'.join(f'BT /F1 12 Tf {30+i*7.2} 100 Td ({c}) Tj ET' for i,c in enumerate('HELLO'))
+        content += '\nBT /F1 12 Tf 200 100 Td (Separate label) Tj ET'
+        page = self.analyze([{'font': 'Courier', 'content': content}])['pages'][0]
+        self.assertEqual([e['text'].strip() for e in page['elements']], ['HELLO', 'Separate label'])
+        self.assertTrue(page['elements'][0]['editable'])
+        self.assertEqual(len(page['elements'][0]['sourceElements']), 5)
+        self.assertEqual(page['quality']['liveTextElementCount'], 6)
+        self.assertTrue(page['quality']['reconstructionVerification']['exactPixels'])
+
+    def test_containing_rectangular_clip_is_safe_but_partial_clip_is_not(self):
+        page = self.analyze([{'content': 'q 20 80 150 70 re W n BT /F1 20 Tf 30 100 Td (Source title) Tj ET Q'}])['pages'][0]
+        text = page['elements'][0]
+        # PDFium may elide a rectangle that fully contains the text bounds.
+        self.assertIn(text['clippingType'], ('none', 'simple_rectangular'))
+        self.assertTrue(text['clipSafe']); self.assertTrue(text['editable'])
+        self.assertTrue(page['quality']['reconstructionVerification']['exactPixels'])
+        partial = self.analyze([{'content': 'q 30 100 20 20 re W n BT /F1 20 Tf 30 100 Td (Clipped title) Tj ET Q'}])['pages'][0]
+        self.assertEqual(partial['elements'][0]['clippingType'], 'simple_rectangular')
+        self.assertFalse(partial['elements'][0]['clipSafe'])
+        self.assertFalse(partial['elements'][0]['editable'])
+
+    def test_rotations_keep_exact_source_and_do_not_claim_unvalidated_editability(self):
+        for rotation in (90, 180, 270):
+            page = self.analyze([{'rotation': rotation}])['pages'][0]
+            self.assertEqual(page['rotation'], rotation)
+            self.assertEqual(page['quality']['editableCount'], 0)
+            self.assertTrue(page['sourceSnapshot']['hash'])

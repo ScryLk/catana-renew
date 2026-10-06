@@ -34,6 +34,7 @@ interface CatalogFixture {
 type SourcePage = ReturnType<typeof makePreview>['pages'][number];
 interface Asset { body: Buffer; width: number; height: number; hash: string }
 interface FixtureState {
+  quotaUsed?: number; quotaConfirmFailures?: number;
   analyses: ImportRequest[]; preparations: ImportRequest[]; confirmations: ImportRequest[]; cancellations: ImportRequest[]; brandWrites: Json[];
   assetRequests: Array<{ path: string; authorization: string | undefined }>;
   catalogs: CatalogFixture[]; analysisFailures: number; lostConfirmationResponses: number;
@@ -167,7 +168,7 @@ async function fixture(page: Page, options: { count?: number; mixed?: boolean; h
     }
     if (path === ENDPOINT) {
       if (method === 'DELETE') { state.cancellations.push({ import_id: url.searchParams.get('import_id') }); return route.fulfill({ status: 204 }); }
-      if (method === 'GET') return route.fulfill({ json: state.preview || { detail: 'Preview not found' } });
+      if (method === 'GET') return route.fulfill({ json: state.catalogs.length ? {...state.preview, status: 'confirmed', catalog_id: 901} : state.preview || { detail: 'Preview not found' } });
       const isJson = request.headers()['content-type']?.includes('application/json');
       const body: ImportRequest = isJson ? request.postDataJSON() : { action: multipartField(request, 'action') || 'analyze',
         organization: multipartField(request, 'organization'), mode: multipartField(request, 'mode'), title: multipartField(request, 'title'),
@@ -181,6 +182,10 @@ async function fixture(page: Page, options: { count?: number; mixed?: boolean; h
       }
       if (body.action === 'confirm') {
         state.confirmations.push(body);
+        if (state.quotaConfirmFailures) {
+          state.quotaConfirmFailures--; state.quotaUsed = 5;
+          return route.fulfill({status: 403, json: {code: 'catalog_limit_exceeded', error: 'Limite de catálogos ativos atingido.', organization: 1, active_catalogs: 5, max_active_catalogs: 5, remaining_catalog_slots: 0}});
+        }
         if (body.import_id !== IMPORT_ID || Number(body.organization) !== 1) return route.fulfill({ status: 400, json: { detail: 'Invalid import or organization' } });
         if (!state.catalogs.length && state.preview) {
           const preview = state.preview; const snapshot = body.brand_id ? { id: BRAND_ID, name: brand.name, version: 2, palette: brand.custom_palette } : {};
@@ -192,7 +197,7 @@ async function fixture(page: Page, options: { count?: number; mixed?: boolean; h
               left_page: preview.pages[index * 2], right_page: preview.pages[index * 2 + 1] || null,
               left_page_elements: [preview.pages[index * 2]], right_page_elements: preview.pages[index * 2 + 1] ? [preview.pages[index * 2 + 1]] : [] })) });
         }
-        if (state.lostConfirmationResponses > 0) { state.lostConfirmationResponses--; return route.fulfill({ status: 503, json: { detail: 'Confirmação recebida; a resposta foi interrompida.' } }); }
+        if (state.lostConfirmationResponses > 0) { state.lostConfirmationResponses--; if (state.quotaUsed != null) state.quotaUsed++; return route.fulfill({ status: 503, json: { detail: 'Confirmação recebida; a resposta foi interrompida.' } }); }
         return route.fulfill({ status: state.confirmations.length === 1 ? 201 : 200, json: { ...state.preview, import_id: IMPORT_ID,
           status: 'confirmed', catalog_id: 901, spreads_count: state.catalogs[0].spreads.length } });
       }
@@ -208,7 +213,11 @@ async function fixture(page: Page, options: { count?: number; mixed?: boolean; h
       if (method !== 'GET') state.brandWrites.push({ path, method, body: request.postDataJSON() });
       return route.fulfill({ json: path === '/api/brands/' ? Number(url.searchParams.get('organization')) === 1 ? [brand] : [] : brand });
     }
-    if (path === '/api/v2/studio/catalogs/') return route.fulfill({ json: state.catalogs });
+    if (path === '/api/v2/studio/catalogs/101/' && method === 'PUT') {
+      state.quotaUsed = Math.max(0, (state.quotaUsed || 0) - 1);
+      return route.fulfill({json: {id: 101, status: 'archived'}});
+    }
+    if (path === '/api/v2/studio/catalogs/') return route.fulfill({ json: state.quotaUsed ? [{id: 101, title: 'Catálogo existente', status: 'active', organization: 1}] : state.catalogs });
     if (path === '/api/v2/studio/catalogs/901/spreads/' && method === 'POST') {
       const body = request.postDataJSON(); const index = Number(body.spread_index);
       const expectedLeft = state.preview?.pages[index * 2]; const expectedRight = state.preview?.pages[index * 2 + 1];
@@ -229,6 +238,7 @@ async function fixture(page: Page, options: { count?: number; mixed?: boolean; h
     if (path.includes('/auth/')) body = { access: 'document-qa-local-only', user: { id: 1, username: 'qa', name: 'QA Import', email: 'qa@example.test', role: 'admin' } };
     else if (path === '/api/organizations/') body = [organization, otherOrganization];
     else if (path.includes('unread_count')) body = { count: 0 };
+    else if (path === '/api/v2/studio/quotas/') body = {organization: 1, active_catalogs: state.quotaUsed ?? state.catalogs.length, max_active_catalogs: 5, remaining_catalog_slots: 5 - (state.quotaUsed ?? state.catalogs.length), plan_tier: 'free', plan_name: 'Free'};
     else if (path.includes('/stats')) body = { catalogs: 0, products: 0, library: 0, history: 0 };
     else if (path.includes('/subscription') || path.includes('/billing/')) body = { plan: 'free', status: 'active', usage: {}, limits: {} };
     return route.fulfill({ json: body });
@@ -427,11 +437,13 @@ test('an analysis error retains file and title for a real retry without creating
 });
 
 test('retrying a lost confirmation response reuses the same import and opens a single committed catalog', async ({ page }) => {
-  const state = await fixture(page, { lostConfirmationResponses: 1 }); const dialog = await openImport(page); await upload(dialog); await analyze(dialog);
+  const state = await fixture(page, { lostConfirmationResponses: 1 }); state.quotaUsed = 4; const dialog = await openImport(page); await upload(dialog); await analyze(dialog);
   await dialog.getByRole('button', { name: 'Confirmar importação', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Tentar novamente', exact: true })).toBeVisible();
   expect(state.catalogs).toHaveLength(1);
-  await dialog.getByRole('button', { name: 'Tentar novamente', exact: true }).click();
+  await dialog.getByRole('button', {name: 'Atualizar limite', exact: true}).click();
+  await expect(dialog.getByRole('button', {name: 'Abrir catálogo importado', exact: true})).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Abrir catálogo importado', exact: true }).click();
   await expect(dialog).toBeHidden(); await expect.poll(async () => (await storeState(page)).activeCatalogId).toBe('901');
   expect(state.confirmations).toHaveLength(2);
   expect(state.confirmations.map(body => body.import_id)).toEqual([IMPORT_ID, IMPORT_ID]);
@@ -510,3 +522,38 @@ for (const width of [320, 390, 1440]) {
     await page.screenshot({ path: testInfo.outputPath(`studio-${width}-imported.png`), fullPage: true, animations: 'disabled' });
   });
 }
+
+
+test('full quota is visible before analysis and archiving preserves the same eight-page preview', async ({page}) => {
+  const state = await fixture(page, {count: 8}); state.quotaUsed = 5;
+  const dialog = await openImport(page);
+  await expect(dialog.getByText('5 de 5 catálogos ativos', {exact: true})).toBeVisible();
+  await upload(dialog, 8);
+  await dialog.getByRole('button', {name: 'Analisar documento', exact: true}).click();
+  await expect(dialog.getByRole('region', {name: 'Prévia do documento'})).toBeVisible();
+  await expect(dialog.getByRole('button', {name: 'Sem vagas para novos catálogos'})).toBeDisabled();
+  await dialog.getByRole('button', {name: 'Comparação', exact: true}).click();
+  await dialog.getByLabel('Página da prévia').selectOption('3');
+  await dialog.getByRole('button', {name: 'Gerenciar catálogos', exact: true}).click();
+  page.once('dialog', prompt => prompt.accept());
+  await dialog.getByRole('button', {name: 'Arquivar', exact: true}).click();
+  await expect(dialog.getByRole('button', {name: 'Confirmar importação', exact: true})).toBeEnabled();
+  await expect(dialog.getByLabel('Página da prévia')).toHaveValue('3');
+  await expect(dialog.getByRole('button', {name: 'Comparação', exact: true})).toHaveAttribute('aria-pressed', 'true');
+  expect(state.analyses).toHaveLength(1);
+  await confirm(page, dialog); expect(state.catalogs).toHaveLength(1);
+});
+
+test('quota changing at confirmation keeps analysis and offers recovery without blind retry', async ({page}) => {
+  const state = await fixture(page); state.quotaUsed = 4; state.quotaConfirmFailures = 1;
+  const dialog = await openImport(page); await upload(dialog); await analyze(dialog);
+  await dialog.getByRole('button', {name: 'Confirmar importação', exact: true}).click();
+  await expect(dialog.getByRole('alert')).toContainText('Limite de catálogos');
+  await expect(dialog.getByRole('button', {name: 'Tentar novamente', exact: true})).toHaveCount(0);
+  await expect(dialog.getByRole('region', {name: 'Prévia do documento'})).toBeVisible();
+  await dialog.getByRole('button', {name: 'Gerenciar catálogos', exact: true}).click();
+  page.once('dialog', prompt => prompt.accept());
+  await dialog.getByRole('button', {name: 'Arquivar', exact: true}).click();
+  await expect(dialog.getByRole('button', {name: 'Confirmar importação', exact: true})).toBeEnabled();
+  await confirm(page, dialog); expect(state.analyses).toHaveLength(1); expect(state.catalogs).toHaveLength(1);
+});

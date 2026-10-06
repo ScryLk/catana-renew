@@ -129,7 +129,7 @@ def _requested_brand(user, data):
     return brand
 
 
-def _requested_organization(user, data, brand=None):
+def _requested_organization(user, data, brand=None, write=True):
     from api.services.brand_intelligence import visible_organizations, assert_organization_access
     organization_id = data.get('organization')
     if brand is not None:
@@ -141,9 +141,12 @@ def _requested_organization(user, data, brand=None):
             organization = None
         if organization is None:
             raise NotFound('Organização não encontrada.')
-        assert_organization_access(user, organization, write=True)
+        assert_organization_access(user, organization, write=write)
         return organization
-    return user.organizations.first()
+    organization = user.organizations.first() or user.owned_organizations.first()
+    if organization:
+        assert_organization_access(user, organization, write=write)
+    return organization
 
 class StudioAgentsListView(APIView):
     """
@@ -164,7 +167,10 @@ class StudioQuotaStatusView(APIView):
 
     def get(self, request):
         user = request.user if request.user and request.user.is_authenticated else None
-        quota, plan = get_user_quota(user) if user else (None, None)
+        organization = _requested_organization(user, request.query_params, write=False) if user else None
+        quota, plan = get_user_quota(user, organization) if user else (None, None)
+        from api.guards.quota_guard import catalog_slot_status
+        slots = catalog_slot_status(user, organization) if user else {}
         if not plan:
             from api.guards.quota_guard import get_or_create_default_plan
             plan = get_or_create_default_plan("free")
@@ -173,6 +179,7 @@ class StudioQuotaStatusView(APIView):
         monthly_quota = plan.monthly_token_quota if plan else 100000
 
         return Response({
+            **slots,
             "tier": plan.tier if plan else "free",
             "plan_name": plan.name if plan else "Plano Gratuito",
             "tokens_used_this_month": tokens_used,
@@ -201,6 +208,11 @@ class StudioCatalogListView(APIView):
                 catalogs = catalogs.filter(organization_id=int(organization_id))
             except (ValueError, TypeError):
                 raise ValidationError({'organization': 'Organização inválida.'})
+        lifecycle = request.query_params.get('status', 'active')
+        if lifecycle not in ('active', 'archived', 'all'):
+            raise ValidationError({'status': 'Escolha active, archived ou all.'})
+        if lifecycle != 'all':
+            catalogs = catalogs.filter(status=lifecycle)
         results = []
         for cat in catalogs:
             spread_count = cat.spreads.count()
@@ -219,6 +231,7 @@ class StudioCatalogListView(APIView):
                 "brand_lock": cat.brand_lock,
                 "palette_data": cat.palette_data,
                 "spread_count": spread_count,
+                "status": cat.status,
                 "created_at": cat.created_at.isoformat(),
                 "updated_at": cat.updated_at.isoformat(),
             })
@@ -227,14 +240,10 @@ class StudioCatalogListView(APIView):
     @transaction.atomic
     def post(self, request):
         user = request.user
-        try:
-            check_catalog_creation_guard(user)
-        except CatalogLimitExceededException as exc:
-            detail_data = exc.detail if isinstance(exc.detail, dict) else {"error": str(exc.detail), "code": "catalog_limit_exceeded"}
-            return Response(detail_data, status=status.HTTP_403_FORBIDDEN)
-
         data = request.data
         brand = _requested_brand(user, data)
+        org = _requested_organization(user, data, brand)
+        check_catalog_creation_guard(user, org)
         title = data.get("title", "Novo Catalogo Studio")
         brand_name = data.get("brand_name", "")
         style_preset = data.get("style_preset", "editorial_clean")
@@ -251,8 +260,6 @@ class StudioCatalogListView(APIView):
         brand_lock = bool(data.get("brand_lock", False))
         palette_data = data.get("palette_data", {})
         unassigned_products = data.get("unassigned_products", [])
-
-        org = _requested_organization(user, data, brand)
 
         catalog = StudioCatalog.objects.create(
             title=title,
@@ -370,6 +377,7 @@ class StudioCatalogDetailView(APIView):
             "secondary_color": catalog.secondary_color,
             "accent_color": catalog.accent_color,
             "font_family": catalog.font_family,
+            "status": catalog.status,
             "page_width": catalog.page_width,
             "page_height": catalog.page_height,
             "total_pages": catalog.total_pages,
@@ -391,6 +399,18 @@ class StudioCatalogDetailView(APIView):
         _assert_brand_catalog_write(request.user, catalog)
 
         data = request.data
+        if 'status' in data:
+            lifecycle = data['status']
+            if lifecycle not in ('active', 'archived'):
+                raise ValidationError({'status': 'Escolha active ou archived.'})
+            if catalog.organization_id:
+                from api.services.brand_intelligence import assert_organization_access
+                assert_organization_access(request.user, catalog.organization, write=True)
+            if lifecycle != catalog.status:
+                if lifecycle == 'active':
+                    check_catalog_creation_guard(request.user, catalog.organization)
+                catalog.status = lifecycle
+                catalog.archived_at = timezone.now() if lifecycle == 'archived' else None
         if 'import_metadata' in data:
             raise ValidationError({'import_metadata': 'O histórico da importação é controlado pelo servidor.'})
         if 'share_import' in data:
@@ -459,6 +479,7 @@ class StudioCatalogDetailView(APIView):
         return Response({
             **_brand_catalog_metadata(catalog),
             "status": "updated",
+            "catalog_status": catalog.status,
             "id": catalog.id,
             "title": catalog.title,
             "brand_lock": catalog.brand_lock,
@@ -731,15 +752,6 @@ class StudioChatStreamView(APIView):
                     {"error": "Catalogo nao encontrado ou sem permissao de acesso"},
                     status=status.HTTP_404_NOT_FOUND
                 )
-
-        if not catalog and not catalog_id and not thread_id:
-            # Se nao informou catalogo, cria rascunho vinculado exclusivamente ao usuario autenticado
-            org = user.organizations.first()
-            catalog = StudioCatalog.objects.create(
-                title="Catalogo em Criacao",
-                created_by=user,
-                organization=org,
-            )
 
         thread = None
         if thread_id:
@@ -1142,7 +1154,7 @@ class StudioCatalogImportAssetView(APIView):
         private_access = visible_organizations(request.user).filter(pk=job.organization_id).exists()
         catalog = job.catalog
         public_access = (asset.kind in RENDER_ASSET_KINDS and job.status == 'confirmed' and catalog is not None
-            and catalog.import_metadata.get('share_enabled') is True and import_quality_passed(catalog.import_metadata)
+            and catalog.status == 'active' and catalog.import_metadata.get('share_enabled') is True and import_quality_passed(catalog.import_metadata)
             and str(asset.pk) in public_import_asset_ids(catalog))
         if not private_access and not public_access:
             raise NotFound('Ativo de importação não encontrado.')
@@ -1375,7 +1387,6 @@ class StudioCatalogGenerateView(APIView):
                 # Preserve the exact version resolved before an expensive AI request.
                 captured_hash = snapshot_hash(brand_context)
                 captured_version = brand_context['meta']['brand_version']
-                check_catalog_creation_guard(request.user)
 
         try:
             kwargs = {'prompt': prompt, 'products': products, 'creative_seed': creative_seed}
@@ -1390,6 +1401,7 @@ class StudioCatalogGenerateView(APIView):
                 if not isinstance(pages, list) or not all(isinstance(page, dict) for page in pages):
                     raise ValueError('Generation returned an invalid page envelope.')
                 with transaction.atomic():
+                    check_catalog_creation_guard(request.user, brand.organization)
                     catalog = StudioCatalog.objects.create(
                         title=str(result.get('title') or 'Novo Catálogo')[:255],
                         created_by=request.user, organization=brand.organization, brand=brand,
@@ -1422,6 +1434,8 @@ class StudioCatalogGenerateView(APIView):
                             brand.pk, captured_version, captured_hash, brand_context['meta'].get('schema_version'),
                             len(brand_context.get('guidelines', [])), len(brand_context.get('assets', [])))
             return Response(result, status=status.HTTP_200_OK)
+        except APIException:
+            raise
         except Exception as err:
             logger.error(f"[StudioCatalogGenerate] Falha ao gerar catalogo: {err}")
             return Response({"error": "Falha na sintese generativa do catalogo."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2527,6 +2541,7 @@ class StudioDemoCatalogLoadView(APIView):
     """
     permission_classes = [AllowAny]
 
+    @transaction.atomic
     def post(self, request):
         template_key = (request.data.get("template_key") or "maison_verdana").strip().lower()
         if template_key not in CANONICAL_DEMO_TEMPLATES:
@@ -2537,7 +2552,8 @@ class StudioDemoCatalogLoadView(APIView):
 
         # Se o usuario estiver autenticado, cria e persiste no PostgreSQL
         if user and user.is_authenticated:
-            org = user.organizations.first() or user.owned_organizations.first()
+            org = _requested_organization(user, request.data)
+            check_catalog_creation_guard(user, org)
             try:
                 catalog = StudioCatalog.objects.create(
                     created_by=user,
@@ -2593,6 +2609,7 @@ class StudioDemoCatalogLoadView(APIView):
                 }, status=status.HTTP_201_CREATED)
 
             except Exception as err:
+                transaction.set_rollback(True)
                 logger.error(f"[StudioDemoCatalogLoad] Erro ao persistir catalogo demo no banco: {err}")
                 # Fallback para resposta in-memory sem travar a experiencia do usuario
 
@@ -2672,7 +2689,7 @@ class StudioPublicCatalogView(APIView):
         except (ValueError, TypeError):
             catalog = None
 
-        if not catalog:
+        if not catalog or catalog.status == 'archived':
             return Response(
                 {"error": "Catálogo público não encontrado ou indisponível."},
                 status=status.HTTP_404_NOT_FOUND

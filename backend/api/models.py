@@ -681,6 +681,8 @@ class StudioCatalog(models.Model):
     brand_snapshot_hash = models.CharField(max_length=64, blank=True)
     generation_metadata = models.JSONField(default=dict, blank=True)
     import_metadata = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=16, choices=[('active', 'Active'), ('archived', 'Archived')], default='active')
+    archived_at = models.DateTimeField(null=True, blank=True)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     brand_name = models.CharField(max_length=255, blank=True, null=True)
@@ -701,6 +703,7 @@ class StudioCatalog(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        indexes = [models.Index(fields=['organization', 'status'], name='studio_org_status_idx')]
         db_table = 'studio_catalogs'
         ordering = ['-updated_at']
 

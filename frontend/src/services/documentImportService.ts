@@ -7,12 +7,28 @@ export function validateDocumentFile(file: File) {
   if (!file.name.toLowerCase().endsWith('.pdf') || (file.type && file.type !== 'application/pdf')) throw new Error('Para importar Word, exporte o documento como PDF. Apenas PDF é aceito nesta versão.');
   if (!file.size || file.size > MAX_DOCUMENT_BYTES) throw new Error('O PDF deve ter entre 1 byte e 25 MB.');
 }
-export function documentImportError(error: unknown) {
-  const data = (error as {response?: {data?: {error?: string; detail?: string}}})?.response?.data;
-  return data?.error || data?.detail || (error instanceof Error ? error.message : 'Não foi possível importar o documento.');
+export function documentImportFailure(error: unknown) {
+  const failure = error as {code?: string; response?: {status?: number; data?: {code?: string; error?: string; detail?: unknown}}};
+  const data = failure?.response?.data;
+  const status = failure?.response?.status;
+  const code = data?.code || (failure?.code === 'ECONNABORTED' ? 'processing_timeout' : status === 403 ? 'permission_denied' : status === 429 ? 'rate_limit_exceeded' : !failure?.response && failure?.code ? 'network_error' : 'document_invalid');
+  const message = typeof data?.error === 'string' ? data.error : typeof data?.detail === 'string' ? data.detail : error instanceof Error ? error.message : 'Não foi possível importar o documento.';
+  return {code, message, retryable: ['network_error', 'processing_timeout', 'document_import_retry_conflict', 'rate_limit_exceeded'].includes(code)};
+}
+export function documentImportError(error: unknown) { return documentImportFailure(error).message; }
+export interface CatalogQuota {
+  organization: number | null; active_catalogs: number; max_active_catalogs: number;
+  remaining_catalog_slots: number; plan_tier: string; plan_name: string;
+}
+export async function getCatalogQuota(organization: number): Promise<CatalogQuota> {
+  return (await api.get('/api/v2/studio/quotas/', {params: {organization}})).data;
 }
 const importWarnings: Record<string, string> = {
-  font_unavailable_source_preserved: 'A fonte original foi preservada como imagem; este texto não está disponível para edição.',
+  font_unavailable_source_preserved: 'A fonte original foi preservada na aparência de origem.',
+  font_substitute_required_for_editing: 'A aparência original foi preservada. Textos editáveis podem usar uma fonte substituta após edição.',
+  BORN_DIGITAL_TEXT_EXTRACTION_DEGRADED: 'O PDF contém texto digital, mas nenhum bloco foi validado para edição. Consulte os detalhes da análise.',
+  text_metrics_may_change_after_edit: 'O texto original usa escala especial. A edição pode alterar as métricas; revise o ajuste na caixa de origem.',
+  reconstruction_budget_source_preserved: 'O limite seguro de processamento foi atingido. Os demais elementos mantêm a aparência original.',
   clipping_preserved_as_raster: 'Recortes e efeitos complexos foram preservados como imagem.',
   ocr_unavailable_source_preserved: 'Esta página foi preservada como imagem; o reconhecimento de texto não está disponível.',
   geometry_extraction_unavailable_source_preserved: 'A página original foi preservada; seus elementos não puderam ser separados para edição.',

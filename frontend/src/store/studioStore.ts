@@ -1454,6 +1454,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       }
     } catch (e) {
       if (blankOperation !== catalogLoadOperation || !isCurrentBrandScope(blankScope)) return;
+      if ((e as {response?: {data?: {code?: string}}}).response?.data?.code === 'catalog_limit_exceeded') {toast.error('Limite de catálogos ativos atingido. Arquive um catálogo ou altere seu plano.'); return;}
       if (activeBrand) { toast.error('Não foi possível salvar o catálogo com a marca. Tente novamente.'); return; }
       console.warn('Falha ao persistir catalogo no backend, utilizando ID local:', e);
     }
