@@ -1,7 +1,11 @@
 """Synthetic PDF fixtures; customer documents must never be committed here."""
 
+import hashlib
 import io
+import json
 import subprocess
+import sys
+from types import SimpleNamespace
 from unittest import mock
 
 from django.test import SimpleTestCase
@@ -210,6 +214,78 @@ class DocumentAdapterTests(SimpleTestCase):
         with self.assertRaises(DocumentImportError) as failure:
             PdfImportAdapter.analyze(b"PK-not-a-PDF", "source.docx", self.sink)
         self.assertEqual(failure.exception.status_code, 415)
+
+    def test_option_shaped_filenames_never_enter_real_worker_argv_or_change_source(self):
+        source = synthetic_pdf([{}])
+        baseline = PdfImportAdapter.analyze(source, "reference.pdf", self.sink)
+        snapshot = baseline["pages"][0]["sourceSnapshot"]
+        expected_png = self.assets[snapshot["url"]][0]
+        real_popen = subprocess.Popen
+        for filename in ("--help.pdf", "-c print('option-shaped').pdf", "--worker;$(echo filename).pdf"):
+            with self.subTest(filename=filename):
+                with mock.patch("api.services.pdf_import_adapter.subprocess.Popen", wraps=real_popen) as launch:
+                    document = PdfImportAdapter.analyze(source, filename, self.sink)
+                launch.assert_called_once()
+                self.assertEqual(launch.call_args.args[0],
+                                 [sys.executable, "-m", "api.services.pdf_import_adapter", "--worker"])
+                self.assertNotIn(filename, launch.call_args.args[0])
+                self.assertFalse(launch.call_args.kwargs.get("shell", False))
+                self.assertEqual(document["sourceFingerprint"], hashlib.sha256(source).hexdigest())
+                result_snapshot = document["pages"][0]["sourceSnapshot"]
+                self.assertEqual(result_snapshot["hash"], snapshot["hash"])
+                self.assertEqual(self.assets[result_snapshot["url"]][0], expected_png)
+
+    def test_invalid_filename_is_rejected_before_worker_launch(self):
+        for filename in ("source\x00.pdf", "source\r\n.pdf"):
+            with self.subTest(filename=filename):
+                with mock.patch("api.services.pdf_import_adapter.subprocess.Popen") as launch:
+                    with self.assertRaises(DocumentImportError) as failure:
+                        PdfImportAdapter.analyze(synthetic_pdf([{}]), filename, self.sink)
+                self.assertEqual(failure.exception.code, "document_invalid_filename")
+                self.assertEqual(failure.exception.status_code, 400)
+                launch.assert_not_called()
+
+    def test_worker_error_messages_and_statuses_are_not_trusted(self):
+        source = synthetic_pdf([{}])
+        cases = [
+            ({"error": {"code": "document_docx_unsupported", "message": "PRIVATE_PARSER_DETAIL", "status_code": 200}},
+             "document_docx_unsupported", 415),
+            ({"error": {"code": "unknown_PRIVATE_PARSER_DETAIL", "message": "PRIVATE_PARSER_DETAIL", "status_code": 200}},
+             "processing_failed", 422),
+            ({"error": None}, "processing_failed", 422),
+            ({"error": "PRIVATE_PARSER_DETAIL"}, "processing_failed", 422),
+            ({"error": {"code": ["PRIVATE_PARSER_DETAIL"]}}, "processing_failed", 422),
+            ([], "processing_failed", 422),
+        ]
+        for response, expected_code, expected_status in cases:
+            with self.subTest(response=response):
+                process = mock.Mock(returncode=0)
+                process.communicate.return_value = (json.dumps(response).encode(), None)
+                with mock.patch("api.services.pdf_import_adapter.subprocess.Popen", return_value=process):
+                    with self.assertRaises(DocumentImportError) as failure:
+                        PdfImportAdapter.analyze(source, "synthetic.pdf", self.sink)
+                self.assertEqual(failure.exception.code, expected_code)
+                self.assertEqual(failure.exception.status_code, expected_status)
+                self.assertNotIn("PRIVATE_PARSER_DETAIL", failure.exception.message)
+        self.assertEqual(self.assets, {})
+
+    def test_worker_serializes_only_static_allowlisted_error_code(self):
+        from api.services.pdf_import_adapter import _worker_main
+        for code, expected in (("document_invalid_pdf", "document_invalid_pdf"),
+                               ("UNKNOWN_PRIVATE_PARSER_DETAIL", "processing_failed")):
+            with self.subTest(code=code):
+                failure = DocumentImportError("document_invalid_pdf")
+                failure.code = code
+                failure.message = "PRIVATE_PARSER_DETAIL"
+                failure.status_code = 200
+                output = io.StringIO()
+                with mock.patch("api.services.pdf_import_adapter._worker_limits"), \
+                     mock.patch("api.services.pdf_import_adapter._analyze_pdf", side_effect=failure), \
+                     mock.patch("api.services.pdf_import_adapter.sys.stdin", SimpleNamespace(buffer=io.BytesIO(synthetic_pdf([{}])))), \
+                     mock.patch("api.services.pdf_import_adapter.sys.stdout", output):
+                    _worker_main()
+                self.assertEqual(json.loads(output.getvalue()), {"error": {"code": expected}})
+                self.assertNotIn("PRIVATE_PARSER_DETAIL", output.getvalue())
 
     def test_scaled_font_matrix_keeps_actual_point_size(self):
         page = self.analyze([{"content": "BT /F1 1 Tf 24 0 0 24 30 100 Tm (Actual 24 pt text) Tj ET"}])["pages"][0]

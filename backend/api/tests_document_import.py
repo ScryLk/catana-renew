@@ -1,6 +1,7 @@
 """Tenant, persistence and publish gates with real synthetic source documents."""
 import copy
 import io
+import json
 import os
 import shutil
 import tempfile
@@ -336,3 +337,92 @@ class DocumentImportTests(TestCase):
         self.assertEqual(StudioCatalog.objects.count(), 0)
         catalog = self.confirm(data)
         self.assertEqual(catalog.total_pages, 1)
+
+    def test_unexpected_errors_at_all_four_response_sinks_use_static_http_failure(self):
+        source = self.analyze()
+        secret = 'INTERNAL_SECRET Traceback (most recent call last): ValueError /srv/private/import.pdf'
+        requests = [
+            lambda: self.client.get(self.url, {'import_id': source['import_id']}),
+            lambda: self.client.post(self.url, {'file': SimpleUploadedFile('source.pdf', synthetic_pdf([{}]), 'application/pdf'),
+                    'organization': self.org.pk}, format='multipart'),
+            lambda: self.client.post(self.url, {'action': 'prepare', 'import_id': source['import_id']}, format='json'),
+            lambda: self.client.post(self.url, {'action': 'confirm', 'import_id': source['import_id']}, format='json'),
+        ]
+        for invoke in requests:
+            with self.subTest(action=invoke), patch('api.services.document_reconstructor.DocumentReconstructorService.response',
+                    side_effect=RuntimeError(secret)):
+                response = invoke()
+            self.assertEqual(response.status_code, 500)
+            self.assertEqual(response.data, {'code': 'document_import_failed',
+                'error': 'Não foi possível concluir a importação. Tente novamente.'})
+            self.assertNotIn(secret, response.content.decode())
+
+    def test_document_errors_are_remapped_at_every_api_action_even_after_attribute_mutation(self):
+        from api.services.document_preflight import DocumentImportError
+        source = self.analyze()
+        secret = 'PRIVATE_EXCEPTION Traceback /srv/private/original.pdf'
+        scenarios = [
+            ('analyze_file', lambda: self.client.post(self.url, {'file': SimpleUploadedFile('source.pdf', synthetic_pdf([{}]), 'application/pdf'),
+                    'organization': self.org.pk}, format='multipart')),
+            ('get_import', lambda: self.client.get(self.url, {'import_id': source['import_id']})),
+            ('prepare_preview', lambda: self.client.post(self.url, {'action': 'prepare', 'import_id': source['import_id']}, format='json')),
+            ('confirm_import', lambda: self.client.post(self.url, {'action': 'confirm', 'import_id': source['import_id']}, format='json')),
+            ('cancel_import', lambda: self.client.delete(self.url + '?import_id=' + source['import_id'])),
+        ]
+        for operation, invoke in scenarios:
+            error = DocumentImportError('document_docx_unsupported', secret, 200)
+            error.message, error.status_code = secret, 200
+            with self.subTest(operation=operation), patch('api.services.document_reconstructor.DocumentReconstructorService.' + operation,
+                    side_effect=error):
+                response = invoke()
+            self.assertEqual(response.status_code, 415)
+            self.assertEqual(response.data, {'code': 'document_docx_unsupported',
+                'error': 'DOCX ainda não é suportado. Exporte o documento para PDF.'})
+            self.assertNotIn(secret, response.content.decode())
+
+    def test_unknown_worker_error_details_and_status_are_not_reflected_or_persisted(self):
+        from unittest.mock import Mock
+        secret = 'PRIVATE_WORKER_SECRET Traceback ValueError /srv/private/document.pdf'
+        for code in ('unknown-' + secret, {'private': secret}, 'document_docx_unsupported'):
+            with self.subTest(code=code):
+                process = Mock()
+                process.communicate.return_value = (json.dumps({'error': {'code': code, 'message': secret, 'status_code': 200}}).encode(), b'')
+                process.returncode = 0
+                with patch('api.services.pdf_import_adapter.subprocess.Popen', return_value=process):
+                    response = self.client.post(self.url, {'file': SimpleUploadedFile('source.pdf', synthetic_pdf([{}]), 'application/pdf'),
+                                             'organization': self.org.pk}, format='multipart')
+                known = code == 'document_docx_unsupported'
+                self.assertEqual(response.status_code, 415 if known else 422)
+                self.assertEqual(response.data['code'], 'document_docx_unsupported' if known else 'processing_failed')
+                for marker in ('PRIVATE_WORKER_SECRET', 'Traceback', 'ValueError', '/srv/private'):
+                    self.assertNotIn(marker, response.content.decode())
+        self.assertEqual(DocumentImport.objects.count(), 0)
+        self.assertEqual(DocumentImportAsset.objects.count(), 0)
+        self.assertEqual(StudioCatalog.objects.count(), 0)
+
+    def test_redesign_exception_details_do_not_reach_analyze_get_prepare_or_confirm_success(self):
+        secret = 'SOURCE_PRIVATE_TRACEBACK Traceback (most recent call last): ValueError /srv/private/customer.pdf'
+        for failure_target in ('api.ai.pipeline.EditorialGenerationPipeline._execute',
+                               'api.ai.composition_planner.CompositionPlanner.compose_page'):
+            with self.subTest(failure_target=failure_target), patch(failure_target, side_effect=ValueError(secret)):
+                source = self.analyze(mode='redesign')
+                responses = [source]
+                get = self.client.get(self.url, {'import_id': source['import_id']})
+                self.assertEqual(get.status_code, 200)
+                responses.append(get.data)
+                prepared = self.client.post(self.url, {'action': 'prepare', 'import_id': source['import_id'], 'mode': 'redesign'}, format='json')
+                self.assertEqual(prepared.status_code, 200, prepared.data)
+                responses.append(prepared.data)
+                confirmed = self.client.post(self.url, {'action': 'confirm', 'import_id': source['import_id']}, format='json')
+                self.assertEqual(confirmed.status_code, 201, confirmed.data)
+                responses.append(confirmed.data)
+                reloaded = self.client.get(self.url, {'import_id': source['import_id']})
+                self.assertEqual(reloaded.status_code, 200)
+                responses.append(reloaded.data)
+                for payload in responses:
+                    serialized = json.dumps(payload)
+                    for marker in ('SOURCE_PRIVATE_TRACEBACK', 'Traceback', 'ValueError', '/srv/private'):
+                        self.assertNotIn(marker, serialized)
+                    self.assertIn('Source title', serialized)
+                    self.assertFalse(payload['report']['quality']['passed'])
+                self.assertEqual(StudioCatalog.objects.get(pk=confirmed.data['catalog_id']).import_metadata['quality']['passed'], False)

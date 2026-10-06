@@ -23,7 +23,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.exceptions import NotFound, ValidationError, NotAuthenticated
+from rest_framework.exceptions import APIException, NotFound, ValidationError, NotAuthenticated
 from drf_spectacular.utils import extend_schema
 
 from api.models import (
@@ -1053,6 +1053,24 @@ class StudioCatalogImportDocumentView(APIView):
     """Private analysis precedes explicit, idempotent catalog confirmation."""
     permission_classes = [IsAuthenticated]
 
+    def handle_exception(self, exc):
+        from api.services.document_preflight import DocumentImportError, public_document_error
+        if isinstance(exc, DocumentImportError):
+            payload, status_code = public_document_error(exc.code)
+            logger.info('document_import rejected code=%s', payload['code'])
+        elif isinstance(exc, APIException):
+            # Authentication, tenant/role access and normal input validation keep
+            # their established DRF statuses and controlled validation guidance.
+            return super().handle_exception(exc)
+        else:
+            # This also covers failures while building the four success DTOs.
+            # Never serialize/log native parser exceptions, tracebacks or paths.
+            payload, status_code = public_document_error('document_import_failed')
+            logger.error('document_import internal failure')
+        response = Response(payload, status=status_code)
+        response.exception = True
+        return response
+
     def get(self, request):
         job = DocumentReconstructorService.get_import(request.user, request.query_params.get('import_id'))
         return Response(DocumentReconstructorService.response(job))
@@ -1100,9 +1118,6 @@ class StudioCatalogImportDocumentView(APIView):
                 content_type=uploaded.content_type or '', title=request.data.get('title'),
                 mode=request.data.get('mode', 'preserve'), brand=brand, brief=request.data.get('brief', ''))
             return Response(DocumentReconstructorService.response(job), status=status.HTTP_200_OK)
-        except DocumentImportError as error:
-            logger.info('document_import rejected code=%s', error.code)
-            return Response({'error': error.message, 'code': error.code}, status=error.status_code)
         except OperationalError as error:
             # SQLite ignores row locks. Competing confirmations must remain safe
             # to retry; the transaction has rolled back before this response.

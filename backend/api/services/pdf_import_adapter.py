@@ -23,7 +23,9 @@ from api.services.document_ir import (
     MAX_WORKER_MEMORY_BYTES, SCHEMA_VERSION, SNAPSHOT_SCALE, fingerprint,
     provenance, validate_document_ir,
 )
-from api.services.document_preflight import MAX_ASSET_BYTES, validate_pdf
+from api.services.document_preflight import (
+    MAX_ASSET_BYTES, public_document_error, validate_pdf, validate_source_file,
+)
 
 
 class PdfImportAdapter:
@@ -31,7 +33,10 @@ class PdfImportAdapter:
     def analyze(cls, file_bytes: bytes, filename: str, asset_sink: AssetSink) -> Dict[str, Any]:
         if not file_bytes or len(file_bytes) > MAX_SOURCE_BYTES:
             raise DocumentImportError("file_size", "O arquivo está vazio ou excede o limite de importação.")
-        command = [sys.executable, "-m", "api.services.pdf_import_adapter", "--worker", filename]
+        # This cheap envelope check runs before launch; untrusted PDF parsing
+        # remains isolated. Filename is UI/storage metadata, never process argv.
+        validate_source_file(file_bytes, filename)
+        command = [sys.executable, "-m", "api.services.pdf_import_adapter", "--worker"]
         started = time.monotonic()
         process = subprocess.Popen(command, cwd=str(Path(__file__).resolve().parents[2]),
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -47,9 +52,12 @@ class PdfImportAdapter:
             payload = json.loads(output)
         except (ValueError, UnicodeError):
             raise DocumentImportError("processing_failed", "Não foi possível processar este PDF com segurança.") from None
+        if not isinstance(payload, dict):
+            raise DocumentImportError("processing_failed")
         if "error" in payload:
             error = payload["error"]
-            raise DocumentImportError(error["code"], error["message"], error.get("status_code", 422))
+            # Worker messages/statuses are never authoritative public output.
+            raise DocumentImportError(error.get("code") if isinstance(error, dict) else None)
         assets = payload["assets"]
         if len(assets) > MAX_ASSETS:
             raise DocumentImportError("asset_limit", "O PDF excede o limite seguro de imagens extraídas.")
@@ -583,18 +591,23 @@ def _analyze_pdf(file_bytes, filename):
         pdf.close()
 
 
-def _worker_main(filename):
+def _worker_main():
     try:
         _worker_limits()
         raw = sys.stdin.buffer.read(MAX_SOURCE_BYTES + 1)
-        document, assets = _analyze_pdf(raw, filename)
+        # The parent already validated the upload filename. The worker receives
+        # only unchanged PDF bytes and repeats preflight under a fixed PDF name.
+        document, assets = _analyze_pdf(raw, "document.pdf")
         payload = {"document": document, "assets": assets}
     except DocumentImportError as exc:
-        payload = {"error": {"code": exc.code, "message": exc.message, "status_code": exc.status_code}}
+        public_error, _ = public_document_error(exc.code)
+        payload = {"error": {"code": public_error["code"]}}
     except Exception:
-        payload = {"error": {"code": "invalid_pdf", "message": "Não foi possível ler ou renderizar este PDF."}}
+        payload = {"error": {"code": "invalid_pdf"}}
     sys.stdout.write(json.dumps(payload, ensure_ascii=True, separators=(",", ":")))
 
 
 if __name__ == "__main__":
-    _worker_main(sys.argv[2] if len(sys.argv) == 3 and sys.argv[1] == "--worker" else "document.pdf")
+    if sys.argv[1:] != ["--worker"]:
+        raise SystemExit(2)
+    _worker_main()

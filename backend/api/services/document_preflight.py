@@ -33,14 +33,55 @@ MAX_GRAPH_DEPTH = 64
 MAX_PAGE_DIMENSION_POINTS = 14_400
 
 
-class DocumentImportError(Exception):
-    """A controlled, non-sensitive failure safe to return through the import API."""
+_PUBLIC_DOCUMENT_ERRORS = {
+    'document_empty': ('document_empty', 'Envie um arquivo PDF não vazio.', 400),
+    'document_too_large': ('document_too_large', 'O limite de importação é de 25 MB.', 413),
+    'file_too_large': ('file_too_large', 'O documento excede o limite de 25 MB.', 413),
+    'document_invalid_filename': ('document_invalid_filename', 'O nome do documento é inválido.', 400),
+    'document_docx_unsupported': ('document_docx_unsupported', 'DOCX ainda não é suportado. Exporte o documento para PDF.', 415),
+    'document_type_unsupported': ('document_type_unsupported', 'A importação aceita arquivos PDF.', 415),
+    'document_mime_mismatch': ('document_mime_mismatch', 'O tipo informado não corresponde a um PDF.', 415),
+    'document_invalid_pdf': ('document_invalid_pdf', 'O PDF está malformado ou não pode ser importado com segurança.', 422),
+    'document_active_content': ('document_active_content', 'Utilize um PDF sem scripts, ações ativas ou arquivos anexados.', 422),
+    'document_forms_unsupported': ('document_forms_unsupported', 'Exporte o PDF com os campos de formulário achatados antes de importar.', 422),
+    'document_invalid_geometry': ('document_invalid_geometry', 'O PDF contém dimensões ou geometria de página inválidas.', 422),
+    'document_encrypted': ('document_encrypted', 'Utilize um PDF sem criptografia ou senha.', 422),
+    'document_empty_pdf': ('document_empty_pdf', 'O PDF não contém páginas.', 422),
+    'document_geometry_unsupported': ('document_geometry_unsupported', 'A escala UserUnit deste PDF ainda não é suportada. Exporte com escala padrão.', 422),
+    'document_resource_limit': ('document_resource_limit', 'O PDF excede os limites de processamento. Reduza as páginas (até 50), a resolução ou a complexidade.', 422),
+    'file_size': ('file_size', 'O arquivo está vazio ou excede o limite de importação.', 422),
+    'processing_timeout': ('processing_timeout', 'O PDF excedeu o tempo seguro de processamento.', 422),
+    'processing_failed': ('processing_failed', 'Não foi possível processar este PDF com segurança.', 422),
+    'asset_limit': ('asset_limit', 'O PDF excede o limite seguro de imagens extraídas.', 422),
+    'page_count_mismatch': ('page_count_mismatch', 'A contagem de páginas do PDF não pôde ser validada.', 422),
+    'invalid_geometry': ('invalid_geometry', 'O PDF contém geometria inválida.', 422),
+    'pixel_limit': ('pixel_limit', 'O PDF excede o limite seguro de resolução total.', 422),
+    'source_render_failed': ('source_render_failed', 'Uma página do PDF não pôde ser preservada. A importação foi interrompida.', 422),
+    'source_not_preserved': ('source_not_preserved', 'Não foi possível preservar todas as páginas.', 422),
+    'invalid_document_ir': ('invalid_document_ir', 'A análise do documento ficou incompleta ou uma página não possui representação original válida.', 422),
+    'invalid_pdf': ('invalid_pdf', 'Não foi possível ler ou renderizar este PDF.', 422),
+    'document_import_failed': ('document_import_failed', 'Não foi possível concluir a importação. Tente novamente.', 500),
+}
 
-    def __init__(self, code, message, status_code=422):
-        super().__init__(message)
-        self.code = code
-        self.message = message
-        self.status_code = status_code
+
+def public_document_error(code):
+    """Select fixed public values; worker/exception messages and statuses are never copied."""
+    known = _PUBLIC_DOCUMENT_ERRORS.get(code) if type(code) is str else None
+    public_code, message, status_code = known or _PUBLIC_DOCUMENT_ERRORS['processing_failed']
+    return {'code': public_code, 'error': message}, status_code
+
+
+class DocumentImportError(Exception):
+    """A classified failure whose public details come only from the static allowlist."""
+
+    def __init__(self, code, message=None, status_code=422):
+        # Keep the existing call signature while discarding dynamic parser/worker
+        # details. The API maps the code again to guard against mutated attributes.
+        public, public_status = public_document_error(code)
+        super().__init__(public['error'])
+        self.code = public['code']
+        self.message = public['error']
+        self.status_code = public_status
 
 
 def _limit(message):
@@ -241,8 +282,8 @@ def validate_pdf(file_bytes, filename, content_type='application/pdf'):
         return result
     except DocumentImportError:
         raise
-    except (MemoryError, LimitReachedError, RecursionError) as error:
-        raise DocumentImportError('document_resource_limit', 'O PDF excede os limites de processamento.') from error
-    except Exception as error:
+    except (MemoryError, LimitReachedError, RecursionError):
+        raise DocumentImportError('document_resource_limit') from None
+    except Exception:
         # Source strings and parser exceptions may contain confidential document data.
-        raise DocumentImportError('document_invalid_pdf', 'O PDF está malformado ou não pode ser importado com segurança.') from error
+        raise DocumentImportError('document_invalid_pdf') from None

@@ -382,3 +382,71 @@ class DocumentRedesignTests(SimpleTestCase):
         self.assertEqual(document['palette']['accent'], '#003A70')
         self.assertNotIn('not-in-source@example.com', self.texts(document))
         self.assertEqual(self.texts(document), [e['text'] for p in self.ir['pages'] for e in p['elements']])
+
+    def test_exception_details_are_replaced_by_exact_static_source_codes(self):
+        secret = 'SOURCE_PRIVATE_TRACEBACK Traceback ValueError /srv/private/customer.pdf token=private'
+        for error, code in [(ValueError(secret), 'SOURCE_REDESIGN_SUBSYSTEM_FAILURE'),
+                            (ValueError('SOURCE_RESOURCE_LIMIT'), 'SOURCE_RESOURCE_LIMIT'),
+                            (RuntimeError(secret), 'SOURCE_REDESIGN_SUBSYSTEM_FAILURE'),
+                            (ValueError({'private_path': secret}), 'SOURCE_REDESIGN_SUBSYSTEM_FAILURE')]:
+            with self.subTest(code=code), patch.object(Pipeline, '_execute', side_effect=error):
+                document = self.generate()
+                self.assertEqual(document['qualityGate']['reasons'], [code])
+                self.assertFalse(document['qualityGate']['publishable'])
+                self.assertEqual(document['sourceDocument'], self.ir)
+                self.assertNotIn(secret, canonical_document(document))
+
+    def test_composition_exception_and_rejected_draft_do_not_enter_source_fallback(self):
+        secret = 'SOURCE_RESOURCE_LIMIT: Traceback /srv/private/customer.pdf'
+        with patch('api.ai.pipeline.CompositionPlanner.compose_page', side_effect=ValueError(secret)):
+            document = self.generate()
+        for page in document['pages']:
+            self.assertEqual(page['importWarning'], 'SOURCE_COMPOSITION_REQUIRES_REVIEW')
+            self.assertNotIn('generativeDraft', page)
+        self.assertNotIn(secret, canonical_document(document))
+        rejected = {'generativeDraft': {'error': secret}, 'fallbackReason': secret,
+                    'composition': {'reason': secret}, 'repair_metadata': {'traceback': secret}, 'products': []}
+        page = SourceDocumentContext.fallback_page(self.ir, 1, secret, rejected)
+        self.assertEqual(page['importWarning'], 'SOURCE_REDESIGN_REQUIRES_REVIEW')
+        self.assertEqual(page['sourceSnapshot'], self.ir['pages'][0]['sourceSnapshot'])
+        self.assertNotIn(secret, canonical_document({'pages': [page]}))
+
+    def test_repair_error_metadata_is_static_without_rewriting_legitimate_source_text(self):
+        secret = 'SOURCE_PRIVATE Traceback /srv/private/customer.pdf'
+        ir = copy.deepcopy(self.ir)
+        text = 'Traceback specimen — legitimate source evidence'
+        element = ir['pages'][0]['elements'][0]
+        element['text'] = text
+        element['provenance'].update(sourceText=text, sourceTextHash=hashlib.sha256(text.encode()).hexdigest())
+
+        def repair(contract, document, **kwargs):
+            document = copy.deepcopy(document)
+            page = document['pages'][0]
+            page.update(renderMode='legacy', blocks=[], generativeDraft={'error': secret},
+                        importWarning=secret, fallbackReason=secret)
+            document['repair_metadata'] = {'fallbackReason': secret, 'repair_log': [secret], 'traceback': secret,
+                                           'fallbackUsed': True, 'fallbackPages': [1]}
+            return document, GenerationValidator.validate(contract, document), [secret]
+
+        from api.ai.visual_critic import VisualCriticReport
+        with patch('api.ai.pipeline.VisualCritic.critique', return_value=VisualCriticReport(1, 1, 1, 1, 1, 1, 1, .6, passed=False)), \
+             patch('api.ai.pipeline.RepairEngine.repair_document', side_effect=repair):
+            document = self.generate(ir)
+        self.assertNotIn(secret, canonical_document(document))
+        self.assertEqual(document['sourceDocument'], ir)
+        self.assertEqual(document['pages'][0]['documentPage']['elements'][0]['text'], text)
+        self.assertEqual(document['repair_metadata']['fallbackReason'], 'SOURCE_REDESIGN_REQUIRES_REVIEW')
+        self.assertEqual(document['observability']['repair_log'], ['SOURCE_REDESIGN_REQUIRES_REVIEW'])
+
+    def test_standard_fallback_keeps_literal_brand_codes_and_omits_exception_class(self):
+        secret = 'Traceback /srv/private/customer.pdf'
+        private_exception = type('PRIVATE_EXCEPTION_CLASS', (RuntimeError,), {})
+        with patch.object(Pipeline, '_execute', side_effect=private_exception(secret)):
+            document = Pipeline.execute('1 página', creative_seed=42)
+        self.assertEqual(document['qualityGate']['reasons'], ['GENERATION_SUBSYSTEM_FAILURE'])
+        self.assertNotIn('PRIVATE_EXCEPTION_CLASS', canonical_document(document))
+        self.assertNotIn(secret, canonical_document(document))
+        brand = {'identity': {'id': 'brand'}, 'meta': {'brand_id': 'brand', 'brand_version': 1}}
+        with patch.object(Pipeline, '_execute', side_effect=ValueError('BRAND_FONT_CONFLICT')):
+            branded = Pipeline.execute('1 página', creative_seed=42, brand_context=brand)
+        self.assertEqual(branded['qualityGate']['reasons'], ['GENERATION_SUBSYSTEM_FAILURE', 'BRAND_FONT_CONFLICT'])

@@ -1,12 +1,58 @@
 import os
 import time
 import logging
-import re
 import json
 from typing import Iterator, Dict, Any, Optional, List
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+# Operational operands stay small enough for bounded conversion and JSON output.
+# Consume the entire Unicode decimal token before accepting it, never its suffix.
+_MAX_NUMERIC_OPERAND_DIGITS = 9
+_INVALID_NUMERIC_OPERAND = object()
+
+
+def _decimal_operand(message, start):
+    end = start
+    while end < len(message) and message[end].isdecimal():
+        end += 1
+    if end - start > _MAX_NUMERIC_OPERAND_DIGITS:
+        return _INVALID_NUMERIC_OPERAND, end
+    return int(message[start:end]), end
+
+
+def _first_percentage_operand(message):
+    """Scan each numeric run/whitespace once; missing '%' cannot cause backtracking."""
+    cursor = 0
+    while cursor < len(message):
+        if not message[cursor].isdecimal():
+            cursor += 1
+            continue
+        value, cursor = _decimal_operand(message, cursor)
+        if value is _INVALID_NUMERIC_OPERAND:
+            return value
+        while cursor < len(message) and message[cursor].isspace():
+            cursor += 1
+        if cursor < len(message) and message[cursor] == '%':
+            return value
+    return None
+
+
+def _first_page_operand(message):
+    cursor = 0
+    while cursor < len(message):
+        if not message.startswith(('pagina', 'página'), cursor):
+            cursor += 1
+            continue
+        cursor += len('pagina')
+        while cursor < len(message) and message[cursor].isspace():
+            cursor += 1
+        if cursor < len(message) and message[cursor].isdecimal():
+            value, _ = _decimal_operand(message, cursor)
+            return value
+    return None
+
 
 class AIResponseChunk:
     def __init__(self, text: str = "", done: bool = False, usage: Optional[Dict[str, int]] = None, metadata: Optional[Dict[str, Any]] = None):
@@ -95,15 +141,22 @@ class MockGeminiProvider:
 
         lower = clean_user_prompt.lower()
 
+        remove_requested = any(k in lower for k in ["retire", "remover", "remova", "tire", "apague", "limpar"])
+        layout_requested = any(k in lower for k in ["layout", "transforme", "converta", "mude"])
+        pricing_requested = any(k in lower for k in ["preço", "preco", "preços", "precos", "aumente", "reajuste", "desconto"])
+        page_operand = _first_page_operand(lower) if remove_requested or layout_requested else None
+        percentage_operand = _first_percentage_operand(lower) if pricing_requested else None
+        if page_operand is _INVALID_NUMERIC_OPERAND or percentage_operand is _INVALID_NUMERIC_OPERAND:
+            return "O número informado excede o limite de 9 dígitos. Reenvie a página ou a porcentagem desejada para aplicar a alteração."
+
         # Detecção de Ações Funcionais (para garantir execução mesmo em modo fallback)
         actions = []
         delegations = []
         summary_parts = []
 
         # 1. Remoção de produto
-        if any(k in lower for k in ["retire", "remover", "remova", "tire", "apague", "limpar"]):
-            pg_match = re.search(r"p[aá]gina\s*(\d+)", lower)
-            rm_page = int(pg_match.group(1)) if pg_match else 3
+        if remove_requested:
+            rm_page = page_operand if page_operand is not None else 3
             actions.append({
                 "action": "remove_product",
                 "type": "remove_product",
@@ -118,9 +171,8 @@ class MockGeminiProvider:
             })
 
         # 2. Mudança de Layout
-        if any(k in lower for k in ["layout", "transforme", "converta", "mude"]):
-            lo_match = re.search(r"p[aá]gina\s*(\d+)", lower)
-            lo_page = int(lo_match.group(1)) if lo_match else 4
+        if layout_requested:
+            lo_page = page_operand if page_operand is not None else 4
             target_layout = "duo"
             if "grid" in lower or "grade" in lower:
                 target_layout = "grid_4"
@@ -148,9 +200,8 @@ class MockGeminiProvider:
             })
 
         # 3. Reajuste de Preços
-        if any(k in lower for k in ["preço", "preco", "preços", "precos", "aumente", "reajuste", "desconto"]):
-            pct_match = re.search(r"(\d+)\s*%", lower)
-            pct = int(pct_match.group(1)) if pct_match else 10
+        if pricing_requested:
+            pct = percentage_operand if percentage_operand is not None else 10
             is_discount = any(k in lower for k in ["desconto", "reduza", "diminua"])
             actions.append({
                 "action": "adjust_pricing",

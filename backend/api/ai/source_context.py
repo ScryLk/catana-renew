@@ -13,11 +13,106 @@ from .commercial_guard import CommercialIntegrityGuard
 from .design_grammar import GenerativeBlock, is_safe_image_url
 
 
+# Values are literals, never reflected exception text or dynamically built codes.
+_PUBLIC_SOURCE_CODES = {
+    'SOURCE_IR_INVALID': 'SOURCE_IR_INVALID',
+    'SOURCE_PAGE_COUNT_INVALID': 'SOURCE_PAGE_COUNT_INVALID',
+    'SOURCE_FINGERPRINT_INVALID': 'SOURCE_FINGERPRINT_INVALID',
+    'SOURCE_PAGE_ORDER_INVALID': 'SOURCE_PAGE_ORDER_INVALID',
+    'SOURCE_GEOMETRY_INVALID': 'SOURCE_GEOMETRY_INVALID',
+    'SOURCE_SNAPSHOT_MISSING': 'SOURCE_SNAPSHOT_MISSING',
+    'SOURCE_ELEMENTS_INVALID': 'SOURCE_ELEMENTS_INVALID',
+    'SOURCE_ELEMENT_ID_INVALID': 'SOURCE_ELEMENT_ID_INVALID',
+    'SOURCE_PROVENANCE_INVALID': 'SOURCE_PROVENANCE_INVALID',
+    'SOURCE_TEXT_EVIDENCE_INVALID': 'SOURCE_TEXT_EVIDENCE_INVALID',
+    'SOURCE_TEXT_HASH_INVALID': 'SOURCE_TEXT_HASH_INVALID',
+    'SOURCE_RESOURCE_LIMIT': 'SOURCE_RESOURCE_LIMIT',
+    'SOURCE_CANDIDATES_INVALID': 'SOURCE_CANDIDATES_INVALID',
+    'SOURCE_PRODUCTS_NOT_FROM_DOCUMENT': 'SOURCE_PRODUCTS_NOT_FROM_DOCUMENT',
+    'SOURCE_UNSUPPORTED_APPEARANCE': 'SOURCE_UNSUPPORTED_APPEARANCE',
+    'SOURCE_IMAGE_APPEARANCE_MISSING': 'SOURCE_IMAGE_APPEARANCE_MISSING',
+    'SOURCE_PRESERVE_ONLY': 'SOURCE_PRESERVE_ONLY',
+    'SOURCE_VISIBILITY_NOT_ADMITTED': 'SOURCE_VISIBILITY_NOT_ADMITTED',
+    'SOURCE_CONTENT_DENSITY_REQUIRES_REVIEW': 'SOURCE_CONTENT_DENSITY_REQUIRES_REVIEW',
+    'SOURCE_TEXT_DENSITY_REQUIRES_REVIEW': 'SOURCE_TEXT_DENSITY_REQUIRES_REVIEW',
+    'SOURCE_PAGE_COUNT_CHANGED': 'SOURCE_PAGE_COUNT_CHANGED',
+    'SOURCE_PAGE_ORDER_CHANGED': 'SOURCE_PAGE_ORDER_CHANGED',
+    'SOURCE_IR_CHANGED': 'SOURCE_IR_CHANGED',
+    'SOURCE_EDITORIAL_COPY_FABRICATED': 'SOURCE_EDITORIAL_COPY_FABRICATED',
+    'SOURCE_PAGE_REFERENCE_INVALID': 'SOURCE_PAGE_REFERENCE_INVALID',
+    'SOURCE_RENDER_MODE_INVALID': 'SOURCE_RENDER_MODE_INVALID',
+    'SOURCE_PAGE_SNAPSHOT_CHANGED': 'SOURCE_PAGE_SNAPSHOT_CHANGED',
+    'SOURCE_GEOMETRY_CHANGED': 'SOURCE_GEOMETRY_CHANGED',
+    'SOURCE_COMMERCIAL_FACT_CHANGED': 'SOURCE_COMMERCIAL_FACT_CHANGED',
+    'SOURCE_FOLIO_FACT_FABRICATED': 'SOURCE_FOLIO_FACT_FABRICATED',
+    'SOURCE_PROVENANCE_CHANGED': 'SOURCE_PROVENANCE_CHANGED',
+    'SOURCE_CONTENT_DUPLICATED': 'SOURCE_CONTENT_DUPLICATED',
+    'SOURCE_ELEMENT_ROLE_CHANGED': 'SOURCE_ELEMENT_ROLE_CHANGED',
+    'SOURCE_TEXT_FACT_CHANGED': 'SOURCE_TEXT_FACT_CHANGED',
+    'SOURCE_IMAGE_FACT_CHANGED': 'SOURCE_IMAGE_FACT_CHANGED',
+    'SOURCE_IMAGE_CROP_FORBIDDEN': 'SOURCE_IMAGE_CROP_FORBIDDEN',
+    'SOURCE_CONTENT_MISSING': 'SOURCE_CONTENT_MISSING',
+    'SOURCE_REDESIGN_SUBSYSTEM_FAILURE': 'SOURCE_REDESIGN_SUBSYSTEM_FAILURE',
+    'SOURCE_COMPOSITION_REQUIRES_REVIEW': 'SOURCE_COMPOSITION_REQUIRES_REVIEW',
+    'SOURCE_REDESIGN_REQUIRES_REVIEW': 'SOURCE_REDESIGN_REQUIRES_REVIEW',
+    'SOURCE_REDESIGN_PARTIAL': 'SOURCE_REDESIGN_PARTIAL',
+    'VISUAL_CRITIC_FAILED': 'VISUAL_CRITIC_FAILED',
+    'RUNTIME_SECURITY_FAILED': 'RUNTIME_SECURITY_FAILED',
+    'BRAND_GUIDELINE_REQUIRES_REVIEW': 'BRAND_GUIDELINE_REQUIRES_REVIEW',
+}
+
+
 class SourceDocumentContext:
     MAX_PAGES = 100
     MAX_ELEMENTS = 12000
     MAX_TEXT_CHARACTERS = 600000
     IMPORT_NULLABLE_FIELDS = ('category', 'details', 'material', 'dimensions', 'reference_code', 'commercial_condition')
+
+    @staticmethod
+    def public_code(reason, fallback='SOURCE_REDESIGN_REQUIRES_REVIEW'):
+        default = _PUBLIC_SOURCE_CODES.get(fallback, 'SOURCE_REDESIGN_REQUIRES_REVIEW') if type(fallback) is str else 'SOURCE_REDESIGN_REQUIRES_REVIEW'
+        return _PUBLIC_SOURCE_CODES.get(reason, default) if type(reason) is str else default
+
+    @classmethod
+    def exception_code(cls, error, fallback):
+        key = error.args[0] if isinstance(error, ValueError) and len(error.args) == 1 else None
+        return cls.public_code(key, fallback)
+
+    @classmethod
+    def normalize_diagnostics(cls, document):
+        """Keep source facts intact; only static diagnostics may cross the preview boundary."""
+        diagnostic_fields = {'reason', 'reasons', 'errors', 'warnings', 'importWarning', 'fallbackReason',
+                             'fallback_reason', 'repair_log', 'recommendations', 'sourceRedesignIntegrityErrors'}
+        private_fields = {'generativeDraft', 'traceback', 'exception', 'exception_class', 'exceptionClass',
+                          'error_detail', 'errorDetail', 'debug', 'stack_trace', 'stackTrace'}
+
+        def scrub(node):
+            if isinstance(node, list):
+                for child in node:
+                    scrub(child)
+            elif isinstance(node, dict):
+                for key in list(node):
+                    if key in private_fields:
+                        node.pop(key)
+                    elif key in diagnostic_fields:
+                        value = node[key]
+                        if isinstance(value, list):
+                            node[key] = [cls.public_code(item) for item in value]
+                        else:
+                            node[key] = cls.public_code(value) if value else ''
+                    elif key not in {'sourceDocument', 'documentPage', 'brandSnapshot', 'provenance'}:
+                        scrub(node[key])
+
+        for key in ('qualityGate', 'qualityReport', 'criticReport', 'repair_metadata', 'observability'):
+            scrub(document.get(key))
+        for page in document.get('pages', []):
+            page.pop('generativeDraft', None)
+            for key in ('importWarning', 'fallbackReason'):
+                if key in page:
+                    page[key] = cls.public_code(page[key])
+            for key in ('qualityGate', 'composition', 'repair_metadata'):
+                scrub(page.get(key))
+        return document
 
     @staticmethod
     def digest(value):
@@ -163,13 +258,9 @@ class SourceDocumentContext:
     def fallback_page(cls, source, number, reason, existing=None):
         """Keep an original page visible when its appearance cannot be recomposed safely."""
         original = source['pages'][number - 1]
-        page = copy.deepcopy(existing or {})
-        page.pop('generativeDraft', None)  # Hidden repair drafts have not passed the source boundary.
-        draft = {key: copy.deepcopy(page[key]) for key in ['blocks', 'composition', 'safeArea'] if page.get(key)}
-        if draft:
-            page['generativeDraft'] = draft
-        for key in ['composition', 'safeArea', 'fingerprint']:
-            page.pop(key, None)
+        reason = cls.public_code(reason)
+        # An original-page fallback needs no rejected draft or internal repair state.
+        page = {'products': copy.deepcopy((existing or {}).get('products', []))}
         page.update(id=page.get('id') or f"source-{source['sourceFingerprint'][:12]}-p{number}",
                     pageNumber=number, type=page.get('type', 'single'), renderMode='document',
                     sourceVisibility='source_only', title=cls.page_title(original), subtitle='', content='',
@@ -185,6 +276,7 @@ class SourceDocumentContext:
     @classmethod
     def fallback(cls, source, reason):
         cls.validate_input(source, enforce_redesign_limits=False)
+        reason = cls.public_code(reason, 'SOURCE_REDESIGN_SUBSYSTEM_FAILURE')
         pages = [cls.fallback_page(source, p['pageNumber'], reason) for p in source['pages']]
         first_text = cls.document_title(source)
         document = {'catalogId': 'source-' + source['sourceFingerprint'][:12], 'title': first_text, 'category': '',

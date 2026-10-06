@@ -33,6 +33,11 @@ from .source_context import SourceDocumentContext, SourceIntegrityGuard
 import hashlib
 import json
 
+_PUBLIC_BRAND_FAILURE_CODES = {
+    'BRAND_FONT_CONFLICT': 'BRAND_FONT_CONFLICT',
+    'BRAND_PALETTE_CONFLICT': 'BRAND_PALETTE_CONFLICT',
+}
+
 logger = logging.getLogger(__name__)
 
 # Feature Flag Oficial da Arquitetura Generativa (Item 43)
@@ -59,7 +64,7 @@ class EditorialGenerationPipeline:
             # A failed subsystem cannot turn a safe renderer fallback into approval.
             logger.error('[EditorialPipeline] Controlled failure: %s', type(exc).__name__)
             if source_document is not None:
-                reason = str(exc) if isinstance(exc, ValueError) and str(exc).startswith('SOURCE_') else 'SOURCE_REDESIGN_SUBSYSTEM_FAILURE:' + type(exc).__name__
+                reason = SourceDocumentContext.exception_code(exc, 'SOURCE_REDESIGN_SUBSYSTEM_FAILURE')
                 fallback = SourceDocumentContext.fallback(source_document, reason)
                 cls._attach_brand_snapshot(fallback, brand_context)
                 return fallback
@@ -88,11 +93,13 @@ class EditorialGenerationPipeline:
                     'palette':{'name':'Safe legacy', 'primary':'#141416','background':'#FFFFFF','accent':'#141416'},
                     'pages':pages, 'totalPages':len(pages), 'renderMode':'legacy',
                     'qualityGate':{'passed':False, 'publishable':False, 'status':'blocked',
-                                   'reasons':['GENERATION_SUBSYSTEM_FAILURE:' + type(exc).__name__]},
+                                   'reasons':['GENERATION_SUBSYSTEM_FAILURE']},
                     'observability':{'fallbackUsed':True, 'fallbackPages':list(range(1,len(pages)+1)),
                                      'qualityGateStatus':'blocked', 'runtimeSecurityPass':False}}
-            if brand_context and isinstance(exc, ValueError) and str(exc) in {'BRAND_FONT_CONFLICT', 'BRAND_PALETTE_CONFLICT'}:
-                fallback['qualityGate']['reasons'].append(str(exc))
+            error_key = exc.args[0] if isinstance(exc, ValueError) and len(exc.args) == 1 and type(exc.args[0]) is str else None
+            brand_failure = _PUBLIC_BRAND_FAILURE_CODES.get(error_key)
+            if brand_context and brand_failure:
+                fallback['qualityGate']['reasons'].append(brand_failure)
             cls._attach_brand_snapshot(fallback, brand_context)
             return fallback
 
@@ -305,6 +312,7 @@ class EditorialGenerationPipeline:
         if source_document is not None:
             source_errors = SourceIntegrityGuard.verify(contract, final_doc, allow_repair_legacy=True)
             if source_errors:
+                source_errors = [SourceDocumentContext.public_code(error) for error in source_errors]
                 fallback = SourceDocumentContext.fallback(source_document, source_errors[0])
                 fallback['qualityGate']['reasons'] = source_errors
                 fallback['observability']['sourceRedesignIntegrityErrors'] = source_errors
@@ -459,6 +467,8 @@ class EditorialGenerationPipeline:
             f"QualityPassed={quality_report.passed})."
         )
 
+        if source_document is not None:
+            SourceDocumentContext.normalize_diagnostics(final_doc)
         return final_doc
 
     @classmethod
@@ -619,9 +629,7 @@ class EditorialGenerationPipeline:
                 except ValueError as error:
                     if not contract.source_document:
                         raise
-                    reason = str(error)
-                    if not reason.startswith('SOURCE_'):
-                        reason = 'SOURCE_COMPOSITION_REQUIRES_REVIEW'
+                    reason = SourceDocumentContext.exception_code(error, 'SOURCE_COMPOSITION_REQUIRES_REVIEW')
                     page_obj = SourceDocumentContext.fallback_page(contract.source_document, p_num, reason, page_obj)
                     assembled_pages.append(page_obj)
                     continue

@@ -161,7 +161,7 @@ Installed versions verified from package metadata: pypdf 6.18.0 (BSD-3-Clause), 
 
 The committed tests generate inert synthetic PDFs and browser fixtures. Customer attachments, original PNGs and screenshots stay outside Git. Adapter tests cover cover, institutional-photo, two-group, dense-grid and contact fixtures with exact initial bitmap composition; digital/scanned/hybrid, missing fonts, clipping, rotation/crop, custom sizes, odd pages, extraction failures, source-render failure and timeout are exercised separately. API tests cover preview-before-persist, idempotency/quota, tenant roles, private storage/sharing, immutable source/edit invalidation, expiry/cancellation, DOCX/invalid files and native replace scope. Frontend tests cover atomic canonical hydration, scope races, retries, asset authentication, text edit/reset, odd slots, unchanged saves and real serialized mixed-size PDF MediaBoxes.
 
-The full backend regression command passed **421 tests** in 55.626 seconds:
+The initial import commit (`c192cd0`) backend regression command passed **421 tests** in 55.626 seconds:
 
 ```bash
 SECRET_KEY=import-test-only-key DEBUG=True DATABASE_URL=sqlite:////tmp/catana-import-tests.sqlite3 DOCUMENT_IMPORT_PRIVATE_ROOT=/tmp/catana-import-test-private /tmp/catana-backend-venv/bin/python manage.py test api --noinput
@@ -197,9 +197,32 @@ The final frontend regression suite passed **110/110 tests across 11 files**. It
 
 Remaining limitations: PDF-only; no OCR provider; no interactive-form/UserUnit support; vectors/unknown fonts remain raster; safe text editability is partial; source snapshots/export have bounded raster resolution; no product mapping UI; edited imports require a review workflow that V1 does not provide; confirmed-source retention follows explicit history preservation; physical preview cleanup needs a scheduler; external production credentials/provider calls and PostgreSQL runtime were not exercised. Migration 0034/private-volume setup must be reviewed before deployment. This work does not deploy or apply production migrations.
 
+## PR #7 CodeQL follow-up
+
+The six reported findings were inspected at their actual data-flow boundaries:
+
+- `provider.py` used an unbounded decimal/whitespace percentage regex. An isolated benchmark of 1,000 / 2,000 / 4,000 unmatched digits took approximately 0.007 / 0.028 / 0.119 seconds, confirming quadratic growth. Operational percentages and page operands now use a linear Unicode-decimal scanner with bounded integer conversion. Oversized numeric tokens are rejected rather than matching a suffix or applying the default percentage.
+- The PDF subprocess received the uploaded filename as one argument. It already used an argument list without a shell; the alert does not establish arbitrary shell execution. The launch arguments are now entirely fixed, the cheap source envelope is validated before launching, and unchanged PDF bytes travel only through stdin. The worker uses a fixed internal PDF name; original filename metadata stays private in the existing coordinator/storage. Regression tests launch the real worker with option/shell-shaped filenames and verify unchanged source hashes and PNG bytes.
+- Successful analyze/prepare/confirm/status responses could contain exception text when a redesign failure started with `SOURCE_`. Source fallback reasons now select literal values from an exact public code map, including after composition/repair. Unknown errors retain the source with a fixed review reason. Worker/API failures also select static public code/message/status values; arbitrary worker messages, statuses, paths, exception classes and traces are never copied into the response. Legitimate customer source text and private provenance remain intact.
+
+These fixes do not suppress CodeQL findings or change its workflow. The configured GitHub API returned `Forbidden`, and no local CodeQL CLI is installed, so remote alert closure must be confirmed by the new GitHub scan after the branch update.
+
+Final follow-up validation passed **453 backend tests in 56.897 seconds**, using the full backend command recorded above. Focused suites passed 89 import/parser/security tests, 113 AI/Brand/import tests and 20 provider operand tests. An independent security review passed 101 checks, including the original exception-leak reproduction after correction and the preserved rendering/share boundaries. The source sentinel observed before the fix no longer appears in analyze, status, prepare, confirm or persisted preview history. Source IR remains unchanged and failed redesign stays blocked from publication.
+
+Exact follow-up commands (repository root unless indicated):
+
+```bash
+SECRET_KEY=import-test-only-key DEBUG=True DATABASE_URL=sqlite:////tmp/catana-import-tests.sqlite3 DOCUMENT_IMPORT_PRIVATE_ROOT=/tmp/catana-import-test-private /tmp/catana-backend-venv/bin/python manage.py test api --noinput
+# The full command above ran in backend/.
+SECRET_KEY=provider-regression-tests DATABASE_URL=sqlite:////tmp/catana-provider-security-tests.sqlite3 AI_PROVIDER=mock /tmp/catana-backend-venv/bin/python backend/manage.py test api.tests_ai_provider_security --noinput --verbosity 2
+SECRET_KEY=provider-security-tests DATABASE_URL=sqlite:////tmp/catana-provider-security-tests.sqlite3 AI_PROVIDER=mock /tmp/catana-backend-venv/bin/python backend/manage.py test api.tests_ai_provider_security api.tests_document_redesign api.tests_brand_pipeline api.tests_production_gate api.tests_document_import --noinput --verbosity 1
+```
+
+The full/focused logs are `/tmp/catana-codeql-full-backend.log`, `/tmp/catana-provider-security-tests.log` and `/tmp/catana-codeql-ai-focused.log`. Independent before/after evidence is under `/workspace/catana-import-qa/codeql-audit-before.txt` and `codeql-audit-after.txt`, outside Git. Customer PDF/images remain outside Git.
+
 ## Changed files
 
-53 changed files in this branch, including this document:
+55 changed files in this branch, including this document:
 
 - `.gitignore`
 - `backend/.dockerignore`
@@ -210,6 +233,7 @@ Remaining limitations: PDF-only; no OCR provider; no interactive-form/UserUnit s
 - `backend/api/ai/design_grammar.py`
 - `backend/api/ai/generation_validator.py`
 - `backend/api/ai/pipeline.py`
+- `backend/api/ai/provider.py`
 - `backend/api/ai/repair_engine.py`
 - `backend/api/ai/requirement_contract.py`
 - `backend/api/ai/source_context.py`
@@ -222,6 +246,7 @@ Remaining limitations: PDF-only; no OCR provider; no interactive-form/UserUnit s
 - `backend/api/services/document_preflight.py`
 - `backend/api/services/document_reconstructor.py`
 - `backend/api/services/pdf_import_adapter.py`
+- `backend/api/tests_ai_provider_security.py`
 - `backend/api/tests_document_adapter.py`
 - `backend/api/tests_document_import.py`
 - `backend/api/tests_document_redesign.py`
