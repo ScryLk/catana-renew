@@ -17,6 +17,10 @@ export interface DocumentElement {
   content?: string;
   editable?: boolean;
   edited?: boolean;
+  sourceVisible?: boolean | null;
+  visibilityStatus?: string;
+  role?: string;
+  bindingProduct?: string | Record<string, unknown>;
   appearance?: {asset: DocumentSnapshot; x: number; y: number; width: number; height: number};
   snapshot?: DocumentSnapshot;
   font?: { original?: string; resolved?: string; fallback?: boolean; size?: number; weight?: number };
@@ -87,6 +91,9 @@ export function validDocumentSnapshot(value: unknown): value is DocumentSnapshot
 }
 export function isEditableDocumentText(element: DocumentElement): boolean {
   return element?.type === 'text' && element.editable === true && typeof element.id === 'string'
+    && (element.sourceVisible === undefined || element.sourceVisible === true)
+    && (element.visibilityStatus === undefined || element.visibilityStatus === 'sourceVisible')
+    && [element.textExtractionConfidence, element.geometryConfidence, element.visibilityConfidence].every(value => value === undefined || (typeof value === 'number' && Number.isFinite(value) && value >= .9))
     && ['x', 'y', 'width', 'height'].every(key => typeof element[key] === 'number' && Number.isFinite(element[key]))
     && element.x >= 0 && element.y >= 0 && element.width > 0 && element.height > 0
     && element.x + element.width <= 1.001 && element.y + element.height <= 1.001

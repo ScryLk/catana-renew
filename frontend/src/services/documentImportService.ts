@@ -42,6 +42,12 @@ export function documentImportWarning(warning: string) {
   return importWarnings[warning] || (/^[a-z][a-z0-9_]{1,100}$/.test(warning) ? 'Alguns elementos foram preservados como imagem para manter a aparência original.' : warning);
 }
 export const documentImportService = {
+  async reanalyze(catalogId: string, signal?: AbortSignal): Promise<DocumentImportAnalysis> {
+    return (await api.post(endpoint, {action: 'reanalyze', catalog_id: catalogId}, {timeout: 120000, signal})).data;
+  },
+  async confirmReanalysis(catalogId: string, importId: string, signal?: AbortSignal): Promise<DocumentImportAnalysis> {
+    return (await api.post(endpoint, {action: 'confirm_reanalysis', catalog_id: catalogId, import_id: importId, replace_reconstruction: true}, {timeout: 120000, signal})).data;
+  },
   async analyze(file: File, options: {organization: number; title: string; mode: DocumentImportMode; brandId?: string | null}, signal?: AbortSignal): Promise<DocumentImportAnalysis> {
     validateDocumentFile(file);
     const payload = new FormData();

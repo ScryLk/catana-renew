@@ -365,3 +365,78 @@ can be reopened even when its creation filled the final slot.
 
 See [hardening audit and validation](document-import-hardening.md) for measured
 coverage, regression evidence, commands and known limits.
+
+## Imported Document Editing Architecture
+
+The private `DocumentImport.document_ir`, confirmed previews and `CatalogSpread`
+reconstruction remain the source of authority. The public render projection omits
+unedited source text and extraction provenance, and includes only independently
+verified visible text elements. An edited visible value is included only when it
+is needed to render the reconstruction. The authenticated Studio detail contract
+continues to carry private editing state; public sharing never does.
+
+`api.services.imported_text_resolver` derives a server editable text index from
+the authorized catalog's persisted source and current reconstruction. Browser
+`editable_text_index` is ignored for imported document mode; Studio sends an
+empty hint. Admission requires the adapter's source-pixel visibility evidence,
+extraction/geometry/visibility confidence, a valid in-crop rectangle, and a
+retained source appearance. Hidden OCR, off-crop objects and unverified candidates
+are excluded. One bad candidate does not disable other safe elements.
+
+The index is versioned (`INDEX_VERSION = 1`) and bounded to 500 entries and a
+32,000-character evidence budget. Selection and the visible spread are prioritized;
+an explicit page scopes derivation to that page. A truncated search asks for a
+narrower selection instead of guessing. There is no PDF parsing/OCR or shared
+cache during chat; derivation reads current persisted revisions, so saves invalidate
+search evidence naturally. Only bounded safe text, IDs, page, role, bounds and
+commercial state enter the model context, as DATA under the existing prompt
+envelope. Logs record IDs, hashes, counts and statuses rather than page text.
+
+The target resolver parses the current user's replacement command deterministically,
+including Portuguese page/capa wording and selected-element shorthand. It checks
+selection, explicit page, local element/group candidates, visible spread and catalog
+fallback, with Unicode accent/case/whitespace normalization. Multiple occurrences
+remain ambiguous and provide safe candidate references. No fuzzy/global replacement
+is used. Every outgoing imported patch, including an SDK proposal, is checked again
+against fresh server evidence before any embedded patch reaches the browser.
+
+Visual text groups are virtual, deterministic local reading-order chains. Compatible
+font hierarchy, close geometry and alignment can join separate words or lines;
+known logos, footers, captions and unrelated roles are excluded. Branching geometry
+is not guessed. Physical source elements remain separate. A full-group replacement
+writes the first member and clears the remaining members. The browser validates all
+members and text fit before committing one history action; a stale, protected or
+oversized/overflowing member rolls back the entire group (`needs_layout_review`).
+
+Commercial Integrity protects semantic commercial roles and authoritative product
+bindings/provenance, with currency/SKU/MOQ/stock/specification context as a fallback.
+Digits alone do not block editorial titles such as `CATÁLOGO 2026` or `Coleção 25`.
+The backend save boundary independently checks source visibility, geometry,
+commercial protection and immutable evidence. Render-only revisions are compared
+against the source render projection and merged into retained private evidence;
+clients cannot replace that evidence or authorize targets.
+
+Source Preservation keeps the original PDF, snapshots, hashes, geometry, source
+text and provenance immutable. The renderer uses the original snapshot as its base
+and erases only the rectangle of an explicitly edited safe element, using the clean
+fallback crop. Untouched/unsafe areas remain exact source pixels. Existing Studio
+save, reload, undo and restore paths persist reconstruction changes. Success copy
+comes from actual action results rather than proposed model prose.
+
+Reanalysis derives missing preview metadata from retained DocumentIR when possible.
+If safe source evidence is unavailable, chat returns `reanalyze_required` and an
+`Atualizar editabilidade` control. `action: reanalyze` on the existing import endpoint
+reads the authorized retained PDF and creates a separate reviewable preview, without
+reupload or modifying the current catalog. `action: confirm_reanalysis` requires
+`replace_reconstruction: true`; a reconstruction revision hash rejects intervening
+edits. Confirmation replaces imported reconstruction pages, preserves separately
+added pages and confirmed source history, and disables sharing pending quality
+review. Missing retained bytes produce `source_unavailable`. Preserve mode remains
+source-only/noneditable; the generative redesign path remains separate.
+
+The regression uses an invented real PDF and real Django import/chat/save APIs.
+Playwright starts from the production render projection without browser source text;
+the natural request must find the target on the server. The isolated transport bridge
+lives under `backend/tests_support`, installs no production route and uses no paid
+model. Run it with Python backend dependencies installed and optionally set
+`CATANA_TEST_PYTHON` to that Python executable.

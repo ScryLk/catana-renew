@@ -6,6 +6,7 @@ invented product, and private source files never enter the public Media alias.
 import copy
 import hashlib
 import io
+import json
 import logging
 import math
 import os
@@ -74,14 +75,11 @@ def public_import_page(page):
     document.update(sourceSnapshot=_public_snapshot(original.get('sourceSnapshot')),
                     visibility='source_only', elements=[])
     is_generative = page.get('renderMode') == 'generative'
-    candidates = [element for element in original.get('elements', []) if isinstance(element, dict)
-                  and element.get('type') == 'text' and element.get('editable') is True]
+    from api.services.imported_text_resolver import safe_element
+    candidates = [element for element in original.get('elements', []) if safe_element(element)]
     reconstructs = (not is_generative and page.get('sourceVisibility') != 'source_only'
                     and original.get('visibility') in ('hybrid', 'reconstructed')
-                    and bool(original.get('fallbackSnapshot'))
-                    and all(_visible_rectangle(element) and (element.get('appearance') or element.get('snapshot'))
-                            and (not element.get('appearance') or _visible_rectangle(element['appearance']))
-                            for element in candidates))
+                    and bool(original.get('fallbackSnapshot')) and bool(candidates))
     if reconstructs:
         document['visibility'] = original['visibility']
         document['fallbackSnapshot'] = _public_snapshot(original.get('fallbackSnapshot'))
@@ -365,9 +363,17 @@ class DocumentReconstructorService:
         if not catalog.import_metadata:
             return
         job = catalog.source_import
-        if source_index >= len(job.previews):
+        if (job.organization_id != catalog.organization_id
+                or catalog.import_metadata.get('sourceFingerprint', job.source_fingerprint) != job.source_fingerprint):
+            raise ValidationError({'documentPage': 'A origem não pertence a este catálogo.'})
+        originals = job.previews
+        if not originals and isinstance(job.document_ir.get('pages'), list):
+            originals = DocumentReconstructorService._document_pages(job.document_ir, job.mode)
+        if not originals:
+            raise ValidationError({'code': 'reanalyze_required', 'documentPage': 'Atualizar editabilidade antes de salvar.'})
+        if source_index >= len(originals):
             return  # A separately added customer page has no original to overwrite.
-        original = job.previews[source_index]
+        original = originals[source_index]
         if not isinstance(elements, list) or len(elements) != 1 or not isinstance(elements[0], dict):
             raise ValidationError({'documentPage': 'As páginas originais devem ser preservadas.'})
         requested = elements[0]
@@ -377,6 +383,38 @@ class DocumentReconstructorService:
         before, after = original.get('documentPage'), requested.get('documentPage')
         if not isinstance(after, dict) or not isinstance(before, dict):
             raise ValidationError({'documentPage': 'A página original deve acompanhar a composição.'})
+        # Render-only clients can submit safe visible revisions without private PDF evidence.
+        # Compare their entire projection, then merge text into the retained private source.
+        projection = public_import_page(original)['documentPage']
+        public_ids = [item['id'] for item in projection['elements']]
+        requested_ids = [item.get('id') for item in after.get('elements', []) if isinstance(item, dict)]
+        if requested_ids == public_ids and after.get('elements') and not any(
+                'sourceVisible' in item for item in after['elements']):
+            public_normalized = copy.deepcopy(after)
+            revisions = {}
+            private_by_id = {item['id']: item for item in before['elements']}
+            for expected, revision in zip(projection['elements'], public_normalized['elements']):
+                identity = revision['id']
+                if 'provenance' in revision:
+                    if revision.pop('provenance') != {'sourceText': private_by_id[identity].get('text')}:
+                        raise ValidationError({'documentPage': 'A origem do texto é imutável.'})
+                if 'text' in revision:
+                    if revision.get('edited') is not True and revision['text'] != private_by_id[identity].get('text'):
+                        raise ValidationError({'documentPage': 'Confirme explicitamente a edição de texto.'})
+                    revisions[identity] = revision.get('text')
+                    revision.pop('text', None)
+                    revision.pop('content', None)
+                    revision.pop('edited', None)
+                if revision != expected:
+                    raise ValidationError({'documentPage': 'A projeção de origem é imutável.'})
+            if public_normalized != projection:
+                raise ValidationError({'documentPage': 'A geometria de origem é imutável.'})
+            after = copy.deepcopy(before)
+            for element in after['elements']:
+                if element['id'] in revisions:
+                    replacement = revisions[element['id']]
+                    element.update(text=replacement, edited=replacement != element.get('text'))
+            requested['documentPage'] = after
         normalized = copy.deepcopy(after)
         before_elements, after_elements = before.get('elements', []), normalized.get('elements', [])
         if not isinstance(after_elements, list) or len(after_elements) != len(before_elements):
@@ -389,16 +427,89 @@ class DocumentReconstructorService:
                     raise ValidationError({'documentPage': 'Somente textos editáveis podem ser alterados explicitamente.'})
                 if len(edited['text']) > 20000:
                     raise ValidationError({'documentPage': 'O texto editado excede o limite permitido.'})
+                from api.services.imported_text_resolver import safe_element, protected_text
+                if (before.get('visibility') == 'source_only' or not safe_element(source)
+                        or protected_text(source.get('text', ''), source) or protected_text(edited['text'])):
+                    raise ValidationError({'documentPage': 'O texto não é editável ou possui dados comerciais protegidos.'})
                 edited['text'] = source.get('text')
             edited.pop('edited', None)
         if normalized != before:
             raise ValidationError({'documentPage': 'A representação original e sua proveniência são imutáveis.'})
 
     @classmethod
+    def reconstruction_revision(cls, catalog):
+        values = [(s.spread_index, s.left_page_elements, s.right_page_elements)
+                  for s in catalog.spreads.order_by('spread_index')]
+        return hashlib.sha256(json.dumps(values, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+    @classmethod
+    def reanalyze_catalog(cls, catalog, user):
+        """Prepare a separate preview from retained bytes; never overwrite customer edits."""
+        assert_organization_access(user, catalog.organization, write=True)
+        try:
+            source = catalog.source_import
+        except DocumentImport.DoesNotExist:
+            raise ValidationError({'code': 'source_unavailable', 'error': 'A origem preservada não está disponível.'})
+        if source.organization_id != catalog.organization_id or not source.source_asset:
+            raise ValidationError({'code': 'source_unavailable'})
+        from api.services.document_preflight import MAX_SOURCE_BYTES
+        try:
+            with source.source_asset.file.open('rb') as file:
+                raw = file.read(MAX_SOURCE_BYTES + 1)
+        except OSError:
+            raise ValidationError({'code': 'source_unavailable'})
+        if hashlib.sha256(raw).hexdigest() != source.source_fingerprint:
+            raise ValidationError({'code': 'source_unavailable', 'error': 'A origem preservada não passou pela verificação.'})
+        revision = cls.reconstruction_revision(catalog)
+        prepared = cls.analyze_file(raw, source.filename, user, catalog.organization,
+            title=catalog.title, mode='editable', brand=catalog.brand)
+        prepared.report['reanalysis'] = {'catalogId': catalog.pk, 'sourceImportId': str(source.pk),
+            'expectedRevision': revision, 'replacementRequiresConfirmation': True}
+        prepared.save(update_fields=['report'])
+        return prepared
+
+    @classmethod
+    @transaction.atomic
+    def confirm_reanalysis(cls, job, catalog, user, replace_reconstruction=False):
+        assert_organization_access(user, catalog.organization, write=True)
+        catalog = StudioCatalog.objects.select_for_update().get(pk=catalog.pk)
+        job = DocumentImport.objects.select_for_update().get(pk=job.pk)
+        decision = job.report.get('reanalysis', {})
+        if (replace_reconstruction is not True or decision.get('catalogId') != catalog.pk
+                or job.organization_id != catalog.organization_id or job.status != 'ready'
+                or job.expires_at <= timezone.now()):
+            raise ValidationError({'code': 'confirmation_required', 'error': 'Revise a prévia e confirme a substituição da reconstrução.'})
+        old = catalog.source_import
+        if (decision.get('sourceImportId') != str(old.pk)
+                or decision.get('expectedRevision') != cls.reconstruction_revision(catalog)):
+            raise ValidationError({'code': 'reanalysis_conflict', 'error': 'O catálogo mudou. Prepare uma nova prévia.'})
+        cls._validate_ir_assets(job, job.document_ir)
+        if len(job.previews) != len(old.previews) and old.previews:
+            raise ValidationError({'code': 'page_count_mismatch'})
+        old.catalog = None
+        old.save(update_fields=['catalog'])  # confirmed source history remains immutable and retained
+        job.catalog = catalog
+        job.status = 'confirmed'
+        job.save(update_fields=['catalog', 'status'])
+        for index, page in enumerate(job.previews):
+            spread, _ = CatalogSpread.objects.get_or_create(catalog=catalog, spread_index=index // 2)
+            field = 'right_page_elements' if index % 2 else 'left_page_elements'
+            setattr(spread, field, [copy.deepcopy(page)])
+            spread.save(update_fields=[field, 'updated_at'])
+        catalog.import_metadata = {'importId': str(job.pk), 'mode': 'editable',
+            'sourceFingerprint': job.source_fingerprint, 'quality': job.report.get('quality', {}),
+            'report': copy.deepcopy(job.report), 'share_enabled': False}
+        catalog.total_pages = max(catalog.total_pages, len(job.previews))
+        catalog.save(update_fields=['import_metadata', 'total_pages', 'updated_at'])
+        return job
+
+    @classmethod
     @transaction.atomic
     def confirm_import(cls, job, user, title=None, mode=None, brand=None, brand_explicit=False):
         job = DocumentImport.objects.select_for_update(of=('self',)).select_related('organization', 'catalog', 'brand').get(pk=job.pk)
         assert_organization_access(user, job.organization, write=True)
+        if job.report.get('reanalysis'):
+            raise ValidationError({'code': 'confirmation_required', 'error': 'Confirme a substituição no catálogo de origem.'})
         if job.catalog_id is not None:
             return job, False
         from api.guards.quota_guard import check_catalog_creation_guard

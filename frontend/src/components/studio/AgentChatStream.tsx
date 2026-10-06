@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useStudioStore, type ChatMessage, type ChatDelegation } from '../../store/studioStore';
 import { toast } from 'sonner';
+import { UpdateDocumentEditability } from './UpdateDocumentEditability';
 
 interface TypewriterTextProps {
   text: string;
@@ -442,6 +443,8 @@ export const AgentChatStream: React.FC = () => {
                     onAnimationEnd={() => markMessageCompleted(msg.id)}
                   />
                 </div>
+
+                {msg.providerMetadata?.planner_status === 'reanalyze_required' && <UpdateDocumentEditability />}
 
                 {/* Sub-itens de acoes adicionais caso haja instrucoes multiplas pontuais */}
                 {msg.actions && msg.actions.length > 1 && !msg.actions.every((act) => parsed.actionText.includes(act)) && (

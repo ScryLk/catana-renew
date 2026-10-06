@@ -163,17 +163,26 @@ describe('Source identity, safe images and progressive editing', () => {
     expect(normalizeDocumentPage({...sourcePage(), sourceSnapshot: {...snapshot(), url: 'data:image/svg+xml;base64,evil'}})).toBeNull();
   });
   it('explicit text edits retain source appearance/provenance and reset exactly to source text', () => {
-    const original = sourcePage(); useStudioStore.setState({activeCatalogId: '51', pages: [page()], totalPages: 1});
+    const original = sourcePage();
+    original.elements[0].text = 'CATÁLOGO 2026';
+    original.elements[0].provenance!.sourceText = 'CATÁLOGO 2026';
+    useStudioStore.setState({activeCatalogId: '51', pages: [{...page(), documentPage: original}], totalPages: 1});
     useStudioStore.getState().updateDocumentText(1, 't1', 'Texto revisado');
     const edited = useStudioStore.getState().pages[0].documentPage!;
     expect(edited.elements[0]).toMatchObject({text: 'Texto revisado', edited: true, provenance: original.elements[0].provenance, appearance: original.elements[0].appearance});
     expect(edited.sourceSnapshot).toEqual(original.sourceSnapshot); expect(edited.width).toBe(original.width);
     useStudioStore.getState().updatePage(1, {documentPage: {...original, width: 999, sourceSnapshot: snapshot('99999999-9999-4999-8999-999999999999')}});
     expect(useStudioStore.getState().pages[0].documentPage?.sourceSnapshot).toEqual(original.sourceSnapshot);
-    useStudioStore.getState().resetDocumentText(1, 't1'); expect(useStudioStore.getState().pages[0].documentPage?.elements[0]).toMatchObject({text: 'Preço R$ 12,34', edited: false});
+    useStudioStore.getState().resetDocumentText(1, 't1'); expect(useStudioStore.getState().pages[0].documentPage?.elements[0]).toMatchObject({text: 'CATÁLOGO 2026', edited: false});
     const markup = renderToStaticMarkup(<DocumentPageRenderer page={{...page(), documentPage: edited}} />);
     expect(markup).toContain('container-type:inline-size'); expect(markup).toContain('Arial'); expect(markup).toContain('Texto revisado');
     expect(renderToStaticMarkup(<DocumentPageRenderer page={{...page(), documentPage: edited}} original />)).not.toContain('Texto revisado');
+  });
+  it('manual editing also protects imported commercial values', () => {
+    const source = page();
+    useStudioStore.setState({pages: [source]});
+    useStudioStore.getState().updateDocumentText(1, 't1', 'Texto inventado');
+    expect(useStudioStore.getState().pages).toEqual([source]);
   });
   it('saves the odd last page once and updates server-controlled share invalidation metadata', async () => {
     useStudioStore.setState({activeCatalogId: '51', pages: Array.from({length: 7}, (_, index) => page(index + 1)), totalPages: 7, currentSpread: [7, 7], importMetadata: {importId: 'import-1', share_enabled: true}});
