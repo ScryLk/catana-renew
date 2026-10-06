@@ -233,6 +233,32 @@ https://github.com/ScryLk/catana-renew/pull/new/fix/document-import-editability-
 
 No force push, merge, production modification or deployment was performed.
 
+## PR #8 CodeQL remediation
+
+PR: https://github.com/ScryLk/catana-renew/pull/8
+
+CodeQL flagged the repeated-alternative font suffix regex at line 55 as a high
+severity inefficient regular expression. Repetitions of `psmt` followed by a
+nonmatching character could trigger exponential backtracking. The adjacent
+source-family suffix regex had the same structural risk.
+
+Both suffix regexes now use a deterministic end-index parser. Each iteration
+consumes a fixed suffix, checks only bounded-size substrings, and slices the
+remaining family once. This avoids regex backtracking and repeated whole-string
+copies. Existing aliases, weights, styles, subset names and source preservation
+remain covered by the PDF regression suite.
+
+The new adversarial regression resolves 20,000 repeated `psmt`, `bold` and
+`-SemiBold` suffixes, including near-matches ending in X, in an isolated subprocess
+with a five-second deadline. It checks fallback/source-family and registry results.
+
+```sh
+SECRET_KEY=local-test DEBUG=True /tmp/catana-venv/bin/python backend/manage.py test api.tests_document_adapter api.tests_document_security --noinput
+# PASS: 52 tests, including adversarial suffixes and source/security invariants.
+```
+
+The fix is pushed to PR #8; the remote CodeQL rerun must confirm the alert is clear.
+
 ## Production gate
 
 DOCUMENT IMPORT HARDENING READY FOR PR REVIEW

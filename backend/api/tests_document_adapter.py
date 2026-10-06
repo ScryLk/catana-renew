@@ -5,6 +5,7 @@ import io
 import json
 import subprocess
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
@@ -497,3 +498,28 @@ class DocumentHardeningTests(SimpleTestCase):
             self.assertEqual(page['rotation'], rotation)
             self.assertEqual(page['quality']['editableCount'], 0)
             self.assertTrue(page['sourceSnapshot']['hash'])
+
+
+    def test_adversarial_font_suffixes_finish_within_bounded_subprocess(self):
+        # A near-match ending in X triggered exponential regex backtracking.
+        # Isolate the deadline so a regression cannot hang the test runner.
+        script = """
+import json, sys
+from api.ai.font_registry import resolve_pdf_font
+names = json.load(sys.stdin)
+results = [resolve_pdf_font(name) for name in names]
+assert results[0]['sourceFamily'] == names[0]
+assert results[1]['sourceFamily'] == names[1]
+assert results[2]['resolvedFont'] == 'Inter'
+assert results[3]['sourceFamily'] == 'Unknown'
+print('ok')
+"""
+        names = ['Unknown' + 'psmt' * 20000 + 'X',
+                 'Unknown' + 'bold' * 20000 + 'X',
+                 'Inter' + 'psmt' * 20000,
+                 'Unknown' + '-SemiBold' * 20000]
+        result = subprocess.run([sys.executable, '-c', script],
+                                input=json.dumps(names), capture_output=True,
+                                text=True, timeout=5, check=True,
+                                cwd=str(Path(__file__).resolve().parents[1]))
+        self.assertEqual(result.stdout.strip(), 'ok')

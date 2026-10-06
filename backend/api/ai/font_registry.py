@@ -38,6 +38,26 @@ def resolve_font_fallback(font_role, requested_font=None):
     return _REGISTRY['fallbacks'].get(font_role, _REGISTRY['fallbacks']['body'])
 
 
+def _strip_font_suffixes(value, suffixes, *, separators=False):
+    """Consume fixed suffixes from the end in linear time, without backtracking.
+
+    Keep an index into the original string: repeatedly slicing the entire
+    remaining name would make long repeated suffixes quadratic.
+    """
+    end = len(value)
+    while end:
+        for suffix in suffixes:
+            size = len(suffix)
+            if end >= size and value[end - size:end].lower() == suffix:
+                end -= size
+                if separators and end and value[end - 1] in '- ':
+                    end -= 1
+                break
+        else:
+            break
+    return value[:end]
+
+
 def resolve_pdf_font(name, weight=0):
     """Resolve PDF naming conventions against the one shared font registry.
 
@@ -52,7 +72,11 @@ def resolve_pdf_font(name, weight=0):
         ('extrabold', 800), ('semibold', 600), ('demibold', 600), ('black', 900),
         ('bold', 700), ('light', 300), ('medium', 500), ('thin', 100),
     ) if suffix in token), 700 if token.endswith('bd') else 400)
-    family_token = re.sub(r'(?:psmt|ps|mt|ltstd|std|regular|roman|extrabold|semibold|demibold|bold|black|light|medium|thin|italic|oblique|bd|it)+$', '', token)
+    family_token = _strip_font_suffixes(token, (
+        'extrabold', 'semibold', 'demibold', 'regular', 'oblique', 'medium',
+        'italic', 'ltstd', 'roman', 'black', 'light', 'psmt', 'bold', 'thin',
+        'std', 'ps', 'mt', 'bd', 'it',
+    ))
     if token.startswith('timesnewroman'):
         family_token = 'timesnewroman'
     families = {re.sub(r'[^a-z0-9]', '', f.lower()): f for f in ALL_VERIFIED_FONTS}
@@ -68,7 +92,12 @@ def resolve_pdf_font(name, weight=0):
         role = 'metadata' if any(s in token for s in ('mono', 'courier', 'code')) else 'display' if 'serif' in token and 'sans' not in token else 'body'
         resolved = resolve_font_fallback(role)
         status = 'generic_fallback'
-    return {'sourceFont': name, 'sourceFamily': families.get(family_token, re.sub(r'(?i)(?:[- ]?(?:regular|bold|italic|oblique|semibold|light|medium))+$', '', source)),
+    source_family = families.get(family_token)
+    if source_family is None:
+        source_family = _strip_font_suffixes(source, (
+            'semibold', 'regular', 'oblique', 'medium', 'italic', 'light', 'bold',
+        ), separators=True)
+    return {'sourceFont': name, 'sourceFamily': source_family,
             'resolvedFont': resolved, 'fontResolutionStatus': status,
             'fontResolutionConfidence': 1.0 if status == 'exact' else .9 if status == 'registry_alias' else .5,
             'fontFallback': status not in ('exact', 'registry_alias'),
