@@ -1,582 +1,168 @@
-import { ResponsiveModal } from '../mobile/ResponsiveModal';
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  X,
-  FileUp,
-  FileText,
-  UploadCloud,
-  Check,
-  Loader2,
-  Sparkles,
-  Scissors,
-  Layers,
-  Palette,
-} from 'lucide-react';
-import { useStudioStore, API_BASE_URL } from '../../store/studioStore';
-import { getAuthToken } from '../../services/api';
+import { useEffect, useRef, useState } from 'react';
+import { FileUp, Loader2, UploadCloud, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { ResponsiveModal } from '../mobile/ResponsiveModal';
+import { useStudioStore } from '../../store/studioStore';
+import { documentImportError, documentImportService, documentImportWarning, validateDocumentFile } from '../../services/documentImportService';
+import type { DocumentImportAnalysis, DocumentImportMode } from '../../types/documentImport';
+import type { CatalogPageData } from '../../data/editorialCatalog.mock';
+import { DocumentPageRenderer } from './DocumentPageRenderer';
+import { GenerativePageRenderer } from './GenerativePageRenderer';
+import { getPageGeometry } from '../../utils/pageGeometry';
 
-interface ImportCatalogModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-export const ImportCatalogModal: React.FC<ImportCatalogModalProps> = ({
-  isOpen,
-  onClose,
-}) => {
-  const {
-    theme,
-    setPages,
-    setCatalogTitle,
-    setActiveCatalogId,
-    setHasStartedSession,
-    setActivePalette,
-  } = useStudioStore();
-
-  const isDark = theme === 'dark';
-
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [removeBackground, setRemoveBackground] = useState(true);
-  const [reconstructionMode, setReconstructionMode] = useState<'redesign' | 'faithful'>('redesign');
-  const [catalogTitleInput, setCatalogTitleInput] = useState('');
-
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Fechar com tecla ESC quando aberto e nao processando
+interface ImportCatalogModalProps { isOpen: boolean; onClose: () => void }
+const modes: Array<{id: DocumentImportMode; name: string; description: string}> = [
+  {id: 'preserve', name: 'Preservar original', description: 'Mantém cada página com sua aparência e tamanho de origem.'},
+  {id: 'editable', name: 'Original editável', description: 'Libera os textos seguros; elementos complexos mantêm sua representação original.'},
+  {id: 'redesign', name: 'Rediagramar com marca', description: 'Cria uma proposta com a marca escolhida e os fatos do documento. A prévia exige revisão.'},
+];
+export function ImportCatalogModal({isOpen, onClose}: ImportCatalogModalProps) {
+  const theme = useStudioStore(state => state.theme);
+  const user = useStudioStore(state => state.activeUserId);
+  const organization = useStudioStore(state => state.activeOrganizationId);
+  const brands = useStudioStore(state => state.brands);
+  const brandStatus = useStudioStore(state => state.brandLoadStatus);
+  const confirmImport = useStudioStore(state => state.confirmDocumentImport);
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('');
+  const [mode, setMode] = useState<DocumentImportMode>('preserve');
+  const [brandId, setBrandId] = useState('');
+  const [analysis, setAnalysis] = useState<DocumentImportAnalysis | null>(null);
+  const [prepared, setPrepared] = useState({mode: 'preserve' as DocumentImportMode, brandId: ''});
+  const [processing, setProcessing] = useState<'analyze' | 'prepare' | 'confirm' | null>(null);
+  const [failedAction, setFailedAction] = useState<'analyze' | 'prepare' | 'confirm'>('analyze');
+  const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'original' | 'reconstructed' | 'comparison'>('original');
+  const [pageIndex, setPageIndex] = useState(0);
+  const [stateScope, setStateScope] = useState(`${user}:${organization}`);
+  const input = useRef<HTMLInputElement>(null);
+  const operation = useRef(0);
+  const controller = useRef<AbortController | null>(null);
+  const analysisRef = useRef<DocumentImportAnalysis | null>(null);
+  analysisRef.current = analysis;
+  const scope = `${user}:${organization}`;
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen && !isProcessing) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isProcessing, onClose]);
-
-  if (!isOpen) return null;
-
-  const STEPS = [
-    'Leitura estrutural das páginas e vetores...',
-    'Isolamento e remoção de fundo com IA...',
-    'Decomposição editorial e tipográfica...',
-    'Extração de paleta e montagem dos spreads A4...',
-  ];
-
-  const handleFileChange = (file: File) => {
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    if (ext !== 'pdf' && ext !== 'docx') {
-      toast.error('Formato não suportado. Por favor, envie um arquivo PDF ou Word (.docx).');
-      return;
-    }
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error('Arquivo muito grande. O limite máximo é de 50 MB.');
-      return;
-    }
-    setSelectedFile(file);
-    if (!catalogTitleInput) {
-      const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-      setCatalogTitleInput(cleanName);
-    }
+    operation.current += 1; controller.current?.abort();
+    setStateScope(scope);
+    setFile(null); setTitle(''); setAnalysis(null); setProcessing(null); setError(null); setBrandId(''); setPageIndex(0);
+    return () => {operation.current += 1; controller.current?.abort();};
+  }, [scope]);
+  useEffect(() => {
+    if (!isOpen) {operation.current += 1; controller.current?.abort(); setProcessing(null);}
+  }, [isOpen]);
+  if (!isOpen || stateScope !== scope) return null;
+  const isDark = theme === 'dark';
+  const panel = isDark ? 'bg-[#101013] border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900';
+  const control = `w-full rounded-lg border px-3 py-2 text-sm ${isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-zinc-300'}`;
+  const pages = analysis?.pages || [];
+  const page = pages[pageIndex];
+  const report = analysis?.report || analysis?.document_ir?.report || {};
+  const quality = (report.quality || {}) as Record<string, unknown>;
+  const warnings = Array.isArray(report.warnings) ? report.warnings.filter((item): item is string => typeof item === 'string') : [];
+  const editableCount = (analysis?.document_ir?.pages || []).reduce((count, item) => count + item.elements.filter(element => element.editable).length, 0);
+  const outdated = Boolean(analysis && (mode !== prepared.mode || brandId !== prepared.brandId));
+  const validScope = user != null && user !== 'anonymous' && organization != null;
+  const selectFile = (selected: File) => {
+    try {validateDocumentFile(selected);} catch (failure) {setError(documentImportError(failure)); return;}
+    setFile(selected); setAnalysis(null); setError(null); setPageIndex(0);
+    if (!title) setTitle(selected.name.replace(/\.pdf$/i, '').replace(/[-_]/g, ' '));
   };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFileChange(e.dataTransfer.files[0]);
-    }
+  const dismiss = () => {
+    operation.current += 1; controller.current?.abort(); setProcessing(null);
+    useStudioStore.getState().cancelDocumentImport();
+    const current = analysisRef.current;
+    if (current && current.status !== 'confirmed' && !current.catalog_id) void documentImportService.cancel(current.import_id).catch(() => { /* The private server analysis also expires automatically. */ });
+    setAnalysis(null); setError(null); onClose();
   };
-
-  const handleStartImport = async () => {
-    if (!selectedFile) {
-      toast.error('Selecione um arquivo PDF ou Word para iniciar a importação.');
-      return;
-    }
-
-    setIsProcessing(true);
-    setCurrentStepIndex(0);
-
-    const stepInterval = setInterval(() => {
-      setCurrentStepIndex((prev) => Math.min(prev + 1, STEPS.length - 1));
-    }, 1800);
-
+  const run = async (action: 'analyze' | 'prepare' | 'confirm') => {
+    if (!validScope) {setError('Selecione uma organização para importar o documento.'); return;}
+    if (brandId && brandStatus !== 'ready') {setError('Sincronize as marcas antes de vincular este documento.'); return;}
+    if (action === 'analyze' && !file) {setError('Selecione um PDF para analisar.'); return;}
+    const currentOperation = ++operation.current;
+    controller.current?.abort(); const request = new AbortController(); controller.current = request;
+    const capturedScope = scope;
+    const current = () => currentOperation === operation.current && `${useStudioStore.getState().activeUserId}:${useStudioStore.getState().activeOrganizationId}` === capturedScope;
+    setProcessing(action); setFailedAction(action); setError(null);
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('title', catalogTitleInput.trim() || selectedFile.name);
-      formData.append('remove_background', String(removeBackground));
-      formData.append('mode', reconstructionMode);
-      formData.append('style_preset', 'auto');
-
-      const token = await getAuthToken();
-      const response = await fetch(`${API_BASE_URL}/api/v2/studio/catalogs/import-document/`, {
-        method: 'POST',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: 'include',
-        body: formData,
-      });
-
-      clearInterval(stepInterval);
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP ${response.status}`);
+      const options = {title: title.trim() || file?.name || 'Documento importado', mode, brandId: brandId || null};
+      if (action === 'confirm') {
+        if (!analysis || outdated) throw new Error('Atualize e revise a prévia antes de confirmar.');
+        const loaded = await confirmImport(analysis.import_id, options);
+        if (!current() || !loaded) return;
+        setAnalysis(null); setFile(null); setTitle(''); setProcessing(null);
+        toast.success('Catálogo importado com suas páginas de origem.'); onClose();
+      } else {
+        const result = action === 'prepare' && analysis
+          ? await documentImportService.prepare(analysis.import_id, options, request.signal)
+          : await documentImportService.analyze(file!, {...options, organization: organization!}, request.signal);
+        if (!current()) return;
+        if (!result.import_id || !Array.isArray(result.pages) || !result.pages.length) throw new Error('A análise não retornou uma representação válida do documento.');
+        setAnalysis(result); setPrepared({mode, brandId}); setPageIndex(0); setView('original');
       }
-
-      const result = await response.json();
-
-      if (result.pages && Array.isArray(result.pages) && result.pages.length > 0) {
-        setPages(result.pages);
-      }
-      if (result.catalog_id) {
-        setActiveCatalogId(String(result.catalog_id));
-      }
-      if (result.title) {
-        setCatalogTitle(result.title);
-      }
-      if (result.palette) {
-        setActivePalette(result.palette);
-      }
-      setHasStartedSession(true);
-
-      toast.success(result.message || 'Catálogo reconstruído com sucesso!');
-      onClose();
-    } catch (err: any) {
-      clearInterval(stepInterval);
-      setIsProcessing(false);
-      console.error('Falha na importacao do catalogo:', err);
-      toast.error(`Falha ao reconstruir o documento: ${err.message || 'Erro inesperado'}`);
-    }
+    } catch (failure) {if (current() && !request.signal.aborted) setError(documentImportError(failure));}
+    finally {if (current()) setProcessing(null);}
   };
-
-  return (
-    <ResponsiveModal label="Importar catálogo" onDismiss={onClose} dismissible={!isProcessing}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isProcessing) onClose();
-      }}
-    >
-      <div
-        className={`w-full max-w-lg rounded-2xl border flex flex-col overflow-hidden transition-colors ${
-          isDark
-            ? 'bg-[#101013] border-zinc-800 text-zinc-100 shadow-[0_30px_70px_rgba(0,0,0,0.95)]'
-            : 'bg-white border-zinc-200 text-zinc-900 shadow-[0_20px_50px_rgba(0,0,0,0.15)]'
-        }`}
-      >
-        {/* Header */}
-        <div
-          className={`px-5 py-3.5 border-b flex items-center justify-between shrink-0 ${
-            isDark ? 'border-zinc-800 bg-[#151518]' : 'border-zinc-200 bg-zinc-50'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={`p-1.5 rounded-lg border ${
-                isDark
-                  ? 'bg-zinc-900 border-zinc-800 text-zinc-200'
-                  : 'bg-white border-zinc-200 text-zinc-800 shadow-2xs'
-              }`}
-            >
-              <FileUp className="size-4" />
-            </div>
-            <div>
-              <h2
-                className={`text-sm font-semibold tracking-tight ${
-                  isDark ? 'text-white' : 'text-zinc-950'
-                }`}
-              >
-                Importar Catálogo
-              </h2>
-              <p className="text-[11px] text-zinc-400">
-                Engenharia reversa inteligente e reconstrução em Canvas Vivo.
-              </p>
-            </div>
-          </div>
-
-          {!isProcessing && (
-            <button
-              type="button"
-              onClick={onClose}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                isDark
-                  ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-                  : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60'
-              }`}
-              title="Fechar"
-            >
-              <X className="size-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Content Body - Compact and Non-Scrolling */}
-        <div className="p-5 space-y-3.5">
-          {/* File Upload Dropzone */}
-          {!isProcessing && (
-            <div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    handleFileChange(e.target.files[0]);
-                  }
-                }}
-                className="hidden"
-              />
-
-              {!selectedFile ? (
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setIsDragging(true);
-                  }}
-                  onDragLeave={() => setIsDragging(false)}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-xl py-7 px-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2.5 ${
-                    isDragging
-                      ? isDark
-                        ? 'border-zinc-400 bg-zinc-800/40'
-                        : 'border-zinc-600 bg-zinc-100'
-                      : isDark
-                      ? 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/20 hover:bg-zinc-900/40'
-                      : 'border-zinc-200 hover:border-zinc-300 bg-zinc-50/50 hover:bg-zinc-50'
-                  }`}
-                >
-                  <div
-                    className={`p-3 rounded-full border ${
-                      isDark
-                        ? 'bg-zinc-800/80 border-zinc-700/60 text-zinc-300'
-                        : 'bg-zinc-200/80 border-zinc-300 text-zinc-700'
-                    }`}
-                  >
-                    <UploadCloud className="size-5" />
-                  </div>
-                  <div>
-                    <p className={`text-xs font-medium ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
-                      Arraste seu catálogo em PDF ou Word aqui
-                    </p>
-                    <p className="text-[11px] text-zinc-400 mt-0.5">
-                      ou clique para selecionar do computador (máximo 50 MB)
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className={`p-3 rounded-xl border flex items-center justify-between ${
-                    isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div
-                      className={`p-1.5 rounded-lg border shrink-0 ${
-                        isDark
-                          ? 'bg-zinc-800/80 border-zinc-700/60 text-zinc-200'
-                          : 'bg-zinc-200 border-zinc-300 text-zinc-800'
-                      }`}
-                    >
-                      <FileText className="size-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium truncate">{selectedFile.name}</p>
-                      <p className="text-[10px] text-zinc-400 font-mono">
-                        {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedFile(null)}
-                    className={`p-1 rounded-md transition-colors cursor-pointer ${
-                      isDark
-                        ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-                        : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60'
-                    }`}
-                    title="Remover arquivo"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Processing Progress Feedback */}
-          {isProcessing && (
-            <div
-              className={`p-5 rounded-xl border space-y-4 text-center ${
-                isDark ? 'bg-zinc-900/80 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
-              }`}
-            >
-              <div className="flex justify-center">
-                <div className="relative">
-                  <div
-                    className={`w-10 h-10 rounded-full border-2 animate-spin ${
-                      isDark
-                        ? 'border-zinc-800 border-t-zinc-200'
-                        : 'border-zinc-300 border-t-zinc-900'
-                    }`}
-                  />
-                  <Sparkles
-                    className={`size-3.5 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${
-                      isDark ? 'text-zinc-200' : 'text-zinc-800'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <h3 className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-zinc-950'}`}>
-                  Reconstruindo Catálogo Editorial...
-                </h3>
-                <p className="text-[11px] text-zinc-400 mt-0.5">
-                  {STEPS[currentStepIndex]}
-                </p>
-              </div>
-
-              <div className={`w-full h-1 rounded-full overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`}>
-                <div
-                  className={`h-full transition-all duration-700 ${isDark ? 'bg-zinc-100' : 'bg-zinc-900'}`}
-                  style={{ width: `${((currentStepIndex + 1) / STEPS.length) * 100}%` }}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-1.5 text-left pt-1">
-                {STEPS.map((step, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex items-center gap-1.5 text-[11px] p-1.5 rounded-lg border ${
-                      idx < currentStepIndex
-                        ? isDark
-                          ? 'text-zinc-300 bg-zinc-800/40 border-zinc-700/40'
-                          : 'text-zinc-700 bg-zinc-100 border-zinc-200'
-                        : idx === currentStepIndex
-                        ? isDark
-                          ? 'text-white bg-zinc-800 border-zinc-600 font-medium'
-                          : 'text-zinc-950 bg-white border-zinc-300 font-medium shadow-2xs'
-                        : isDark
-                        ? 'text-zinc-600 border-transparent opacity-40'
-                        : 'text-zinc-400 border-transparent opacity-40'
-                    }`}
-                  >
-                    {idx < currentStepIndex ? (
-                      <Check className="size-3 shrink-0 text-zinc-400" />
-                    ) : idx === currentStepIndex ? (
-                      <Loader2 className="size-3 shrink-0 animate-spin text-zinc-200" />
-                    ) : (
-                      <span className="size-3 flex items-center justify-center font-mono text-[9px] border rounded-full">
-                        {idx + 1}
-                      </span>
-                    )}
-                    <span className="truncate">{step}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Configuration Options (When not processing) */}
-          {!isProcessing && (
-            <div className="space-y-3">
-              {/* Title input */}
-              <div>
-                <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider mb-1">
-                  Título do Projeto
-                </label>
-                <input
-                  type="text"
-                  value={catalogTitleInput}
-                  onChange={(e) => setCatalogTitleInput(e.target.value)}
-                  placeholder="Ex: Coleção Verão 2026"
-                  className={`w-full text-xs px-3 py-2 rounded-xl border outline-none transition-all ${
-                    isDark
-                      ? 'bg-zinc-900/60 border-zinc-800 text-zinc-100 focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600/40'
-                      : 'bg-zinc-50 border-zinc-200 text-zinc-900 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-300'
-                  }`}
-                />
-              </div>
-
-              {/* Unified Minimalist Settings Group */}
-              <div
-                className={`rounded-xl border divide-y overflow-hidden ${
-                  isDark
-                    ? 'bg-zinc-900/30 border-zinc-800 divide-zinc-800/70'
-                    : 'bg-zinc-50/70 border-zinc-200 divide-zinc-200'
-                }`}
-              >
-                {/* Setting 1: Background removal toggle */}
-                <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Scissors className="size-3.5 text-zinc-400 shrink-0" />
-                    <div className="min-w-0 flex items-center gap-2">
-                      <span className={`text-xs font-medium ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
-                        Isolar produtos e remover fundo (IA)
-                      </span>
-                      <span
-                        className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
-                          isDark
-                            ? 'bg-zinc-800 text-zinc-400 border-zinc-700/60'
-                            : 'bg-zinc-200/60 text-zinc-600 border-zinc-300'
-                        }`}
-                      >
-                        Recomendado
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Toggle Switch */}
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={removeBackground}
-                    onClick={() => setRemoveBackground(!removeBackground)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
-                      removeBackground
-                        ? isDark ? 'bg-zinc-100' : 'bg-zinc-900'
-                        : isDark ? 'bg-zinc-800' : 'bg-zinc-300'
-                    }`}
-                    title={removeBackground ? 'Remoção de fundo ativada' : 'Remoção de fundo desativada'}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full shadow-xs transition duration-200 ease-in-out mt-[3px] ${
-                        removeBackground
-                          ? isDark
-                            ? 'translate-x-4.5 bg-zinc-950'
-                            : 'translate-x-4.5 bg-white'
-                          : isDark
-                            ? 'translate-x-1 bg-zinc-400'
-                            : 'translate-x-1 bg-white'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Setting 2: Reconstruction mode segmented switch */}
-                <div className="px-3.5 py-2.5 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 shrink-0">
-                    <Layers className="size-3.5 text-zinc-400 shrink-0" />
-                    <span className={`text-xs font-medium ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
-                      Modo de Reconstrução
-                    </span>
-                  </div>
-
-                  <div
-                    className={`p-0.5 rounded-lg border flex gap-0.5 ${
-                      isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-200/70 border-zinc-300/80'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setReconstructionMode('redesign')}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
-                        reconstructionMode === 'redesign'
-                          ? isDark
-                            ? 'bg-zinc-800 text-white shadow-xs'
-                            : 'bg-white text-zinc-950 shadow-xs'
-                          : isDark
-                          ? 'text-zinc-400 hover:text-zinc-200'
-                          : 'text-zinc-600 hover:text-zinc-900'
-                      }`}
-                    >
-                      {reconstructionMode === 'redesign' && <Check className="size-3 text-zinc-300" />}
-                      <span>Rediagramação A4</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setReconstructionMode('faithful')}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
-                        reconstructionMode === 'faithful'
-                          ? isDark
-                            ? 'bg-zinc-800 text-white shadow-xs'
-                            : 'bg-white text-zinc-950 shadow-xs'
-                          : isDark
-                          ? 'text-zinc-400 hover:text-zinc-200'
-                          : 'text-zinc-600 hover:text-zinc-900'
-                      }`}
-                    >
-                      {reconstructionMode === 'faithful' && <Check className="size-3 text-zinc-300" />}
-                      <span>Fiel ao Original</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Setting 3: Automatic Brand Palette extraction info */}
-                <div className="px-3.5 py-2.5 flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Palette className="size-3.5 text-zinc-400 shrink-0" />
-                    <span className={`text-[11px] truncate ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                      Paleta e identidade visual
-                    </span>
-                  </div>
-                  <span
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded border shrink-0 ${
-                      isDark
-                        ? 'bg-zinc-800/80 text-zinc-400 border-zinc-700/60'
-                        : 'bg-zinc-200/60 text-zinc-600 border-zinc-300'
-                    }`}
-                  >
-                    Extração Automática
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer Actions */}
-        <div
-          className={`px-5 py-3.5 border-t flex items-center justify-between shrink-0 ${
-            isDark ? 'border-zinc-800 bg-[#151518]' : 'border-zinc-200 bg-zinc-50'
-          }`}
-        >
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isProcessing}
-            className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer disabled:opacity-50 ${
-              isDark
-                ? 'text-zinc-400 hover:text-white hover:bg-zinc-800/40'
-                : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-200/60'
-            }`}
-          >
-            Cancelar
-          </button>
-
-          <button
-            type="button"
-            onClick={handleStartImport}
-            disabled={!selectedFile || isProcessing}
-            className={`flex items-center gap-2 px-4.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed ${
-              isDark
-                ? 'bg-zinc-100 hover:bg-white text-zinc-950'
-                : 'bg-zinc-900 hover:bg-zinc-800 text-white'
-            }`}
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="size-3.5 animate-spin" />
-                <span>Processando...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="size-3.5 shrink-0" />
-                <span>Importar e Reconstruir Catálogo</span>
-              </>
-            )}
-          </button>
-        </div>
+  const preview = (item: CatalogPageData, original: boolean) => {
+    const geometry = getPageGeometry(item);
+    return <div className="relative mx-auto bg-white overflow-hidden shadow-[0_0_0_1px_#d4d4d8]" style={{width: `min(100%, calc(48vh * ${geometry.width / geometry.height}))`, aspectRatio: `${geometry.width}/${geometry.height}`}}>
+      {original || item.renderMode === 'document' ? <DocumentPageRenderer page={item} original={original} /> : <GenerativePageRenderer page={item} />}
+    </div>;
+  };
+  return <ResponsiveModal label="Importar catálogo" onDismiss={dismiss} className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/75">
+    <div className={`w-full max-w-3xl rounded-2xl border flex flex-col overflow-hidden max-h-[calc(100dvh-24px)] ${panel}`}>
+      <div className="px-4 py-3 border-b border-zinc-500/20 flex items-center justify-between gap-3 shrink-0">
+        <div className="min-w-0"><h2 className="font-semibold flex items-center gap-2"><FileUp className="size-4" />Importar Catálogo</h2><p className="text-xs text-zinc-500">Analise, compare e confirme as páginas antes de salvar.</p></div>
+        <button type="button" onClick={dismiss} aria-label="Fechar importação" className="p-2 shrink-0"><X className="size-4" /></button>
       </div>
-    </ResponsiveModal>
-  );
-};
+      <div className="p-4 overflow-y-auto min-h-0 space-y-4">
+        {!validScope && <p role="alert" className="text-sm text-amber-600">Selecione uma organização para importar o documento.</p>}
+        {!analysis && <div>
+          <input ref={input} type="file" aria-label="Arquivo PDF" accept=".pdf,application/pdf" className="sr-only" disabled={Boolean(processing)} onChange={event => {const selected = event.target.files?.[0]; if (selected) selectFile(selected);}} />
+          <button type="button" className="w-full border-2 border-dashed border-zinc-500/30 rounded-xl p-5 text-center" disabled={Boolean(processing)}
+            onDragOver={event => event.preventDefault()} onDrop={event => {event.preventDefault(); if (!processing && event.dataTransfer.files[0]) selectFile(event.dataTransfer.files[0]);}} onClick={() => input.current?.click()}>
+            <UploadCloud className="size-5 mx-auto mb-2" /><span className="block text-sm break-all">{file?.name || 'Selecionar PDF ou arrastar arquivo'}</span><span className="text-xs text-zinc-500">PDF • máximo 25 MB</span>
+          </button>
+          <p className="text-xs text-zinc-500 mt-2">Para importar Word, exporte o documento como PDF.</p>
+        </div>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="text-xs">Título do catálogo<input aria-label="Título do catálogo" className={`${control} mt-1`} value={title} disabled={Boolean(processing)} onChange={event => setTitle(event.target.value)} /></label>
+          <label className="text-xs">Marca do catálogo<select aria-label="Marca do catálogo" className={`${control} mt-1`} value={brandId} disabled={Boolean(processing)} onChange={event => setBrandId(event.target.value)}>
+            <option value="">Sem marca</option>{brands.filter(brand => brand.status !== 'archived' && brand.organization === organization).map(brand => <option key={brand.id} value={brand.id} disabled={brandStatus !== 'ready'}>{brand.name}</option>)}
+          </select></label>
+        </div>
+        <fieldset disabled={Boolean(processing)} className="space-y-2"><legend className="text-xs font-semibold mb-2">Modo de importação</legend>
+          {modes.map(option => <label key={option.id} className={`flex gap-2 items-start border rounded-lg p-2.5 cursor-pointer ${mode === option.id ? 'border-sky-500' : 'border-zinc-500/20'}`}>
+            <input type="radio" name="document-import-mode" value={option.id} checked={mode === option.id} onChange={() => setMode(option.id)} className="mt-0.5" />
+            <span className="min-w-0"><span className="text-sm block">{option.name}</span><span className="text-xs text-zinc-500 block">{option.description}</span></span>
+          </label>)}
+        </fieldset>
+        <p className="text-xs text-zinc-500">Imagens e fundos são preservados. Isolamento de produto indisponível nesta etapa: nenhum recorte automático será aplicado.</p>
+        {processing && <div role="status" className="flex items-center gap-2 text-sm"><Loader2 className="size-4 animate-spin shrink-0" />{processing === 'confirm' ? 'Salvando catálogo…' : processing === 'prepare' ? 'Atualizando prévia…' : 'Analisando documento…'}</div>}
+        {error && <div role="alert" className="rounded-lg p-3 text-sm border border-red-500/30 space-y-2"><p>{error}</p><button type="button" onClick={() => void run(failedAction)} disabled={Boolean(processing)} className="underline">Tentar novamente</button></div>}
+        {analysis && <>
+          <section aria-label="Relatório de importação" className="text-xs border border-zinc-500/20 rounded-lg p-3 space-y-1">
+            <p className="font-semibold">{pages.length} páginas preservadas • {editableCount} textos editáveis</p>
+            <p>A geometria de origem é mantida. O documento original permanece disponível para comparação.</p>
+            {quality.status === 'needs_review' && <p className="text-amber-600">A proposta precisa de revisão; o original foi preservado.</p>}
+            {!editableCount && <p>Esta análise preserva as páginas como imagens. Não há textos seguros para edição.</p>}
+            {warnings.map((warning, index) => <p key={index} className="text-amber-600">{documentImportWarning(warning)}</p>)}
+          </section>
+          {outdated && <p role="status" className="text-xs text-amber-600">Atualize a prévia para revisar o modo e a marca escolhidos.</p>}
+          <section aria-label="Prévia do documento" className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {(['original', 'reconstructed', 'comparison'] as const).map((value, index) => <button type="button" key={value} aria-pressed={view === value} onClick={() => setView(value)} className={`text-xs px-3 py-2 rounded-lg border ${view === value ? 'border-sky-500' : 'border-zinc-500/20'}`}>{['Original', 'Reconstruído', 'Comparação'][index]}</button>)}
+              <select aria-label="Página da prévia" className="text-xs border border-zinc-500/30 rounded-lg p-2 bg-transparent" value={pageIndex} onChange={event => setPageIndex(Number(event.target.value))}>{pages.map((item, index) => <option key={item.id} value={index}>Página {index + 1}</option>)}</select>
+            </div>
+            {page && (view === 'comparison' ? <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><p className="text-xs mb-1">Original</p>{preview(page, true)}</div><div><p className="text-xs mb-1">Reconstruído</p>{preview(page, false)}</div></div> : preview(page, view === 'original'))}
+          </section>
+        </>}
+      </div>
+      <div className="px-4 py-3 border-t border-zinc-500/20 flex flex-wrap justify-end gap-2 shrink-0">
+        <button type="button" onClick={dismiss} className="rounded-lg px-3 py-2 text-sm border border-zinc-500/30">{analysis || processing ? 'Cancelar análise' : 'Cancelar'}</button>
+        {!analysis ? <button type="button" disabled={!file || !validScope || Boolean(processing)} onClick={() => void run('analyze')} className="rounded-lg px-4 py-2 text-sm bg-sky-600 text-white disabled:opacity-40">Analisar documento</button>
+          : outdated ? <button type="button" disabled={Boolean(processing)} onClick={() => void run('prepare')} className="rounded-lg px-4 py-2 text-sm bg-sky-600 text-white disabled:opacity-40">Atualizar prévia</button>
+          : <button type="button" disabled={Boolean(processing)} onClick={() => void run('confirm')} className="rounded-lg px-4 py-2 text-sm bg-sky-600 text-white disabled:opacity-40">Confirmar importação</button>}
+      </div>
+    </div>
+  </ResponsiveModal>;
+}

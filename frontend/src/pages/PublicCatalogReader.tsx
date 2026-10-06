@@ -32,6 +32,7 @@ import { CANONICAL_DEMO_TEMPLATES } from '../data/demoCatalogs.data';
 import { CatalogPageData, ProductItem, StudioPalette } from '../data/editorialCatalog.mock';
 import api from '../services/api';
 import { toast } from 'sonner';
+import { getPageGeometry, getSpreadGeometry } from '../utils/pageGeometry';
 
 interface PublicSpreadData {
   spread_index: number;
@@ -74,7 +75,6 @@ export const PublicCatalogReader: React.FC = () => {
   const currentSpreadIndex = Math.floor(currentSinglePageIndex / 2);
   const setCurrentSpreadIndex = (action: React.SetStateAction<number>) => setCurrentSinglePageIndex((current) =>
     (typeof action === 'function' ? action(Math.floor(current / 2)) : action) * 2);
-  const { ref: readerViewportRef, fit } = usePublicationFit(viewMode === 'single' ? 490 : 980, 693, 32);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [ambientTheme, setAmbientTheme] = useState<'dark' | 'light'>('dark');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -167,6 +167,11 @@ export const PublicCatalogReader: React.FC = () => {
   const totalSpreads = catalog?.spreads?.length || 0;
   const currentSpread = catalog?.spreads?.[currentSpreadIndex] || null;
   const currentSinglePage = allPages[currentSinglePageIndex] || null;
+  const spreadGeometry = getSpreadGeometry(currentSpread?.left_page, currentSpread?.right_page);
+  const currentGeometry = getPageGeometry(currentSinglePage);
+  const readerWidth = viewMode === 'single' ? currentGeometry.width : spreadGeometry.width;
+  const readerHeight = viewMode === 'single' ? currentGeometry.height : spreadGeometry.height;
+  const {ref: readerViewportRef, fit} = usePublicationFit(readerWidth, readerHeight, 32);
 
   // Navegação anterior
   const handlePrev = useCallback(() => {
@@ -377,9 +382,9 @@ export const PublicCatalogReader: React.FC = () => {
             {viewMode === 'spread'
               ? `Lâmina ${currentSpreadIndex + 1} de ${totalSpreads} · (Páginas ${String(
                   currentSpread?.left_page?.pageNumber || 1
-                ).padStart(2, '0')} - ${String(
-                  currentSpread?.right_page?.pageNumber || 2
-                ).padStart(2, '0')})`
+                ).padStart(2, '0')}${currentSpread?.right_page ? ` - ${String(
+                  currentSpread.right_page.pageNumber
+                ).padStart(2, '0')}` : ''})`
               : `Página ${currentSinglePageIndex + 1} de ${allPages.length}`}
           </span>
         </div>
@@ -538,12 +543,12 @@ export const PublicCatalogReader: React.FC = () => {
 
         {/* Contêiner de Escalonamento e Proporção A4 */}
         <div className="flex min-h-full min-w-full w-fit p-4">
-        <div className="relative m-auto shrink-0" style={{ width: (viewMode === 'single' ? 490 : 980) * fit * zoomLevel, height: 693 * fit * zoomLevel }}>
-        <div className="origin-top-left flex items-center justify-center" style={{ width: viewMode === 'single' ? 490 : 980, height: 693, transform: `scale(${fit * zoomLevel})` }}>
+        <div className="relative m-auto shrink-0" style={{ width: readerWidth * fit * zoomLevel, height: readerHeight * fit * zoomLevel }}>
+        <div className="origin-top-left flex items-center justify-center" style={{ width: readerWidth, height: readerHeight, transform: `scale(${fit * zoomLevel})` }}>
           {viewMode === 'spread' && currentSpread ? (
             /* ================= MODO SPREAD DUPLO (REVISTA ABERTA) ================= */
             <div
-              className={`relative flex items-center rounded-sm overflow-hidden transition-shadow duration-300 ${
+              className={`relative flex items-start rounded-sm overflow-hidden transition-shadow duration-300 ${
                 isDark
                   ? 'shadow-[0_30px_90px_rgba(0,0,0,0.85)] border border-zinc-800/80'
                   : 'shadow-[0_25px_70px_rgba(0,0,0,0.18)] border border-stone-300'
@@ -565,20 +570,20 @@ export const PublicCatalogReader: React.FC = () => {
                     activePalette={catalog.palette_data}
                   />
                 ) : (
-                  <div className="w-[490px] h-[693px] bg-zinc-900 flex items-center justify-center text-zinc-600 text-xs font-mono">
-                    Página em Branco
+                  <div style={{width: spreadGeometry.left.width, height: spreadGeometry.left.height}} className="bg-zinc-900 flex items-center justify-center text-zinc-600 text-xs font-mono">
+                    Posição vazia
                   </div>
                 )}
               </div>
 
               {/* Lombada Central (Book Spine Gradient) */}
-              <div
+              {!currentSpread.left_page?.documentPage && !currentSpread.right_page?.documentPage && <div
                 className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-8 pointer-events-none z-10"
                 style={{
                   background:
                     'linear-gradient(to right, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.04) 50%, rgba(0,0,0,0.22) 100%)',
                 }}
-              />
+              />}
 
               {/* Página Direita */}
               <div
@@ -596,8 +601,8 @@ export const PublicCatalogReader: React.FC = () => {
                     activePalette={catalog.palette_data}
                   />
                 ) : (
-                  <div className="w-[490px] h-[693px] bg-zinc-900 flex items-center justify-center text-zinc-600 text-xs font-mono">
-                    Página em Branco
+                  <div data-virtual-page-slot style={{width: spreadGeometry.right.width, height: spreadGeometry.right.height}} className="bg-zinc-900 flex items-center justify-center text-zinc-600 text-xs font-mono">
+                    Posição vazia
                   </div>
                 )}
               </div>

@@ -155,6 +155,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+DOCUMENT_IMPORT_PRIVATE_ROOT = env('DOCUMENT_IMPORT_PRIVATE_ROOT', default=str(BASE_DIR / 'private_document_imports'))
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

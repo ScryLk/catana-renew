@@ -1,5 +1,27 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
+import { pdfGeometryFromElement } from '../utils/pageGeometry';
+
+class PDFExportError extends Error {}
+function assertCaptureBudget(width: number, height: number, scale: number) {
+  const pixelWidth = Math.ceil(width * scale);
+  const pixelHeight = Math.ceil(height * scale);
+  if (![pixelWidth, pixelHeight].every(value => Number.isFinite(value) && value > 0)
+    || Math.max(pixelWidth, pixelHeight) > 32767 || pixelWidth * pixelHeight > 16_000_000) {
+    throw new PDFExportError('Esta página excede o limite seguro de exportação nesta resolução. Use uma resolução menor.');
+  }
+}
+
+async function waitForSourceAssets(container: HTMLElement) {
+  const deadline = Date.now() + 15000;
+  while (container.querySelector('[data-document-asset-state="pending"]')) {
+    if (Date.now() > deadline) throw new PDFExportError('As páginas originais ainda não carregaram. Tente exportar novamente.');
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  if (container.querySelector('[data-document-asset-state="error"]')) {
+    throw new PDFExportError('Uma página original não está disponível. A exportação foi interrompida.');
+  }
+}
 
 export interface PDFExportOptions {
   fileName?: string;
@@ -40,6 +62,7 @@ class PDFExportService {
 
       // Garante que as webfonts terminaram de carregar antes da captura
       await document.fonts.ready;
+      await waitForSourceAssets(container);
 
       // Pre-carrega todas as imagens no container com timeout de protecao
       const allImages = Array.from(container.getElementsByTagName('img'));
@@ -68,17 +91,17 @@ class PDFExportService {
         }
       }
 
-      // Criar documento PDF no padrao A4 (210 x 297 mm)
-      const pdf = new jsPDF('p', 'mm', 'a4', compress);
-      const pdfWidth = 210;
-      const pdfHeight = 297;
+      const firstGeometry = pdfGeometryFromElement(pageElements[0]);
+      const pdf = new jsPDF({orientation: firstGeometry.pdfWidthMm > firstGeometry.pdfHeightMm ? 'landscape' : 'portrait',
+        unit: 'mm', format: [firstGeometry.pdfWidthMm, firstGeometry.pdfHeightMm], compress});
       const totalPages = pageElements.length;
-
-      // Calculo de DPI: A4 tem 8.2677 polegadas de largura
-      const targetPixelWidth = (210 / 25.4) * dpi; // 2480.3 px para 300 DPI, 1240.1 px para 150 DPI
 
       for (let i = 0; i < totalPages; i++) {
         const pageElement = pageElements[i];
+        const geometry = pdfGeometryFromElement(pageElement);
+        const pdfWidth = geometry.pdfWidthMm;
+        const pdfHeight = geometry.pdfHeightMm;
+        const targetPixelWidth = (pdfWidth / 25.4) * dpi;
 
         if (onProgress) {
           const progress = Math.round(10 + (i / totalPages) * 80);
@@ -86,11 +109,13 @@ class PDFExportService {
         }
 
         if (i > 0) {
-          pdf.addPage();
+          pdf.addPage([pdfWidth, pdfHeight], pdfWidth > pdfHeight ? 'landscape' : 'portrait');
         }
 
         const currentWidth = pageElement.offsetWidth || 490;
         const computedScale = Math.max(2, targetPixelWidth / currentWidth);
+        const currentHeight = pageElement.offsetHeight || currentWidth * geometry.height / geometry.width;
+        assertCaptureBudget(currentWidth, currentHeight, computedScale);
 
         const canvas = await html2canvas(pageElement, {
           scale: computedScale,
@@ -127,6 +152,7 @@ class PDFExportService {
         onProgress(100, 'Download concluído com sucesso!');
       }
     } catch (error) {
+      if (error instanceof PDFExportError) throw error;
       console.error('Error generating PDF:', error);
       throw new Error('Falha ao gerar o PDF em alta resolução. Tente novamente.');
     }
@@ -135,6 +161,11 @@ class PDFExportService {
   // Gera snapshot de imagem PNG de alta resolução de um elemento DOM
   async generatePNG(element: HTMLElement, scale: number = 3): Promise<string> {
     await document.fonts.ready;
+    await waitForSourceAssets(element);
+    const geometry = pdfGeometryFromElement(element);
+    const width = element.offsetWidth || geometry.width;
+    const height = element.offsetHeight || geometry.height;
+    assertCaptureBudget(width, height, scale);
     const canvas = await html2canvas(element, {
       scale,
       useCORS: true,

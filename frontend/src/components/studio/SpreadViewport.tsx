@@ -23,13 +23,14 @@ import { MiniPageThumbnail } from './MiniPageThumbnail';
 import { AgentCursorLayer } from './AgentCursorLayer';
 import { PageOverlayLayer } from './PageOverlayLayer';
 import { GenerativePageRenderer } from './GenerativePageRenderer';
+import { DocumentPageRenderer } from './DocumentPageRenderer';
+import { getPageGeometry } from '../../utils/pageGeometry';
 import { Tooltip } from '../ui/Tooltip';
 import { toast } from 'sonner';
 
 export const SpreadViewport: React.FC = () => {
   const { isCompact, isPhone } = useResponsiveLayout();
   const { pageNumber, phoneZoom } = useStudioResponsive();
-  const { ref: viewportRef, fit } = usePublicationFit(490, 760);
   const {
     zoomLevel,
     viewMode,
@@ -83,7 +84,16 @@ export const SpreadViewport: React.FC = () => {
 
   // Encontra as duas páginas do spread atual
   const leftPage = pages.find((p) => p.pageNumber === currentSpread[0]);
-  const rightPage = pages.find((p) => p.pageNumber === (isCompact ? pageNumber : currentSpread[1]));
+  const effectiveViewMode = isCompact ? 'single' : viewMode;
+  const rightPage = effectiveViewMode === 'spread' && currentSpread[0] === currentSpread[1]
+    ? undefined : pages.find((p) => p.pageNumber === (isCompact ? pageNumber : currentSpread[1]));
+  const leftGeometry = getPageGeometry(leftPage);
+  const rightGeometry = getPageGeometry(rightPage ?? leftPage);
+  const hasSourceGeometry = !!(leftPage?.documentPage || rightPage?.documentPage);
+  const baseWidth = effectiveViewMode === 'single' ? rightGeometry.width
+    : leftGeometry.width + rightGeometry.width + 86;
+  const baseHeight = (effectiveViewMode === 'single' ? rightGeometry.height : Math.max(leftGeometry.height, rightGeometry.height)) + (isCompact ? 67 : 42);
+  const {ref: viewportRef, fit} = usePublicationFit(baseWidth, baseHeight);
 
   // Handler para selecionar elemento
   const handleSelect = (elementId: string, e: React.MouseEvent, defaultName?: string | null, defaultPrice?: string | null) => {
@@ -386,10 +396,7 @@ export const SpreadViewport: React.FC = () => {
     );
   };
 
-  const effectiveViewMode = isCompact ? 'single' : viewMode;
-  const scale = (isCompact ? fit : 1) * (isPhone ? phoneZoom : zoomLevel) / 100;
-  const baseWidth = effectiveViewMode === 'single' ? 490 : 1066;
-  const baseHeight = isCompact ? 760 : 735;
+  const scale = (isCompact || hasSourceGeometry ? fit : 1) * (isPhone ? phoneZoom : zoomLevel) / 100;
   const scaledWidth = Math.round(baseWidth * scale);
   const scaledHeight = Math.round(baseHeight * scale);
 
@@ -424,6 +431,7 @@ export const SpreadViewport: React.FC = () => {
   };
 
   const renderPageContent = (page: CatalogPageData) => {
+    if (page.renderMode === 'document') return <DocumentPageRenderer page={page} interactive />;
     const accent = page.accentColor || activePalette.accent;
     const isDarkPage = isDarkPageBg(page.backgroundColor);
 
@@ -1477,7 +1485,7 @@ export const SpreadViewport: React.FC = () => {
         {leftPage && (
           <div className={`flex flex-col items-center ${effectiveViewMode === 'single' ? 'hidden' : ''}`}>
             {/* Top Bar for Left Page */}
-            <div className="w-[490px] flex items-center justify-between px-1.5 pb-2.5 text-xs select-none">
+            <div style={{width: leftGeometry.width}} className="flex items-center justify-between px-1.5 pb-2.5 text-xs select-none">
               <div className="flex items-center gap-2 min-w-0">
                 <span
                   className={`text-[10px] font-mono font-bold tracking-wider uppercase px-2 py-0.5 rounded border shrink-0 ${
@@ -1562,12 +1570,15 @@ export const SpreadViewport: React.FC = () => {
 
             {/* Left Page Frame */}
             <div
-              className={`w-[490px] h-[693px] rounded-sm relative transition-all border overflow-hidden ${
+              className={`rounded-sm relative transition-all border overflow-hidden ${
                 isDark
                   ? 'shadow-[0_16px_50px_rgba(0,0,0,0.65)] border-zinc-700/60'
                   : 'shadow-[0_20px_50px_rgba(40,30,20,0.08),0_4px_12px_rgba(0,0,0,0.04)] border-stone-300/60'
               }`}
               style={{
+                width: leftGeometry.width,
+                height: leftGeometry.height,
+                ...(leftPage.documentPage ? {borderWidth: 0, outline: '1px solid #71717a'} : {}),
                 backgroundColor: leftPage.backgroundColor,
                 color: leftPage.textColor,
               }}
@@ -1579,7 +1590,7 @@ export const SpreadViewport: React.FC = () => {
         )}
 
         {/* Center Swap Pages Quick Button (Between Left and Right) */}
-        {effectiveViewMode !== 'single' && (
+        {effectiveViewMode !== 'single' && rightPage && (
           <div className="flex flex-col items-center justify-center pt-44 self-start">
             <Tooltip text="Inverter páginas (Esquerda ⇄ Direita)" position="top">
               <button
@@ -1606,7 +1617,7 @@ export const SpreadViewport: React.FC = () => {
         {rightPage && (
           <div className="flex flex-col items-center">
             {/* Top Bar for Right Page */}
-            <div className="w-[490px] flex items-center justify-between px-1.5 pb-2.5 text-xs select-none">
+            <div style={{width: rightGeometry.width}} className="flex items-center justify-between px-1.5 pb-2.5 text-xs select-none">
               <div className="flex items-center gap-2 min-w-0">
                 <span
                   className={`text-[10px] font-mono font-bold tracking-wider uppercase px-2 py-0.5 rounded border shrink-0 ${
@@ -1691,12 +1702,15 @@ export const SpreadViewport: React.FC = () => {
 
             {/* Right Page Frame */}
             <div
-              className={`w-[490px] h-[693px] rounded-sm relative transition-all border overflow-hidden ${
+              className={`rounded-sm relative transition-all border overflow-hidden ${
                 isDark
                   ? 'shadow-[0_16px_50px_rgba(0,0,0,0.65)] border-zinc-700/60'
                   : 'shadow-[0_20px_50px_rgba(40,30,20,0.08),0_4px_12px_rgba(0,0,0,0.04)] border-stone-300/60'
               }`}
               style={{
+                width: rightGeometry.width,
+                height: rightGeometry.height,
+                ...(rightPage.documentPage ? {borderWidth: 0, outline: '1px solid #71717a'} : {}),
                 backgroundColor: rightPage.backgroundColor,
                 color: rightPage.textColor,
               }}
@@ -1705,6 +1719,9 @@ export const SpreadViewport: React.FC = () => {
               <PageOverlayLayer page={rightPage} />
             </div>
           </div>
+        )}
+        {effectiveViewMode === 'spread' && leftPage && !rightPage && (
+          <div data-virtual-page-slot aria-label="Posição vazia após a última página" className="mt-10 rounded-sm border border-dashed border-zinc-500/30" style={{width: leftGeometry.width, height: leftGeometry.height}} />
         )}
           </div>
         </div>

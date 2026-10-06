@@ -32,6 +32,7 @@ db.sqlite3
 # Media uploads
 /backend/media/
 /media/
+/backend/private_document_imports/
 
 # OS / Editor
 .DS_Store

@@ -15,6 +15,8 @@ sobre um catalog_id alvo, sem orfanar Components reutilizáveis de outros catál
 from django.db import transaction
 
 from .models import Catalog, Page, Component, PageComponent, Theme
+from .services.brand_intelligence import assert_organization_access, visible_organizations
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 
 VERSAO_SUPORTADA = '1.0'
 
@@ -108,20 +110,33 @@ def importar_catalogo_json(data, *, user, organization=None, sede=None,
                       (idempotente: reimportar o mesmo JSON não duplica páginas).
     """
     validar_catalogio(data)
+    if not user or not user.is_authenticated:
+        raise PermissionDenied('Autenticação obrigatória para importar catálogos.')
     meta = data.get('catalog', {})
 
     if mode == 'replace':
         if not catalog_id:
             raise IngestError('mode="replace" exige "catalog_id".')
         try:
-            catalog = Catalog.objects.get(id=catalog_id)
-        except Catalog.DoesNotExist:
-            raise IngestError(f'Catálogo {catalog_id} não encontrado para replace.')
+            catalog = Catalog.objects.select_for_update().get(id=catalog_id)
+        except (Catalog.DoesNotExist, ValueError, TypeError):
+            raise NotFound('Catálogo não encontrado para substituição.')
+        # Authorize before clearing any source content. Former membership and
+        # another tenant's ID never grant replacement rights.
+        if catalog.organization_id:
+            assert_organization_access(user, catalog.organization, write=True)
+            if organization is not None and organization.pk != catalog.organization_id:
+                raise ValidationError({'organization': 'O catálogo pertence a outra organização.'})
+        elif catalog.created_by_id != user.pk and not user.is_superuser:
+            raise NotFound('Catálogo não encontrado para substituição.')
+        organization, sede = catalog.organization, catalog.sede
         _limpar_conteudo(catalog)
         catalog.title = meta.get('name') or catalog.title
         catalog.description = meta.get('description') or catalog.description or ''
         catalog.save(update_fields=['title', 'description'])
     elif mode == 'new':
+        if organization is not None:
+            assert_organization_access(user, organization, write=True)
         catalog = Catalog.objects.create(
             title=meta.get('name'),
             description=meta.get('description') or '',

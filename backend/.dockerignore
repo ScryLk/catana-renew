@@ -21,3 +21,4 @@ node_modules/
 .pytest_cache/
 htmlcov/
 .coverage
+private_document_imports/

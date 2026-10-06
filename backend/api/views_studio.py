@@ -15,18 +15,20 @@ from decimal import Decimal
 from typing import Generator, Optional, Dict, Any, List
 from django.conf import settings
 from api.services.image_validator import validate_image_file, validate_image_bytes
-from django.http import StreamingHttpResponse, JsonResponse
+from django.http import StreamingHttpResponse, JsonResponse, FileResponse
 from django.db.models import Q
-from django.db import transaction
+from django.db import transaction, OperationalError
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.exceptions import NotFound, ValidationError, NotAuthenticated
+from rest_framework.exceptions import APIException, NotFound, ValidationError, NotAuthenticated
 from drf_spectacular.utils import extend_schema
 
 from api.models import (
     StudioCatalog,
+    DocumentImport, DocumentImportAsset,
     CatalogSpread,
     ChatThread,
     ChatMessage,
@@ -63,7 +65,8 @@ def _studio_catalogs_for(user):
     from api.services.brand_intelligence import visible_organizations
     organizations = visible_organizations(user)
     return StudioCatalog.objects.filter(
-        Q(brand__isnull=True) & (Q(created_by=user) | Q(organization__in=organizations))
+        Q(brand__isnull=True, import_metadata={}) & (Q(created_by=user) | Q(organization__in=organizations))
+        | Q(brand__isnull=True, organization__in=organizations) & ~Q(import_metadata={})
         | Q(brand__isnull=False, organization__in=organizations,
             brand__organization__in=organizations)
     )
@@ -78,17 +81,25 @@ def _brand_catalog_metadata(catalog):
         'brand_snapshot': catalog.brand_snapshot,
         'brand_snapshot_hash': catalog.brand_snapshot_hash,
         'qualityGate': (catalog.generation_metadata or {}).get('qualityGate'),
+        'import_metadata': catalog.import_metadata,
     }
 
 
 def _assert_brand_catalog_write(user, catalog):
-    if catalog.brand_id:
+    if catalog.brand_id or catalog.import_metadata:
         from api.services.brand_intelligence import assert_organization_access
         assert_organization_access(user, catalog.organization, write=True)
 
 
 def _invalidate_generation_approval(catalog, reason):
     """An approval certifies generated content, not later customer edits."""
+    if catalog.import_metadata:
+        previous_import = catalog.import_metadata.get('quality') or {}
+        catalog.import_metadata = {
+            **catalog.import_metadata, 'share_enabled': False,
+            'quality': {**previous_import, 'passed': False, 'status': 'needs_review',
+                        'errors': list(dict.fromkeys([*previous_import.get('errors', []), reason]))},
+        }
     if not catalog.generation_metadata:
         return
     previous = catalog.generation_metadata.get('qualityGate') or {}
@@ -380,6 +391,17 @@ class StudioCatalogDetailView(APIView):
         _assert_brand_catalog_write(request.user, catalog)
 
         data = request.data
+        if 'import_metadata' in data:
+            raise ValidationError({'import_metadata': 'O histórico da importação é controlado pelo servidor.'})
+        if 'share_import' in data:
+            if not catalog.import_metadata or type(data['share_import']) is not bool:
+                raise ValidationError({'share_import': 'Informe uma decisão explícita para um catálogo importado.'})
+            if data['share_import']:
+                from api.services.document_reconstructor import import_quality_passed
+                if not import_quality_passed(catalog.import_metadata):
+                    raise ValidationError({'share_import': 'A importação precisa passar pela revisão de qualidade.'})
+                DocumentReconstructorService.validate_catalog_source(catalog)
+            catalog.import_metadata = {**catalog.import_metadata, 'share_enabled': data['share_import']}
         presentation_fields = ('title', 'description', 'style_preset', 'primary_color',
                                'secondary_color', 'accent_color', 'font_family',
                                'total_pages', 'palette_data')
@@ -422,6 +444,8 @@ class StudioCatalogDetailView(APIView):
             catalog.font_family = data["font_family"]
         if "total_pages" in data:
             catalog.total_pages = int(data["total_pages"])
+            if catalog.import_metadata and catalog.total_pages < len(catalog.source_import.previews):
+                raise ValidationError({'total_pages': 'Todas as páginas originais devem ser preservadas.'})
         if "brand_lock" in data:
             catalog.brand_lock = bool(data["brand_lock"])
         if "palette_data" in data:
@@ -492,6 +516,9 @@ class StudioSpreadManageView(APIView):
         elif right_elements is None:
             right_elements = []
 
+        DocumentReconstructorService.validate_page_update(catalog, left_elements, spread_index * 2)
+        DocumentReconstructorService.validate_page_update(catalog, right_elements, spread_index * 2 + 1)
+
         existing = catalog.spreads.filter(spread_index=spread_index).first()
         content_changed = existing is None or existing.left_page_elements != left_elements or existing.right_page_elements != right_elements
         spread, created = CatalogSpread.objects.update_or_create(
@@ -505,10 +532,11 @@ class StudioSpreadManageView(APIView):
         )
         if content_changed:
             _invalidate_generation_approval(catalog, 'GENERATED_CONTENT_UPDATED')
-            catalog.save(update_fields=['generation_metadata', 'updated_at'])
+            catalog.save(update_fields=['generation_metadata', 'import_metadata', 'updated_at'])
 
         return Response({
             'qualityGate': (catalog.generation_metadata or {}).get('qualityGate'),
+            'import_metadata': catalog.import_metadata,
             "id": spread.id,
             "catalog_id": catalog.id,
             "spread_index": spread.spread_index,
@@ -564,6 +592,9 @@ class StudioSpreadBulkSyncView(APIView):
                 elif right_elements is None:
                     right_elements = []
 
+                DocumentReconstructorService.validate_page_update(catalog, left_elements, spread_index * 2)
+                DocumentReconstructorService.validate_page_update(catalog, right_elements, spread_index * 2 + 1)
+
                 existing = catalog.spreads.filter(spread_index=spread_index).first()
                 content_changed = content_changed or existing is None or existing.left_page_elements != left_elements or existing.right_page_elements != right_elements
                 spread, _ = CatalogSpread.objects.update_or_create(
@@ -581,6 +612,8 @@ class StudioSpreadBulkSyncView(APIView):
             if total_pages is not None:
                 try:
                     t_pages_int = int(total_pages)
+                    if catalog.import_metadata and t_pages_int < len(catalog.source_import.previews):
+                        raise ValidationError({'total_pages': 'Todas as páginas originais devem ser preservadas.'})
                     if t_pages_int > 0:
                         content_changed = content_changed or catalog.total_pages != t_pages_int
                         catalog.total_pages = t_pages_int
@@ -589,10 +622,11 @@ class StudioSpreadBulkSyncView(APIView):
                     pass
             if content_changed:
                 _invalidate_generation_approval(catalog, 'GENERATED_CONTENT_UPDATED')
-                catalog.save(update_fields=['generation_metadata', 'updated_at'])
+                catalog.save(update_fields=['generation_metadata', 'import_metadata', 'updated_at'])
 
         return Response({
             'qualityGate': (catalog.generation_metadata or {}).get('qualityGate'),
+            'import_metadata': catalog.import_metadata,
             "status": "success",
             "catalog_id": catalog.id,
             "synced_spreads": saved_spreads,
@@ -1016,44 +1050,112 @@ class StudioTemplateSaveFromSpreadView(APIView):
 
 
 class StudioCatalogImportDocumentView(APIView):
-    """
-    Importacao e engenharia reversa de catalogo a partir de PDF/DOCX
-    POST /api/v2/studio/catalogs/import-document/
-    """
-    permission_classes = [AllowAny]
+    """Private analysis precedes explicit, idempotent catalog confirmation."""
+    permission_classes = [IsAuthenticated]
+
+    def handle_exception(self, exc):
+        from api.services.document_preflight import DocumentImportError, public_document_error
+        if isinstance(exc, DocumentImportError):
+            payload, status_code = public_document_error(exc.code)
+            logger.info('document_import rejected code=%s', payload['code'])
+        elif isinstance(exc, APIException):
+            # Authentication, tenant/role access and normal input validation keep
+            # their established DRF statuses and controlled validation guidance.
+            return super().handle_exception(exc)
+        else:
+            # This also covers failures while building the four success DTOs.
+            # Never serialize/log native parser exceptions, tracebacks or paths.
+            payload, status_code = public_document_error('document_import_failed')
+            logger.error('document_import internal failure')
+        response = Response(payload, status=status_code)
+        response.exception = True
+        return response
+
+    def get(self, request):
+        job = DocumentReconstructorService.get_import(request.user, request.query_params.get('import_id'))
+        return Response(DocumentReconstructorService.response(job))
+
+    def delete(self, request):
+        job = DocumentReconstructorService.get_import(request.user, request.query_params.get('import_id'), write=True, allow_expired=True)
+        DocumentReconstructorService.cancel_import(job, request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def post(self, request):
-        uploaded_file = request.FILES.get("file")
-        if not uploaded_file:
-            return Response({"error": "Nenhum arquivo enviado para importacao."}, status=status.HTTP_400_BAD_REQUEST)
-
-        filename = uploaded_file.name
-        file_bytes = uploaded_file.read()
-
-        title = request.data.get("title")
-        brand_name = request.data.get("brand_name")
-        style_preset = request.data.get("style_preset", "editorial_clean")
-        mode = request.data.get("mode", "redesign")
-        remove_bg = request.data.get("remove_background") in [True, "true", "True", "1", 1]
-
+        from api.services.document_preflight import DocumentImportError, MAX_SOURCE_BYTES
         try:
-            result = DocumentReconstructorService.reconstruct_from_file(
-                file_bytes=file_bytes,
-                filename=filename,
-                title=title,
-                brand_name=brand_name,
-                style_preset=style_preset,
-                remove_bg=remove_bg,
-                mode=mode,
-                user=request.user if request.user.is_authenticated else None,
-            )
-            return Response(result, status=status.HTTP_201_CREATED)
-        except Exception as exc:
-            logger.error(f"[ImportDocument] Erro na reconstrucao do catalogo: {exc}")
-            return Response(
-                {"error": f"Nao foi possivel reconstruir o documento: {str(exc)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            action = request.data.get('action', 'analyze')
+            if action not in ('analyze', 'prepare', 'confirm'):
+                raise ValidationError({'action': 'Ação de importação inválida.'})
+            if action in ('prepare', 'confirm'):
+                job = DocumentReconstructorService.get_import(request.user, request.data.get('import_id'), write=True)
+                organization_id = request.data.get('organization')
+                if organization_id is not None and str(organization_id) != str(job.organization_id):
+                    raise ValidationError({'organization': 'A prévia pertence a outra organização.'})
+                explicit_brand = 'brand_id' in request.data or 'brand' in request.data
+                requested_id = request.data.get('brand_id', request.data.get('brand'))
+                brand = _requested_brand(request.user, {**request.data, 'organization': job.organization_id}) if requested_id else None
+                if action == 'prepare':
+                    with transaction.atomic():
+                        job = DocumentImport.objects.select_for_update().get(pk=job.pk)
+                        DocumentReconstructorService.prepare_preview(job, request.data.get('mode', job.mode),
+                            brand=brand if explicit_brand else job.brand, brief=request.data.get('brief', ''))
+                        job.save()
+                    return Response(DocumentReconstructorService.response(job))
+                job, created = DocumentReconstructorService.confirm_import(job, request.user,
+                    title=request.data.get('title'), mode=request.data.get('mode'), brand=brand, brand_explicit=explicit_brand)
+                return Response(DocumentReconstructorService.response(job), status=201 if created else 200)
+            uploaded = request.FILES.get('file')
+            if not uploaded:
+                raise ValidationError({'file': 'Selecione um documento para analisar.'})
+            if uploaded.size > MAX_SOURCE_BYTES:
+                raise DocumentImportError('file_too_large', 'O documento excede o limite de 25 MB.', 413)
+            organization_id = request.data.get('organization')
+            if organization_id is None:
+                raise ValidationError({'organization': 'Selecione a organização de destino.'})
+            brand = _requested_brand(request.user, request.data)
+            organization = _requested_organization(request.user, request.data, brand)
+            job = DocumentReconstructorService.analyze_file(uploaded.read(MAX_SOURCE_BYTES + 1), uploaded.name, request.user, organization,
+                content_type=uploaded.content_type or '', title=request.data.get('title'),
+                mode=request.data.get('mode', 'preserve'), brand=brand, brief=request.data.get('brief', ''))
+            return Response(DocumentReconstructorService.response(job), status=status.HTTP_200_OK)
+        except OperationalError as error:
+            # SQLite ignores row locks. Competing confirmations must remain safe
+            # to retry; the transaction has rolled back before this response.
+            if action in ('confirm', 'prepare') and any(message in str(error).lower()
+                    for message in ('database is locked', 'database table is locked')):
+                return Response({'error': 'A importação está sendo atualizada. Tente novamente.',
+                                 'code': 'document_import_retry_conflict'}, status=status.HTTP_409_CONFLICT)
+            raise
+
+
+class StudioCatalogImportAssetView(APIView):
+    """Only opted-in render assets are public; original files always require tenant access."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, asset_id):
+        from api.services.brand_intelligence import visible_organizations
+        from api.services.document_reconstructor import RENDER_ASSET_KINDS, import_quality_passed, public_import_asset_ids
+        asset = DocumentImportAsset.objects.select_related('document_import__catalog').filter(pk=asset_id).first()
+        if asset is None:
+            raise NotFound('Ativo de importação não encontrado.')
+        job = asset.document_import
+        private_access = visible_organizations(request.user).filter(pk=job.organization_id).exists()
+        catalog = job.catalog
+        public_access = (asset.kind in RENDER_ASSET_KINDS and job.status == 'confirmed' and catalog is not None
+            and catalog.import_metadata.get('share_enabled') is True and import_quality_passed(catalog.import_metadata)
+            and str(asset.pk) in public_import_asset_ids(catalog))
+        if not private_access and not public_access:
+            raise NotFound('Ativo de importação não encontrado.')
+        if job.status != 'confirmed' and job.expires_at <= timezone.now():
+            raise NotFound('Esta prévia expirou.')
+        try:
+            response = FileResponse(asset.file.open('rb'), content_type='application/pdf' if asset.kind == 'source' else 'image/png',
+                                    as_attachment=asset.kind == 'source', filename=job.filename if asset.kind == 'source' else '')
+        except OSError as error:
+            raise NotFound('Ativo indisponível.') from error
+        response['Cache-Control'] = 'private, no-store'
+        response['X-Content-Type-Options'] = 'nosniff'
+        return response
 
 
 class StudioMediaRemoveBackgroundView(APIView):
@@ -2576,6 +2678,12 @@ class StudioPublicCatalogView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        if catalog.import_metadata:
+            from api.services.document_reconstructor import import_quality_passed
+            if catalog.import_metadata.get('share_enabled') is not True or not import_quality_passed(catalog.import_metadata):
+                return Response({'error': 'Este documento não foi autorizado para compartilhamento.',
+                                 'code': 'import_catalog_private'}, status=status.HTTP_403_FORBIDDEN)
+
         if catalog.generation_metadata:
             gate = catalog.generation_metadata.get('qualityGate') or {}
             if not (isinstance(gate, dict) and gate.get('passed') is True
@@ -2589,6 +2697,10 @@ class StudioPublicCatalogView(APIView):
         for sp in spreads_qs:
             left_page = sp.left_page_elements[0] if sp.left_page_elements and len(sp.left_page_elements) > 0 else None
             right_page = sp.right_page_elements[0] if sp.right_page_elements and len(sp.right_page_elements) > 0 else None
+            if catalog.import_metadata:
+                from api.services.document_reconstructor import public_import_page
+                left_page = public_import_page(left_page)
+                right_page = public_import_page(right_page)
             spreads_data.append({
                 "spread_index": sp.spread_index,
                 "title": sp.title or f"Lâmina {sp.spread_index + 1}",
@@ -2607,7 +2719,7 @@ class StudioPublicCatalogView(APIView):
             "palette_data": catalog.palette_data or {},
             "total_pages": catalog.total_pages or (len(spreads_data) * 2),
             "spreads": spreads_data,
-            "unassigned_products": catalog.unassigned_products or [],
+            "unassigned_products": [] if catalog.import_metadata else (catalog.unassigned_products or []),
             "created_at": catalog.created_at.isoformat() if hasattr(catalog, "created_at") and catalog.created_at else None,
             "is_demo": False,
         }, status=status.HTTP_200_OK)

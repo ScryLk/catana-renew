@@ -21,6 +21,7 @@ import { pdfExportService } from '../../services/pdfExportService';
 import api from '../../services/api';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
+import { getPageGeometry } from '../../utils/pageGeometry';
 
 export const ExportCatalogModal: React.FC = () => {
   const {
@@ -34,9 +35,12 @@ export const ExportCatalogModal: React.FC = () => {
     activePalette,
     theme,
     openAccountSettings,
+    openExportModal,
+    importMetadata,
   } = useStudioStore();
 
   const isDark = theme === 'dark';
+  const canShare = !importMetadata || importMetadata.share_enabled === true || importMetadata.shareEnabled === true;
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<'pdf' | 'share' | 'catana' | 'images'>(exportModalTab || 'pdf');
@@ -214,7 +218,11 @@ export const ExportCatalogModal: React.FC = () => {
       id: activeCatalogId || 'catana-editorial-01',
       title: catalogTitle,
       totalPages: pages.length,
-      aspectRatio: '1:1.414 (A4 Vertical)',
+      aspectRatio: pages.some(page => page.documentPage) ? 'source-per-page' : '1:1.414 (A4 Vertical)',
+      ...(pages.some(page => page.documentPage) ? {pageGeometry: pages.map(page => {
+        const geometry = getPageGeometry(page);
+        return {pageNumber: page.pageNumber, width: geometry.width, height: geometry.height, unit: geometry.unit};
+      })} : {}),
       activePalette: activePalette,
     },
     typography: {
@@ -383,7 +391,7 @@ export const ExportCatalogModal: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => setActiveTab('share')}
+              onClick={() => { void openExportModal('share'); }}
               className={`flex items-center gap-2 px-3.5 py-2.5 rounded-t-lg text-xs font-semibold border-b-2 transition-colors cursor-pointer shrink-0 ${
                 activeTab === 'share'
                   ? isDark
@@ -582,7 +590,7 @@ export const ExportCatalogModal: React.FC = () => {
                       >
                         {pages.map((p) => (
                           <option key={p.id} value={p.pageNumber}>
-                            Página {String(p.pageNumber).padStart(2, '0')} ({p.type.toUpperCase()})
+                            Página {String(p.pageNumber).padStart(2, '0')} ({p.renderMode === 'document' ? 'DOCUMENTO' : p.type?.toUpperCase() || 'PÁGINA'})
                           </option>
                         ))}
                       </select>
@@ -667,7 +675,10 @@ export const ExportCatalogModal: React.FC = () => {
             )}
 
             {/* ================= TAB 2: COMPARTILHAR & LINK PÚBLICO ================= */}
-            {activeTab === 'share' && (
+            {activeTab === 'share' && !canShare && (
+              <p role="alert" className="text-sm">Este catálogo importado está privado. Use a aba Compartilhar para solicitar uma nova validação antes de habilitar o link público.</p>
+            )}
+            {activeTab === 'share' && canShare && (
               <div className="space-y-6">
                 {/* Public Link Box */}
                 <div>
@@ -784,7 +795,9 @@ export const ExportCatalogModal: React.FC = () => {
                 </div>
 
                 {/* Access Protection */}
-                <div
+                {importMetadata ? (
+                  <p className="text-xs">O link habilitado permite acesso público às páginas renderizadas. O PDF de origem permanece privado. Proteção por senha ainda não está disponível.</p>
+                ) : <div
                   className={`p-4 rounded-xl border space-y-3 ${
                     isDark ? 'bg-zinc-900/40 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
                   }`}
@@ -825,7 +838,7 @@ export const ExportCatalogModal: React.FC = () => {
                       />
                     </div>
                   )}
-                </div>
+                </div>}
               </div>
             )}
 
@@ -842,8 +855,8 @@ export const ExportCatalogModal: React.FC = () => {
                     <h3 className="text-xs font-semibold">Padrão Aberto e Interoperável</h3>
                     <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600'} leading-relaxed`}>
                       O arquivo .catana é um pacote JSON padronizado contendo todas as lâminas, coordenadas, produtos,
-                      tokens tipográficos e especificações de cores. Pode ser versionado em Git e importado em qualquer
-                      instância do Katana Studio.
+                      tokens tipográficos e especificações de cores. O arquivo exportado usa o schema Studio v2;
+                      a reimportação desse pacote ainda não está disponível. Ativos privados continuam vinculados à organização de origem.
                     </p>
                   </div>
                 </div>
@@ -872,7 +885,7 @@ export const ExportCatalogModal: React.FC = () => {
                     }`}
                   >
                     <span className="text-[10px] text-zinc-400 block mb-0.5">Proporção Base</span>
-                    <span className="text-sm font-semibold">1:1.414 (A4)</span>
+                    <span className="text-sm font-semibold">{pages.some(page => page.documentPage) ? 'Dimensões de origem por página' : '1:1.414 (A4)'}</span>
                   </div>
                   <div
                     className={`p-3 rounded-xl border ${
@@ -1002,7 +1015,7 @@ export const ExportCatalogModal: React.FC = () => {
                       >
                         {pages.map((p) => (
                           <option key={p.id} value={p.pageNumber}>
-                            Página {String(p.pageNumber).padStart(2, '0')} ({p.type.toUpperCase()})
+                            Página {String(p.pageNumber).padStart(2, '0')} ({p.renderMode === 'document' ? 'DOCUMENTO' : p.type?.toUpperCase() || 'PÁGINA'})
                           </option>
                         ))}
                       </select>

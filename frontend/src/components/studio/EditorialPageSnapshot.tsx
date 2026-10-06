@@ -3,6 +3,8 @@ import React from 'react';
 import { CatalogPageData, StudioPalette } from '../../data/editorialCatalog.mock';
 import { PageOverlayLayer } from './PageOverlayLayer';
 import { GenerativePageRenderer } from './GenerativePageRenderer';
+import { DocumentPageRenderer } from './DocumentPageRenderer';
+import { getPageGeometry } from '../../utils/pageGeometry';
 
 interface EditorialPageSnapshotProps {
   page: CatalogPageData;
@@ -562,18 +564,25 @@ export const EditorialPageSnapshot: React.FC<EditorialPageSnapshotProps> = ({
 
   const isGenerative = page.renderMode === 'generative';
 
+  const geometry = getPageGeometry(page);
+  const isDocument = page.renderMode === 'document';
   const pageInner = (
     <div
-      className={`pdf-page-content w-[490px] h-[693px] relative overflow-hidden select-none ${className}`}
+      className={`pdf-page-content relative overflow-hidden select-none ${className}`}
       data-page-id={page.id}
-      data-render-mode={isGenerative ? 'generative' : 'legacy'}
+      data-render-mode={isDocument ? 'document' : isGenerative ? 'generative' : 'legacy'}
+      data-source-width={page.documentPage ? geometry.width : undefined}
+      data-source-height={page.documentPage ? geometry.height : undefined}
+      data-source-unit={page.documentPage ? geometry.unit : undefined}
       style={{
+        width: geometry.width,
+        height: geometry.height,
         backgroundColor: page.backgroundColor,
         color: page.textColor,
         ...style,
       }}
     >
-      {isGenerative ? (
+      {isDocument ? <DocumentPageRenderer page={page} /> : isGenerative ? (
         <GenerativePageRenderer page={page} interactive={false} />
       ) : (
         <>

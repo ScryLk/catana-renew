@@ -321,6 +321,8 @@ class RepairEngine:
     @classmethod
     def _clean_placeholders(cls, doc: Dict[str, Any], contract: RequirementContract):
         """Substitui menções a 'Lorem Ipsum' por conteúdo editorial legítimo."""
+        if contract.source_document:
+            return  # A source specimen is a fact, even when it contains placeholder words.
         title_ctx = doc.get("title", "Coleção Editorial")
         for p in doc.get("pages", []):
             if "lorem" in str(p.get("content", "")).lower():

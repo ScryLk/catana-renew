@@ -1,6 +1,10 @@
 import { cn } from '../../lib/utils';
 import React from 'react';
 import { CatalogPageData } from '../../data/editorialCatalog.mock';
+import { DocumentPageRenderer } from './DocumentPageRenderer';
+import { getPageGeometry } from '../../utils/pageGeometry';
+import { ProtectedDocumentImage } from './ProtectedDocumentImage';
+import { protectedDocumentAssetPath } from '../../services/documentImportService';
 
 interface MiniPageThumbnailProps {
   page: CatalogPageData;
@@ -19,8 +23,11 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
 }) => {
   const isDarkBg = page.backgroundColor === '#1A1817';
   const isGenerative = page.renderMode === 'generative';
+  const geometry = getPageGeometry(page);
+  const isDocument = page.renderMode === 'document';
 
   const renderThumbnailContent = () => {
+    if (isDocument) return <DocumentPageRenderer page={page} />;
     // 1. RENDERIZAÇÃO EXCLUSIVA GENERATIVA (Item 26: Nunca renderiza legacy por baixo de generative)
     if (isGenerative) {
       return (
@@ -40,7 +47,9 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
                   backgroundColor: isImg ? (b.imageUrl ? undefined : 'rgba(0,0,0,0.08)') : undefined,
                 }}
               >
-                {isImg && b.imageUrl ? (
+                {isImg && b.imageUrl && protectedDocumentAssetPath(b.imageUrl) ? (
+                  <ProtectedDocumentImage snapshot={{url: b.imageUrl}} alt="" className="w-full h-full object-cover" />
+                ) : isImg && b.imageUrl ? (
                   <img loading="lazy" decoding="async" src={b.imageUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <div
@@ -347,6 +356,7 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
           : 'border-zinc-700/60 hover:border-zinc-400 opacity-90 hover:opacity-100'
       }`, className)}
       style={{
+        ...(isDocument ? {aspectRatio: `${geometry.width}/${geometry.height}`, height: 'auto', padding: 0, borderWidth: 0, outline: '1px solid #71717a'} : {}),
         backgroundColor: page.backgroundColor,
         color: page.textColor,
       }}

@@ -410,7 +410,18 @@ class StudioBackendTests(TestCase):
         self.assertEqual(out_img.getpixel((40, 40))[3], 255)
 
     def test_document_import_pdf_reconstruction(self):
-        """Verifica a rota de importacao e engenharia reversa de documento"""
+        """A preview creates no catalog; explicit confirmation retains both pages."""
+        import tempfile
+        import shutil
+        from django.test import override_settings
+        from api.models import Organization
+        private_root = tempfile.mkdtemp(prefix='studio-import-')
+        setting = override_settings(DOCUMENT_IMPORT_PRIVATE_ROOT=private_root)
+        setting.enable()
+        self.addCleanup(setting.disable)
+        self.addCleanup(shutil.rmtree, private_root, True)
+        organization = Organization.objects.create(name='Import tenant', owner=self.user)
+        self.user.organizations.add(organization)
         url = reverse('studio_catalog_import_document')
 
         # Cria um PDF sintetico com 2 paginas usando pypdf
@@ -430,21 +441,23 @@ class StudioBackendTests(TestCase):
             {
                 "file": upload,
                 "title": "Colecao Fornecedor 2026",
-                "brand_name": "Fornecedor Teste",
-                "remove_background": "false",
-                "mode": "redesign",
+                "organization": organization.pk,
+                "mode": "preserve",
             },
             format="multipart"
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertIn("catalog_id", response.data)
-        self.assertGreaterEqual(response.data["total_pages"], 2)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertNotIn('catalog_id', response.data)
+        self.assertEqual(response.data["total_pages"], 2)
+        response = self.client.post(url, {'action': 'confirm', 'import_id': response.data['import_id']}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
 
         # Verifica persistencia no banco
         catalog = StudioCatalog.objects.get(id=response.data["catalog_id"])
         self.assertEqual(catalog.title, "Colecao Fornecedor 2026")
-        self.assertGreaterEqual(catalog.spreads.count(), 1)
+        self.assertEqual(catalog.spreads.count(), 1)
+        self.assertEqual(catalog.total_pages, 2)
 
     def test_remove_background_api_endpoint(self):
         """Verifica a rota POST /api/v2/studio/media/remove-background/ com upload de arquivo"""
@@ -775,7 +788,6 @@ class StudioBackendTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertIn("error", response.data)
-
 
 
 
