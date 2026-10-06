@@ -190,18 +190,50 @@ case ran and passed on PostgreSQL with no skipped tests.
 
 ## Files changed
 
-- Backend: existing font registry, quota guard, StudioCatalog model and migration
-  0035, existing document reconstructor and PDF adapter, Studio views.
-- Backend tests: document adapter/import, catalog lifecycle/concurrency, billing
-  test isolation and explicit quota organization.
-- Frontend: DocumentPageRenderer, ImportCatalogModal, StudioSidebar, shared
-  CatalogLifecycleManager, documentImportService and its tests, API quota
-  interceptor, Studio store blank quota denial, document types, documentTextFit.
-- Browser tests: existing document-import.spec.ts.
-- Docs: catalog-import-engine.md and this audit/validation report.
+- `backend/api/ai/font_registry.py`
+- `backend/api/guards/quota_guard.py`
+- `backend/api/migrations/0035_studiocatalog_archived_at_studiocatalog_status_and_more.py`
+- `backend/api/models.py`
+- `backend/api/services/document_reconstructor.py`
+- `backend/api/services/pdf_import_adapter.py`
+- `backend/api/tests_abacatepay.py`
+- `backend/api/tests_catalog_lifecycle.py`
+- `backend/api/tests_document_adapter.py`
+- `backend/api/tests_document_import.py`
+- `backend/api/views_studio.py`
+- `docs/catalog-import-engine.md`
+- `docs/document-import-hardening.md`
+- `frontend/e2e/document-import.spec.ts`
+- `frontend/src/components/studio/CatalogLifecycleManager.tsx`
+- `frontend/src/components/studio/DocumentPageRenderer.tsx`
+- `frontend/src/components/studio/ImportCatalogModal.tsx`
+- `frontend/src/components/studio/StudioSidebar.tsx`
+- `frontend/src/services/api.ts`
+- `frontend/src/services/documentImportService.test.tsx`
+- `frontend/src/services/documentImportService.ts`
+- `frontend/src/store/studioStore.ts`
+- `frontend/src/types/documentImport.ts`
+- `frontend/src/utils/documentTextFit.ts`
 
 ## Publication
 
-Branch: `fix/document-import-editability-quota`. Publication status is recorded
-when the authorized push/PR attempt completes. No force push, merge or deployment.
+Branch: `fix/document-import-editability-quota`, pushed successfully to origin.
+Implementation commit: `ed6366a` (followed by this validation/publication record).
+
+```sh
+git push -u origin fix/document-import-editability-quota
+# PASS: branch pushed and upstream configured.
+gh pr create --base main --head fix/document-import-editability-quota --title 'Harden document text editability and organization catalog quotas' --body-file /tmp/catana-pr-body.md
+# BLOCKED: Post "https://api.github.com/graphql": Forbidden.
+```
+
+The GitHub API request was blocked; no PR was created automatically. The pushed
+branch is reviewable and the PR title/body were prepared locally. Manual creation:
+https://github.com/ScryLk/catana-renew/pull/new/fix/document-import-editability-quota
+
+No force push, merge, production modification or deployment was performed.
+
+## Production gate
+
+DOCUMENT IMPORT HARDENING READY FOR PR REVIEW
 
