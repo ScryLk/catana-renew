@@ -757,20 +757,8 @@ class StudioThreadMessagesView(APIView):
 
 
 def extract_patch_from_text(text: str) -> Optional[Dict[str, Any]]:
-    """
-    Extrai bloco estruturado de JSON Patch emitido pelo modelo.
-    Suporta formatacao ```json:patch ... ``` ou ```json ... ``` contendo a chave 'actions' ou 'updates'.
-    """
-    if not text:
-        return None
-    pattern = r"```(?:json:patch|json)?\s*(\{[\s\S]*?(?:\"updates\"|\"actions\")[\s\S]*?\})\s*```"
-    match = re.search(pattern, text)
-    if match:
-        try:
-            return json.loads(match.group(1))
-        except Exception:
-            pass
-    return None
+    from api.services.agent_output import parse_agent_output
+    return parse_agent_output(text).patch_candidate
 
 
 class StudioChatStreamView(APIView):
@@ -782,6 +770,12 @@ class StudioChatStreamView(APIView):
 
     def post(self, request):
         user = request.user
+        from uuid import UUID, uuid4
+        raw_request_id = request.data.get('client_request_id')
+        try:
+            request_id = str(UUID(str(raw_request_id))) if raw_request_id else str(uuid4())
+        except (ValueError, TypeError, AttributeError):
+            return Response({'error': 'Identificador de solicitação inválido.'}, status=400)
         client_ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "127.0.0.1"))
         if "," in client_ip:
             client_ip = client_ip.split(",")[0].strip()
@@ -943,6 +937,7 @@ class StudioChatStreamView(APIView):
             # Evento inicial de conexao
             init_payload = {
                 "event": "start",
+                "client_request_id": request_id,
                 "agent_role": agent.role,
                 "agent_name": agent.name,
                 "thread_id": thread.id,
@@ -973,7 +968,16 @@ class StudioChatStreamView(APIView):
                 full_content = "".join(accumulated_text)
 
                 # Extrai bloco de patch estruturado para aplicacao no canvas
-                patch_data = extract_patch_from_text(full_content)
+                from api.services.agent_output import parse_agent_output, PROTOCOL_FAILURE
+                parsed_output = parse_agent_output(full_content)
+                patch_data = parsed_output.patch_candidate
+                full_content = parsed_output.human_text
+                metadata['agent_protocol_status'] = parsed_output.protocol_status
+                metadata['client_request_id'] = request_id
+                logger.info('agent_protocol user=%s catalog=%s request_id=%s status=%s', user.id, catalog.id if catalog else None, request_id, parsed_output.protocol_status)
+                if parsed_output.protocol_status == 'invalid':
+                    full_content = PROTOCOL_FAILURE
+                    yield f"data: {json.dumps({'event':'protocol_error', 'code':'patch_invalid', 'client_request_id':request_id})}\n\n"
                 if patch_data:
                     from api.services.studio_action_policy import ActionPolicyRouter, MESSAGES, confirmation_token
                     proposed_patch = patch_data
@@ -986,8 +990,7 @@ class StudioChatStreamView(APIView):
                         if all(d.allowed or d.requiresConfirmation for d in decisions):
                             metadata['confirmation_token'] = confirmation_token(catalog, user, proposed_patch)
                     else:
-                        from api.ai.text_commands import planner_response
-                        full_content = planner_response(('Proposta validada; aguardando execução.', patch_data))
+                        full_content = 'Proposta validada; aguardando execução.'
                 # No embedded model delta is executable before policy validation.
                 yield f"data: {json.dumps({'event': 'token', 'text': full_content})}\n\n"
                 if patch_data:
@@ -1016,6 +1019,7 @@ class StudioChatStreamView(APIView):
 
                 done_payload = {
                     "event": "done",
+                    "client_request_id": request_id,
                     "message_id": assistant_msg.id,
                     "thread_id": thread.id,
                     "catalog_id": catalog.id if catalog else None,

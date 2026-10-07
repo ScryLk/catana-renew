@@ -38,7 +38,7 @@ function App() {
   const [selectedProductCode, setSelectedProductCode] = useState<string | null>(null);
 
   useEffect(() => {
-    checkAuth();
+    if (!isClerkConfigured) void checkAuth();
   }, [checkAuth]);
 
   useEffect(() => {

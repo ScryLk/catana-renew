@@ -88,8 +88,8 @@ async function fixtures(page: Page, options: Partial<ApiFixture> = {}) {
     sessionStorage.setItem('catana_splash_shown', 'true');
     localStorage.setItem('active_organization', JSON.stringify(organization));
     localStorage.setItem('active_sede', JSON.stringify(organization.sedes[0]));
-    if (legacy && !localStorage.getItem('katana_studio_brands:1')) {
-      localStorage.setItem('katana_studio_brands:1', backup);
+    if (legacy && !localStorage.getItem('katana_studio_brands:27')) {
+      localStorage.setItem('katana_studio_brands:27', backup);
     }
   }, { organization, legacy: state.legacy, backup: legacyBackup });
   await page.route('**/api/**', async (route) => {
@@ -162,7 +162,8 @@ async function fixtures(page: Page, options: Partial<ApiFixture> = {}) {
       return route.fulfill({ status: 400, json: { detail: 'Unexpected Brand fixture request' } });
     }
     let body: unknown = [];
-    if (path.includes('/auth/')) body = { access: 'brand-qa-local-only', user: { id: 1, username: 'qa', name: 'QA Brand', email: 'qa@example.test', role: 'admin' } };
+    if (path.includes('/auth/')) body = { access: 'brand-qa-local-only', user: { id: 27, username: 'qa', name: 'QA Brand', email: 'qa@example.test', role: 'admin' } };
+    else if (path === '/api/profile/') body = { id: 27, username: 'qa', name: 'QA Brand', email: 'qa@example.test', role: 'admin' };
     else if (path === '/api/organizations/') body = [organization];
     else if (path === '/api/v2/studio/catalogs/') body = state.catalogs ? [historicalCatalog] : [];
     else if (path === '/api/v2/studio/catalogs/101/') body = historicalCatalog;
@@ -242,7 +243,7 @@ test('existing Brand selector and editor create and update server truth across r
     body: expect.objectContaining({ organization: 1, name: 'Atelier atualizado' }),
   }));
   await page.evaluate(() => {
-    for (const key of Object.keys(localStorage)) if (key.startsWith('katana_brand_cache:')) localStorage.removeItem(key);
+    for (const key of Object.keys(localStorage)) if (key.startsWith('catana:studio:v2:') && key.endsWith(':brand_cache')) localStorage.removeItem(key);
   });
   await page.reload();
   await expect(page.getByRole('heading', { name: 'O que vamos criar hoje?' })).toBeVisible();
@@ -272,7 +273,7 @@ test('legacy browser Brands require destination confirmation and preserve backup
   expect(state.mutations.filter(item => item.path === '/api/brands/migrate/')).toEqual([
     { path: '/api/brands/migrate/', method: 'POST', body: expect.objectContaining({ organization: 1, brands: [expect.objectContaining(legacyBrand)] }) },
   ]);
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('katana_studio_brands:1'))).toBe(legacyBackup);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('katana_studio_brands:27'))).toBe(legacyBackup);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'O que vamos criar hoje?' })).toBeVisible();
   const menu = await selector(page);
@@ -281,7 +282,7 @@ test('legacy browser Brands require destination confirmation and preserve backup
   const freshEditor = await newBrand(page);
   await expect(freshEditor.getByRole('button', { name: 'Importar marcas deste navegador', exact: true })).toHaveCount(0);
   expect(state.mutations.filter(item => item.path === '/api/brands/migrate/')).toHaveLength(1);
-  expect(await page.evaluate(() => localStorage.getItem('katana_studio_brands:1'))).toBe(legacyBackup);
+  expect(await page.evaluate(() => localStorage.getItem('katana_studio_brands:27'))).toBe(legacyBackup);
   await noOverflow(page);
 });
 

@@ -4,14 +4,15 @@ set -euo pipefail
 VPS_IP="179.236.238.62"
 VPS_USER="root"
 REMOTE_DEST="/var/www/catana"
-LOCAL_SRC="/Users/lucas/Documents/catanarepo/catana-renew"
+LOCAL_SRC="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "=========================================================="
 echo "    🚀 CATANA 2.0 — DEPLOY PRODUCAO VIA DOCKER COMPOSE"
 echo "=========================================================="
 
 echo "📦 [0/4] Compilando build de produção atualizado do frontend..."
-npm --prefix "${LOCAL_SRC}/frontend" run build
+bash "${LOCAL_SRC}/scripts/build_frontend_production.sh"
+(cd "${LOCAL_SRC}" && bash scripts/deploy_preflight.sh)
 
 echo "📡 [1/4] Sincronizando arquivos para a VPS (${VPS_USER}@${VPS_IP}:${REMOTE_DEST})..."
 rsync -avz --progress \
@@ -20,6 +21,9 @@ rsync -avz --progress \
     --exclude="venv" \
     --exclude="*/venv" \
     --exclude=".git" \
+    --exclude=".env*" \
+    --exclude=".venv" \
+    --exclude="*.sqlite3" \
     --exclude="__pycache__" \
     --exclude="*.pyc" \
     --exclude=".DS_Store" \
@@ -48,7 +52,7 @@ ssh "${VPS_USER}@${VPS_IP}" "
 "
 
 echo "🩺 [4/4] Executando Smoke Test na API de Produção..."
-HEALTH_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" https://usecatana.com.br/api/health/ || true)
+HEALTH_STATUS=$(curl --fail --silent --show-error -o /dev/null -w "%{http_code}" https://usecatana.com.br/api/health/ || true)
 echo "Healthcheck response status: ${HEALTH_STATUS}"
 
 echo "=========================================================="

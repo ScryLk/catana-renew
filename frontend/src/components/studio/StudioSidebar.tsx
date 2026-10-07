@@ -1,3 +1,4 @@
+import { isAuthReady } from '../../store/authStore';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Plus,
@@ -20,7 +21,9 @@ import { useAuthStore } from '../../store/authStore';
 import { CatalogLifecycleManager } from './CatalogLifecycleManager';
 import api from '../../services/api';
 
-export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNavigate?: () => void }> = ({ mobile = false, compact = false, onNavigate }) => {
+export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNavigate?: () => void;
+}> = ({ mobile = false, compact = false, onNavigate }) => {
+  const authReady = useAuthStore(isAuthReady);
   const { user, logout, isAuthenticated, openAuthModal } = useAuthStore();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -75,7 +78,11 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
   };
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!authReady) {
+      setQuotaData(null);
+      return;
+    }
+    setQuotaData(null);
     let isMounted = true;
     const fetchQuota = async () => {
       try {
@@ -98,7 +105,7 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
       isMounted = false;
       window.removeEventListener('catana:subscription-updated', handleSubUpdated);
     };
-  }, [isAuthenticated, activeOrganizationId]);
+  }, [authReady, user?.id, activeOrganizationId]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -264,10 +271,19 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
 
       {/* Seções de Navegação (Estilo Antigravity IDE: Marcas, Projetos Não Vinculados e Templates Demo) */}
       <div className="flex-1 overflow-y-auto custom-scrollbar px-2 py-2 space-y-2">
-        {brandLoadStatus === 'loading' && <p role="status" className="px-2 text-xs text-zinc-500">Carregando marcas…</p>}
-        {brandLoadStatus === 'error' && <div className="px-2 space-y-2 text-xs text-amber-600"><p>{brandLoadError}</p><button type="button" onClick={() => syncBrands().then(() => useStudioStore.getState().syncUserCatalogs())} className="underline">Tentar novamente</button></div>}
-        {legacyBrandCount > 0 && <button type="button" onClick={() => openBrandModal()} className="w-full text-left p-2 rounded-lg border border-amber-500/30 text-xs text-amber-600">{legacyBrandCount} marca(s) neste navegador · Importar</button>}
-        {catalogBrandContext.brandVersion != null && brands.some(brand => brand.id === catalogBrandContext.brandId && (brand.currentVersion || 1) > catalogBrandContext.brandVersion!) && <p role="status" className="px-2 text-xs text-amber-600">Este catálogo usa a versão {catalogBrandContext.brandVersion}. A marca está na versão {brands.find(brand => brand.id === catalogBrandContext.brandId)?.currentVersion}. A identidade original foi preservada.</p>}
+        {brandLoadStatus === 'loading' && (
+          <p role="status" className="px-2 text-xs text-zinc-500">Carregando marcas…</p>
+        )}
+        {brandLoadStatus === 'error' && (
+          <div className="px-2 space-y-2 text-xs text-amber-600"><p>{brandLoadError}</p><button type="button" onClick={() => syncBrands().then(() => useStudioStore.getState().syncUserCatalogs())} className="underline">Tentar novamente</button></div>
+        )}
+        {legacyBrandCount > 0 && (
+          <button type="button" onClick={() => openBrandModal()} className="w-full text-left p-2 rounded-lg border border-amber-500/30 text-xs text-amber-600">{legacyBrandCount} marca(s) neste navegador · Importar</button>
+        )}
+        {catalogBrandContext.brandVersion != null && brands.some(brand => brand.id === catalogBrandContext.brandId && (brand.currentVersion || 1) > catalogBrandContext.brandVersion!) && (
+            <p role="status" className="px-2 text-xs text-amber-600">Este catálogo usa a versão {catalogBrandContext.brandVersion}. A marca está na versão{' '}
+              {brands.find(brand => brand.id === catalogBrandContext.brandId)?.currentVersion}. A identidade original foi preservada.</p>
+          )}
         {/* 1. Seção: MARCAS */}
         <div className="px-2.5 py-1 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
@@ -314,8 +330,8 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
                         ? 'bg-zinc-800/60 border-zinc-700/80 text-zinc-100 font-medium'
                         : 'bg-zinc-200/70 border-zinc-300 text-zinc-900 font-medium'
                       : isDark
-                      ? 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
-                      : 'border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
+                        ? 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
+                        : 'border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -368,14 +384,16 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
                                   ? 'bg-zinc-800 text-white font-medium shadow-xs border border-zinc-700'
                                   : 'bg-zinc-900 text-white font-medium shadow-xs'
                                 : isDark
-                                ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
-                                : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50'
+                                  ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
+                                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50'
                             }`}
                           >
                             <span className="truncate min-w-0 flex-1">{catalog.title}</span>
                             <span
                               className={`text-[10px] font-mono shrink-0 ${
-                                isCatalogActive ? 'text-zinc-300' : 'text-zinc-500'
+                                isCatalogActive
+                                  ? 'text-zinc-300'
+                                  : 'text-zinc-500'
                               }`}
                             >
                               {catalog.updatedAt}
@@ -447,7 +465,9 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
 
           {/* Lista Plana de Projetos Independentes */}
           <div className="space-y-0.5 mt-1">
-            {activeOrganizationId != null && <details className="p-2 text-xs"><summary className="cursor-pointer py-2">Gerenciar catálogos e arquivados</summary><CatalogLifecycleManager organization={activeOrganizationId} /></details>}
+            {activeOrganizationId != null && (
+              <details className="p-2 text-xs"><summary className="cursor-pointer py-2">Gerenciar catálogos e arquivados</summary><CatalogLifecycleManager organization={activeOrganizationId} /></details>
+            )}
             {filteredUnlinkedCatalogs.length === 0 ? (
               <div className="px-2.5 py-1.5 text-[11px] text-zinc-500 italic select-none">
                 Nenhum projeto avulso
@@ -467,8 +487,8 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
                           ? 'bg-zinc-800 text-white font-medium shadow-xs border border-zinc-700'
                           : 'bg-zinc-900 text-white font-medium shadow-xs'
                         : isDark
-                        ? 'text-zinc-300 hover:text-white hover:bg-zinc-900/60'
-                        : 'text-zinc-700 hover:text-zinc-950 hover:bg-zinc-200/50'
+                          ? 'text-zinc-300 hover:text-white hover:bg-zinc-900/60'
+                          : 'text-zinc-700 hover:text-zinc-950 hover:bg-zinc-200/50'
                     }`}
                   >
                     <span className="truncate min-w-0 flex-1 font-medium">{catalog.title}</span>
@@ -536,8 +556,8 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
                           ? 'bg-zinc-800 text-white font-medium shadow-xs border border-zinc-700'
                           : 'bg-zinc-900 text-white font-medium shadow-xs'
                         : isDark
-                        ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
-                        : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50'
+                          ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
+                          : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50'
                     }`}
                   >
                     <span className="truncate min-w-0 flex-1">{tpl.title}</span>
@@ -594,7 +614,11 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
                 title={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
                 aria-label="Alternar tema"
               >
-                {isDark ? <Sun className="size-3" /> : <Moon className="size-3" />}
+                {isDark ? (
+                  <Sun className="size-3" />
+                ) : (
+                  <Moon className="size-3" />
+                )}
               </button>
             </div>
 
@@ -637,7 +661,8 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
                       <span>Consumo de IA</span>
                     </span>
                     <span className="font-mono">
-                      {tokensUsed.toLocaleString('pt-BR')} / {tokenQuota.toLocaleString('pt-BR')}
+                      {tokensUsed.toLocaleString('pt-BR')} /{' '}
+                      {tokenQuota.toLocaleString('pt-BR')}
                     </span>
                   </div>
                   <div className="w-full h-1.5 rounded-full bg-zinc-700/30 overflow-hidden">
@@ -702,8 +727,8 @@ export const StudioSidebar: React.FC<{ mobile?: boolean; compact?: boolean; onNa
                     ? 'bg-zinc-800 border-zinc-700 text-white'
                     : 'bg-zinc-100 border-zinc-300 text-zinc-950'
                   : isDark
-                  ? 'bg-zinc-900/50 hover:bg-zinc-800/60 border-zinc-800/80 text-zinc-200'
-                  : 'bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-900'
+                    ? 'bg-zinc-900/50 hover:bg-zinc-800/60 border-zinc-800/80 text-zinc-200'
+                    : 'bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-900'
               }`}
               aria-expanded={isProfileMenuOpen}
               aria-haspopup="true"

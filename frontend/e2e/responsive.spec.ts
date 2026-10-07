@@ -17,6 +17,7 @@ async function fixtures(page: Page) {
     const path = new URL(route.request().url()).pathname;
     let body: unknown = [];
     if (path.includes('/auth/')) body = { access: 'responsive-test', refresh: 'responsive-test', user: { id: 1, username: 'qa', name: 'QA Mobile', email: 'qa@example.test', role: 'admin' } };
+    else if (path === '/api/profile/') body = {id: 1, username: 'qa', name: 'QA Mobile', email: 'qa@example.test', role: 'admin'};
     else if (path.includes('/public/catalogs/')) return route.fulfill({ status: 404, json: { detail: 'Fixture uses canonical demo fallback' } });
     else if (path === '/api/organizations/') body = [{ id: 1, name: 'Atelier de teste', owner: 1, created_at: '2026-01-01', updated_at: '2026-01-01', default_sede: 1, sedes: [{ id: 1, name: 'Sede principal', organization: 1, created_at: '2026-01-01', updated_at: '2026-01-01', members_count: 1 }] }];
     else if (path === '/api/media/stats/') body = { total_files: 1, folders_count: 0, total_size: 1024, total_size_formatted: '1 KB', images_count: 1, videos_count: 0, documents_count: 0, favorites_count: 0 };
@@ -57,7 +58,16 @@ for (const [width, height] of viewports) {
   });
 }
 
+async function waitForWorkspace(page: Page) {
+  await expect.poll(() => page.evaluate(async () => {
+    // @ts-expect-error Vite serves the application store for this browser fixture.
+    const { useStudioStore } = await import('/src/store/studioStore.ts');
+    return useStudioStore.getState().catalogSyncStatus;
+  })).toBe('ready');
+}
+
 async function openCatalog(page: Page) {
+  await waitForWorkspace(page);
   await page.evaluate(async () => {
     // Seed existing store with canonical document fixtures; no production test hook.
     // @ts-expect-error Vite serves application TS modules for this dev-browser integration test.
@@ -115,6 +125,8 @@ test('mobile management search, more navigation and modal Escape', async ({ page
   await page.getByRole('link', { name: 'Organizações', exact: true }).click();
   await expect(page).toHaveURL(/organizations/);
   await noOverflow(page);
+  const branchCard = page.locator('main').getByText('Sede principal', { exact: true }).locator('../..');
+  await expect.poll(() => branchCard.evaluate((card) => card.scrollWidth - card.clientWidth)).toBeLessThanOrEqual(1);
 });
 
 test('reader fit and page selection survive orientation; zoom remains locally scrollable', async ({ page }) => {
@@ -312,6 +324,7 @@ test('shared management chrome follows light and dark themes on phone', async ({
 test('generation progress keeps cancel and editor actions reachable on compact screens', async ({ page }) => {
   await fixtures(page);
   await page.goto('/studio');
+  await waitForWorkspace(page);
   await page.evaluate(async () => {
     // @ts-expect-error Existing Vite module; seed UI without calling paid generation services.
     const { useStudioStore } = await import('/src/store/studioStore.ts');

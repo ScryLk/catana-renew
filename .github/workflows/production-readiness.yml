@@ -7,6 +7,57 @@ concurrency:
   group: readiness-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  auth-session-contracts:
+    outputs:
+      auth: ${{ steps.auth.outcome }}
+      workspace: ${{ steps.workspace.outcome }}
+      protocol: ${{ steps.protocol.outcome }}
+      backend_config: ${{ steps.backend_config.outcome }}
+      build_env: ${{ steps.build_env.outcome }}
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-only-nonproduction-key-for-isolated-tests
+      DEBUG: 'True'
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/catana_auth_ci
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: catana_auth_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python -m pip install -r backend/requirements.txt
+      - run: npm ci --prefix frontend
+      - name: Auth session tests
+        id: auth
+        run: npm test --prefix frontend -- src/store/authSession.test.ts src/services/authTokenProvider.test.ts src/components/auth/ClerkAuthSync.test.tsx src/components/auth/PrivateRoute.test.tsx
+      - name: Workspace isolation
+        id: workspace
+        run: npm test --prefix frontend -- src/store/workspaceSession.test.ts src/store/studioStore.isolation.test.ts
+      - name: Agent protocol
+        id: protocol
+        run: |
+          npm test --prefix frontend -- src/utils/agentProtocol.test.ts src/components/studio/AgentChatStream.test.tsx src/services/documentImportService.test.tsx
+          cd backend && python manage.py test api.tests_agent_protocol.AgentProtocolTests api.tests_agent_protocol.AgentOutputParserTests api.tests_agent_protocol.ClerkProvisioningTests api.tests_agent_protocol.ClerkProvisioningConcurrencyTests --noinput
+      - name: Backend auth configuration check
+        id: backend_config
+        run: cd backend && python manage.py test api.tests_agent_protocol.BackendAuthPreflightTests --noinput
+      - name: Frontend build environment
+        id: build_env
+        run: node --test scripts/frontend_build_config.test.mjs
   full-backend-suite:
     runs-on: ubuntu-latest
     env:
@@ -46,7 +97,14 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --prefix frontend
+      - run: node scripts/frontend_build_config.mjs
+        env:
+          VITE_AUTH_PROVIDER: clerk
+          VITE_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
       - run: npm run build --prefix frontend
+        env:
+          VITE_AUTH_PROVIDER: clerk
+          VITE_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
   contracts:
     runs-on: ubuntu-latest
     steps:
@@ -123,7 +181,7 @@ jobs:
           path: production-diff.txt
   report:
     if: always()
-    needs: [full-backend-suite, full-frontend-suite, build, contracts, determinism, security-smoke, production-diff]
+    needs: [full-backend-suite, full-frontend-suite, build, contracts, determinism, security-smoke, production-diff, auth-session-contracts]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -141,10 +199,20 @@ jobs:
           DETERMINISM: ${{ needs.determinism.result }}
           SECURITY: ${{ needs.security-smoke.result }}
           DIFF: ${{ needs.production-diff.result }}
+          AUTH_SESSION: ${{ needs.auth-session-contracts.outputs.auth }}
+          WORKSPACE: ${{ needs.auth-session-contracts.outputs.workspace }}
+          PROTOCOL: ${{ needs.auth-session-contracts.outputs.protocol }}
+          BACKEND_CONFIG: ${{ needs.auth-session-contracts.outputs.backend_config }}
+          BUILD_ENV: ${{ needs.auth-session-contracts.outputs.build_env }}
         run: |
           {
             echo "COMMIT: $COMMIT_SHA"
             echo "BRANCH: $SOURCE_REF"
+            echo "AUTH SESSION TESTS: $AUTH_SESSION"
+            echo "WORKSPACE ISOLATION: $WORKSPACE"
+            echo "AGENT PROTOCOL: $PROTOCOL"
+            echo "FRONTEND BUILD ENV: $BUILD_ENV"
+            echo "BACKEND AUTH CONFIG CHECK: $BACKEND_CONFIG"
             echo "BACKEND TESTS: $BACKEND"
             echo "FRONTEND TESTS: $FRONTEND"
             echo "FRONTEND BUILD: $BUILD"

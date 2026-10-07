@@ -1,3 +1,4 @@
+import { selectOrganization } from '../services/workspaceContext';
 /**
  * 🎯 Context Selector Component
  *
@@ -68,7 +69,7 @@ export const ContextSelector: FC = () => {
   };
 
   const handleSelectOrganization = (org: Organization) => {
-    localStorage.setItem('active_organization', JSON.stringify(org));
+    selectOrganization(org);
     // Clear the old tenant immediately, before the context reload is scheduled.
     const studio = useStudioStore.getState();
     studio.setActiveUserId(studio.activeUserId);

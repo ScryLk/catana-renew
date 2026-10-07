@@ -1,3 +1,4 @@
+import { sanitizeAgentText } from '../../utils/agentProtocol';
 import React, { useRef, useEffect } from 'react';
 import {
   Sparkles,
@@ -135,6 +136,22 @@ export const AgentChatStream: React.FC = () => {
 
   // Garante que a mensagem nativa de boas-vindas do sistema/geracao fique no topo, com mensagens do usuario abaixo
   const displayMessages = React.useMemo(() => {
+    const cleanMessages = messages.map(msg =>
+      msg.role === 'assistant'
+        ? {
+            ...msg,
+            content: sanitizeAgentText(msg.content),
+            actions: msg.actions?.map(sanitizeAgentText).filter(Boolean),
+            delegations: msg.delegations?.map(delegation => ({
+              ...delegation,
+              action: sanitizeAgentText(delegation.action)
+            })).filter(delegation => Boolean(delegation.action)),
+            reasoning: msg.reasoning
+              ? sanitizeAgentText(msg.reasoning)
+              : undefined
+          }
+        : msg
+    );
     if (messages.length >= 2) {
       const firstIsUser = messages[0].role === 'user';
       const secondIsWelcome =
@@ -144,10 +161,10 @@ export const AgentChatStream: React.FC = () => {
           messages[1].content.includes('gerado e diagramado com sucesso!'));
 
       if (firstIsUser && secondIsWelcome) {
-        return [messages[1], messages[0], ...messages.slice(2)];
+        return [cleanMessages[1], cleanMessages[0], ...cleanMessages.slice(2)];
       }
     }
-    return messages;
+    return cleanMessages;
   }, [messages]);
 
   useEffect(() => {
@@ -281,7 +298,7 @@ export const AgentChatStream: React.FC = () => {
       } else if (msg.actions && msg.actions.length > 0) {
         actionText = msg.actions.join(' · ');
       } else {
-        actionText = 'Ajuste executado com sucesso e diagramação sincronizada pelo Conselho Editorial.';
+        actionText = 'Nenhuma alteração confirmada na prancheta.';
       }
     }
 
@@ -289,7 +306,7 @@ export const AgentChatStream: React.FC = () => {
       if (msg.actions && msg.actions.length > 0) {
         actionText = msg.actions.join(' · ');
       } else {
-        actionText = 'Ajuste executado com sucesso pelo Conselho Editorial.';
+        actionText = 'Nenhuma alteração confirmada na prancheta.';
       }
     }
 

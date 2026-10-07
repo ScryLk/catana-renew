@@ -21,7 +21,7 @@ import { NewCatalogModal } from '../components/studio/NewCatalogModal';
 import { BrandModal } from '../components/studio/BrandModal';
 import { AuthModal } from '../components/auth/AuthModal';
 import { useStudioStore } from '../store/studioStore';
-import { useAuthStore, isAutoLoginSettled, isClerkConfigured } from '../store/authStore';
+import { useAuthStore, isAuthReady } from '../store/authStore';
 import { toast } from 'sonner';
 import { billingService } from '../services/billingService';
 
@@ -48,14 +48,14 @@ const StudioLayout: React.FC = () => {
     isAuthModalOpen,
     openAuthModal,
     closeAuthModal,
-    checkAuth,
-    autoLogin,
+    authStatus,
+    activeOrganizationId
   } = useAuthStore();
 
-  const [checkingAuth, setCheckingAuth] = useState(() => {
-    if (isClerkConfigured) return !isAuthenticated;
-    return !isAutoLoginSettled();
-  });
+  const authReady = isAuthReady({ authStatus });
+  const checkingAuth = ['unknown', 'loading', 'resolving_identity'].includes(
+    authStatus
+  );
 
   const handleSplashComplete = () => {
     setShowSplash(false);
@@ -65,24 +65,6 @@ const StudioLayout: React.FC = () => {
       // Silencioso
     }
   };
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      setCheckingAuth(false);
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    checkAuth();
-    if (isAutoLoginSettled()) {
-      setCheckingAuth(false);
-    } else if (!isClerkConfigured) {
-      autoLogin().finally(() => setCheckingAuth(false));
-    } else {
-      const timer = setTimeout(() => setCheckingAuth(false), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [checkAuth, autoLogin]);
 
   // Se acessar /login, /register, /forgot-password ou via query param ?auth=..., abre a respectiva visao no modal
   useEffect(() => {
@@ -111,21 +93,15 @@ const StudioLayout: React.FC = () => {
     openAccountSettings,
     closeAccountSettings,
     toggleProductDrawer,
-    loadExistingCatalog,
-    syncUserCatalogs,
-    syncBrands,
-    setActiveUserId,
+    initializeWorkspace,
+    catalogSyncStatus
   } = useStudioStore();
 
   const isDark = theme === 'dark';
 
-  // Sincroniza os catalogos do usuario do banco de dados na inicializacao
   useEffect(() => {
-    if (isAuthenticated && user?.id) {
-      setActiveUserId(user.id);
-      syncBrands().then(() => syncUserCatalogs());
-    }
-  }, [isAuthenticated, user?.id, setActiveUserId, syncUserCatalogs, syncBrands]);
+    if (authReady && user?.id) void initializeWorkspace(user.id);
+  }, [authReady, user?.id, activeOrganizationId, initializeWorkspace]);
 
   // Trata retorno de checkout do AbacatePay (?billing=success ou ?billing=canceled)
   useEffect(() => {
@@ -164,19 +140,6 @@ const StudioLayout: React.FC = () => {
     window.addEventListener('catana:open-billing-modal', handleOpenBilling);
     return () => window.removeEventListener('catana:open-billing-modal', handleOpenBilling);
   }, [openAccountSettings]);
-
-  // Restaura projeto ativo apos recarregar a pagina (F5) estritamente para o usuario autenticado
-  useEffect(() => {
-    try {
-      if (!isAuthenticated || !user?.id) return;
-      const lastActiveCatalogId = localStorage.getItem(`katana_studio_last_active_catalog:${user.id}`);
-      if (lastActiveCatalogId && !useStudioStore.getState().hasStartedSession) {
-        loadExistingCatalog(lastActiveCatalogId);
-      }
-    } catch (e) {
-      console.warn('Erro ao restaurar sessao do catalogo:', e);
-    }
-  }, [isAuthenticated, user?.id, loadExistingCatalog]);
 
   // Global shortcut Ctrl+B / Cmd+B to toggle global sidebar, Ctrl+J / Cmd+J to toggle AI CoPilot
   useEffect(() => {
@@ -251,14 +214,34 @@ const StudioLayout: React.FC = () => {
       )}
 
       {/* ChatGPT-style Collapsible Sidebar */}
-      {isCompact ? <MobileSheet open={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} title="Catana Studio" side="left">
+      {isCompact ? (
+        <MobileSheet open={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} title="Catana Studio" side="left">
         <StudioSidebar mobile onNavigate={() => setMobileSidebarOpen(false)} />
-      </MobileSheet> : <StudioSidebar compact={isTablet} /> }
+      </MobileSheet>
+      ) : (
+        <StudioSidebar compact={isTablet} />
+      )}
 
       {/* Main Workspace: Either Home Chat or Split-Screen (Agent Studio + Living Canvas) */}
       <main className="min-w-0 min-h-0 flex-1 flex flex-col h-full overflow-hidden relative">
+        {authReady && catalogSyncStatus === 'error' && (
+          <div role="alert" className="p-3">
+            Não foi possível sincronizar seus catálogos.{' '}
+            <button
+              onClick={() => {
+                if (user) void initializeWorkspace(user.id);
+              }}
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
         <StudioMobileNavigation onMenu={() => setMobileSidebarOpen(true)} />
-        {!hasStartedSession ? (
+        {checkingAuth ? (
+          <div role="status" className="p-6">
+            Verificando sua sessão…
+          </div>
+        ) : !hasStartedSession ? (
           <section id="studio-assistant" role={isPhone ? 'tabpanel' : undefined} aria-label="Assistente" className="min-h-0 flex flex-1"><StudioHomeChat /></section>
         ) : (
           <div className="min-h-0 flex-1 w-full flex overflow-hidden animate-in fade-in duration-300">
@@ -300,7 +283,7 @@ const StudioLayout: React.FC = () => {
 
       {/* Modal de Autenticacao In-Context (Light/Dark Mode) */}
       <AuthModal
-        isOpen={!checkingAuth && (isAuthModalOpen || !isAuthenticated)}
+        isOpen={!checkingAuth && (isAuthModalOpen || !authReady)}
         onClose={closeAuthModal}
         canDismiss={isAuthenticated}
       />
@@ -308,4 +291,6 @@ const StudioLayout: React.FC = () => {
   );
 };
 
-export const KatanaStudio: React.FC = () => <StudioResponsiveProvider><StudioLayout /></StudioResponsiveProvider>;
+export const KatanaStudio: React.FC = () => (
+  <StudioResponsiveProvider><StudioLayout /></StudioResponsiveProvider>
+);

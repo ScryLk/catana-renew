@@ -236,6 +236,7 @@ async function fixture(page: Page, options: { count?: number; mixed?: boolean; h
     if (/generate|\/chat\//.test(path)) return route.fulfill({ status: 418, json: { detail: 'Paid AI is outside this browser fixture' } });
     let body: unknown = [];
     if (path.includes('/auth/')) body = { access: 'document-qa-local-only', user: { id: 1, username: 'qa', name: 'QA Import', email: 'qa@example.test', role: 'admin' } };
+    else if (path === '/api/profile/') body = { id: 1, username: 'qa', name: 'QA Import', email: 'qa@example.test', role: 'admin' };
     else if (path === '/api/organizations/') body = [organization, otherOrganization];
     else if (path.includes('unread_count')) body = { count: 0 };
     else if (path === '/api/v2/studio/quotas/') body = {organization: 1, active_catalogs: state.quotaUsed ?? state.catalogs.length, max_active_catalogs: 5, remaining_catalog_slots: 5 - (state.quotaUsed ?? state.catalogs.length), plan_tier: 'free', plan_name: 'Free'};
@@ -250,7 +251,7 @@ async function storeModule(page: Page) {
 }
 async function storeState(page: Page) {
   return page.evaluate(async moduleUrl => { const { useStudioStore } = await import(moduleUrl); const state = useStudioStore.getState();
-    return { pages: state.pages, totalPages: state.totalPages, activeCatalogId: state.activeCatalogId, activeBrandId: state.activeBrandId,
+    return { catalogSyncStatus: state.catalogSyncStatus, pages: state.pages, totalPages: state.totalPages, activeCatalogId: state.activeCatalogId, activeBrandId: state.activeBrandId,
       activeOrganizationId: state.activeOrganizationId, catalogBrandContext: state.catalogBrandContext, qualityGate: state.qualityGate, importMetadata: state.importMetadata }; }, await storeModule(page));
 }
 async function openImport(page: Page) {
@@ -465,10 +466,12 @@ test('cancelling a pending analysis ignores its late response and leaves the Stu
 test('changing organization while analysis is pending discards the old tenant response', async ({ page }) => {
   const state = await fixture(page, { holdAnalysis: true }); const dialog = await openImport(page); await upload(dialog);
   await dialog.getByRole('button', { name: 'Analisar documento', exact: true }).click(); await expect.poll(() => state.analyses.length).toBe(1);
-  // The same synchronous scope invalidation used by ContextSelector, before its scheduled reload.
-  await page.evaluate(async ({ moduleUrl, nextOrg }) => { localStorage.setItem('active_organization', JSON.stringify(nextOrg));
-    const { useStudioStore } = await import(moduleUrl); const state = useStudioStore.getState(); state.setActiveUserId(state.activeUserId);
-  }, { moduleUrl: await storeModule(page), nextOrg: otherOrganization });
+  // Use the membership-validated selection path owned by ContextSelector.
+  await page.evaluate(async (nextOrg) => {
+    // @ts-expect-error Vite serves the runtime workspace module for browser QA.
+    const { selectOrganization } = await import('/src/services/workspaceContext.ts');
+    selectOrganization(nextOrg);
+  }, otherOrganization);
   state.releaseAnalysis!();
   await expect(dialog.getByRole('button', { name: 'Confirmar importação', exact: true })).toHaveCount(0);
   await expect.poll(async () => (await storeState(page)).activeOrganizationId).toBe(2);
@@ -584,6 +587,7 @@ test('real private PDF resolves commands without browser source text, saves grou
       return route.fulfill({status: Number(reply.status), contentType: String(reply.content_type), body: Buffer.from(String(reply.base64), 'base64')});
     });
     await page.goto('/studio');
+    await expect.poll(async () => (await storeState(page)).catalogSyncStatus).toBe('ready');
     await page.evaluate(async ({moduleUrl, catalogId}) => {const {useStudioStore} = await import(moduleUrl); await useStudioStore.getState().loadExistingCatalog(catalogId);}, {moduleUrl: await storeModule(page), catalogId});
     const before = (await storeState(page)).pages[0].documentPage;
     expect(before.elements.every((e: {text?: string; provenance?: unknown}) => e.text === undefined && e.provenance === undefined)).toBe(true);
@@ -593,6 +597,7 @@ test('real private PDF resolves commands without browser source text, saves grou
     await expect(page.getByText("Texto da página atualizado para 'ITENS'.", {exact: true})).toBeVisible();
     await page.evaluate(async moduleUrl => {const {useStudioStore} = await import(moduleUrl); await useStudioStore.getState().flushSaveSpread();}, await storeModule(page));
     await page.reload();
+    await expect.poll(async () => (await storeState(page)).catalogSyncStatus).toBe('ready');
     await page.evaluate(async ({moduleUrl, catalogId}) => {const {useStudioStore} = await import(moduleUrl); await useStudioStore.getState().loadExistingCatalog(catalogId);}, {moduleUrl: await storeModule(page), catalogId});
     let saved = (await storeState(page)).pages[0].documentPage;
     expect(saved.elements.some((e: {text?: string}) => e.text === 'ITENS')).toBe(true);
@@ -626,6 +631,7 @@ test('eight imported pages accept a closing ninth page through real API, reload,
       return route.fulfill({status:Number(reply.status),contentType:String(reply.content_type),body:Buffer.from(String(reply.base64),'base64')});
     });
     await page.goto('/studio');
+    await expect.poll(async () => (await storeState(page)).catalogSyncStatus).toBe('ready');
     const load=async()=>page.evaluate(async ({url,id})=>{const {useStudioStore}=await import(url);await useStudioStore.getState().loadExistingCatalog(id);},{url:await storeModule(page),id:catalogId});
     await load();
     const before=(await storeState(page)).pages.map((p:{documentPage:unknown})=>p.documentPage);
@@ -636,7 +642,9 @@ test('eight imported pages accept a closing ninth page through real API, reload,
     let state=await storeState(page);
     expect(state.pages[8]).toMatchObject({pageOrigin:'catana_authored',contentRole:'closing',type:'backcover'});
     expect(state.pages.slice(0,8).map((p:{documentPage:unknown})=>p.documentPage)).toEqual(before);
-    await page.reload();await load();
+    await page.reload();
+    await expect.poll(async () => (await storeState(page)).catalogSyncStatus).toBe('ready');
+    await load();
     state=await storeState(page);
     expect(state.pages).toHaveLength(9);
     // History is scoped to the active editing session; exercise persisted undo/redo after a fresh addition.

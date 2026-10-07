@@ -1,613 +1,403 @@
-import { logger } from '../utils/logger';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { setInMemoryAccessToken, API_BASE_URL } from '../services/api';
+import { API_BASE_URL } from '../services/api';
+import {
+  isClerkConfigured,
+  authProviderMode,
+  type AuthProviderMode
+} from '../services/authConfig';
+import {
+  configureAuthProvider,
+  setInMemoryAccessToken,
+  setTokenReady,
+  clearAuthRuntime,
+  refreshAuthToken,
+  AuthNotReadyError,
+  getAuthProvider
+} from '../services/authTokenProvider';
+import {
+  clearWorkspaceContext,
+  resolveWorkspaceContext
+} from '../services/workspaceContext';
 import { useStudioStore } from './studioStore';
-
-const CLERK_PUBLISHABLE_KEY =
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
-  import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-export const isClerkConfigured =
-  Boolean(CLERK_PUBLISHABLE_KEY) &&
-  (CLERK_PUBLISHABLE_KEY.startsWith('pk_test_') || CLERK_PUBLISHABLE_KEY.startsWith('pk_live_')) &&
-  !CLERK_PUBLISHABLE_KEY.includes('placeholder');
-
-// Login automatico (conveniencia de dev - autenticacao nao exigida no momento).
-// Desabilitado automaticamente em producao ou quando o Clerk estiver configurado.
-export const AUTO_LOGIN_ENABLED =
-  !import.meta.env.PROD &&
-  !isClerkConfigured &&
-  (import.meta.env.VITE_AUTO_LOGIN ?? 'true') !== 'false';
-const DEFAULT_USER = {
-  username: import.meta.env.VITE_DEFAULT_USER || 'demo',
-  password: import.meta.env.VITE_DEFAULT_PASSWORD || 'demo12345',
-  email: 'demo@catana.dev',
-  role: 'admin',
-};
-
-let autoLoginPromise: Promise<void> | null = null;
-let autoLoginDone = false;
-export const isAutoLoginSettled = () => autoLoginDone || !AUTO_LOGIN_ENABLED;
-
+export { isClerkConfigured };
+export type AuthStatus =
+  | 'unknown'
+  | 'loading'
+  | 'signed_out'
+  | 'resolving_identity'
+  | 'ready'
+  | 'refreshing'
+  | 'error';
 export interface User {
   id: number;
+  externalAuthId?: string;
   name: string;
   email: string;
   avatar?: string;
   username?: string;
   role?: 'admin' | 'editor' | 'viewer';
 }
-
+interface BackendProfile {
+  id: number;
+  name?: string;
+  first_name?: string;
+  username: string;
+  email: string;
+  avatar?: string;
+  role?: User['role'];
+}
+interface ClerkIdentity {
+  id: string;
+}
+interface Credentials {
+  username: string;
+  password: string;
+}
 interface AuthStore {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
+  authStatus: AuthStatus;
+  authProvider: AuthProviderMode;
+  activeOrganizationId: number | null;
   isLoading: boolean;
   error: string | null;
   isAuthModalOpen: boolean;
   authModalView: 'login' | 'register' | 'forgot-password';
-  openAuthModal: (view?: 'login' | 'register' | 'forgot-password') => void;
+  openAuthModal: (view?: AuthStore['authModalView']) => void;
   closeAuthModal: () => void;
-  login: (credentials: { username: string; password: string }) => Promise<void>;
+  clearError: () => void;
+  login: (credentials: Credentials) => Promise<void>;
   googleLogin: (credential: string) => Promise<void>;
+  register: (credentials: Record<string, unknown>) => Promise<void>;
   logout: (promptRelogin?: boolean) => Promise<void>;
   checkAuth: () => Promise<void>;
   silentRefresh: () => Promise<boolean>;
-  clearError: () => void;
-  register: (user: any) => Promise<void>;
   autoLogin: () => Promise<void>;
-  syncClerkUser: (clerkUser: any, token: string | null) => Promise<void>;
+  syncClerkUser: (user: ClerkIdentity, token: string | null) => Promise<void>;
   setClerkAuthSettled: () => void;
   requestPasswordReset: (email: string) => Promise<{ message: string }>;
-  confirmPasswordReset: (payload: { uid: string; token: string; new_password: string }) => Promise<{ message: string }>;
+  confirmPasswordReset: (payload: {
+    uid: string;
+    token: string;
+    new_password: string;
+  }) => Promise<{ message: string }>;
 }
-
-// Helper para selecionar organizacao e sede padrao apos login
-async function setupUserOrganizationContext(accessToken: string) {
-  try {
-    const orgsResponse = await axios.get(`${API_BASE_URL}/api/organizations/`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-      withCredentials: true,
-    });
-
-    const organizations = orgsResponse.data?.results ?? orgsResponse.data;
-
-    if (organizations && organizations.length > 0) {
-      const firstOrg = organizations[0];
-      localStorage.setItem('active_organization', JSON.stringify(firstOrg));
-
-      if (firstOrg.default_sede && firstOrg.sedes) {
-        const defaultSede = firstOrg.sedes.find((s: any) => s.id === firstOrg.default_sede);
-        if (defaultSede) {
-          localStorage.setItem('active_sede', JSON.stringify(defaultSede));
-        }
-      }
-    }
-  } catch (orgError) {
-    logger.debug('Falha ao carregar organizacao inicial:', orgError);
-  }
+export const isAuthReady = (state: Pick<AuthStore, 'authStatus'>) =>
+  state.authStatus === 'ready' || state.authStatus === 'refreshing';
+export const AUTO_LOGIN_ENABLED =
+  !import.meta.env.PROD &&
+  authProviderMode === 'legacy' &&
+  (import.meta.env.VITE_AUTO_LOGIN ?? 'true') !== 'false';
+let settled = false;
+export const isAutoLoginSettled = () => settled || !AUTO_LOGIN_ENABLED;
+let initialization: Promise<void> | null = null;
+let clerkFlight: { subject: string; promise: Promise<void> } | null = null;
+let identityEpoch = 0;
+let externalSubject: string | null = null;
+export function invalidateIdentityResolution() {
+  identityEpoch++;
+  externalSubject = null;
+  clerkFlight = null;
 }
-
+function resetIdentity() {
+  invalidateIdentityResolution();
+  clearAuthRuntime();
+  clearWorkspaceContext();
+  useStudioStore.getState().resetStudioState();
+}
 export const useAuthStore = create<AuthStore>()(
   persist(
-    (set, get) => ({
-      user: null,
-      token: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null,
-      isAuthModalOpen: false,
-      authModalView: 'login',
-
-      openAuthModal: (view = 'login') =>
-        set({ isAuthModalOpen: true, authModalView: view, error: null }),
-
-      closeAuthModal: () => set({ isAuthModalOpen: false, error: null }),
-
-      login: async (credentials) => {
-        set({ isLoading: true, error: null });
-        try {
-          // Dispara login seguro com cookie HttpOnly de refresh token
-          const response = await axios.post(
-            `${API_BASE_URL}/api/auth/token/`,
-            {
-              username: credentials.username,
-              password: credentials.password,
-            },
-            { withCredentials: true }
-          );
-
-          const { access, user: rawUser } = response.data;
-
-          setInMemoryAccessToken(access);
-          localStorage.setItem('access_token', access);
-          // O refresh_token e gerenciado via Cookie HttpOnly seguro pelo backend
-
-          let user: User;
-          if (rawUser) {
-            user = {
-              id: rawUser.id,
-              name: rawUser.name || rawUser.username,
-              email: rawUser.email,
-              avatar: rawUser.avatar,
-              username: rawUser.username,
-              role: rawUser.role || 'editor',
-            };
-          } else {
-            const profileResponse = await axios.get(`${API_BASE_URL}/api/profile/`, {
-              headers: { Authorization: `Bearer ${access}` },
-              withCredentials: true,
-            });
-            const userData = profileResponse.data;
-            user = {
-              id: userData.id,
-              name: userData.name || userData.username,
-              email: userData.email,
-              avatar: userData.avatar,
-              username: userData.username,
-              role: userData.role || 'viewer',
-            };
-          }
-
-          await setupUserOrganizationContext(access);
-
-          const previousUserId = get().user?.id;
-          if (previousUserId && previousUserId !== user.id) {
-            useStudioStore.getState().resetStudioState();
-          }
-          useStudioStore.getState().setActiveUserId(user.id);
-
-          set({
-            user,
-            token: access,
-            isAuthenticated: true,
-            isLoading: false,
-            isAuthModalOpen: false,
-          });
-        } catch (err: any) {
-          setInMemoryAccessToken(null);
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-
-          const errorMsg =
-            err.response?.data?.error ||
-            err.response?.data?.detail ||
-            (err instanceof Error ? err.message : 'Credenciais invalidas');
-
-          set({
-            error: errorMsg,
-            isLoading: false,
-            user: null,
-            token: null,
-            isAuthenticated: false,
-          });
-          throw err;
-        }
-      },
-
-      googleLogin: async (credential: string) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await axios.post(
-            `${API_BASE_URL}/api/auth/google/`,
-            { credential },
-            { withCredentials: true }
-          );
-
-          const { access, user: rawUser } = response.data;
-
-          setInMemoryAccessToken(access);
-          localStorage.setItem('access_token', access);
-
-          const user: User = {
-            id: rawUser.id,
-            name: rawUser.name || rawUser.username,
-            email: rawUser.email,
-            avatar: rawUser.avatar,
-            username: rawUser.username,
-            role: rawUser.role || 'editor',
-          };
-
-          await setupUserOrganizationContext(access);
-
-          const prevUid = get().user?.id;
-          if (prevUid && prevUid !== user.id) {
-            useStudioStore.getState().resetStudioState();
-          }
-          useStudioStore.getState().setActiveUserId(user.id);
-
-          set({
-            user,
-            token: access,
-            isAuthenticated: true,
-            isLoading: false,
-            isAuthModalOpen: false,
-          });
-        } catch (err: any) {
-          setInMemoryAccessToken(null);
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-
-          const errorMsg =
-            err.response?.data?.error ||
-            err.response?.data?.detail ||
-            'Falha na autenticacao com o Google';
-
-          set({
-            error: errorMsg,
-            isLoading: false,
-            user: null,
-            token: null,
-            isAuthenticated: false,
-          });
-          throw err;
-        }
-      },
-
-      silentRefresh: async () => {
-        try {
-          const storedRefresh = localStorage.getItem('refresh_token');
-          const response = await axios.post(
-            `${API_BASE_URL}/api/auth/token/refresh/`,
-            { refresh: storedRefresh || undefined },
-            { withCredentials: true }
-          );
-
-          const { access, refresh: newRefresh, user: rawUser } = response.data;
-          setInMemoryAccessToken(access);
-          localStorage.setItem('access_token', access);
-          if (newRefresh) {
-            localStorage.setItem('refresh_token', newRefresh);
-          }
-
-          let user = get().user;
-          if (rawUser) {
-            user = {
-              id: rawUser.id,
-              name: rawUser.name || rawUser.username,
-              email: rawUser.email,
-              avatar: rawUser.avatar,
-              username: rawUser.username,
-              role: rawUser.role || 'editor',
-            };
-          } else if (!user) {
-            const profileResponse = await axios.get(`${API_BASE_URL}/api/profile/`, {
-              headers: { Authorization: `Bearer ${access}` },
-              withCredentials: true,
-            });
-            const userData = profileResponse.data;
-            user = {
-              id: userData.id,
-              name: userData.name || userData.username,
-              email: userData.email,
-              avatar: userData.avatar,
-              username: userData.username,
-              role: userData.role || 'viewer',
-            };
-          }
-
-          set({
-            user,
-            token: access,
-            isAuthenticated: true,
-          });
-          if (user?.id) {
-            useStudioStore.getState().setActiveUserId(user.id);
-          }
-          return true;
-        } catch {
-          setInMemoryAccessToken(null);
-          localStorage.removeItem('access_token');
-          set({
-            user: null,
-            token: null,
-            isAuthenticated: false,
-          });
-          return false;
-        }
-      },
-
-      logout: async (promptRelogin = false) => {
-        try {
-          // Apenas dispara signOut no Clerk em logout explicito acionado pelo usuario,
-          // evitando redirecionamentos e loops em caso de expiracao silenciosa
-          if (!promptRelogin && typeof window !== 'undefined' && (window as any).Clerk?.signOut) {
-            try {
-              await (window as any).Clerk.signOut();
-            } catch {
-              // Silencioso
-            }
-          }
-          const storedRefresh = localStorage.getItem('refresh_token');
-          if (storedRefresh) {
-            await axios.post(
-              `${API_BASE_URL}/api/auth/logout/`,
-              { refresh: storedRefresh },
-              { withCredentials: true }
-            ).catch(() => {});
-          }
-        } catch (e) {
-          logger.debug('Logout endpoint falhou silenciosamente:', e);
-        } finally {
-          setInMemoryAccessToken(null);
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          localStorage.removeItem('active_organization');
-          localStorage.removeItem('active_sede');
-          // Reseta completamente o estado do Studio na memória e remove chaves não-isoladas
-          useStudioStore.getState().resetStudioState();
-          set({
-            user: null,
-            token: null,
-            isAuthenticated: false,
-            isAuthModalOpen: promptRelogin,
-            authModalView: 'login',
-          });
-          if (promptRelogin) {
-            toast.error('Sessão expirada. Acesse sua conta novamente para continuar com segurança.', {
-              id: 'catana-session-expired',
-              duration: 8000,
-            });
-          }
-        }
-      },
-
-      syncClerkUser: async (clerkUser: any, token: string | null) => {
-        if (token) {
-          setInMemoryAccessToken(token);
-          localStorage.setItem('access_token', token);
-        }
+    (set, get) => {
+      const resolveIdentity = async (
+        access: string,
+        epoch: number,
+        externalAuthId?: string
+      ) => {
+        if (!access) throw new AuthNotReadyError();
+        setInMemoryAccessToken(access);
+        const headers = { Authorization: `Bearer ${access}` };
+        const { data: profile } = await axios.get<BackendProfile>(
+          `${API_BASE_URL}/api/profile/`,
+          { headers, withCredentials: true }
+        );
+        if (epoch !== identityEpoch) return;
+        if (!Number.isInteger(profile.id) || profile.id <= 0)
+          throw new Error('Identidade Catana inválida.');
+        const { data } = await axios.get(`${API_BASE_URL}/api/organizations/`, {
+          headers,
+          withCredentials: true
+        });
+        if (epoch !== identityEpoch) return;
+        const organizations = Array.isArray(data) ? data : data.results;
+        if (!Array.isArray(organizations))
+          throw new Error('Não foi possível resolver suas organizações.');
         const user: User = {
-          id: typeof clerkUser.id === 'number' ? clerkUser.id : 1,
-          name: clerkUser.fullName || clerkUser.firstName || 'Usuario',
-          email: clerkUser.primaryEmailAddress?.emailAddress || '',
-          avatar: clerkUser.imageUrl,
-          username: clerkUser.username || (clerkUser.primaryEmailAddress?.emailAddress || '').split('@')[0],
-          role: 'editor',
+          ...profile,
+          name: profile.name || profile.first_name || profile.username,
+          externalAuthId
         };
-        if (token) {
-          setupUserOrganizationContext(token).catch(() => {});
-        }
-        const prevUid = get().user?.id;
-        if (prevUid && prevUid !== user.id) {
-          useStudioStore.getState().resetStudioState();
-        }
+        const activeOrganizationId = resolveWorkspaceContext(
+          user.id,
+          organizations
+        );
         useStudioStore.getState().setActiveUserId(user.id);
+        setTokenReady(true);
         set({
           user,
-          token: token || null,
+          token: access,
           isAuthenticated: true,
+          authStatus: 'ready',
+          activeOrganizationId,
           isLoading: false,
           isAuthModalOpen: false,
+          error: null
         });
-        autoLoginDone = true;
-      },
-
-      setClerkAuthSettled: () => {
-        autoLoginDone = true;
-      },
-
-      checkAuth: async () => {
-        if (typeof window !== 'undefined' && (window as any).Clerk?.user) {
-          try {
-            const clerkUser = (window as any).Clerk.user;
-            const clerkToken = await (window as any).Clerk.session?.getToken();
-            if (clerkToken) {
-              setInMemoryAccessToken(clerkToken);
-              localStorage.setItem('access_token', clerkToken);
-            }
-            const user: User = {
-              id: typeof clerkUser.id === 'number' ? clerkUser.id : 1,
-              name: clerkUser.fullName || clerkUser.firstName || 'Usuario',
-              email: clerkUser.primaryEmailAddress?.emailAddress || '',
-              avatar: clerkUser.imageUrl,
-              username: clerkUser.username || (clerkUser.primaryEmailAddress?.emailAddress || '').split('@')[0],
-              role: 'editor',
-            };
-            if (clerkToken) {
-              await setupUserOrganizationContext(clerkToken);
-            }
-            const prevUid = get().user?.id;
-            if (prevUid && prevUid !== user.id) {
-              useStudioStore.getState().resetStudioState();
-            }
-            useStudioStore.getState().setActiveUserId(user.id);
+        settled = true;
+      };
+      const legacyLogin = async (path: string, payload: unknown) => {
+        if (authProviderMode === 'clerk') throw new AuthNotReadyError();
+        resetIdentity();
+        configureAuthProvider('legacy');
+        const epoch = identityEpoch;
+        set({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          activeOrganizationId: null,
+          authStatus: 'loading',
+          isLoading: true,
+          error: null
+        });
+        try {
+          const { data } = await axios.post(`${API_BASE_URL}${path}`, payload, {
+            withCredentials: true
+          });
+          if (epoch !== identityEpoch) return;
+          localStorage.setItem('access_token', data.access);
+          await resolveIdentity(data.access, epoch);
+        } catch (error) {
+          if (epoch === identityEpoch)
             set({
-              user,
-              token: clerkToken || null,
-              isAuthenticated: true,
+              authStatus: 'error',
               isLoading: false,
+              error: 'Não foi possível acessar sua conta.'
             });
-            autoLoginDone = true;
-            return;
+          throw error;
+        }
+      };
+      return {
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        authStatus: 'unknown',
+        authProvider: authProviderMode,
+        activeOrganizationId: null,
+        isLoading: false,
+        error: null,
+        isAuthModalOpen: false,
+        authModalView: 'login',
+        openAuthModal: (view = 'login') =>
+          set({ isAuthModalOpen: true, authModalView: view, error: null }),
+        closeAuthModal: () => set({ isAuthModalOpen: false, error: null }),
+        clearError: () => set({ error: null }),
+        login: credentials => legacyLogin('/api/auth/token/', credentials),
+        googleLogin: credential =>
+          legacyLogin('/api/auth/google/', { credential }),
+        register: credentials => legacyLogin('/api/register/', credentials),
+        silentRefresh: async () => {
+          if (authProviderMode === 'clerk') return false;
+          const epoch = identityEpoch;
+          try {
+            const access = await refreshAuthToken();
+            await resolveIdentity(access, epoch);
+            return epoch === identityEpoch;
           } catch {
-            // Continua para o fallback padrao
+        if(epoch===identityEpoch) {
+          if(get().user) {
+            set({authStatus:'error',isLoading:false,error:'Sua sessão está indisponível. Verifique a conexão e tente novamente.'});
+          } else {
+            resetIdentity();
+            set({user:null,token:null,isAuthenticated:false,activeOrganizationId:null,authStatus:'signed_out',isLoading:false});
           }
         }
-
-        // Se o Clerk estiver ativo e ainda carregando no browser, evita limpar tokens prematuramente
-        if (isClerkConfigured) {
-          return;
-        }
-
-        const storedToken = localStorage.getItem('access_token');
-        if (storedToken) {
-          setInMemoryAccessToken(storedToken);
-        }
-        await get().silentRefresh();
-      },
-
-      clearError: () => set({ error: null }),
-
-      autoLogin: async () => {
-        if (!AUTO_LOGIN_ENABLED) return;
-        if (autoLoginPromise) return autoLoginPromise;
-
-        autoLoginPromise = (async () => {
+        return false;
+          }
+        },
+        checkAuth: () => {
+          if (authProviderMode === 'clerk') return Promise.resolve();
+          if (initialization) return initialization;
+          set({ authStatus: 'loading', isLoading: true });
+          configureAuthProvider('legacy');
+          initialization = (async () => {
+            const success = await get().silentRefresh();
+            if (!success && AUTO_LOGIN_ENABLED && !get().user) await get().autoLogin();
+          })().finally(() => {
+            settled = true;
+            initialization = null;
+          });
+          return initialization;
+        },
+        autoLogin: async () => {
+          if (!AUTO_LOGIN_ENABLED) return;
+          const credentials = {
+            username: import.meta.env.VITE_DEFAULT_USER || 'demo',
+            password: import.meta.env.VITE_DEFAULT_PASSWORD || 'demo12345'
+          };
           try {
-            // Tenta primeiro refresh silencioso via cookie existente
-            const refreshed = await get().silentRefresh();
-            if (refreshed) return;
-
-            // Caso contrario, utiliza o usuario padrao de desenvolvimento
-            await get().login({
-              username: DEFAULT_USER.username,
-              password: DEFAULT_USER.password,
-            });
+            await get().login(credentials);
           } catch {
             try {
               await get().register({
-                username: DEFAULT_USER.username,
-                email: DEFAULT_USER.email,
-                password: DEFAULT_USER.password,
-                role: DEFAULT_USER.role,
+                ...credentials,
+                email: 'demo@catana.dev',
+                role: 'admin'
               });
-            } catch (err) {
-              if (import.meta.env.DEV) {
-                console.error('[autoLogin] falha ao registrar usuario demo', err);
-              }
+            } catch {
+              /* Auth remains recoverable. */
             }
-          } finally {
-            autoLoginDone = true;
           }
-        })();
-
-        return autoLoginPromise;
-      },
-
-      register: async (credentials) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await axios.post(
-            `${API_BASE_URL}/api/register/`,
-            credentials,
-            { withCredentials: true }
-          );
-
-          const { user: userData, access, organization, default_sede } = response.data;
-
-          setInMemoryAccessToken(access);
-          localStorage.setItem('access_token', access);
-
-          if (organization) {
-            localStorage.setItem('active_organization', JSON.stringify(organization));
-          }
-          if (default_sede) {
-            localStorage.setItem('active_sede', JSON.stringify(default_sede));
-          }
-
-          const user: User = {
-            id: userData.id,
-            name: userData.first_name || userData.username,
-            email: userData.email,
-            avatar: userData.avatar,
-            username: userData.username,
-            role: userData.role || 'viewer',
-          };
-
-          const prevUid = get().user?.id;
-          if (prevUid && prevUid !== user.id) {
+          settled = true;
+        },
+        syncClerkUser: (clerkUser, access) => {
+          if (getAuthProvider() !== 'clerk') configureAuthProvider('clerk');
+          if (clerkFlight?.subject === clerkUser.id) return clerkFlight.promise;
+          if (externalSubject === clerkUser.id && isAuthReady(get()))
+            return Promise.resolve();
+          if (externalSubject !== clerkUser.id) {
+            identityEpoch++;
+            clearWorkspaceContext();
             useStudioStore.getState().resetStudioState();
           }
-          useStudioStore.getState().setActiveUserId(user.id);
-
+          externalSubject = clerkUser.id;
+          const epoch = identityEpoch;
           set({
-            user,
-            token: access,
-            isAuthenticated: true,
-            isLoading: false,
-            isAuthModalOpen: false,
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            activeOrganizationId: null,
+            authProvider: 'clerk',
+            authStatus: 'resolving_identity',
+            isLoading: true,
+            error: null
           });
-        } catch (err: any) {
-          const errorMessage =
-            err.response?.data?.error ||
-            err.response?.data?.detail ||
-            err.message ||
-            'Erro ao registrar conta';
+          const promise = resolveIdentity(access || '', epoch, clerkUser.id)
+            .catch(() => {
+              if (epoch === identityEpoch) {
+                setTokenReady(false);
+                set({
+                  authStatus: 'error',
+                  isLoading: false,
+                  error:
+                    'Não foi possível verificar sua sessão. Tente novamente.'
+                });
+              }
+            })
+            .finally(() => {
+              if (clerkFlight?.promise === promise) clerkFlight = null;
+              settled = true;
+            });
+          clerkFlight = { subject: clerkUser.id, promise };
+          return promise;
+        },
+        setClerkAuthSettled: () => {
+          resetIdentity();
+          settled = true;
           set({
-            error: errorMessage,
-            isLoading: false,
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            activeOrganizationId: null,
+            authStatus: 'signed_out',
+            isLoading: false
           });
-          throw err;
-        }
-      },
-
-      requestPasswordReset: async (email: string) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await axios.post(
-            `${API_BASE_URL}/api/auth/password-reset/`,
-            { email }
-          );
-          set({ isLoading: false });
-          return response.data;
-        } catch (err: any) {
-          const errorMessage =
-            err.response?.data?.error ||
-            err.response?.data?.detail ||
-            err.message ||
-            'Erro ao solicitar redefinicao de senha';
-          set({ error: errorMessage, isLoading: false });
-          throw err;
-        }
-      },
-
-      confirmPasswordReset: async (payload: { uid: string; token: string; new_password: string }) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await axios.post(
-            `${API_BASE_URL}/api/auth/password-reset/confirm/`,
-            payload
-          );
-          set({ isLoading: false });
-          return response.data;
-        } catch (err: any) {
-          const errorMessage =
-            err.response?.data?.error ||
-            err.response?.data?.detail ||
-            err.message ||
-            'Erro ao redefinir senha';
-          set({ error: errorMessage, isLoading: false });
-          throw err;
-        }
-      },
-    }),
+        },
+        logout: async (promptRelogin = false) => {
+          const mode = get().authProvider;
+          resetIdentity();
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            activeOrganizationId: null,
+            authStatus: 'signed_out',
+            isLoading: false,
+            isAuthModalOpen: promptRelogin
+          });
+          if (mode === 'clerk') {
+            const clerk = (
+              window as unknown as { Clerk?: { signOut: () => Promise<void> } }
+            ).Clerk;
+            if (!promptRelogin) await clerk?.signOut();
+          } else
+            await axios
+              .post(
+                `${API_BASE_URL}/api/auth/logout/`,
+                {},
+                { withCredentials: true }
+              )
+              .catch(() => {});
+          if (promptRelogin)
+            toast.error('Sessão expirada. Acesse sua conta novamente.');
+        },
+        requestPasswordReset: async email =>
+          (
+            await axios.post(`${API_BASE_URL}/api/auth/password-reset/`, {
+              email
+            })
+          ).data,
+        confirmPasswordReset: async payload =>
+          (
+            await axios.post(
+              `${API_BASE_URL}/api/auth/password-reset/confirm/`,
+              payload
+            )
+          ).data
+      };
+    },
     {
       name: 'catana-auth-storage',
-      partialize: (state) => ({
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-      }),
+      version: 2,
+      partialize: () => ({}),
+      migrate: () => ({}),
+      merge: (_persisted, current) => current
     }
   )
 );
-
-// Listener global para tratar expiracao de sessao (HTTP 401) e perda de conexao
 if (typeof window !== 'undefined') {
+  window.addEventListener('catana:auth-status', event => {
+    const status = (event as CustomEvent).detail.status as AuthStatus;
+    if (status === 'ready' && !useAuthStore.getState().user) return;
+    useAuthStore.setState({
+      authStatus: status,
+      ...(status === 'error'
+        ? { error: 'Sua sessão precisa ser verificada novamente.' }
+        : {})
+    });
+  });
+  window.addEventListener('catana:organization-changed', event => {
+    const { organizationId } = (event as CustomEvent).detail;
+    const user = useAuthStore.getState().user;
+    useAuthStore.setState({ activeOrganizationId: organizationId });
+    if (user) useStudioStore.getState().setActiveUserId(user.id);
+  });
   window.addEventListener('catana:unauthorized', () => {
-    // Se o usuario estiver com sessao ativa no Clerk, ignora para evitar falsos positivos
-    if ((window as any).Clerk?.session) {
-      return;
-    }
-    useAuthStore.getState().logout(true);
-  });
-
-  window.addEventListener('offline', () => {
-    toast.error('Conexão perdida. Verifique sua rede de internet.', {
-      id: 'catana-offline-toast',
-      duration: 6000,
+    setTokenReady(false);
+    useAuthStore.setState({
+      authStatus: 'error',
+      error: 'Sua sessão expirou. Tente novamente.'
     });
   });
-
   window.addEventListener('online', () => {
-    toast.success('Conexão restabelecida!', {
-      id: 'catana-online-toast',
-      duration: 4000,
-    });
-    useAuthStore.getState().silentRefresh();
+    if (useAuthStore.getState().user) {
+      if (useAuthStore.getState().authProvider === 'clerk')
+        void refreshAuthToken().catch(() => {});
+      else void useAuthStore.getState().silentRefresh();
+    }
   });
 }
