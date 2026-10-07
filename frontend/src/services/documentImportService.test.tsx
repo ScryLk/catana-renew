@@ -188,7 +188,10 @@ describe('Source identity, safe images and progressive editing', () => {
     useStudioStore.setState({activeCatalogId: '51', pages: Array.from({length: 7}, (_, index) => page(index + 1)), totalPages: 7, currentSpread: [7, 7], importMetadata: {importId: 'import-1', share_enabled: true}});
     const post = vi.spyOn(api, 'post').mockResolvedValue({data: {import_metadata: {importId: 'import-1', share_enabled: false, quality: {passed: false}}}});
     await useStudioStore.getState().flushSaveSpread();
-    expect(post.mock.calls[0][1]).toMatchObject({spread_index: 3, left_page_elements: [page(7)], right_page_elements: []});
+    const payload=post.mock.calls[0][1] as {total_pages:number;spreads:unknown[]};
+    expect(payload.total_pages).toBe(7);
+    expect(payload.spreads).toHaveLength(4);
+    expect(payload.spreads[3]).toMatchObject({spread_index: 3, left_page_elements: [page(7)], right_page_elements: []});
     expect(useStudioStore.getState().importMetadata?.share_enabled).toBe(false);
   });
   it('keeps the real minimal backend page wrapper byte-equivalent during an untouched hydration/save', async () => {
@@ -200,7 +203,7 @@ describe('Source identity, safe images and progressive editing', () => {
     await useStudioStore.getState().loadExistingCatalog('51');
     await useStudioStore.getState().flushSaveSpread();
     // Strict server source approval must survive opening/exporting without an edit.
-    const payload = post.mock.calls[0][1] as {left_page_elements: unknown[]; right_page_elements: unknown[]};
+    const payload = (post.mock.calls[0][1] as {spreads:{left_page_elements: unknown[]; right_page_elements: unknown[]}[]}).spreads[0];
     expect(JSON.parse(JSON.stringify(payload.left_page_elements[0]))).toEqual(original);
     expect(payload.right_page_elements).toEqual([]);
     expect(useStudioStore.getState().importMetadata?.quality).toMatchObject({passed: true});

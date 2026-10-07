@@ -95,9 +95,12 @@ def _invalidate_generation_approval(catalog, reason):
     """An approval certifies generated content, not later customer edits."""
     if catalog.import_metadata:
         previous_import = catalog.import_metadata.get('quality') or {}
+        from api.services.catalog_page_origin import catalog_pages
+        edited_source = any(e.get('edited') for p in catalog_pages(catalog) for e in (p.get('documentPage') or {}).get('elements', []) if isinstance(e,dict))
+        structural_only = reason == 'GENERATED_CONTENT_UPDATED' and not edited_source
         catalog.import_metadata = {
             **catalog.import_metadata, 'share_enabled': False,
-            'quality': {**previous_import, 'passed': False, 'status': 'needs_review',
+            'quality': previous_import if structural_only else {**previous_import, 'passed': False, 'status': 'needs_review',
                         'errors': list(dict.fromkeys([*previous_import.get('errors', []), reason]))},
         }
     if not catalog.generation_metadata:
@@ -191,6 +194,13 @@ class StudioQuotaStatusView(APIView):
             "can_use_council": plan.can_use_council if plan else False,
             "can_export_pdf": plan.can_export_pdf if plan else True,
         })
+
+
+def _comparable_pages(catalog, values):
+    if not catalog.import_metadata:
+        return values
+    from api.services.catalog_page_origin import normalize_page
+    return [normalize_page(p,catalog) for p in values] if isinstance(values,list) else values
 
 
 class StudioCatalogListView(APIView):
@@ -305,6 +315,7 @@ class StudioCatalogListView(APIView):
             "brand_name": catalog.brand_name,
             "style_preset": catalog.style_preset,
             "total_pages": catalog.total_pages,
+            "source_page_count": len(catalog.source_import.document_ir.get("pages",[])) if catalog.import_metadata else 0,
             "brand_lock": catalog.brand_lock,
             "palette_data": catalog.palette_data,
             "unassigned_products": catalog.unassigned_products,
@@ -332,6 +343,10 @@ class StudioCatalogDetailView(APIView):
         for s in catalog.spreads.all().order_by("spread_index"):
             left = s.left_page_elements[0] if (isinstance(s.left_page_elements, list) and len(s.left_page_elements) > 0) else (s.left_page_elements or {})
             right = s.right_page_elements[0] if (isinstance(s.right_page_elements, list) and len(s.right_page_elements) > 0) else (s.right_page_elements or {})
+            if catalog.import_metadata:
+                from api.services.catalog_page_origin import normalize_page
+                left = normalize_page(left, catalog) if left else left
+                right = normalize_page(right, catalog) if right else right
             spreads.append({
                 "id": s.id,
                 "spread_index": s.spread_index,
@@ -380,6 +395,7 @@ class StudioCatalogDetailView(APIView):
             "status": catalog.status,
             "page_width": catalog.page_width,
             "page_height": catalog.page_height,
+            "source_page_count": len(catalog.source_import.document_ir.get("pages",[])) if catalog.import_metadata else 0,
             "total_pages": catalog.total_pages,
             "brand_lock": catalog.brand_lock,
             "palette_data": catalog.palette_data,
@@ -464,13 +480,18 @@ class StudioCatalogDetailView(APIView):
             catalog.font_family = data["font_family"]
         if "total_pages" in data:
             catalog.total_pages = int(data["total_pages"])
-            if catalog.import_metadata and catalog.total_pages < len(catalog.source_import.previews):
-                raise ValidationError({'total_pages': 'Todas as páginas originais devem ser preservadas.'})
+            if catalog.import_metadata:
+                from api.services.catalog_page_origin import catalog_pages
+                if catalog.total_pages != len(catalog_pages(catalog)):
+                    raise ValidationError({'code': 'invalid_structure'})
         if "brand_lock" in data:
             catalog.brand_lock = bool(data["brand_lock"])
         if "palette_data" in data:
             catalog.palette_data = data["palette_data"]
         if "unassigned_products" in data:
+            if catalog.import_metadata:
+                from api.services.catalog_page_origin import catalog_pages, validate_commercial_revision
+                validate_commercial_revision(catalog,catalog_pages(catalog),data['unassigned_products'])
             catalog.unassigned_products = data["unassigned_products"]
         if any(previous_presentation[field] != getattr(catalog, field) for field in presentation_fields):
             _invalidate_generation_approval(catalog, 'GENERATED_CONTENT_UPDATED')
@@ -537,11 +558,21 @@ class StudioSpreadManageView(APIView):
         elif right_elements is None:
             right_elements = []
 
+        if catalog.import_metadata:
+            from api.services.catalog_page_origin import catalog_pages, validate_sequence
+            existing_pages = catalog_pages(catalog)
+            proposed = copy.deepcopy(existing_pages)
+            pair = left_elements + right_elements
+            old_pair = existing_pages[spread_index*2:spread_index*2+2]
+            if [p.get('id') for p in pair] != [p.get('id') for p in old_pair]:
+                raise ValidationError({'code':'invalid_structure', 'error':'Salve alterações de sequência em lote.'})
+            proposed[spread_index*2:spread_index*2+2] = pair
+            validate_sequence(catalog,proposed)
         DocumentReconstructorService.validate_page_update(catalog, left_elements, spread_index * 2)
         DocumentReconstructorService.validate_page_update(catalog, right_elements, spread_index * 2 + 1)
 
         existing = catalog.spreads.filter(spread_index=spread_index).first()
-        content_changed = existing is None or existing.left_page_elements != left_elements or existing.right_page_elements != right_elements
+        content_changed = existing is None or _comparable_pages(catalog,existing.left_page_elements) != _comparable_pages(catalog,left_elements) or _comparable_pages(catalog,existing.right_page_elements) != _comparable_pages(catalog,right_elements)
         spread, created = CatalogSpread.objects.update_or_create(
             catalog=catalog,
             spread_index=spread_index,
@@ -585,6 +616,38 @@ class StudioSpreadBulkSyncView(APIView):
         if not isinstance(spreads_data, list):
             return Response({"error": "O campo spreads deve ser uma lista"}, status=status.HTTP_400_BAD_REQUEST)
 
+        if catalog.import_metadata:
+            from api.services.catalog_page_origin import catalog_pages, validate_sequence, origin, validate_commercial_revision
+            pages = []
+            if len(spreads_data) > 50 or any(not isinstance(item,dict) for item in spreads_data) or [item.get('spread_index') for item in spreads_data] != list(range(len(spreads_data))):
+                raise ValidationError({'code': 'invalid_structure'})
+            for item in spreads_data:
+                for side in ('left','right'):
+                    values = [item[side+'_page']] if item.get(side+'_page') is not None else item.get(side+'_page_elements', [])
+                    if not isinstance(values,list) or len(values)>1:
+                        raise ValidationError({'code': 'invalid_structure'})
+                    pages.extend(values)
+            validate_sequence(catalog,pages)
+            validate_commercial_revision(catalog,pages,request.data.get('unassigned_products',catalog.unassigned_products))
+            if request.data.get('total_pages') != len(pages):
+                raise ValidationError({'code': 'invalid_structure'})
+            old_sources = {p['id'] for p in catalog_pages(catalog) if origin(p,catalog) != 'catana_authored'}
+            removed = old_sources - {p['id'] for p in pages}
+            if removed:
+                from api.services.studio_action_policy import confirmed_patch
+                approved = confirmed_patch(request.data.get('confirmation_token',''),catalog,user)
+                if not approved:
+                    raise ValidationError({'code': 'confirmation_required'})
+                actions = approved['actions']
+                old_pages = catalog_pages(catalog)
+                authorized = set()
+                for action in actions:
+                    if action['action']=='remove_page':
+                        authorized.update(p['id'] for p in old_pages if action['target']==f"page:{p['pageNumber']}")
+                    elif action['action']=='reconfigure_catalog':
+                        authorized.update(p['id'] for p in old_pages[action['params']['totalPages']:])
+                if not removed <= authorized:
+                    raise ValidationError({'code': 'source_integrity_violation'})
         from django.db import transaction
         saved_spreads = []
         content_changed = False
@@ -617,7 +680,7 @@ class StudioSpreadBulkSyncView(APIView):
                 DocumentReconstructorService.validate_page_update(catalog, right_elements, spread_index * 2 + 1)
 
                 existing = catalog.spreads.filter(spread_index=spread_index).first()
-                content_changed = content_changed or existing is None or existing.left_page_elements != left_elements or existing.right_page_elements != right_elements
+                content_changed = content_changed or existing is None or _comparable_pages(catalog,existing.left_page_elements) != _comparable_pages(catalog,left_elements) or _comparable_pages(catalog,existing.right_page_elements) != _comparable_pages(catalog,right_elements)
                 spread, _ = CatalogSpread.objects.update_or_create(
                     catalog=catalog,
                     spread_index=spread_index,
@@ -629,18 +692,24 @@ class StudioSpreadBulkSyncView(APIView):
                 )
                 saved_spreads.append(spread.spread_index)
 
+            if 'unassigned_products' in request.data:
+                products=request.data['unassigned_products']
+                if not isinstance(products,list) or len(products)>1000 or any(not isinstance(p,dict) for p in products) or len(json.dumps(products))>1000000:
+                    raise ValidationError({'code':'invalid_structure'})
+                catalog.unassigned_products=products
+                catalog.save(update_fields=['unassigned_products','updated_at'])
             total_pages = request.data.get("total_pages")
             if total_pages is not None:
                 try:
                     t_pages_int = int(total_pages)
-                    if catalog.import_metadata and t_pages_int < len(catalog.source_import.previews):
-                        raise ValidationError({'total_pages': 'Todas as páginas originais devem ser preservadas.'})
+
                     if t_pages_int > 0:
                         content_changed = content_changed or catalog.total_pages != t_pages_int
                         catalog.total_pages = t_pages_int
                         catalog.save(update_fields=["total_pages", "updated_at"])
                 except (ValueError, TypeError):
                     pass
+            catalog.spreads.exclude(spread_index__in=saved_spreads).delete()
             if content_changed:
                 _invalidate_generation_approval(catalog, 'GENERATED_CONTENT_UPDATED')
                 catalog.save(update_fields=['generation_metadata', 'import_metadata', 'updated_at'])
@@ -830,6 +899,7 @@ class StudioChatStreamView(APIView):
         catalog_context = {
             "catalog_id": catalog.id if catalog else None,
             "title": catalog.title if catalog else "",
+            "catalog_page_count": catalog.total_pages if catalog else 0,
             "brand_name": catalog.brand_name if catalog else "",
             "style_preset": catalog.style_preset if catalog else "",
             "primary_color": catalog.primary_color if catalog else "",
@@ -859,6 +929,15 @@ class StudioChatStreamView(APIView):
             else:
                 imported_entries = None
 
+        if catalog:
+            from api.services.studio_action_policy import editorial_index
+            authored_entries=editorial_index(catalog,spread_index, requested_page if catalog.import_metadata else None)
+            if catalog.import_metadata:
+                catalog_context['editable_text_index'] = (imported_entries or []) + authored_entries
+                if authored_entries:
+                    catalog_context['imported_text_status'] = 'ready'
+            else:
+                catalog_context['editable_text_index'] = authored_entries
         # 7. Gerador de Eventos SSE
         def sse_event_stream() -> Generator[str, None, None]:
             # Evento inicial de conexao
@@ -887,13 +966,6 @@ class StudioChatStreamView(APIView):
                 for chunk in stream_generator:
                     if chunk.text:
                         accumulated_text.append(chunk.text)
-                        token_payload = {
-                            "event": "token",
-                            "text": chunk.text,
-                        }
-                        if imported_entries is None:
-                            yield f"data: {json.dumps(token_payload)}\n\n"
-
                     if chunk.done:
                         final_usage = chunk.usage
                         metadata = chunk.metadata
@@ -902,20 +974,22 @@ class StudioChatStreamView(APIView):
 
                 # Extrai bloco de patch estruturado para aplicacao no canvas
                 patch_data = extract_patch_from_text(full_content)
-                if imported_entries is not None and patch_data:
-                    from api.services.imported_text_resolver import catalog_index, validate_patch
-                    # Re-read persisted state after model latency; never certify stale targets.
-                    fresh_entries, _ = catalog_index(catalog, spread_index, selected_element_id, requested_page)
-                    patch_data = validate_patch(patch_data, fresh_entries)
+                if patch_data:
+                    from api.services.studio_action_policy import ActionPolicyRouter, MESSAGES, confirmation_token
+                    proposed_patch = patch_data
+                    patch_data, decisions = ActionPolicyRouter(catalog, user, {**catalog_context,'user_message':message}).validate_patch(proposed_patch)
+                    metadata['action_policy'] = [{'actionCategory':d.actionCategory, 'reasonCode':d.reasonCode} for d in decisions]
                     if patch_data is None:
-                        full_content = 'Edição rejeitada: o destino não é editável ou os dados comerciais estão protegidos.'
-                        metadata['planner_status'] = 'invalid_target'
+                        failure = next(d for d in decisions if not d.allowed)
+                        metadata['planner_status'] = failure.reasonCode
+                        full_content = MESSAGES.get(failure.reasonCode, MESSAGES['invalid_action'])
+                        if all(d.allowed or d.requiresConfirmation for d in decisions):
+                            metadata['confirmation_token'] = confirmation_token(catalog, user, proposed_patch)
                     else:
                         from api.ai.text_commands import planner_response
-                        full_content = planner_response(('Edição proposta; aguardando execução.', patch_data))
-                if imported_entries is not None:
-                    # Embedded patches must not reach the client's fallback parser before validation.
-                    yield f"data: {json.dumps({'event': 'token', 'text': full_content})}\n\n"
+                        full_content = planner_response(('Proposta validada; aguardando execução.', patch_data))
+                # No embedded model delta is executable before policy validation.
+                yield f"data: {json.dumps({'event': 'token', 'text': full_content})}\n\n"
                 if patch_data:
                     yield f"data: {json.dumps({'event': 'patch', 'patch': patch_data})}\n\n"
 
@@ -2790,3 +2864,22 @@ class StudioPublicCatalogView(APIView):
             "created_at": catalog.created_at.isoformat() if hasattr(catalog, "created_at") and catalog.created_at else None,
             "is_demo": False,
         }, status=status.HTTP_200_OK)
+
+class StudioActionConfirmView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, catalog_id):
+        catalog = _studio_catalogs_for(request.user).filter(pk=catalog_id).first()
+        if not catalog:
+            return Response({'code':'cross_tenant_target'}, status=404)
+        _assert_brand_catalog_write(request.user,catalog)
+        from api.services.studio_action_policy import confirmed_patch, ActionPolicyRouter
+        token=request.data.get('confirmation_token')
+        proposed=confirmed_patch(token,catalog,request.user) if isinstance(token,str) else None
+        if not proposed:
+            return Response({'code':'stale_target'},status=409)
+        patch, decisions=ActionPolicyRouter(catalog,request.user,confirmed=True).validate_patch(proposed)
+        if not patch:
+            return Response({'code':next(d.reasonCode for d in decisions if not d.allowed)},status=400)
+        patch['confirmation_token']=token
+        return Response({'patch':patch})

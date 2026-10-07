@@ -37,6 +37,7 @@ class BaseAgent:
             "     \"summary\": \"<descricao concisa da alteracao>\"\n"
             "   }\n"
             "   ```\n"
+            "Texto Catana usa target page:N/field:title (ou quote/content/subtitle/label), texto importado usa page:N/element:ID. Sempre inclua expectedText exatamente igual ao índice do servidor; não adivinhe alvos.\n"
             "4. Regra Estrita: Nao utilize nenhum emoji em suas respostas sob qualquer hipotese."
         )
         return f"{base_prompt}{KatanaGuardrailEngine.UNIVERSAL_SYSTEM_GUARDRAIL_DIRECTIVE}"

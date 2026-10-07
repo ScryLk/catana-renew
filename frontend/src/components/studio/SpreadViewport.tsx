@@ -1405,7 +1405,7 @@ export const SpreadViewport: React.FC = () => {
             >
               <div
                 className="w-20 h-20 rounded-full border flex items-center justify-center p-2 bg-[#1A1817] shadow-lg"
-                style={{ borderColor: `${accent}66` }}
+                style={{ borderColor: `${accent}66`, backgroundColor:page.backgroundColor }}
               >
                 <span
                   className="text-3xl font-serif text-[#F5F1EA]"
@@ -1420,7 +1420,7 @@ export const SpreadViewport: React.FC = () => {
                   {page.label}
                 </span>
                 <div className="w-10 h-[1px]" style={{ backgroundColor: accent }} />
-                <p className="text-xs tracking-[0.2em] text-[#F5F1EA] font-light leading-relaxed whitespace-pre-line max-w-[280px]">
+                <p className="text-xs tracking-[0.2em] font-light leading-relaxed whitespace-pre-line max-w-[280px]" style={{color:page.textColor}}>
                   {page.content}
                 </p>
               </div>

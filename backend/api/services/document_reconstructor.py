@@ -70,7 +70,8 @@ def public_import_page(page):
         return None
     original = page.get('documentPage')
     if not isinstance(original, dict):
-        return None
+        # Authored pages have no imported evidence to expose. Use the normal runtime projection.
+        return _render_fields(page, ('id','pageNumber','pageOrigin','type','contentRole','renderMode','title','subtitle','content','quote','label','backgroundColor','textColor','accentColor','folio','products','blocks','safeArea','composition','overlays','editorialImage'))
     document = _render_fields(original, ('pageNumber', 'width', 'height', 'unit'))
     document.update(sourceSnapshot=_public_snapshot(original.get('sourceSnapshot')),
                     visibility='source_only', elements=[])
@@ -95,7 +96,7 @@ def public_import_page(page):
             if element.get('snapshot'):
                 projected['snapshot'] = _public_snapshot(element['snapshot'])
             document['elements'].append(projected)
-    result = _render_fields(page, ('id', 'pageNumber', 'renderMode', 'pageWidth', 'pageHeight', 'sourceUnit'))
+    result = _render_fields(page, ('id', 'pageNumber', 'renderMode', 'pageWidth', 'pageHeight', 'sourceUnit','pageOrigin','sourcePageNumber','derivedFromPageId','overlays'))
     result['documentPage'] = document
     if is_generative:
         result.update(_render_fields(page, ('type', 'contentRole', 'backgroundColor', 'textColor',
@@ -353,14 +354,20 @@ class DocumentReconstructorService:
                     if not isinstance(values, list) or len(values) != 1 or not isinstance(values[0], dict):
                         raise ValidationError({'share_import': 'A composição deve ser revisada antes de compartilhar.'})
                     pages.append(values[0])
-        if (catalog.total_pages != len(job.document_ir['pages']) or pages != job.previews):
-            raise ValidationError({'share_import': 'A composição mudou e deve ser revisada antes de compartilhar.'})
+        from api.services.catalog_page_origin import validate_sequence
+        validate_sequence(catalog, pages)
+        if catalog.total_pages != len(pages):
+            raise ValidationError({'share_import': 'A sequência atual deve ser salva antes de compartilhar.'})
+        for position, page in enumerate(pages):
+            cls.validate_page_update(catalog, [copy.deepcopy(page)], position)
         return True
 
     @staticmethod
     def validate_page_update(catalog, elements, source_index):
         """Editable text is a customer revision; retained source evidence is immutable."""
         if not catalog.import_metadata:
+            if not isinstance(elements,list) or any(not isinstance(page,dict) or page.get('pageOrigin') not in (None,'catana_authored') for page in elements):
+                raise ValidationError({'code':'invalid_structure'})
             return
         job = catalog.source_import
         if (job.organization_id != catalog.organization_id
@@ -371,15 +378,41 @@ class DocumentReconstructorService:
             originals = DocumentReconstructorService._document_pages(job.document_ir, job.mode)
         if not originals:
             raise ValidationError({'code': 'reanalyze_required', 'documentPage': 'Atualizar editabilidade antes de salvar.'})
-        if source_index >= len(originals):
-            return  # A separately added customer page has no original to overwrite.
-        original = originals[source_index]
+        from api.services.catalog_page_origin import normalize_page, origin, source_number
+        if not elements:
+            return  # Sequence removals are validated atomically by the bulk endpoint.
         if not isinstance(elements, list) or len(elements) != 1 or not isinstance(elements[0], dict):
-            raise ValidationError({'documentPage': 'As páginas originais devem ser preservadas.'})
+            raise ValidationError({'code': 'invalid_structure'})
         requested = elements[0]
+        if origin(requested, catalog) == 'catana_authored':
+            normalize_page(requested, catalog)  # Cannot claim any source evidence.
+            if requested.get('renderMode') not in (None, 'legacy', 'generative'):
+                raise ValidationError({'code': 'invalid_structure'})
+            from api.ai.design_grammar import is_safe_image_url
+            if requested.get('editorialImage') and not is_safe_image_url(requested['editorialImage']):
+                raise ValidationError({'code': 'invalid_structure'})
+            from api.ai.design_grammar import validate_runtime_block
+            blocks=requested.get('blocks',[])
+            if not isinstance(blocks,list) or len(blocks)>500 or any(not validate_runtime_block(b)[0] for b in blocks):
+                raise ValidationError({'code':'invalid_structure'})
+            # Bounded runtime JSON; imported evidence cannot hide in authored pages.
+            if len(json.dumps(requested)) > 100000:
+                raise ValidationError({'code': 'invalid_structure'})
+            return
+        normalized_origin = normalize_page(requested, catalog)
+        number = source_number(normalized_origin)
+        original = originals[number - 1]
+        for key in ('id',):
+            if origin(requested, catalog) == 'imported_source' and requested.get(key) != original.get(key):
+                raise ValidationError({'code': 'source_integrity_violation'})
+        elements[0].update(normalized_origin)
         for field in ('pageWidth', 'pageHeight', 'sourceUnit', 'sourceSnapshot'):
             if requested.get(field) != original.get(field):
                 raise ValidationError({'documentPage': 'A geometria e os ativos de origem são imutáveis.'})
+        # Source-derived product facts and bound runtime blocks remain authoritative.
+        from api.ai.commercial_guard import CommercialIntegrityGuard
+        if not CommercialIntegrityGuard.verify_document_commercial_integrity(original.get('products',[]),[requested])[0]:
+            raise ValidationError({'code':'commercial_integrity_blocked'})
         before, after = original.get('documentPage'), requested.get('documentPage')
         if not isinstance(after, dict) or not isinstance(before, dict):
             raise ValidationError({'documentPage': 'A página original deve acompanhar a composição.'})

@@ -113,7 +113,7 @@ def catalog_index(catalog, spread_index=0, selected=None, page_number=None):
         previews = DocumentReconstructorService._document_pages(document, job.mode) if isinstance(document, dict) and isinstance(document.get('pages'), list) else []
     if not previews:
         return [], 'reanalyze_required'
-    if page_number is not None and not 1 <= page_number <= len(previews):
+    if page_number is not None and not 1 <= page_number <= catalog.total_pages:
         return [], 'invalid_target'
     if catalog.import_metadata.get('mode') == 'preserve' or job.mode == 'preserve':
         return [], 'not_editable'
@@ -138,14 +138,18 @@ def catalog_index(catalog, spread_index=0, selected=None, page_number=None):
             number = spread.spread_index * 2 + side + 1
             if page_number is not None and number != page_number:
                 continue
-            if number > len(previews) or not isinstance(values, list) or len(values) != 1 or not isinstance(values[0], dict):
+            if not isinstance(values, list) or len(values) != 1 or not isinstance(values[0], dict):
                 continue
-            source_page = previews[number - 1].get('documentPage') or {}
+            from api.services.catalog_page_origin import source_number, origin
+            source_no = source_number(values[0])
+            if origin(values[0], catalog) == 'catana_authored' or type(source_no) is not int or not 1 <= source_no <= len(previews):
+                continue
+            source_page = previews[source_no - 1].get('documentPage') or {}
             current_page = values[0].get('documentPage') or {}
             if any(current_page.get(k) != source_page.get(k) for k in ('width', 'height', 'unit')):
                 continue
             from api.services.document_reconstructor import public_import_page
-            projected_source = public_import_page(previews[number - 1])
+            projected_source = public_import_page(previews[source_no - 1])
             projected_elements = {e['id']: e for e in projected_source['documentPage']['elements']} if projected_source else {}
             source_elements = {e.get('id'): e for e in source_page.get('elements', []) if isinstance(e, dict)}
             evidence_found = evidence_found or any(isinstance(e.get('text'), str) for e in source_elements.values())
@@ -212,7 +216,7 @@ def catalog_index(catalog, spread_index=0, selected=None, page_number=None):
 
 
 def validate_patch(patch, entries):
-    """All imported document edits, including SDK proposals, pass this boundary."""
+    """Only imported source text actions pass this boundary."""
     if not isinstance(patch, dict) or not isinstance(patch.get('actions'), list) or not 1 <= len(patch['actions']) <= 100 or patch.get('updates'):
         return None
     indexed = {entry['target']: entry for entry in entries}
@@ -225,7 +229,7 @@ def validate_patch(patch, entries):
             return None
         entry = indexed.get(target)
         params = action.get('params')
-        if not entry or entry['commercial'] or not isinstance(params, dict):
+        if not entry or entry['commercial'] or not isinstance(params, dict) or set(params) - {'find','replacement','text','expectedText','members'}:
             return None
         replacement = params.get('replacement', params.get('text'))
         if not isinstance(replacement, str) or len(replacement) > 2000 or protected_text(replacement):

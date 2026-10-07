@@ -32,7 +32,7 @@ with tempfile.TemporaryDirectory(prefix='catana-browser-api-') as workspace:
     org = Organization.objects.create(name='Browser private source', owner=owner)
     owner.organizations.add(org)
     source = synthetic_pdf([{'size': (595, 842), 'content':
-        'BT /F1 35 Tf 50 600 Td (CATALOGO DE) Tj ET BT /F1 36 Tf 50 555 Td (PRODUTOS) Tj ET BT /F1 12 Tf 50 50 Td (SOCIAL FOOTER) Tj ET'}])
+        'BT /F1 35 Tf 50 600 Td (CATALOGO DE) Tj ET BT /F1 36 Tf 50 555 Td (PRODUTOS) Tj ET BT /F1 12 Tf 50 50 Td (SOCIAL FOOTER) Tj ET'} for _ in range(int(sys.argv[1]) if len(sys.argv)>1 else 1)])
     job = DocumentReconstructorService.analyze_file(source, 'invented.pdf', owner, org, mode='editable')
     job, _ = DocumentReconstructorService.confirm_import(job, owner, mode='editable')
     client = APIClient()
