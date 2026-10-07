@@ -9,4 +9,3 @@ export function socialAuthError(error: unknown): string {
     return 'O acesso com o Google não está disponível. Use outra forma de acesso ou contate o suporte.';
   return 'Não foi possível acessar com o Google. Tente novamente ou use outra forma de acesso.';
 }
-
