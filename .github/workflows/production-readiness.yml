@@ -50,7 +50,7 @@ jobs:
       - name: Agent protocol
         id: protocol
         run: |
-          npm test --prefix frontend -- src/utils/agentProtocol.test.ts src/components/studio/AgentChatStream.test.tsx
+          npm test --prefix frontend -- src/utils/agentProtocol.test.ts src/components/studio/AgentChatStream.test.tsx src/services/documentImportService.test.tsx
           cd backend && python manage.py test api.tests_agent_protocol.AgentProtocolTests api.tests_agent_protocol.AgentOutputParserTests api.tests_agent_protocol.ClerkProvisioningTests api.tests_agent_protocol.ClerkProvisioningConcurrencyTests --noinput
       - name: Backend auth configuration check
         id: backend_config

@@ -4827,7 +4827,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
             if (data.event === 'patch' && data.patch && !appliedPatch) {
               appliedPatch = data.patch;
-              executePatch(data.patch);
+
             }
 
             if (data.event === 'protocol_error') protocolError = true;
@@ -4838,7 +4838,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
                 providerMetadata = data.metadata || {};
               if (data.patch && !appliedPatch) {
                 appliedPatch = data.patch;
-                executePatch(data.patch);
+
               }
             }
           } catch (error) {
@@ -4849,6 +4849,9 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
       if (!streamIsCurrent()) return;
         if (!streamDone) throw new Error('Interrupted stream');
+        // Execute only a complete, accepted response; an interrupted proposal has no effects.
+        if (protocolError) appliedPatch = null;
+        else if (appliedPatch) executePatch(appliedPatch);
         // Extrai açoes e delegaçoes para a mensagem formada
       const actionSummaries = appliedPatch ? resolveActionSummaries(appliedPatch).filter((_: string, index: number) => executionResults[index]?.status === 'applied') : [];
       const mappedDelegations = resolveDelegations(appliedPatch,

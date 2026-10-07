@@ -262,3 +262,13 @@ it('does not turn an authoritative quota denial into an offline blank catalog', 
   expect(useStudioStore.getState().activeCatalogId).toBeNull();
   expect(useStudioStore.getState().hasStartedSession).toBe(false);
 });
+it('does not execute a structured patch from a stream interrupted before done', async () => {
+  useStudioStore.setState({activeCatalogId: '40', hasStartedSession: true, pages: [page()], totalPages: 1, currentSpread: [1, 1], threads: [{id: 'old', title: 'Anterior', mode: 'orchestrator', roleId: 'orchestrator', createdAt: '00:00', messages: []}], activeThreadId: 'old'});
+  configureAuthProvider('legacy'); setInMemoryAccessToken('test'); setTokenReady(true);
+  const read = vi.fn().mockResolvedValueOnce({done: false, value: new TextEncoder().encode('data: {"event":"patch","patch":{"updates":[{"page":1,"title":"Título antigo"}]}}\n')}).mockResolvedValue({done: true});
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ok: true, body: {getReader: () => ({read, cancel: vi.fn()})}}));
+  const patch = vi.spyOn(useStudioStore.getState(), 'applySpreadPatch');
+  await useStudioStore.getState().sendMessageToAgent('Alterar o título');
+  expect(patch).not.toHaveBeenCalled();
+  expect(useStudioStore.getState().messages.at(-1)?.content).toContain('interrompida');
+});

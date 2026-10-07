@@ -58,7 +58,16 @@ for (const [width, height] of viewports) {
   });
 }
 
+async function waitForWorkspace(page: Page) {
+  await expect.poll(() => page.evaluate(async () => {
+    // @ts-expect-error Vite serves the application store for this browser fixture.
+    const { useStudioStore } = await import('/src/store/studioStore.ts');
+    return useStudioStore.getState().catalogSyncStatus;
+  })).toBe('ready');
+}
+
 async function openCatalog(page: Page) {
+  await waitForWorkspace(page);
   await page.evaluate(async () => {
     // Seed existing store with canonical document fixtures; no production test hook.
     // @ts-expect-error Vite serves application TS modules for this dev-browser integration test.
@@ -313,6 +322,7 @@ test('shared management chrome follows light and dark themes on phone', async ({
 test('generation progress keeps cancel and editor actions reachable on compact screens', async ({ page }) => {
   await fixtures(page);
   await page.goto('/studio');
+  await waitForWorkspace(page);
   await page.evaluate(async () => {
     // @ts-expect-error Existing Vite module; seed UI without calling paid generation services.
     const { useStudioStore } = await import('/src/store/studioStore.ts');

@@ -8,7 +8,7 @@ The model's fenced JSON is a private model protocol. It terminates in `api/servi
 2. `authenticatedStreamingFetch` obtains the same provider token used by Axios. Only an HTTP 401 before body consumption can retry, once, preserving the request body/UUID. Once SSE begins, read failures are reported and never replayed.
 3. Backend buffers model output, then the deterministic parser returns human text, a patch candidate, and `none`, `valid`, or `invalid` protocol status.
 4. The existing ActionPolicyRouter normalizes and validates candidates. Source integrity, commercial integrity, schema validation, confirmation and tenant ownership remain authoritative.
-5. Public token events carry only human prose. Accepted actions arrive in structured `patch` events; `done.patch` is a compatibility copy and the frontend executes at most once. Rejected actions produce readable policy feedback and structured action-policy metadata.
+5. Public token events carry only human prose. Accepted actions arrive in structured `patch` events; `done.patch` is a compatibility copy and the frontend executes at most once, after a completed done event. An interrupted proposal is never applied. Rejected actions produce readable policy feedback and structured action-policy metadata.
 6. Frontend applies accepted actions, waits for persistence, then reports ActionResult feedback. A proposal is not a claim that execution succeeded.
 
 ## Malformed output

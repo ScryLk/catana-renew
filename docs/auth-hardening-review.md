@@ -96,7 +96,7 @@ Final validation commands and results are recorded below; synthetic fixture valu
 DATABASE_URL=postgresql://postgres:catana-local-test-only@127.0.0.1:55432/catana_auth_ci \
 PATH="$PWD/.venv/bin:$PATH" bash scripts/run_backend_checks.sh
 
-# 160 tests passed in 20 frontend files.
+# 161 tests passed in 20 frontend files.
 npm test --prefix frontend
 
 # TypeScript and Vite production build passed.
@@ -118,6 +118,25 @@ PATH="$PWD/.venv/bin:$PATH" bash scripts/deploy_preflight.sh # passed with those
 
 PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
 CATANA_TEST_PYTHON="$PWD/.venv/bin/python" npm run test:e2e --prefix frontend
+```
+
+Browser validation: the broad run passed 61 cases and exposed three fixture boot races (desktop shortcuts, generation progress and tablet rendering). Those fixtures now wait for workspace readiness; all three passed on a clean server. Both real imported-document API cases passed again after execution was deferred until stream completion. The PR browser workflow reruns the entire 64-case suite.
+
+```bash
+# 3 passed after fixture correction.
+cd frontend
+PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
+CATANA_TEST_PYTHON=/workspace/catana-renew/.venv/bin/python \
+npx playwright test e2e/responsive.spec.ts \
+  --grep 'desktop Studio preserves|generation progress keeps|tablet catalog fits' \
+  --workers=1 --reporter=line --output=/tmp/hardening-clean-layout-browser
+
+# 2 real API cases passed after the incomplete-stream regression fix.
+PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
+CATANA_TEST_PYTHON=/workspace/catana-renew/.venv/bin/python \
+npx playwright test e2e/document-import.spec.ts \
+  --grep 'real private PDF|eight imported pages' \
+  --workers=1 --reporter=line --output=/tmp/hardening-final-stream-browser
 ```
 
 ## Files Changed
