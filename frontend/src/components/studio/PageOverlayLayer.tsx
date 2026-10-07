@@ -772,7 +772,7 @@ function renderShape(
 }
 
 function renderBadge(element: PageOverlayElement, subType: string, color: string) {
-  const text = element.text || 'OFERTA';
+  const text = element.text ?? 'EDITORIAL';
   const subText = element.subText;
 
   if (subType === 'corner_ribbon') {
@@ -824,8 +824,8 @@ function renderBadge(element: PageOverlayElement, subType: string, color: string
 }
 
 function renderStamp(element: PageOverlayElement, color: string) {
-  const text = (element.text || 'AUTENTICO').toUpperCase();
-  const subText = (element.subText || 'KATANA ATELIER').toUpperCase();
+  const text = (element.text ?? 'EDITORIAL').toUpperCase();
+  const subText = (element.subText ?? '').toUpperCase();
 
   return (
     <div

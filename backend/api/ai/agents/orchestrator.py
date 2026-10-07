@@ -1,5 +1,7 @@
 import re
 import logging
+import json
+from api.services.studio_action_policy import REGISTRY
 from typing import Dict, Any, Optional, List, Tuple
 from api.ai.agents.base import BaseAgent
 from api.ai.guardrails import KatanaGuardrailEngine, ThreatCategory, COMPILED_POLITICS
@@ -43,7 +45,7 @@ class OrchestratorAgent(BaseAgent):
             "  \"spread_index\": <indice_zero_based_da_lamina_afetada>,\n"
             "  \"actions\": [\n"
             "    {\n"
-            "      \"action\": \"add_page\" | \"remove_page\" | \"reconfigure_catalog\" | \"summarize_content\" | \"remove_product\" | \"assign_product\" | \"swap_product\" | \"create_product\" | \"change_layout\" | \"update_text\" | \"set_page_color\" | \"adjust_pricing\" | \"generate_skus\" | \"set_palette\" | \"brand_lock\" | \"remove_background\" | \"generate_photo\" | \"navigate\" | \"export_pdf\" | \"add_overlay\" | \"highlight_product\" | \"remove_overlay\" | \"clear_overlays\" | \"update_overlay\" | \"mutate_layout\" | \"regenerate_composition\" | \"increase_creativity\" | \"decrease_creativity\" | \"change_visual_direction\",\n"
+            f"      \"action\": {' | '.join(json.dumps(a) for a in REGISTRY if REGISTRY[a]['executor'])},\n"
             "      \"target\": \"page:<numero>\" | \"product:<id>\" | \"catalog:theme\" | \"catalog:products\" | \"global\",\n"
             "      \"params\": { <parametros_da_acao> }\n"
             "    }\n"
@@ -59,7 +61,7 @@ class OrchestratorAgent(BaseAgent):
             "```\n\n"
             "EXEMPLOS NORMATIVOS:\n"
             "- Reconfigurar catálogo / definir total de páginas: action 'reconfigure_catalog', target 'global', params {'totalPages': 1 | 2 | 4 | 6, 'title': '...'}\n"
-            "- Adicionar página: action 'add_page', target 'catalog:pages', params {'type': 'hero' | 'manifesto' | 'duo' | 'grid_4', 'afterPage': 2}\n"
+            "- Adicionar página: action 'add_page', target 'catalog:pages', params {'type': 'hero' | 'manifesto' | 'duo' | 'grid_4', 'afterPage': 2, 'contentRole': 'closing'}; finalização/encerramento/contracapa usam contentRole closing e posição final, sem inventar contatos.\n"
             "- Remover página: action 'remove_page', target 'page:2'\n"
             "- Resumir conteúdo: action 'summarize_content', target 'page:2', params {'condensedText': '...'}\n"
             "- Remover produto: action 'remove_product', target 'page:3', params {'slotIndex': 0, 'returnToDrawer': true}\n"
@@ -68,8 +70,8 @@ class OrchestratorAgent(BaseAgent):
             "- Mudar layout: action 'change_layout', target 'page:5', params {'type': 'grid_4' | 'hero' | 'duo' | 'manifesto' | 'divider'}\n"
             "- Reajustar precos: action 'adjust_pricing', target 'global', params {'mode': 'percentage', 'amount': 15}\n"
             "- Gerar SKUs: action 'generate_skus', target 'catalog:products', params {'prefix': 'ART-', 'format': '000'}\n"
-            "- Texto importado: action 'update_text', target 'page:1/element:<id_estavel>' ou 'element:<id_estavel>', params {'text': '...'}; preserve tipografia, geometria e origem. Nunca use campos de pagina para texto importado.\n"
-            "- Editar texto: action 'update_text', target 'page:2', params {'quote': '...', 'title': '...', 'content': '...'}\n"
+            "- Texto importado: action 'update_text', target 'page:1/element:<id_estavel>' ou 'element:<id_estavel>', params {'text': '...', 'expectedText': '<texto exato do índice do servidor>'}; preserve tipografia, geometria e origem. Nunca use campos de pagina para texto importado.\n"
+            "- Editar texto Catana: action 'update_text', target 'page:2/field:title' (ou quote/content/subtitle/label), params {'text': '...', 'expectedText': '<valor atual do índice do servidor>'}\n"
             "- Alterar cor da página / capa: action 'set_page_color', target 'page:1', params {'backgroundColor': '#000000'}\n"
             "- Remover fundo: action 'remove_background', target 'page:4', params {'slotIndex': 0}\n"
             "- Paleta e Trava: action 'set_palette' com 'brand_lock', params {'paletteName': 'Slate & Noir Minimaliste', 'locked': true}\n"

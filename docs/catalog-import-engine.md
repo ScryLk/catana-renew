@@ -440,3 +440,16 @@ the natural request must find the target on the server. The isolated transport b
 lives under `backend/tests_support`, installs no production route and uses no paid
 model. Run it with Python backend dependencies installed and optionally set
 `CATANA_TEST_PYTHON` to that Python executable.
+
+## Mixed-origin editing and action policies
+
+Imported catalogs may contain source pages, independently authored Catana pages
+and derived copies. Source page count belongs to the retained import; current
+catalog count belongs to the edited sequence. Structural and visual operations
+route through their own policies rather than the imported-text resolver.
+
+See [Studio action policy](studio-action-policy.md) for the complete capability
+matrix, origin normalization, source-removal confirmation, source integrity,
+atomic saving, sharing and current export behavior. The eight-to-nine-page
+closing regression is tested through real private Django APIs and the existing
+Studio executor, including persistence, undo/redo and the export snapshot.

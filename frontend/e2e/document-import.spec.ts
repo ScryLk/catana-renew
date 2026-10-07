@@ -219,16 +219,15 @@ async function fixture(page: Page, options: { count?: number; mixed?: boolean; h
       return route.fulfill({json: {id: 101, status: 'archived'}});
     }
     if (path === '/api/v2/studio/catalogs/') return route.fulfill({ json: state.quotaUsed ? [{id: 101, title: 'Catálogo existente', status: 'active', organization: 1}] : state.catalogs });
-    if (path === '/api/v2/studio/catalogs/901/spreads/' && method === 'POST') {
-      const body = request.postDataJSON(); const index = Number(body.spread_index);
-      const expectedLeft = state.preview?.pages[index * 2]; const expectedRight = state.preview?.pages[index * 2 + 1];
-      const unchanged = isDeepStrictEqual(body.left_page_elements, expectedLeft ? [expectedLeft] : [])
-        && isDeepStrictEqual(body.right_page_elements, expectedRight ? [expectedRight] : []);
-      state.spreadWrites.push({ body, unchanged });
-      // Deterministic preserve imports carry their approval in import_metadata;
-      // the canonical backend's generative qualityGate is null for this mode.
-      return route.fulfill({ json: { qualityGate: null,
-        import_metadata: { ...state.catalogs[0]?.import_metadata, quality: { passed: unchanged } } } });
+    if (path === '/api/v2/studio/catalogs/901/spreads/bulk/' && method === 'POST') {
+      const body = request.postDataJSON();
+      const unchanged = body.total_pages === state.preview?.pages.length && body.spreads.every((spread: {spread_index:number;left_page_elements:SourcePage[];right_page_elements:SourcePage[]}) => {
+        const index=spread.spread_index;
+        const expectedLeft=state.preview?.pages[index*2], expectedRight=state.preview?.pages[index*2+1];
+        return isDeepStrictEqual(spread.left_page_elements,expectedLeft ? [expectedLeft] : []) && isDeepStrictEqual(spread.right_page_elements,expectedRight ? [expectedRight] : []);
+      });
+      state.spreadWrites.push({body,unchanged});
+      return route.fulfill({json:{qualityGate:null,import_metadata:{...state.catalogs[0]?.import_metadata,quality:{passed:unchanged}}}});
     }
     if (path === '/api/v2/studio/catalogs/901/') {
       if (method !== 'GET') return route.fulfill({ json: state.catalogs[0] });
@@ -609,5 +608,50 @@ test('real private PDF resolves commands without browser source text, saves grou
     saved = (await storeState(page)).pages[0].documentPage;
     expect(saved.elements.some((e: {text?: string}) => e.text === 'PRODUTOS')).toBe(true);
     expect(saved.sourceSnapshot).toEqual(before.sourceSnapshot);
+  } finally {bridge.close();}
+});
+
+test('eight imported pages accept a closing ninth page through real API, reload, undo, redo and export', async ({page})=>{
+  test.setTimeout(120000);
+  await page.setViewportSize({width:1440,height:1000});
+  await fixture(page,{count:8});
+  const bridge=await importEditingBridge(8);
+  const catalogId=String(bridge.initial.catalog_id);
+  try {
+    await page.route('**/api/v2/studio/**',async route=>{
+      const request=route.request(),path=new URL(request.url()).pathname;
+      if (!(path===`/api/v2/studio/catalogs/${catalogId}/` || path.startsWith(`/api/v2/studio/catalogs/${catalogId}/spreads`) || path.includes('/import-document/assets/') || path==='/api/v2/studio/chat/stream/')) return route.fallback();
+      const reply=await bridge.request(request.method(),path,request.postData() ? request.postDataJSON() : undefined);
+      expect(reply.bridge_error).toBeUndefined();
+      return route.fulfill({status:Number(reply.status),contentType:String(reply.content_type),body:Buffer.from(String(reply.base64),'base64')});
+    });
+    await page.goto('/studio');
+    const load=async()=>page.evaluate(async ({url,id})=>{const {useStudioStore}=await import(url);await useStudioStore.getState().loadExistingCatalog(id);},{url:await storeModule(page),id:catalogId});
+    await load();
+    const before=(await storeState(page)).pages.map((p:{documentPage:unknown})=>p.documentPage);
+    const input=page.getByRole('textbox',{name:'Instrução ou comando para o assistente de design'});
+    await input.fill('crie uma outra página de finalização do catálogo');await input.press('Enter');
+    await expect.poll(async()=>(await storeState(page)).pages.length).toBe(9);
+    await expect(page.getByText('Página de finalização adicionada após a página 8.',{exact:true})).toBeVisible();
+    let state=await storeState(page);
+    expect(state.pages[8]).toMatchObject({pageOrigin:'catana_authored',contentRole:'closing',type:'backcover'});
+    expect(state.pages.slice(0,8).map((p:{documentPage:unknown})=>p.documentPage)).toEqual(before);
+    await page.reload();await load();
+    state=await storeState(page);
+    expect(state.pages).toHaveLength(9);
+    // History is scoped to the active editing session; exercise persisted undo/redo after a fresh addition.
+    await page.evaluate(async url=>{const {useStudioStore}=await import(url);const s=useStudioStore.getState();s.removePage(9);await s.flushSaveSpread();},await storeModule(page));
+    await input.fill('crie uma outra página de finalização do catálogo');await input.press('Enter');
+    await expect.poll(async()=>(await storeState(page)).pages.length).toBe(9);
+    await page.evaluate(async url=>{const {useStudioStore}=await import(url);const s=useStudioStore.getState();s.undo();await s.flushSaveSpread();},await storeModule(page));
+    expect((await storeState(page)).pages).toHaveLength(8);
+    await page.evaluate(async url=>{const {useStudioStore}=await import(url);const s=useStudioStore.getState();s.redo();await s.flushSaveSpread();s.openExportModal('pdf');},await storeModule(page));
+    expect((await storeState(page)).pages).toHaveLength(9);
+    await expect(page.locator('.pdf-page-content')).toHaveCount(9);
+    const detail=await bridge.request('GET',`/api/v2/studio/catalogs/${catalogId}/`);
+    const saved=JSON.parse(Buffer.from(String(detail.base64),'base64').toString());
+    expect(saved.source_page_count).toBe(8);
+    expect(saved.total_pages).toBe(9);
+    expect(saved.spreads[4].right_page_elements).toEqual([]);
   } finally {bridge.close();}
 });

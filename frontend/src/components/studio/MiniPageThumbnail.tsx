@@ -1,6 +1,7 @@
 import { cn } from '../../lib/utils';
 import React from 'react';
 import { CatalogPageData } from '../../data/editorialCatalog.mock';
+import { PageOverlayLayer } from './PageOverlayLayer';
 import { DocumentPageRenderer } from './DocumentPageRenderer';
 import { getPageGeometry } from '../../utils/pageGeometry';
 import { ProtectedDocumentImage } from './ProtectedDocumentImage';
@@ -27,7 +28,7 @@ export const MiniPageThumbnail: React.FC<MiniPageThumbnailProps> = ({
   const isDocument = page.renderMode === 'document';
 
   const renderThumbnailContent = () => {
-    if (isDocument) return <DocumentPageRenderer page={page} />;
+    if (isDocument) return <><DocumentPageRenderer page={page} /><PageOverlayLayer page={page} interactive={false} /></>;
     // 1. RENDERIZAÇÃO EXCLUSIVA GENERATIVA (Item 26: Nunca renderiza legacy por baixo de generative)
     if (isGenerative) {
       return (

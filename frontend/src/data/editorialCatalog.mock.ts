@@ -178,6 +178,9 @@ export function normalizeCatalogDocument<T extends { pages?: CatalogPageData[]; 
   let invalid = document.pages !== undefined && !Array.isArray(document.pages);
   const pages = (Array.isArray(document?.pages) ? document.pages : []).filter(page => {if (!page || typeof page !== 'object') {invalid=true; return false;} return true;}).map(page => {
     let pageInvalid = false;
+    const knownOrigins = ['imported_source','catana_authored','derived_from_import'];
+    if (page.pageOrigin && !knownOrigins.includes(page.pageOrigin)) {invalid=true; pageInvalid=true;}
+    page = {...page, ...(page.pageOrigin ? {pageOrigin: knownOrigins.includes(page.pageOrigin) ? page.pageOrigin : undefined} : !page.documentPage ? {pageOrigin: 'catana_authored' as const} : {})};
     if (page.renderMode === 'document') {
       const documentPage = normalizeDocumentPage(page.documentPage);
       if (!documentPage) { invalid = true; pageInvalid = true; }
@@ -229,6 +232,12 @@ export interface GenerativeCompositionMeta {
 }
 
 export interface CatalogPageData {
+  pageOrigin?: 'imported_source' | 'catana_authored' | 'derived_from_import';
+  sourceImportId?: string;
+  sourcePageNumber?: number;
+  sourceFingerprint?: string;
+  sourcePageFingerprint?: string;
+  derivedFromPageId?: string;
   documentPage?: DocumentPageIR;
   pageWidth?: number;
   pageHeight?: number;

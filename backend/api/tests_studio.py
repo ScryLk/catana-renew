@@ -797,17 +797,33 @@ class StudioBackendTests(TestCase):
     def test_imported_pt_text_command_streams_patch_and_separated_guard_metadata(self):
         from unittest.mock import patch
         from api.ai.provider import GeminiAIProvider
+        import tempfile
+        import shutil
+        from django.test import override_settings
+        from api.models import Organization
+        from api.tests_document_adapter import synthetic_pdf
+        from api.services.document_reconstructor import DocumentReconstructorService
+        private_root=tempfile.mkdtemp(prefix='studio-command-')
+        setting=override_settings(DOCUMENT_IMPORT_PRIVATE_ROOT=private_root)
+        setting.enable()
+        self.addCleanup(setting.disable)
+        self.addCleanup(shutil.rmtree,private_root,True)
+        organization=Organization.objects.create(name='Command tenant',owner=self.user)
+        self.user.organizations.add(organization)
+        job=DocumentReconstructorService.analyze_file(synthetic_pdf([{'content':'BT /F1 20 Tf 30 100 Td (CATALOGO DE PRODUTOS) Tj ET'}]),'source.pdf',self.user,organization,mode='editable')
+        job,_=DocumentReconstructorService.confirm_import(job,self.user,mode='editable')
+        source=next(e for e in job.previews[0]['documentPage']['elements'] if e.get('editable'))
         provider = GeminiAIProvider(api_key='')
         provider.client = None
         with patch('api.ai.agents.base.get_ai_provider', return_value=provider), patch('api.ai.agents.base.TemplateRAGService.retrieve_best_template_prompt', return_value='Brand PL Design; imported geometry unit pt'):
             response = self.client.post(reverse('studio_chat_stream'), {
                 'message': 'altere catálogo de produtos para catálogo de itens',
-                'agent_role': 'orchestrator', 'active_spread_data': {'left_page': {'unit': 'pt'}},
-                'editable_text_index': [{'id': 'title-1', 'target': 'page:1/element:title-1', 'text': 'CATÁLOGO DE PRODUTOS', 'editable': True, 'visible': True}],
+                'catalog_id':job.catalog_id, 'agent_role': 'orchestrator', 'active_spread_data': {'left_page': {'unit': 'pt'}},
+                'editable_text_index': [],
             }, format='json')
             events = [json.loads(line[6:]) for line in b''.join(response.streaming_content).decode().splitlines() if line.startswith('data: ')]
         patch_event = next(event for event in events if event['event'] == 'patch')
-        self.assertEqual(patch_event['patch']['actions'][0]['target'], 'page:1/element:title-1')
+        self.assertEqual(patch_event['patch']['actions'][0]['target'], f"page:1/element:{source['id']}")
         done = next(event for event in events if event['event'] == 'done')
         self.assertEqual(done['metadata']['user_guard_status'], 'PASSED')
         self.assertEqual(done['metadata']['provider'], 'local-command-planner')

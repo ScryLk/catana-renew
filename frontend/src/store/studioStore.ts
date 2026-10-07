@@ -1,3 +1,4 @@
+import ACTION_REGISTRY from '../../../shared/studio-actions.json';
 import { editableTextIndex, executeTextAction, executeTextGroup, executionFeedback, commercialText, type ActionResult } from '../utils/textCommandExecution';
 import { normalizeCatalogDocument, QualityGate } from '../data/editorialCatalog.mock';
 import { parseSuppliedPrice } from '../utils/commercialProduct';
@@ -789,6 +790,9 @@ export interface StudioState {
   updatePage: (pageNumber: number, updates: Partial<CatalogPageData>) => void;
   addPage: (options?: {
     type?: PageLayoutType;
+    contentRole?: string;
+    pageId?: string;
+    pageColors?: {backgroundColor?:string; textColor?:string; accentColor?:string};
     afterPage?: number;
     title?: string;
     subtitle?: string;
@@ -844,6 +848,8 @@ export interface StudioState {
 
   // JSON Patch mutation
   applySpreadPatch: (patch: {
+    confirmation_token?: string;
+    expectedPageIds?: string[];
     spread_index?: number;
     updates?: Array<{ target: string; field: string; value: any }>;
     actions?: Array<{
@@ -915,6 +921,9 @@ const saveCustomRoles = (roles: StudioRole[], userId?: string | number | null) =
     localStorage.setItem(`katana_studio_custom_roles:${uid}`, JSON.stringify(customs));
   }
 };
+
+let patchExecuting = false;
+let pendingConfirmationToken: string | undefined;
 
 export const useStudioStore = create<StudioState>((rawSet, get) => {
   let brandEpoch = 0;
@@ -1584,7 +1593,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   addProductToRepository: (productData) => {
     const newProduct: ProductItem = {
       ...productData,
-      id: `prod-custom-${Date.now()}`,
+      id: `prod-custom-${crypto.randomUUID()}`,
     };
     set((s) => ({
       unassignedProducts: [newProduct, ...s.unassignedProducts],
@@ -3074,6 +3083,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
     const pageToRemove = s.pages.find((p) => p.pageNumber === pageNumber);
     if (!pageToRemove) return;
+    if (pageToRemove.documentPage && s.importMetadata && !pendingConfirmationToken) {toast.info('Confirme a remoção da página original pelo assistente.'); return;}
 
     s.pushHistorySnapshot();
 
@@ -3135,7 +3145,9 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     const activePal = s.activePalette || STUDIO_PALETTE_PRESETS[0];
 
     const newPage: CatalogPageData = {
-      id: `page-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: options?.pageId || crypto.randomUUID(),
+      pageOrigin: 'catana_authored',
+      contentRole: options?.contentRole,
       pageNumber: insertIndex + 1,
       type: pageType,
       title: options?.title || (pageType === 'manifesto' ? 'Manifesto Editorial' : pageType === 'divider' ? 'Nova Coleção' : 'Destaque Editorial'),
@@ -3146,6 +3158,12 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       backgroundColor: isDark ? activePal.primary : activePal.background,
       textColor: isDark ? activePal.background : activePal.primary,
       accentColor: activePal.accent,
+      ...(options?.pageColors || (() => {
+        const palette = s.catalogBrandContext?.brandSnapshot?.palette;
+        if (!Array.isArray(palette)) return {};
+        const captured = Object.fromEntries(palette.filter((c: {status?:string; hex?:string; role?:string})=>['confirmed','user_supplied'].includes(c.status || '') && /^#[a-f0-9]{6}$/i.test(c.hex || '')).map(c=>[c.role,c.hex]));
+        return {backgroundColor:captured.primary || activePal.background,textColor:captured.background || activePal.primary,accentColor:captured.accent || activePal.accent};
+      })()),
       folio: `PÁG. ${String(insertIndex + 1).padStart(2, '0')}`,
       products: [],
     };
@@ -3309,6 +3327,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   canRedo: false,
 
   pushHistorySnapshot: () => {
+    if (patchExecuting) return;
     const currentPages = get().pages;
     set((s) => {
       const snapshot = JSON.parse(JSON.stringify(currentPages));
@@ -3336,6 +3355,8 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       redoStack: [...redoStack, currentSnapshot],
       canUndo: newHistory.length > 0,
       canRedo: true,
+      totalPages: previousSnapshot.length,
+      currentSpread: [1,Math.min(2,previousSnapshot.length)],
       saveStatus: 'unsaved',
     });
 
@@ -3357,6 +3378,8 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       redoStack: newRedo,
       canUndo: true,
       canRedo: newRedo.length > 0,
+      totalPages: nextSnapshot.length,
+      currentSpread: [1,Math.min(2,nextSnapshot.length)],
       saveStatus: 'unsaved',
     });
 
@@ -3393,24 +3416,19 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       set({ saveStatus: 'saved' });
       return;
     }
-    const [leftPageNum, rightPageNum] = state.currentSpread;
-    const leftPage = state.pages.find((p) => p.pageNumber === leftPageNum);
-    const rightPage = rightPageNum === leftPageNum ? undefined : state.pages.find((p) => p.pageNumber === rightPageNum);
-
     set({ saveStatus: 'saving' });
 
     try {
       const numericCatalogId = parseInt(catalogId, 10);
       if (!isNaN(numericCatalogId)) {
-        const response = await api.post(
-          `/api/v2/studio/catalogs/${numericCatalogId}/spreads/`,
-          {
-            spread_index: Math.floor((leftPageNum - 1) / 2),
-            title: `Spread ${leftPageNum}-${rightPageNum}`,
-            left_page_elements: leftPage ? [leftPage] : [],
-            right_page_elements: rightPage ? [rightPage] : [],
-          }
-        );
+        const spreads = [];
+        for (let offset=0; offset<state.pages.length; offset+=2) {
+          spreads.push({spread_index:offset/2, left_page_elements:[state.pages[offset]], right_page_elements:state.pages[offset+1] ? [state.pages[offset+1]] : []});
+        }
+        const response = await api.post(`/api/v2/studio/catalogs/${numericCatalogId}/spreads/bulk/`, {
+          spreads, total_pages:state.pages.length, unassigned_products:state.unassignedProducts, ...(pendingConfirmationToken ? {confirmation_token:pendingConfirmationToken} : {}),
+        });
+        pendingConfirmationToken = undefined;
         if (!saveIsCurrent()) return;
         if (response.data?.qualityGate != null) {
           // Publication approval belongs to the server document, including after edits.
@@ -3433,8 +3451,21 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     if ((patch.actions?.length || 0) > 100 || (patch.updates?.length || 0) > 500) return [{action_id: '0', target: 'global', status: 'invalid_target'}];
     const state = get();
     const results: ActionResult[] = [];
+    const unknown = patch.actions?.find(a => !a || !Object.prototype.hasOwnProperty.call(ACTION_REGISTRY,String(a.action || a.type)) || (ACTION_REGISTRY as Record<string,{executor:boolean}>)[String(a.action || a.type)]?.executor === false);
+    if (unknown) return [{action_id: '0', target: String(unknown.target || 'global'), status: 'unsupported'}];
+    if (patch.confirmation_token) pendingConfirmationToken = patch.confirmation_token;
+    if (patch.expectedPageIds && JSON.stringify(patch.expectedPageIds) !== JSON.stringify(state.pages.map(p=>p.id))) return [{action_id:'0',target:'catalog:pages',status:'invalid_target',reason:'stale_target'}];
+    // Text fitting and stale checks happen before any action in an AI batch mutates state.
+    for (const a of patch.actions || []) {
+      const name=a.action || a.type;
+      if ((name === 'update_text' && /(?:element:|\/field:)/.test(a.target)) || name === 'update_text_group') {
+        const check = name === 'update_text_group' ? executeTextGroup(state.pages,a.target,a.params || {}) : executeTextAction(state.pages,a.target,a.params || {});
+        if (!['applied','unchanged'].includes(check.result.status)) return [check.result];
+      }
+    }
     state.pushHistorySnapshot();
-
+    patchExecuting = true;
+    try {
     const [leftPageNum, rightPageNum] = state.currentSpread;
 
     // 1. Processar Acoes Operacionais do Conselho Editorial
@@ -3563,6 +3594,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
             else if (rawType.includes('single')) mappedType = 'single';
             else if (rawType.includes('divis') || rawType.includes('divider')) mappedType = 'divider';
             else if (rawType.includes('manifesto')) mappedType = 'manifesto';
+            else if (rawType === 'backcover') mappedType = 'backcover';
             else if (rawType.includes('capa') || rawType.includes('cover')) mappedType = 'cover';
             else mappedType = 'hero';
 
@@ -3575,12 +3607,36 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
             get().addPage({
               type: mappedType,
+              contentRole: params.contentRole,
+              pageId: params.pageId,
+              pageColors: params.pageColors,
               afterPage,
               title: rawAction.title || params.title,
               subtitle: rawAction.subtitle || params.subtitle,
               content: rawAction.content || params.content,
               quote: rawAction.quote || params.quote,
             });
+            results.push({action_id: String(results.length), action: 'add_page', target: targetStr, status: 'applied', reason: params.contentRole === 'closing' ? `Página de finalização adicionada após a página ${afterPage ?? state.pages.length}.` : 'Página adicionada ao catálogo.'});
+            break;
+          }
+
+          case 'move_page':
+          case 'duplicate_page': {
+            const pages = [...get().pages];
+            const index = pages.findIndex(p => p.pageNumber === targetPage);
+            if (index < 0) {results.push({action_id: '', target:targetStr,status:'invalid_target'}); break;}
+            const source = pages[index];
+            let moving = source;
+            let after = params.afterPage;
+            if (!Number.isInteger(after) || after < 0 || after > pages.length) {results.push({action_id:'',target:targetStr,status:'invalid_target'}); break;}
+            if (actType === 'duplicate_page') {
+              moving = {...structuredClone(source), id:params.pageId || crypto.randomUUID(), pageOrigin:source.documentPage || source.pageOrigin === 'imported_source' || source.pageOrigin === 'derived_from_import' ? 'derived_from_import' : 'catana_authored', ...(source.documentPage || source.pageOrigin === 'imported_source' || source.pageOrigin === 'derived_from_import' ? {derivedFromPageId:source.id} : {})};
+            } else {
+              pages.splice(index,1);
+              if (after > index) after--;
+            }
+            pages.splice(after,0,moving);
+            set({pages:pages.map((p,i)=>({...p,pageNumber:i+1})),totalPages:pages.length,saveStatus:'unsaved'});
             break;
           }
 
@@ -4314,7 +4370,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         }
         if (results.length === resultCountBefore) {
           const changed = beforeAction !== JSON.stringify({pages: get().pages, products: get().unassignedProducts});
-          results.push({action_id: `${results.length}`, target: targetStr, status: changed ? 'applied' : 'unchanged'});
+          results.push({action_id: `${results.length}`, action: actType, target: targetStr, status: changed ? 'applied' : ['navigate','export_pdf'].includes(actType) ? 'applied' : 'unchanged'});
         }
       }
     }
@@ -4385,8 +4441,10 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       get().goToSpread(patch.spread_index);
     }
 
+    patchExecuting = false;
     get().debouncedSaveCurrentSpread();
     return results.map((result, index) => ({...result, action_id: String(index)}));
+    } finally {patchExecuting = false;}
   },
 
   sendMessageToAgent: async (prompt, attachments) => {
@@ -4753,7 +4811,12 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         cleanContent = 'Nenhuma alteração confirmada na prancheta.';
       }
 
-      if (appliedPatch) cleanContent = executionFeedback(executionResults);
+      if (appliedPatch) {
+        await get().flushSaveSpread();
+        if (!streamIsCurrent()) return;
+        if (get().saveStatus === 'error') executionResults = executionResults.map(r => ({...r,status:'failed' as const,reason:'Não foi possível salvar a alteração. Tente novamente.'}));
+        cleanContent = executionFeedback(executionResults);
+      }
 
       if (!appliedPatch && /(?:realizad[oa]|executad[oa]|atualizad[oa]|sincronizad[oa]|conclu[ií]d[oa])/i.test(cleanContent) && providerMetadata.user_guard_status !== 'BLOCKED') cleanContent = 'Nenhuma alteração confirmada na prancheta. ' + (providerMetadata.mock ? 'O provedor simulado está ativo.' : 'Selecione o texto ou reformule a solicitação.');
 

@@ -3,8 +3,8 @@ import type { CatalogPageData } from '../data/editorialCatalog.mock';
 import { isEditableDocumentText, validDocumentSnapshot } from '../types/documentImport';
 import { fitDocumentText } from './documentTextFit';
 
-export type ActionStatus = 'applied' | 'not_found' | 'ambiguous' | 'not_editable' | 'blocked_by_integrity' | 'invalid_target' | 'unchanged' | 'needs_layout_review';
-export interface ActionResult { action_id: string; target: string; status: ActionStatus; reason?: string; value?: string }
+export type ActionStatus = 'applied' | 'not_found' | 'ambiguous' | 'not_editable' | 'blocked_by_integrity' | 'invalid_target' | 'unchanged' | 'needs_layout_review' | 'unsupported' | 'confirmation_required' | 'failed';
+export interface ActionResult { action_id: string; action?: string; target: string; status: ActionStatus; reason?: string; value?: string }
 
 /** Retain offsets so normalization never rewrites typography or unrelated text. */
 function normalizedOffsets(text: string) {
@@ -135,7 +135,7 @@ export function executeTextGroup(pages: CatalogPageData[], target: string, param
 export function executionFeedback(results: ActionResult[]): string {
   const applied = results.filter(result => result.status === 'applied');
   const messages: Record<ActionStatus, string> = {
-    applied: '', not_found: 'Texto ou destino não encontrado; selecione o trecho novamente.',
+    applied: '', unsupported: 'Essa operação ainda não é suportada.', confirmation_required: 'Confirme a remoção da sequência atual.', failed: 'Não foi possível salvar a alteração.', not_found: 'Texto ou destino não encontrado; selecione o trecho novamente.',
     ambiguous: 'Há mais de uma ocorrência; selecione um único texto ou indique a página.',
     not_editable: 'Texto preservado na imagem original; use reconstrução ou redesign para editar com segurança.',
     blocked_by_integrity: 'Edição bloqueada pela integridade dos dados comerciais.',
@@ -143,6 +143,7 @@ export function executionFeedback(results: ActionResult[]): string {
     unchanged: 'Nenhuma mudança confirmada para esta ação.',
     needs_layout_review: 'O texto precisa de revisão de layout; nenhuma parte do grupo foi alterada.',
   };
-  const success = applied.length === 1 && applied[0].value ? `Texto da página atualizado para '${applied[0].value.slice(0, 160)}'.` : applied.length ? `${applied.length} alteração(ões) aplicada(s) na prancheta.` : 'Nenhuma alteração aplicada.';
+  const structural = applied.find(r => r.action === 'add_page' || r.action === 'remove_page' || r.action === 'add_overlay');
+  const success = structural ? structural.reason || (structural.action === 'add_overlay' ? 'Selo adicionado à página.' : 'Sequência de páginas atualizada.') : applied.length === 1 && applied[0].value ? `Texto da página atualizado para '${applied[0].value.slice(0, 160)}'.` : applied.length ? `${applied.length} alteração(ões) aplicada(s) na prancheta.` : 'Nenhuma alteração aplicada.';
   return [success, ...new Set(results.filter(result => result.status !== 'applied').map(result => messages[result.status]))].join(' ');
 }

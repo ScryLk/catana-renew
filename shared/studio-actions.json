@@ -1,0 +1,142 @@
+{
+  "navigate": {
+    "category": "non_mutating",
+    "executor": true
+  },
+  "export_pdf": {
+    "category": "non_mutating",
+    "executor": true
+  },
+  "update_text": {
+    "category": "source_element_edit",
+    "executor": true
+  },
+  "update_text_group": {
+    "category": "source_element_edit",
+    "executor": true
+  },
+  "add_page": {
+    "category": "catalog_structure",
+    "executor": true
+  },
+  "remove_page": {
+    "category": "catalog_structure",
+    "executor": true
+  },
+  "move_page": {
+    "category": "catalog_structure",
+    "executor": true
+  },
+  "duplicate_page": {
+    "category": "catalog_structure",
+    "executor": true
+  },
+  "reconfigure_catalog": {
+    "category": "catalog_structure",
+    "executor": true
+  },
+  "add_overlay": {
+    "category": "catana_visual_layer",
+    "executor": true
+  },
+  "remove_overlay": {
+    "category": "catana_visual_layer",
+    "executor": true
+  },
+  "clear_overlays": {
+    "category": "catana_visual_layer",
+    "executor": true
+  },
+  "update_overlay": {
+    "category": "catana_visual_layer",
+    "executor": true
+  },
+  "set_page_color": {
+    "category": "catana_visual_layer",
+    "executor": true
+  },
+  "highlight_product": {
+    "category": "catana_visual_layer",
+    "executor": true
+  },
+  "set_palette": {
+    "category": "catana_visual_layer",
+    "executor": true
+  },
+  "brand_lock": {
+    "category": "catana_visual_layer",
+    "executor": true
+  },
+  "summarize_content": {
+    "category": "catana_editorial_content",
+    "executor": true
+  },
+  "create_product": {
+    "category": "commercial",
+    "executor": true
+  },
+  "assign_product": {
+    "category": "commercial",
+    "executor": true
+  },
+  "remove_product": {
+    "category": "commercial",
+    "executor": true
+  },
+  "swap_product": {
+    "category": "commercial",
+    "executor": true
+  },
+  "adjust_pricing": {
+    "category": "commercial",
+    "executor": true
+  },
+  "generate_skus": {
+    "category": "commercial",
+    "executor": true
+  },
+  "change_layout": {
+    "category": "generative",
+    "executor": true
+  },
+  "remove_background": {
+    "category": "generative",
+    "executor": true
+  },
+  "generate_photo": {
+    "category": "generative",
+    "executor": true
+  },
+  "mutate_layout": {
+    "category": "generative",
+    "executor": false
+  },
+  "regenerate_composition": {
+    "category": "generative",
+    "executor": false
+  },
+  "increase_creativity": {
+    "category": "generative",
+    "executor": false
+  },
+  "decrease_creativity": {
+    "category": "generative",
+    "executor": false
+  },
+  "change_visual_direction": {
+    "category": "generative",
+    "executor": false
+  },
+  "delete_source": {
+    "category": "source_destructive",
+    "executor": false
+  },
+  "replace_source": {
+    "category": "source_destructive",
+    "executor": false
+  },
+  "delete_source_snapshot": {
+    "category": "source_destructive",
+    "executor": false
+  }
+}

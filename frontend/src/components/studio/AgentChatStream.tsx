@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useStudioStore, type ChatMessage, type ChatDelegation } from '../../store/studioStore';
 import { toast } from 'sonner';
+import { ConfirmStudioAction } from './ConfirmStudioAction';
 import { UpdateDocumentEditability } from './UpdateDocumentEditability';
 
 interface TypewriterTextProps {
@@ -444,6 +445,7 @@ export const AgentChatStream: React.FC = () => {
                   />
                 </div>
 
+                {typeof msg.providerMetadata?.confirmation_token === 'string' && <ConfirmStudioAction key={`${useStudioStore.getState().activeCatalogId}:${msg.id}`} token={msg.providerMetadata.confirmation_token} />}
                 {msg.providerMetadata?.planner_status === 'reanalyze_required' && <UpdateDocumentEditability />}
 
                 {/* Sub-itens de acoes adicionais caso haja instrucoes multiplas pontuais */}

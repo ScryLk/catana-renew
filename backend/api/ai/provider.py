@@ -281,10 +281,12 @@ class GeminiAIProvider:
         literal_prompt = gateway["formatted_prompt"]
         if gateway["status"] == "NORMALIZED":
             literal_prompt = KatanaGuardrailEngine.sanitize_and_extract_intent(envelope.current_user)[1]
-        plan = plan_text_replacement(literal_prompt, context)
+        from api.ai.structural_commands import plan_structure
+        structure_plan = plan_structure(literal_prompt, context)
+        plan = structure_plan or plan_text_replacement(literal_prompt, context)
         if plan is not None:
             yield AIResponseChunk(text=planner_response(plan))
-            yield AIResponseChunk(done=True, metadata={**diagnostics, "provider": "local-command-planner", "model": "deterministic", "planner_status": plan[1]["planner_status"], "resolution_candidates": plan[1].get('candidates', []), "action_planner": "normalized-text-replacement"})
+            yield AIResponseChunk(done=True, metadata={**diagnostics, "provider": "local-command-planner", "model": "deterministic", "planner_status": plan[1]["planner_status"], "resolution_candidates": plan[1].get('candidates', []), "action_planner": "catalog-structure" if structure_plan else "normalized-text-replacement"})
             return
         # Mock receives only literal intent, never serialized customer context.
         prompt = literal_prompt

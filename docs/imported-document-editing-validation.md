@@ -189,3 +189,14 @@ gh pr create --repo ScryLk/catana-renew --base main --head fix/server-imported-t
 gh api --method POST repos/ScryLk/catana-renew/pulls --input /tmp/imported-editing-pr.json
 # GitHub REST: Forbidden.
 ```
+
+## Follow-up: imported catalog action architecture
+
+The text-only resolver is now scoped to imported source text. Full Studio patches
+pass the category router, and source lineage is independent of display position.
+See [Studio action policy](studio-action-policy.md) and
+[action architecture validation](studio-action-policy-validation.md). The earlier
+text confidence, visibility, geometry, product binding and immutable-source tests
+remain active. Browser-provided text without an owned persisted catalog is no
+longer an execution authority; the old Studio guard test now uses a real private
+PDF and an empty browser index instead.

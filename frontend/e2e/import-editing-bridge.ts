@@ -2,8 +2,8 @@ import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { resolve } from 'node:path';
 
-export async function importEditingBridge() {
-  const process = spawn(globalThis.process.env.CATANA_TEST_PYTHON || 'python3', [resolve('../backend/tests_support/import_editing_bridge.py')], {stdio: ['pipe', 'pipe', 'pipe']});
+export async function importEditingBridge(pages = 1) {
+  const process = spawn(globalThis.process.env.CATANA_TEST_PYTHON || 'python3', [resolve('../backend/tests_support/import_editing_bridge.py'), String(pages)], {stdio: ['pipe', 'pipe', 'pipe']});
   const pending: Array<{resolve: (value: Record<string, unknown>) => void; reject: (error: Error) => void}> = [];
   const buffered: Record<string, unknown>[] = [];
   let diagnostic = '';

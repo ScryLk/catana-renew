@@ -46,6 +46,27 @@ describe('imported document PDF export', () => {
     });
   });
 
+  it('serializes eight source pages plus one authored closing page into a nine-page PDF', async () => {
+    const container=document.createElement('div');container.id='mixed-export';
+    for(let index=0;index<9;index++) {
+      const page=document.createElement('div');page.className='pdf-page-content';
+      page.dataset.pageId=index<8 ? `source-${index+1}` : 'closing-page';
+      page.dataset.pageOrigin=index<8 ? 'imported_source' : 'catana_authored';
+      page.dataset.sourceWidth=index<8 ? '595' : '794';
+      page.dataset.sourceHeight=index<8 ? '842' : '1123';
+      page.dataset.sourceUnit=index<8 ? 'pt' : 'px';
+      container.append(page);
+    }
+    document.body.append(container);
+    await pdfExportService.generatePDF(container.id,{dpi:72});
+    const boxes=[...captured.output.matchAll(/\/MediaBox \[([^\]]+)\]/g)].map(m=>m[1].trim().split(/\s+/).map(Number));
+    expect(boxes).toHaveLength(9);
+    expect(html2canvas).toHaveBeenCalledTimes(9);
+    for(const box of boxes.slice(0,8)) {expect(box[2]).toBeCloseTo(595,3);expect(box[3]).toBeCloseTo(842,3);}
+    expect(boxes[8][2]).toBeCloseTo(595.5,3);
+    expect(boxes[8][3]).toBeCloseTo(842.25,3);
+  });
+
   it('refuses a PDF whose private source image failed to load', async () => {
     const container = document.createElement('div'); container.id = 'source-export';
     container.innerHTML = '<div class="pdf-page-content"><div data-document-asset-state="error"></div></div>';
