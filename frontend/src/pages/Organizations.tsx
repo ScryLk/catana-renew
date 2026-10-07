@@ -367,18 +367,18 @@ export const Organizations: FC = () => {
                                         return (
                                             <div
                                                 key={sede.id}
-                                                className={`p-4 rounded-lg border cursor-pointer transition-all flex justify-between items-center group
+                                                className={`min-w-0 p-4 rounded-lg border cursor-pointer transition-all flex flex-col items-start gap-3 md:flex-row md:justify-between md:items-center group
                                                 ${activeSedeId === sede.id ? 'ring-2 ring-primary bg-primary/5' : ''}
                                                 ${isDefault ? 'border-amber-500/40 dark:border-amber-500/30 bg-amber-500/5' : 'bg-card hover:border-primary/50'}
                                             `}
                                                 onClick={() => handleSelectSede(sede)}
                                             >
-                                                <div className="flex flex-wrap items-center gap-3">
-                                                    <MapPin className={`h-5 w-5 ${activeSedeId === sede.id ? 'text-primary' : 'text-primary/70'}`} />
-                                                    <span className={`font-medium truncate ${isDefault ? 'text-amber-700 dark:text-amber-400' : ''}`}>{sede.name}</span>
+                                                <div className="flex min-w-0 max-w-full items-center gap-3">
+                                                    <MapPin className={`h-5 w-5 shrink-0 ${activeSedeId === sede.id ? 'text-primary' : 'text-primary/70'}`} />
+                                                    <span className={`min-w-0 font-medium break-words ${isDefault ? 'text-amber-700 dark:text-amber-400' : ''}`}>{sede.name}</span>
                                                 </div>
 
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex max-w-full flex-wrap items-center gap-2">
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"

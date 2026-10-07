@@ -125,6 +125,8 @@ test('mobile management search, more navigation and modal Escape', async ({ page
   await page.getByRole('link', { name: 'Organizações', exact: true }).click();
   await expect(page).toHaveURL(/organizations/);
   await noOverflow(page);
+  const branchCard = page.locator('main').getByText('Sede principal', { exact: true }).locator('../..');
+  await expect.poll(() => branchCard.evaluate((card) => card.scrollWidth - card.clientWidth)).toBeLessThanOrEqual(1);
 });
 
 test('reader fit and page selection survive orientation; zoom remains locally scrollable', async ({ page }) => {

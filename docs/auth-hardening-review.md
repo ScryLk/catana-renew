@@ -23,6 +23,7 @@ Before fixes, five new frontend assertions failed: Clerk identity became numeric
 | AgentChatStream / displayMessages | Old malformed replies displayed verbatim | Defensive suppression of complete/partial private protocol |
 | studioStore / sendMessageToAgent | Separate streaming auth; prose action recovery | Shared provider, stable request UUID, structured events only, execution feedback after save |
 | clerk_auth / provision_local_user_from_clerk | Nonatomic first-login workspace | Unique identity winner with atomic organization/sede/quota creation |
+| Organizations / branch-office card | Name and touch-sized action buttons competed in one narrow row | Phone cards stack name and wrapping actions; desktop layout retained; strict page and card overflow assertions |
 | deploy/sync_to_vps.sh and build/preflight scripts | Build environment unverified; machine-specific path | Explicit provider, validated Vite configuration, asset/revision metadata and safe preflight |
 
 ## Authentication Architecture
@@ -120,7 +121,7 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
 CATANA_TEST_PYTHON="$PWD/.venv/bin/python" npm run test:e2e --prefix frontend
 ```
 
-Browser validation: the broad run passed 61 cases and exposed three fixture boot races (desktop shortcuts, generation progress and tablet rendering). Those fixtures now wait for workspace readiness; all three passed on a clean server. Both real imported-document API cases passed again after execution was deferred until stream completion. The PR browser workflow reruns the entire 64-case suite.
+Browser validation: the final local CI-mode run passed all 64 cases. GitHub Chromium then exposed a 5-pixel overflow in the Organizations branch-office card at 320px: its touch-sized actions competed with the name in one row. Phone cards now stack the name and wrapping actions. Both failing cases passed locally after the fix; the management test additionally asserts that the card itself has no overflow. All 163 frontend tests and the TypeScript/Vite build passed again. The full GitHub suite validates the final PR revision.
 
 ```bash
 # 3 passed after fixture correction.
