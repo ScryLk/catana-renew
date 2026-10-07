@@ -10,6 +10,7 @@ services:
       - catana_private_documents:/app/private_document_imports
       - catana_static:/app/staticfiles
       - ./backend/db.sqlite3:/app/db.sqlite3
+      - ./shared:/shared:ro
     env_file:
       - ./backend/.env
     environment:

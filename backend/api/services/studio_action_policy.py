@@ -16,10 +16,17 @@ from api.services.imported_text_resolver import (
     validate_patch,
     protected_text,
 )
+def _resolve_shared_actions_path() -> Path:
+    parents = Path(__file__).resolve().parents
+    candidates = [p / "shared/studio-actions.json" for p in parents]
+    candidates.extend([Path("/shared/studio-actions.json"), Path("/app/shared/studio-actions.json")])
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return Path("/shared/studio-actions.json")
 
-REGISTRY = json.loads(
-    (Path(__file__).resolve().parents[3] / "shared/studio-actions.json").read_text()
-)
+
+REGISTRY = json.loads(_resolve_shared_actions_path().read_text())
 ALIASES = {
     "create_page": "add_page",
     "insert_page": "add_page",
