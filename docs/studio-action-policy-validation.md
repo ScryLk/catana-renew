@@ -193,4 +193,23 @@ revisions; a later source-removal redo may require a fresh confirmation.
 
 ## Publication
 
-Pending final branch push and GitHub PR API result. No merge or production change.
+Code commit `bc3eee6` was pushed successfully to
+`origin/fix/imported-catalog-action-policy-router`. GraphQL and REST PR creation
+both returned `Forbidden` in this environment:
+
+```bash
+gh pr create --repo ScryLk/catana-renew --base main \
+--head fix/imported-catalog-action-policy-router \
+--title 'Fix imported catalog action routing and mixed page lineage' \
+--body-file /tmp/catana-action-pr-body.md
+# Post https://api.github.com/graphql: Forbidden
+
+gh api --method POST repos/ScryLk/catana-renew/pulls \
+--input /tmp/catana-action-pr.json
+# Post https://api.github.com/repos/ScryLk/catana-renew/pulls: Forbidden
+```
+
+No PR was created by this session. Use the
+[prepared branch comparison](https://github.com/ScryLk/catana-renew/compare/main...fix/imported-catalog-action-policy-router?expand=1)
+to open it manually. CI results could not be read through the blocked GitHub API;
+the passing results above are local validation. No merge or production change.
