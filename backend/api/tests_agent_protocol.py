@@ -34,7 +34,7 @@ class AgentOutputParserTests(TestCase):
     def test_malformed_multiple_and_partial_fences_fail_closed(self):
         from api.services.agent_output import parse_agent_output
         valid = '```json:patch\n{"actions":[]}\n```'
-        for raw in ('```json:patch', '```json:pa', '```patch\n{"actions":[', valid + valid, '```json:patch\nnot json\n```'):
+        for raw in ('```json:patch', '```json:pa', '```patch\n{"actions":[', valid + valid, '```json:patch\nnot json\n```', '```python\n{"actions":[]}\n```', '{"label":"private","actions":[]}\n```text\nhello\n```'):
             with self.subTest(raw=raw):
                 result = parse_agent_output('Proposta\n' + raw)
                 self.assertEqual(result.protocol_status, 'invalid')

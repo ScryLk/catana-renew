@@ -22,10 +22,14 @@ export function sanitizeAgentText(text: string): string {
     cursor = closing + 3;
   }
   const privateMarker =
-    /(?:json:patch|DocumentIR|\{\s*"(?:actions|updates|target|policy_version)"\s*:)/i.exec(
+    /(?:json:patch|DocumentIR|"(?:actions|updates|target|policy_version)"\s*:)/i.exec(
       result,
     );
-  if (privateMarker) result = result.slice(0, privateMarker.index);
+  if (privateMarker) {
+    const fence = result.lastIndexOf('```', privateMarker.index);
+    const object = result.lastIndexOf('{', privateMarker.index);
+    result = result.slice(0, fence >= 0 ? fence : object >= 0 ? object : privateMarker.index);
+  }
   // A partial opening fence cannot flash while the next token is in flight.
   return result.replace(/`{1,2}[^`]*$/, "").trim();
 }

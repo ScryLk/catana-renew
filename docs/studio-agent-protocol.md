@@ -13,9 +13,9 @@ The model's fenced JSON is a private model protocol. It terminates in `api/servi
 
 ## Malformed output
 
-Complete json:patch/patch/json blocks are recognized without a complete-block regex dependency. Truncated headers, unclosed blocks, invalid JSON and multiple machine blocks invalidate the entire candidate. No partial action executes. Public prose contains a clean retry message; a `protocol_error` event and non-sensitive request-ID/status diagnostics record the failure. Stored assistant content is also clean.
+Complete json:patch/patch/json blocks are recognized without a complete-block regex dependency. Truncated headers, unclosed blocks, invalid JSON and multiple machine blocks invalidate the entire candidate. Known private payloads under unrelated fence labels or preceding another fence are also rejected. No partial action executes. Public prose contains a clean retry message; a `protocol_error` event and non-sensitive request-ID/status diagnostics record the failure. Stored assistant content is also clean.
 
-Frontend `sanitizeAgentText` additionally suppresses private/truncated protocol in old stored messages and display paths. Normal chat does not recover actions by scanning prose. This filter is a final safeguard, not the backend parser or a replacement for policy validation.
+Frontend `sanitizeAgentText` additionally suppresses private/truncated protocol in old stored messages, action summaries, delegated-agent notes and reasoning display paths. Empty filtered replies never claim execution success. Normal chat does not recover actions by scanning prose. This filter is a final safeguard, not the backend parser or a replacement for policy validation.
 
 Example private model output:
 

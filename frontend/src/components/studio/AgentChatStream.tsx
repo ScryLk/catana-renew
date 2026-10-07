@@ -141,6 +141,11 @@ export const AgentChatStream: React.FC = () => {
         ? {
             ...msg,
             content: sanitizeAgentText(msg.content),
+            actions: msg.actions?.map(sanitizeAgentText).filter(Boolean),
+            delegations: msg.delegations?.map(delegation => ({
+              ...delegation,
+              action: sanitizeAgentText(delegation.action)
+            })).filter(delegation => Boolean(delegation.action)),
             reasoning: msg.reasoning
               ? sanitizeAgentText(msg.reasoning)
               : undefined
@@ -293,7 +298,7 @@ export const AgentChatStream: React.FC = () => {
       } else if (msg.actions && msg.actions.length > 0) {
         actionText = msg.actions.join(' · ');
       } else {
-        actionText = 'Ajuste executado com sucesso e diagramação sincronizada pelo Conselho Editorial.';
+        actionText = 'Nenhuma alteração confirmada na prancheta.';
       }
     }
 
@@ -301,7 +306,7 @@ export const AgentChatStream: React.FC = () => {
       if (msg.actions && msg.actions.length > 0) {
         actionText = msg.actions.join(' · ');
       } else {
-        actionText = 'Ajuste executado com sucesso pelo Conselho Editorial.';
+        actionText = 'Nenhuma alteração confirmada na prancheta.';
       }
     }
 

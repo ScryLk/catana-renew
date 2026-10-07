@@ -10,7 +10,7 @@ it.each(['```json:patch\n{"actions":[', '```patch\n{"actions":[]}\n```'])(
     Element.prototype.scrollIntoView = vi.fn();
     useStudioStore.setState({
       messages: [
-        { id: "stored", role: "assistant", content: "Proposta.\n" + raw },
+        { id: "stored", role: "assistant", content: raw.startsWith("```patch") ? raw : "Proposta.\n" + raw, actions: [raw, raw], delegations: [{roleId: "director", roleName: "Diretor", badge: "Design", action: raw}] },
       ],
       agentStatus: "idle",
     });
@@ -23,7 +23,8 @@ it.each(['```json:patch\n{"actions":[', '```patch\n{"actions":[]}\n```'])(
         await act(async () => {
           await vi.advanceTimersByTimeAsync(40);
         });
-      expect(container.textContent).toContain("Proposta.");
+      expect(container.textContent).toContain(raw.startsWith("```patch") ? "Nenhuma alteração confirmada" : "Proposta.");
+      expect(container.textContent).not.toContain("executado com sucesso");
       expect(container.textContent).not.toContain("```");
       expect(container.textContent).not.toContain("actions");
     } finally {

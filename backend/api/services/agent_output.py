@@ -2,6 +2,8 @@
 import json
 from dataclasses import dataclass
 
+PRIVATE_MARKERS = ('json:patch', 'documentir', '"actions"', '"updates"', '"target"')
+
 PROTOCOL_FAILURE = 'Não consegui transformar essa solicitação em uma alteração válida. Tente novamente.'
 
 @dataclass
@@ -18,15 +20,7 @@ def parse_agent_output(text: str) -> AgentOutput:
     while cursor < len(text):
         opening = text.find('```', cursor)
         if opening < 0:
-            tail = text[cursor:]
-            # A raw payload or an un-fenced protocol label is also private.
-            for marker in ('json:patch', 'DocumentIR', '"actions"', '"updates"', '"target"'):
-                if marker in tail:
-                    position = tail.index(marker)
-                    opening_object = tail.rfind('{', 0, position)
-                    tail = tail[:opening_object if opening_object >= 0 else position]
-                    invalid = True
-            human.append(tail)
+            human.append(text[cursor:])
             break
         human.append(text[cursor:opening])
         newline = text.find('\n', opening + 3)
@@ -49,10 +43,21 @@ def parse_agent_output(text: str) -> AgentOutput:
                     candidates.append(candidate)
             except (ValueError, TypeError):
                 invalid = True
+        elif any(marker in body.lower() for marker in PRIVATE_MARKERS):
+            invalid = True
         else:
             human.append(text[opening:closing + 3])
         cursor = closing + 3
+    prose = ''.join(human)
+    for marker in PRIVATE_MARKERS:
+        position = prose.lower().find(marker)
+        if position >= 0:
+            fence = prose.rfind('```', 0, position)
+            opening_object = prose.rfind('{', 0, position)
+            start = fence if fence >= 0 else opening_object if opening_object >= 0 else position
+            prose = prose[:start]
+            invalid = True
     # Do not accept a valid block beside a malformed or unexpected second block.
     if invalid or len(candidates) > 1:
-        return AgentOutput(''.join(human).strip(), None, 'invalid')
-    return AgentOutput(''.join(human).strip(), candidates[0] if candidates else None, 'valid' if candidates else 'none')
+        return AgentOutput(prose.strip(), None, 'invalid')
+    return AgentOutput(prose.strip(), candidates[0] if candidates else None, 'valid' if candidates else 'none')

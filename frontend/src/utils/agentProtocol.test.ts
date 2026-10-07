@@ -7,6 +7,8 @@ it.each([
   "```json:pa",
   '```json\n{"actions":[]}\n```',
   '{"actions":[{"target":"secret"}]}',
+  '{"label":"private","actions":[]}',
+  '```python\n{"actions":[]}\n```',
 ])("suppresses private or truncated protocol: %s", (raw) => {
   expect(sanitizeAgentText("Proposta.\n" + raw)).toBe("Proposta.");
 });

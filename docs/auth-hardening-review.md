@@ -83,7 +83,7 @@ Added auth-session-contracts to PR CI and production-readiness, with PostgreSQL 
 - authTokenProvider: cold boot, simultaneous 401, bounded failure, safe streaming retry and stale account refresh.
 - ClerkAuthSync and PrivateRoute: single initialization, membership readiness, stale resolution and pure route gates.
 - workspaceSession: per-organization cache isolation, readiness, untrusted legacy hints, successful restore and scoped errors/late responses.
-- AgentChatStream and agentProtocol: rendering and complete/partial/raw protocol suppression.
+- AgentChatStream and agentProtocol: rendering, nested action/delegation suppression, no false success for empty protocol replies, and complete/partial/raw protocol suppression.
 - tests_agent_protocol: valid policy-routed actions, malformed SSE/persistence, atomic provisioning/concurrency and config requirements.
 - frontend_build_config: missing/malformed configuration and synthetic Clerk wiring without network calls.
 
@@ -96,7 +96,7 @@ Final validation commands and results are recorded below; synthetic fixture valu
 DATABASE_URL=postgresql://postgres:catana-local-test-only@127.0.0.1:55432/catana_auth_ci \
 PATH="$PWD/.venv/bin:$PATH" bash scripts/run_backend_checks.sh
 
-# 161 tests passed in 20 frontend files.
+# 163 tests passed in 20 frontend files.
 npm test --prefix frontend
 
 # TypeScript and Vite production build passed.
