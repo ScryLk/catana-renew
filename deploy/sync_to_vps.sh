@@ -41,6 +41,11 @@ ssh "${VPS_USER}@${VPS_IP}" "
         sed -i 's/^DEBUG=True/DEBUG=False/' ${REMOTE_DEST}/backend/.env
         sed -i 's|KATANA_FRONTEND_URL=.*|KATANA_FRONTEND_URL=https://usecatana.com.br|' ${REMOTE_DEST}/backend/.env
         sed -i 's|FRONTEND_URL=.*|FRONTEND_URL=https://usecatana.com.br|' ${REMOTE_DEST}/backend/.env
+        grep -q '^AUTH_PROVIDER=' ${REMOTE_DEST}/backend/.env || echo 'AUTH_PROVIDER=clerk' >> ${REMOTE_DEST}/backend/.env
+        grep -q '^ENVIRONMENT=' ${REMOTE_DEST}/backend/.env || echo 'ENVIRONMENT=production' >> ${REMOTE_DEST}/backend/.env
+    fi
+    if [ -f ${REMOTE_DEST}/frontend/.env.production ]; then
+        grep -q '^VITE_AUTH_PROVIDER=' ${REMOTE_DEST}/frontend/.env.production || echo 'VITE_AUTH_PROVIDER=clerk' >> ${REMOTE_DEST}/frontend/.env.production
     fi
 "
 

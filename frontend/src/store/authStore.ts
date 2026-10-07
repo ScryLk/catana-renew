@@ -209,7 +209,7 @@ export const useAuthStore = create<AuthStore>()(
           legacyLogin('/api/auth/google/', { credential }),
         register: credentials => legacyLogin('/api/register/', credentials),
         silentRefresh: async () => {
-          if (authProviderMode === 'clerk') return false;
+          if (getAuthProvider() === 'clerk') return false;
           const epoch = identityEpoch;
           try {
             const access = await refreshAuthToken();
@@ -228,7 +228,7 @@ export const useAuthStore = create<AuthStore>()(
           }
         },
         checkAuth: () => {
-          if (authProviderMode === 'clerk') return Promise.resolve();
+          if (getAuthProvider() === 'clerk') return Promise.resolve();
           if (initialization) return initialization;
           set({ authStatus: 'loading', isLoading: true });
           configureAuthProvider('legacy');

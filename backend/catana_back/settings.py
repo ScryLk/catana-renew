@@ -207,6 +207,8 @@ if not DEBUG:
     X_FRAME_OPTIONS = 'DENY'
     SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
     SECURE_CROSS_ORIGIN_OPENER_POLICY = env('SECURE_CROSS_ORIGIN_OPENER_POLICY', default='same-origin-allow-popups')
+    if not SECURE_SSL_REDIRECT:
+        SILENCED_SYSTEM_CHECKS = ['security.W008']
 
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
     'https://usecatana.com.br',
