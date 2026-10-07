@@ -30,6 +30,8 @@ import { Toaster } from 'sonner';
 import { useStudioStore } from './store/studioStore';
 import { ClerkAuthSync } from './components/auth/ClerkAuthSync';
 import { isClerkConfigured } from './store/authStore';
+import { authProviderMode } from './services/authConfig';
+import { ClerkAuthCallback } from './components/auth/ClerkAuthCallback';
 
 function App() {
   const { isPhone } = useResponsiveLayout();
@@ -38,7 +40,7 @@ function App() {
   const [selectedProductCode, setSelectedProductCode] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isClerkConfigured) void checkAuth();
+    if (authProviderMode === 'legacy') void checkAuth();
   }, [checkAuth]);
 
   useEffect(() => {
@@ -83,6 +85,7 @@ function App() {
       <Router>
         <Routes>
           {/* Public Auth Routes & AI Studio Experience */}
+          <Route path="/auth/callback" element={<ClerkAuthCallback />} />
           <Route path="/login" element={<KatanaStudio />} />
           <Route path="/register" element={<KatanaStudio />} />
           <Route path="/forgot-password" element={<KatanaStudio />} />

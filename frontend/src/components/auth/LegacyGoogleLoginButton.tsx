@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { authProviderMode } from '../../services/authConfig';
 
 declare global {
   interface Window {
     google?: {
       accounts: {
         id: {
-          initialize: (config: any) => void;
-          renderButton: (parent: HTMLElement, options: any) => void;
+          initialize: (config: GoogleInitializeOptions) => void;
+          renderButton: (parent: HTMLElement, options: GoogleButtonOptions) => void;
           prompt: () => void;
         };
       };
@@ -16,7 +17,10 @@ declare global {
   }
 }
 
-interface GoogleLoginButtonProps {
+interface GoogleCredentialResponse { credential?: string; }
+interface GoogleInitializeOptions { client_id: string; callback: (response: GoogleCredentialResponse) => void; auto_select: boolean; cancel_on_tap_outside: boolean; }
+interface GoogleButtonOptions { theme: string; size: string; type: string; shape: string; text: string; logo_alignment: string; width: number; locale: string; }
+interface LegacyGoogleLoginButtonProps {
   onSuccess: (credential: string) => void;
   onError?: (error: string) => void;
   isLoading?: boolean;
@@ -25,7 +29,7 @@ interface GoogleLoginButtonProps {
 let activeSuccessCallback: ((credential: string) => void) | null = null;
 let activeErrorCallback: ((error: string) => void) | null = null;
 
-function globalGsiCallback(response: any) {
+function globalGsiCallback(response: GoogleCredentialResponse) {
   if (response.credential) {
     activeSuccessCallback?.(response.credential);
   } else if (activeErrorCallback) {
@@ -33,7 +37,7 @@ function globalGsiCallback(response: any) {
   }
 }
 
-export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
+const ConfiguredLegacyGoogleLoginButton: React.FC<LegacyGoogleLoginButtonProps> = ({
   onSuccess,
   onError,
   isLoading = false,
@@ -52,6 +56,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   }, [onSuccess, onError]);
 
   useEffect(() => {
+    if (!clientId) return;
     // Se o script ja foi carregado anteriormente
     if (window.google?.accounts?.id) {
       setScriptLoaded(true);
@@ -71,7 +76,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     return () => {
       // Deixa o script em cache
     };
-  }, [onError]);
+  }, [onError, clientId]);
 
   useEffect(() => {
     if (!scriptLoaded || !containerRef.current || !clientId) return;
@@ -105,10 +110,10 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         width: Math.min(Math.max(calculatedWidth, 240), 400),
         locale: 'pt-BR',
       });
-    } catch (err) {
-      console.error('Erro ao inicializar Google Identity Services:', err);
+    } catch {
+      onError?.('Não foi possível iniciar o acesso com o Google.');
     }
-  }, [scriptLoaded, clientId]);
+  }, [scriptLoaded, clientId, onError]);
 
   // Se nao ha Client ID configurado (desenvolvimento inicial sem chaves cadastradas)
   const handleDevMockClick = () => {
@@ -152,8 +157,11 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   }
 
   return (
-    <div className="w-full flex justify-center items-center overflow-hidden">
+    <div className="w-full flex justify-center items-center overflow-hidden" aria-busy={isLoading} inert={isLoading}>
       <div ref={containerRef} className="w-full min-h-[44px] flex justify-center" />
     </div>
   );
 };
+
+export const LegacyGoogleLoginButton: React.FC<LegacyGoogleLoginButtonProps> = props =>
+  authProviderMode === 'legacy' ? <ConfiguredLegacyGoogleLoginButton {...props} /> : null;

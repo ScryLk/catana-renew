@@ -6,6 +6,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.pagination import PageNumberPagination
 from .services.image_validator import validate_image_file
 from .throttling import RegisterRateThrottle
+from .auth_provider import legacy_auth_only
 from django.db.models import Count, Sum, Q
 from django.contrib.auth import update_session_auth_hash
 from .models import (
@@ -1183,6 +1184,7 @@ def upload_avatar(request):
     serializer = UserProfileSerializer(user, context={'request': request})
     return Response(serializer.data)
 
+@legacy_auth_only
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def change_password(request):
@@ -1250,6 +1252,7 @@ def recent_activity(request):
     serializer = ActivitySerializer(activities, many=True)
     return Response(serializer.data)
 
+@legacy_auth_only
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def logout_all_sessions(request):
@@ -1262,6 +1265,7 @@ def logout_all_sessions(request):
     # para invalidar todos os tokens JWT do usuário
 
     return Response({'message': 'Todas as sessões foram encerradas'})
+@legacy_auth_only
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([RegisterRateThrottle])
