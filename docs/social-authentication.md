@@ -35,7 +35,7 @@ An explicit `VITE_AUTH_PROVIDER` wins even when both providers' browser-safe IDs
 
 The installed `@clerk/clerk-react` version is **5.61.9**. Its installed TypeScript definitions support `useSignIn`, `useSignUp`, `authenticateWithRedirect`, `useClerk().handleRedirectCallback`, and SignIn/SignUp virtual routing. The shared ClerkGoogleAuthButton calls the matching Clerk resource with `strategy: oauth_google`, `redirectUrl: /auth/callback`, and `redirectUrlComplete: /studio`. A ref and loading state prevent concurrent starts. Cancellation, disabled strategies and other errors become controlled Portuguese messages; raw provider payloads never enter logs or UI. No legacy fallback occurs.
 
-ClerkAuthCallback delegates state, nonce, PKCE, transfer, verification and session completion to Clerk. It runs once under StrictMode and provides a usable return-to-login action on failure. ClerkAuthSync remains the sole owner of subsequent Catana identity resolution. Google must be enabled in the Clerk instance; this repository and mocked tests cannot verify that dashboard setting. SDK configuration failures are reported without a legacy fallback. Configure `/auth/callback` and the deployed application origin according to the Clerk instance's redirect/origin settings.
+ClerkAuthCallback delegates state, nonce, PKCE, transfer, verification and session completion to Clerk. It runs once under StrictMode. The installed React wrapper may resolve immediately and swallow the underlying SDK rejection, so a return-to-login action is always available; a ten-second unresolved-callback notice provides recovery even without a propagated error. Unit and browser tests model this wrapper behavior. ClerkAuthSync remains the sole owner of subsequent Catana identity resolution. Google must be enabled in the Clerk instance; this repository and mocked tests cannot verify that dashboard setting. SDK configuration failures are reported without a legacy fallback. Configure `/auth/callback` and the deployed application origin according to the Clerk instance's redirect/origin settings.
 
 The chosen SDK flow redirects the current browser on both phone and desktop. Catana neither opens OAuth popups nor implements window.postMessage or forces FedCM. The installed SDK owns the provider protocol; Google-side browser behavior requires a real signed-in smoke test.
 
@@ -57,7 +57,7 @@ Existing Clerk subjects remain authoritative across sign-in methods. JWT and sig
 
 Nginx's canonical TLS document server and Django's security default already used `same-origin-allow-popups`. The user supplied a live `curl -sSI https://usecatana.com.br` response dated `Wed, 07 Oct 2026 17:41:40 GMT` (14:41:40 Brasília time): HTTP/2 200, HTML served by nginx/1.31.6, and exactly one `cross-origin-opener-policy: same-origin-allow-popups`. HSTS, nosniff, XSS protection and the existing referrer policy were also present; the supplied response did not show CSP or X-Frame-Options. This verifies the existing deployed SPA document policy, not this PR's deployment.
 
-Direct cloud curl was blocked by the proxy with CONNECT 403. A disposable local Nginx TLS integration test independently reproduced duplicate baseline COOP headers on a proxied API response and passed all four routes after the fix. It uses a temporary synthetic certificate trusted with `--cacert`; TLS verification stays enabled.
+Direct cloud curl was blocked by the proxy with CONNECT 403. A disposable local Nginx TLS integration test independently reproduced duplicate baseline COOP headers on a proxied API response and passed all four routes after the fix. It uses a temporary synthetic certificate trusted with `--cacert`; TLS verification stays enabled. An initial GitHub smoke run exposed a container startup race: Docker published its port before Nginx's TLS listener was ready. Bounded retries now cover transient handshake errors. A deliberately delayed entrypoint reproduced the original exit 35 and passed all four strict header assertions with the updated script.
 
 The warning's behavior after actual Clerk Google login is **not yet observed**: there are no configured live tenant credentials or signed-in staging browser here. Removing Catana's standalone GIS path eliminates the confirmed competing flow; it does not prove every Google/Clerk console warning disappears.
 
@@ -85,7 +85,7 @@ Vite values are compiled into the bundle. `scripts/build_frontend_production.sh`
 
 - 34 provider/config routing tests across modal, standalone pages, reset, both modes, missing config and invalid explicit mode.
 - 10 legacy GIS isolation/loading/mock tests; 12 store mutation/logout boundary tests.
-- 9 Clerk social/widget/readiness/callback tests, including safe errors, cancellation, double-click and delayed real identity resolution.
+- 10 Clerk social/widget/readiness/callback tests, including safe errors, cancellation, double-click and delayed real identity resolution.
 - Backend provider, audience, verified-email collision, signed-webhook and PostgreSQL concurrency coverage in `api.tests_social_auth`; existing auth/Clerk assertions updated for strict configuration.
 - 12 isolated Chromium browser cases using an explicit test-only Clerk alias, covering both providers, 320/390/desktop light/dark, retry, callback failure and numeric identity/org readiness. The production Vite configuration never aliases Clerk. Browser fixtures have separate caches and artifacts and do not replicate or validate Clerk-hosted form internals.
 - COOP scope/mount/inheritance/deduplication checks and actual disposable Nginx TLS responses; additional safe build-environment cases.
@@ -102,7 +102,7 @@ git switch main
 git pull --ff-only origin main
 git switch -c fix/clerk-google-social-auth-consolidation
 
-npm test --prefix frontend                     # 228 passed in 24 files
+npm test --prefix frontend                     # 229 passed in 24 files
 npm run build --prefix frontend                # TypeScript / Vite passed
 npm run lint --prefix frontend                 # Existing repository lint failures; see below
 
@@ -135,7 +135,7 @@ CI=true PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
 CATANA_TEST_PYTHON=/workspace/catana-renew/.venv/bin/python npm run test:e2e
 ```
 
-Local browser validation: the full existing suite passed 63 cases; a source edit during the Vite run triggered recorded HMR and detached the quota-import modal. That unchanged case passed on targeted rerun after edits stopped. The final PR workflow runs all 64 from a fresh checkout. The isolated social-auth suite passed all 12 cases after separating Vite caches and artifacts.
+Local browser validation: the full existing suite passed 63 cases; a source edit during the Vite run triggered recorded HMR and detached the quota-import modal. That unchanged case passed on targeted rerun after edits stopped. The final PR workflow runs all 64 from a fresh checkout. Its job budget is 30 minutes because one observed Chromium installation consumed nearly 13 minutes before the existing eight-minute suite could start. No test or assertion was removed. The isolated social-auth suite passed all 12 cases after separating Vite caches and artifacts, including the installed callback wrapper's swallowed-error behavior.
 
 The Clerk-mode GIS regression was captured before production edits. Baseline Nginx reproduced two COOP headers on `/api/profile/`; the fixed config passes `/`, `/sign-in`, `/api/profile/` and `/admin/`. Repository lint was compared against an untouched archive of the audited main using the same installed tooling: baseline 223 errors / 21 warnings, changed tree 220 errors / 21 warnings, and no introduced findings. The three removed errors were untyped legacy GIS trust-boundary values. Focused ESLint on new auth/test code passes. The existing large Vite bundle warning remains.
 
@@ -145,6 +145,7 @@ Changes are confined to authentication UI and store guards, backend provider/rec
 
 - `.github/workflows/ci.yml`
 - `.github/workflows/production-readiness.yml`
+- `.github/workflows/responsive-browser.yml`
 - `.gitignore`
 - `backend/.env.example`
 - `backend/api/auth_provider.py`

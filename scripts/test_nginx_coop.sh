@@ -12,7 +12,11 @@ docker_local() {
     docker --host=unix:///var/run/docker.sock "$@"
 }
 cleanup() {
-  if [ -n "$test_container" ]; then docker_local rm -f "$test_container" >/dev/null 2>&1 || true; fi
+  local test_status=$?
+  if [ -n "$test_container" ]; then
+    if [ "$test_status" -ne 0 ]; then docker_local logs --tail 30 "$test_container" >&2 || true; fi
+    docker_local rm -f "$test_container" >/dev/null 2>&1 || true
+  fi
   rm -rf "$test_dir"
 }
 trap cleanup EXIT
@@ -43,8 +47,10 @@ docker_local exec "$test_container" nginx -t
 test_port="$(docker_local port "$test_container" 443/tcp)"
 test_port="${test_port##*:}"
 for route in / /sign-in /api/profile/ /admin/; do
-  # This address is the disposable loopback container, never the remote domain.
-  curl --silent --show-error --head --max-time 5 --retry 5 --retry-connrefused --retry-delay 1 \
+  # Docker can publish the loopback port before Nginx starts its TLS listener;
+  # retry transient handshake resets too, with a bounded startup budget. TLS
+  # still verifies the fixture certificate. This never contacts the remote host.
+  curl --silent --show-error --head --max-time 5 --retry 5 --retry-all-errors --retry-delay 1 --retry-max-time 15 \
     --cacert "$test_dir/certs/fullchain.pem" -H 'Host: usecatana.com.br' \
     "https://127.0.0.1:$test_port$route" > "$test_dir/headers.txt"
   node --input-type=module - "$test_dir/headers.txt" "$route" <<'NODE'

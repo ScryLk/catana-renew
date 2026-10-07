@@ -193,12 +193,18 @@ test.describe('Clerk social authentication', () => {
     assertNoLegacyAuthority(fixture.requests, fixture.googleRequests);
   });
 
-  test('an invalid callback reports cancellation and returns to a working login', async ({ page }) => {
+  test('a swallowed callback failure keeps recovery available and shows a bounded notice', async ({ page }) => {
     const fixture = await browserFixture(page, { scenario: 'callback_error' });
     await page.goto('/auth/callback');
-    await expect(page.getByRole('alert')).toContainText('cancelado');
+    const recoveryLink = page.getByRole('link', { name: 'Voltar para o acesso' });
+    await expect(recoveryLink).toBeVisible();
+    await expect(page.getByRole('status')).toHaveText('Concluindo seu acesso ao Catana…');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(page.getByRole('alert')).toHaveText('O acesso ainda não foi concluído. Você pode voltar e tentar novamente.', { timeout: 15000 });
+    await expect(page).toHaveURL(/\/auth\/callback$/);
     expect((await mockCalls(page)).filter(call => call.operation === 'callback')).toHaveLength(1);
-    await page.getByRole('link', { name: 'Voltar para o acesso' }).click();
+    expect(fixture.requests.filter(request => ['/api/profile/', '/api/organizations/'].includes(request.path))).toEqual([]);
+    await recoveryLink.click();
     await expect(page.getByRole('button', { name: 'Continuar com o Google', exact: true })).toBeEnabled();
     await expect.poll(async () => (await state(page)).status).toBe('signed_out');
     assertNoLegacyAuthority(fixture.requests, fixture.googleRequests);

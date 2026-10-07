@@ -32,12 +32,18 @@ async function authenticateWithRedirect(operation: string, options: RedirectOpti
 const signIn = { authenticateWithRedirect: (options: RedirectOptions) => authenticateWithRedirect('signIn.redirect', options) };
 const signUp = { authenticateWithRedirect: (options: RedirectOptions) => authenticateWithRedirect('signUp.redirect', options) };
 const getToken = async () => { record('getToken'); return snapshot.isSignedIn ? 'clerk-browser-session-token' : null; };
+async function completeRedirectCallback(options: CallbackOptions) {
+  await Promise.resolve();
+  if (currentScenario() === 'callback_error') throw providerError('oauth_access_denied');
+  sessionStorage.setItem('catana_clerk_mock_subject', 'user_google_browser_contract');
+  window.location.assign(options.signInForceRedirectUrl || '/studio');
+}
 const clerk = {
   async handleRedirectCallback(options: CallbackOptions) {
     record('callback', options);
-    if (currentScenario() === 'callback_error') throw providerError('oauth_access_denied');
-    sessionStorage.setItem('catana_clerk_mock_subject', 'user_google_browser_contract');
-    window.location.assign(options.signInForceRedirectUrl || '/studio');
+    // Installed Clerk React 5.61.9 resolves this wrapper immediately and swallows
+    // the underlying ClerkJS callback rejection; Catana cannot rely on .catch().
+    void completeRedirectCallback(options).catch(() => {});
   },
   async signOut() {
     sessionStorage.removeItem('catana_clerk_mock_subject');

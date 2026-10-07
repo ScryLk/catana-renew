@@ -46,7 +46,7 @@ beforeEach(() => {
   useAuthStore.getState().setClerkAuthSettled();
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 function button(label = 'Continuar com o Google') {
   const found = [...document.querySelectorAll('button')].find(item => item.textContent?.trim() === label);
   if (!found) throw new Error(`Button missing: ${label}`);
@@ -143,5 +143,22 @@ it('completes the callback once under StrictMode and handles cancellation withou
   expect(container.querySelector('[role="alert"]')?.textContent).toContain('cancelado');
   expect(container.textContent).not.toContain('SECRET-TOKEN');
   expect(container.querySelector('a')?.getAttribute('href')).toBe('/login');
+  expect(axios.post).not.toHaveBeenCalled();
+});
+
+it('keeps recovery usable when the installed Clerk wrapper resolves while swallowing callback rejection', async () => {
+  vi.useFakeTimers();
+  // IsomorphicClerk 5.61.9 does not propagate its underlying SDK promise.
+  const underlying = vi.fn().mockRejectedValue({ errors: [{ code: 'oauth_access_denied', message: 'SECRET-TOKEN' }] });
+  sdk.callback.mockImplementation(() => { void underlying().catch(() => {}); return Promise.resolve(); });
+  await act(async () => root.render(<StrictMode><ClerkAuthCallback /></StrictMode>));
+  expect(container.querySelector('a')?.getAttribute('href')).toBe('/login');
+  expect(container.querySelector('[role="status"]')).not.toBeNull();
+  await act(async () => vi.advanceTimersByTime(10000));
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain('ainda não foi concluído');
+  expect(sdk.callback).toHaveBeenCalledTimes(1);
+  expect(underlying).toHaveBeenCalledTimes(1);
+  expect(container.textContent).not.toContain('SECRET-TOKEN');
+  expect(isAuthReady(useAuthStore.getState())).toBe(false);
   expect(axios.post).not.toHaveBeenCalled();
 });
