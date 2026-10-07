@@ -85,7 +85,7 @@ class ClerkJWTAuthenticationTests(TestCase):
     @patch('api.clerk_auth.get_clerk_jwks')
     @patch('api.clerk_auth.RSAAlgorithm.from_jwk')
     @patch('api.clerk_auth.jwt.decode')
-    def test_existing_user_linked_by_email(self, mock_jwt_decode, mock_rsa, mock_jwks, mock_header):
+    def test_existing_user_linked_by_verified_email(self, mock_jwt_decode, mock_rsa, mock_jwks, mock_header):
         existing_user = User.objects.create_user(
             username='carlos',
             email='carlos@catana.dev',
@@ -99,6 +99,7 @@ class ClerkJWTAuthenticationTests(TestCase):
         mock_jwt_decode.return_value = {
             'sub': 'user_clerk_carlos_555',
             'email': 'carlos@catana.dev',
+            'email_verified': True,
         }
 
         request = self.factory.get(
@@ -111,6 +112,7 @@ class ClerkJWTAuthenticationTests(TestCase):
         self.assertEqual(existing_user.clerk_user_id, 'user_clerk_carlos_555')
 
 
+@override_settings(AUTH_PROVIDER='clerk')
 class ClerkWebhookViewTests(TestCase):
     def setUp(self):
         self.client = APIClient()

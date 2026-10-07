@@ -8,7 +8,6 @@ from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import status, permissions
-from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
@@ -16,6 +15,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 
 from .models import Organization, Sede, SubscriptionPlan, OrganizationQuota
+from .auth_provider import LegacyAuthAPIView
 from .throttling import LoginRateThrottle, PasswordResetRateThrottle
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ def format_user_payload(user):
     }
 
 
-class CatanaTokenObtainPairView(APIView):
+class CatanaTokenObtainPairView(LegacyAuthAPIView):
     """
     Autentica usuario com email ou username e senha.
     Retorna o access_token no corpo JSON e define o refresh_token em cookie HttpOnly.
@@ -107,7 +107,7 @@ class CatanaTokenObtainPairView(APIView):
         return response
 
 
-class CatanaTokenRefreshView(APIView):
+class CatanaTokenRefreshView(LegacyAuthAPIView):
     """
     Renova silenciosamente o access_token lendo o cookie HttpOnly catana_refresh_token.
     Executa rotacao estrita (emite novo refresh e adiciona o antigo a blacklist).
@@ -161,7 +161,7 @@ class CatanaTokenRefreshView(APIView):
         return response
 
 
-class CatanaLogoutView(APIView):
+class CatanaLogoutView(LegacyAuthAPIView):
     """
     Encerra a sessao do usuario: invalida o refresh token na blacklist e deleta o cookie.
     """
@@ -186,7 +186,7 @@ class CatanaLogoutView(APIView):
         return response
 
 
-class CatanaLogoutAllView(APIView):
+class CatanaLogoutAllView(LegacyAuthAPIView):
     """
     Encerra todas as sessoes ativas do usuario (revoga todos os outstanding tokens).
     """
@@ -211,7 +211,7 @@ class CatanaLogoutAllView(APIView):
         return response
 
 
-class GoogleAuthView(APIView):
+class GoogleAuthView(LegacyAuthAPIView):
     """
     Endpoint para autenticacao via Google OAuth 2.0 (Google Identity Services).
     Recebe { 'credential': '<google_id_token>' }, valida a assinatura oficial e
@@ -245,11 +245,16 @@ class GoogleAuthView(APIView):
             first_name = request.data.get('given_name') or 'Google'
             last_name = request.data.get('family_name') or 'User'
         else:
+            client_id = getattr(settings, 'GOOGLE_CLIENT_ID', '')
+            if not client_id:
+                return Response(
+                    {'error': 'Autenticacao Google indisponivel neste ambiente.'},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
             try:
                 from google.oauth2 import id_token
                 from google.auth.transport import requests as google_requests
 
-                client_id = getattr(settings, 'GOOGLE_CLIENT_ID', None) or None
                 id_info = id_token.verify_oauth2_token(
                     credential,
                     google_requests.Request(),
@@ -257,7 +262,7 @@ class GoogleAuthView(APIView):
                 )
 
                 email = id_info.get('email')
-                if not email or not id_info.get('email_verified', False):
+                if not email or id_info.get('email_verified') is not True:
                     return Response(
                         {'error': 'E-mail do Google nao verificado ou ausente.'},
                         status=status.HTTP_400_BAD_REQUEST
@@ -352,7 +357,7 @@ class GoogleAuthView(APIView):
         return response
 
 
-class PasswordResetRequestView(APIView):
+class PasswordResetRequestView(LegacyAuthAPIView):
     """
     Solicita a redefinicao de senha para um usuario ativo.
     Gera um token criptografico seguro via default_token_generator e envia
@@ -410,7 +415,7 @@ class PasswordResetRequestView(APIView):
         )
 
 
-class PasswordResetConfirmView(APIView):
+class PasswordResetConfirmView(LegacyAuthAPIView):
     """
     Valida o token criptografico e define a nova senha do usuario.
     Invalida sessoes ativas anteriores garantindo seguranca pos-redefinicao.

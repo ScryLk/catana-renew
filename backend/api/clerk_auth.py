@@ -20,6 +20,11 @@ _JWKS_CACHE = {
 _JWKS_TTL_SECONDS = 3600  # 1 hora
 
 
+class ClerkIdentityConflict(AuthenticationFailed):
+    default_detail = 'Nao foi possivel resolver a identidade. Entre em contato com o suporte.'
+    default_code = 'identity_link_required'
+
+
 def get_clerk_jwks(jwks_url: str) -> dict:
     """
     Obtem o conjunto de chaves publicas (JWKS) do Clerk com cache em memoria.
@@ -93,7 +98,9 @@ def _create_local_user_from_clerk(clerk_id: str, email: str = '', first_name: st
     return user
 
 
-def provision_local_user_from_clerk(clerk_id: str, email: str = '', first_name: str = '', last_name: str = ''):
+def provision_local_user_from_clerk(clerk_id: str, email: str = '', first_name: str = '', last_name: str = '', *, email_verified=False):
+    if not isinstance(clerk_id, str) or not clerk_id.strip() or len(clerk_id) > 128:
+        raise AuthenticationFailed('Identificador do usuario invalido no token do Clerk.')
     # Unique clerk_user_id selects one winner. Its entire workspace commits atomically.
     for attempt in range(3):
         try:
@@ -101,6 +108,26 @@ def provision_local_user_from_clerk(clerk_id: str, email: str = '', first_name: 
                 existing = User.objects.filter(clerk_user_id=clerk_id).first()
                 if existing:
                     return existing
+                if not isinstance(email, str):
+                    raise AuthenticationFailed('Dados de identidade invalidos.')
+                email = email.strip()
+                if email:
+                    matches = list(User.objects.select_for_update().filter(email__iexact=email)[:2])
+                    if matches:
+                        if len(matches) == 1 and matches[0].clerk_user_id == clerk_id:
+                            # A concurrent JWT/webhook linked this subject while
+                            # this transaction was waiting for the local user lock.
+                            return matches[0]
+                        # A signed email string alone is not proof of ownership.
+                        # Ambiguous or already-linked identities require explicit migration.
+                        if (email_verified is not True or len(matches) != 1
+                                or matches[0].clerk_user_id is not None
+                                or not matches[0].is_active):
+                            raise ClerkIdentityConflict()
+                        user = matches[0]
+                        user.clerk_user_id = clerk_id
+                        user.save(update_fields=['clerk_user_id'])
+                        return user
                 return _create_local_user_from_clerk(clerk_id, email, first_name, last_name)
         except IntegrityError:
             existing = User.objects.filter(clerk_user_id=clerk_id).first()
@@ -186,23 +213,18 @@ class ClerkJWTAuthentication(BaseAuthentication):
             raise AuthenticationFailed("Token de autenticacao invalido.")
 
         clerk_id = payload.get('sub')
-        if not clerk_id:
+        if not isinstance(clerk_id, str) or not clerk_id.strip() or len(clerk_id) > 128:
             raise AuthenticationFailed("Identificador do usuario ausente no token do Clerk.")
 
         # Reconcilia usuario local
         user = User.objects.filter(clerk_user_id=clerk_id).first()
 
-        # Se nao achou por clerk_user_id, tenta por email nas claims
-        email = payload.get('email') or payload.get('primary_email_address') or ''
-        if not user and email:
-            user = User.objects.filter(email__iexact=email, clerk_user_id__isnull=True).first()
-            if user:
-                with transaction.atomic():
-                    linked = User.objects.filter(pk=user.pk, clerk_user_id__isnull=True).update(clerk_user_id=clerk_id)
-                if not linked:
-                    user = User.objects.filter(clerk_user_id=clerk_id).first()
+        # Only the validated Clerk subject selects an existing mapped identity.
+        email = payload.get('email')
+        if email is None or email == '':
+            email = payload.get('primary_email_address') or ''
 
-        # Se ainda nao existir, provisiona localmente com seguranca
+        # Both JWT and webhook creation use one collision-safe reconciliation path.
         if not user:
             first_name = payload.get('first_name', '')
             last_name = payload.get('last_name', '')
@@ -211,6 +233,7 @@ class ClerkJWTAuthentication(BaseAuthentication):
                 email=email,
                 first_name=first_name,
                 last_name=last_name,
+                email_verified=payload.get('email_verified') is True,
             )
 
         if not user.is_active:

@@ -1,7 +1,9 @@
+import { authProviderMode } from '../services/authConfig';
+import { ClerkAuthPage } from '../components/auth/ClerkAuthExperience';
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { GoogleLoginButton } from '../components/auth/GoogleLoginButton';
+import { LegacyGoogleLoginButton } from '../components/auth/LegacyGoogleLoginButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +15,7 @@ import { useStudioStore } from '../store/studioStore';
 
 type AccountType = 'individual' | 'company';
 
-export const Register = () => {
+const LegacyRegister = () => {
   const navigate = useNavigate();
   const isDark = useStudioStore((s) => s.theme === 'dark');
   const { register, googleLogin, isLoading, error: authError, clearError } = useAuthStore();
@@ -117,8 +119,8 @@ export const Register = () => {
       });
       // Success handling is done in store/component wrapper usually, but here we redirect
       navigate('/login');
-    } catch (err) {
-      console.error('Registration failed:', err);
+    } catch {
+      // The store reports a controlled error without exposing credentials.
     }
   };
 
@@ -175,13 +177,13 @@ export const Register = () => {
                 <div className="space-y-4">
                   {/* Google Login no Registro */}
                   <div className="space-y-3">
-                    <GoogleLoginButton
+                    <LegacyGoogleLoginButton
                       onSuccess={async (credential) => {
                         try {
                           await googleLogin(credential);
                           navigate('/');
-                        } catch (err) {
-                          console.error('Falha no registro via Google:', err);
+                        } catch {
+                          // The store reports a controlled error.
                         }
                       }}
                       isLoading={isLoading}
@@ -499,4 +501,9 @@ export const Register = () => {
   );
 };
 
+
+
+export const Register = () => authProviderMode === 'legacy'
+  ? <LegacyRegister />
+  : <ClerkAuthPage view="register" />;
 export default Register;

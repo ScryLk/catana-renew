@@ -3,7 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useStudioStore } from '../../store/studioStore';
-import { GoogleLoginButton } from './GoogleLoginButton';
+import { LegacyGoogleLoginButton } from './LegacyGoogleLoginButton';
+import { authProviderMode } from '../../services/authConfig';
+import { ClerkAuthModal } from './ClerkAuthExperience';
 import { MultiAgentShowcase } from './MultiAgentShowcase';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -16,7 +18,7 @@ interface AuthModalProps {
   canDismiss?: boolean;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({
+const LegacyAuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
   canDismiss = true,
@@ -223,7 +225,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {!isForgotPasswordView && (
                 <>
                   <div className="mb-4">
-                    <GoogleLoginButton
+                    <LegacyGoogleLoginButton
                       onSuccess={async (credential) => {
                         try {
                           await googleLogin(credential);
@@ -570,3 +572,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     </ResponsiveModal>
   );
 };
+
+export const AuthModal: React.FC<AuthModalProps> = props => authProviderMode === 'legacy'
+  ? <LegacyAuthModal {...props} />
+  : <ClerkAuthModal {...props} />;

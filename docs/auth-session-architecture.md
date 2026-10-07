@@ -52,3 +52,9 @@ Protected boot sets scope, synchronizes brands/catalogs, and checks the last-act
 ## Provisioning
 
 The existing unique clerk_user_id constraint chooses the winner for first-login provisioning. User, organization, sede and quota are created in one transaction; a uniqueness loser reuses the winner, and workspace failures roll back the user. Email reconciliation cannot overwrite an already linked Clerk subject. Existing JWT verification and tenant isolation remain in force.
+
+## Social provider boundary
+
+The follow-up social authentication audit starts from main `3cf4b7dee608bccf258c4039d4d2fc30725a1f50`. [Social authentication](social-authentication.md) records the complete old/new flow map and acceptance evidence. AuthModal and standalone Login/Register/ResetPassword dispatch by the canonical mode. Clerk uses shared ClerkAuthExperience, supported SDK widgets and its Google redirect/callback; only ClerkAuthSync resolves Catana profile and memberships. Legacy Google GIS is explicitly isolated in LegacyGoogleLoginButton. No UI/store endpoint fallback crosses authorities, including recovery and logout.
+
+Backend legacy mutation gates run before authentication, and Clerk webhooks run only in Clerk or local test/development mixed mode. Unknown modes and staging/production mixed mode fail closed. JWT/webhook email reconciliation now requires trusted verified evidence for exactly one active unlinked user; collisions never overwrite an existing Clerk subject. Standard tokens lacking those claims cannot automatically migrate a legacy email account. See the documented migration limitation and [deployment checks](deployment.md).

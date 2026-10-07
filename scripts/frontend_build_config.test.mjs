@@ -28,3 +28,25 @@ test("legacy is explicit and does not require Clerk; missing mode fails", () => 
   );
   assert.throws(() => validateFrontendConfig({}));
 });
+test("Clerk builds require no legacy Google credentials", () => {
+  assert.equal(validateFrontendConfig({
+    VITE_AUTH_PROVIDER: "clerk",
+    VITE_CLERK_PUBLISHABLE_KEY: "pk_live_" + Buffer.from("clerk.usecatana.com.br$").toString("base64"),
+  }), "clerk");
+});
+test("explicit authority wins when credentials for both providers are present", () => {
+  const credentials = {
+    VITE_GOOGLE_CLIENT_ID: "legacy-client.apps.googleusercontent.com",
+    VITE_CLERK_PUBLISHABLE_KEY: "pk_test_" + Buffer.from("example.clerk.accounts.dev$").toString("base64"),
+  };
+  assert.equal(validateFrontendConfig({ ...credentials, VITE_AUTH_PROVIDER: "legacy" }), "legacy");
+  assert.equal(validateFrontendConfig({ ...credentials, VITE_AUTH_PROVIDER: "clerk" }), "clerk");
+  assert.throws(() => validateFrontendConfig({ ...credentials, VITE_AUTH_PROVIDER: "unknown" }));
+});
+test("encoded invalid hosts cannot pass as a safe Clerk build key", () => {
+  for (const host of ["https://clerk.example.com$", "clerk..example.com$", "-clerk.example.com$", "clerk.example.com", "localhost$"])
+    assert.throws(() => validateFrontendConfig({
+      VITE_AUTH_PROVIDER: "clerk",
+      VITE_CLERK_PUBLISHABLE_KEY: "pk_test_" + Buffer.from(host).toString("base64"),
+    }));
+});

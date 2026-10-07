@@ -7,6 +7,68 @@ concurrency:
   group: readiness-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  social-auth-contracts:
+    outputs:
+      provider_isolation: ${{ steps.provider_isolation.outcome }}
+      clerk_social: ${{ steps.clerk_social.outcome }}
+      legacy_isolation: ${{ steps.legacy_isolation.outcome }}
+      coop: ${{ steps.coop.outcome }}
+      frontend_auth_build: ${{ steps.frontend_auth_build.outcome }}
+      social_browser: ${{ steps.social_browser.outcome }}
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-only-nonproduction-key-for-isolated-tests
+      DEBUG: 'True'
+      ENVIRONMENT: development
+      DATABASE_URL: sqlite:////tmp/catana-social-auth-ci.sqlite3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python -m pip install -r backend/requirements.txt
+      - run: npm ci --prefix frontend
+      - name: AUTH PROVIDER ISOLATION
+        id: provider_isolation
+        run: npm test --prefix frontend -- src/services/authProviderRouting.test.tsx src/store/authProviderIsolation.test.ts
+      - name: CLERK SOCIAL AUTH
+        id: clerk_social
+        if: always()
+        run: npm test --prefix frontend -- src/components/auth/ClerkAuthExperience.test.tsx src/components/auth/ClerkAuthSync.test.tsx
+      - name: LEGACY AUTH ISOLATION
+        id: legacy_isolation
+        if: always()
+        run: |
+          npm test --prefix frontend -- src/components/auth/LegacyGoogleLoginButton.test.tsx
+          cd backend && python manage.py test api.tests_social_auth --noinput
+      - name: COOP CONFIGURATION
+        id: coop
+        if: always()
+        run: |
+          node --test scripts/check_coop_config.test.mjs
+          node scripts/check_coop_config.mjs
+          bash scripts/test_nginx_coop.sh
+      - name: FRONTEND AUTH BUILD CONFIG
+        id: frontend_auth_build
+        if: always()
+        run: node --test scripts/frontend_build_config.test.mjs
+      - name: SOCIAL AUTH BROWSER QA
+        id: social_browser
+        if: always()
+        run: |
+          npx --prefix frontend playwright install --with-deps chromium
+          cd frontend && npx playwright test --config playwright.social-auth.config.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: social-auth-browser-evidence
+          path: |
+            frontend/playwright-report-social-auth/
+            frontend/test-results-social-auth/
+          retention-days: 14
   auth-session-contracts:
     outputs:
       auth: ${{ steps.auth.outcome }}
@@ -181,7 +243,7 @@ jobs:
           path: production-diff.txt
   report:
     if: always()
-    needs: [full-backend-suite, full-frontend-suite, build, contracts, determinism, security-smoke, production-diff, auth-session-contracts]
+    needs: [full-backend-suite, full-frontend-suite, build, contracts, determinism, security-smoke, production-diff, auth-session-contracts, social-auth-contracts]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -199,6 +261,12 @@ jobs:
           DETERMINISM: ${{ needs.determinism.result }}
           SECURITY: ${{ needs.security-smoke.result }}
           DIFF: ${{ needs.production-diff.result }}
+          PROVIDER_ISOLATION: ${{ needs.social-auth-contracts.outputs.provider_isolation }}
+          CLERK_SOCIAL: ${{ needs.social-auth-contracts.outputs.clerk_social }}
+          LEGACY_ISOLATION: ${{ needs.social-auth-contracts.outputs.legacy_isolation }}
+          COOP: ${{ needs.social-auth-contracts.outputs.coop }}
+          FRONTEND_AUTH_BUILD: ${{ needs.social-auth-contracts.outputs.frontend_auth_build }}
+          SOCIAL_BROWSER: ${{ needs.social-auth-contracts.outputs.social_browser }}
           AUTH_SESSION: ${{ needs.auth-session-contracts.outputs.auth }}
           WORKSPACE: ${{ needs.auth-session-contracts.outputs.workspace }}
           PROTOCOL: ${{ needs.auth-session-contracts.outputs.protocol }}
@@ -208,6 +276,12 @@ jobs:
           {
             echo "COMMIT: $COMMIT_SHA"
             echo "BRANCH: $SOURCE_REF"
+            echo "AUTH PROVIDER ISOLATION: $PROVIDER_ISOLATION"
+            echo "CLERK SOCIAL AUTH: $CLERK_SOCIAL"
+            echo "LEGACY AUTH ISOLATION: $LEGACY_ISOLATION"
+            echo "COOP CONFIGURATION: $COOP"
+            echo "FRONTEND AUTH BUILD CONFIG: $FRONTEND_AUTH_BUILD"
+            echo "SOCIAL AUTH BROWSER QA: $SOCIAL_BROWSER"
             echo "AUTH SESSION TESTS: $AUTH_SESSION"
             echo "WORKSPACE ISOLATION: $WORKSPACE"
             echo "AGENT PROTOCOL: $PROTOCOL"

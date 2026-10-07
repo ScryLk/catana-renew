@@ -5,6 +5,8 @@ import path from "node:path";
 import { distHashes } from "./frontend_build_config.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 try {
+  if (!["clerk", "legacy"].includes(process.env.AUTH_PROVIDER))
+    throw new Error("explicit backend auth mode required");
   const expected =
     process.env.EXPECTED_COMMIT ||
     execFileSync("git", ["rev-parse", "HEAD"], {

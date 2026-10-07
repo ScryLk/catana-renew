@@ -51,3 +51,5 @@ yarn-error.log*
 # Browser QA artifacts
 frontend/test-results/
 frontend/playwright-report/
+frontend/test-results-social-auth/
+frontend/playwright-report-social-auth/

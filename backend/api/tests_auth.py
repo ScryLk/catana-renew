@@ -13,6 +13,7 @@ from api.models import Organization, Sede, StudioCatalog, SubscriptionPlan
 User = get_user_model()
 
 
+@override_settings(AUTH_PROVIDER='legacy')
 class CatanaAuthTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -230,6 +231,7 @@ class CatanaAuthTests(TestCase):
         self.assertIn('error', res.data)
 
 
+@override_settings(AUTH_PROVIDER='legacy', GOOGLE_CLIENT_ID='synthetic-test-client.apps.googleusercontent.com')
 class OAuthAndMassAssignmentSecurityTests(TestCase):
     """
     Suíte obrigatória de segurança cobrindo:

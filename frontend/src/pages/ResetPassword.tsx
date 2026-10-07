@@ -1,3 +1,5 @@
+import { authProviderMode } from '../services/authConfig';
+import { ClerkAuthPage } from '../components/auth/ClerkAuthExperience';
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
@@ -9,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, AlertCircle, CheckCircle2, Lock, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
-export const ResetPassword = () => {
+const LegacyResetPassword = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const uid = searchParams.get('uid') || '';
@@ -258,3 +260,8 @@ export const ResetPassword = () => {
     </div>
   );
 };
+
+export const ResetPassword = () => authProviderMode === 'legacy'
+  ? <LegacyResetPassword />
+  : <ClerkAuthPage view="forgot-password" />;
+export default ResetPassword;

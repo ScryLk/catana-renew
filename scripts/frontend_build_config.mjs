@@ -22,7 +22,12 @@ export function validateFrontendConfig(env) {
       key.replace(/^pk_(test|live)_/, ""),
       "base64",
     ).toString("utf8");
-    if (!/^[a-zA-Z0-9.-]+\$$/.test(host))
+    const hostname = host.endsWith("$") ? host.slice(0, -1) : "";
+    const labels = hostname.split(".");
+    if (
+      hostname.length > 253 || labels.length < 2 ||
+      labels.some((label) => !/^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(label))
+    )
       throw new Error("Clerk publishable key host is invalid.");
   }
   return mode;

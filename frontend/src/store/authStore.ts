@@ -70,6 +70,7 @@ interface AuthStore {
   openAuthModal: (view?: AuthStore['authModalView']) => void;
   closeAuthModal: () => void;
   clearError: () => void;
+  // Legacy-only entry points. Clerk UI uses its SDK and ClerkAuthSync instead.
   login: (credentials: Credentials) => Promise<void>;
   googleLogin: (credential: string) => Promise<void>;
   register: (credentials: Record<string, unknown>) => Promise<void>;
@@ -159,7 +160,7 @@ export const useAuthStore = create<AuthStore>()(
         settled = true;
       };
       const legacyLogin = async (path: string, payload: unknown) => {
-        if (authProviderMode === 'clerk') throw new AuthNotReadyError();
+        if (authProviderMode !== 'legacy') throw new AuthNotReadyError();
         resetIdentity();
         configureAuthProvider('legacy');
         const epoch = identityEpoch;
@@ -209,7 +210,7 @@ export const useAuthStore = create<AuthStore>()(
           legacyLogin('/api/auth/google/', { credential }),
         register: credentials => legacyLogin('/api/register/', credentials),
         silentRefresh: async () => {
-          if (getAuthProvider() === 'clerk') return false;
+          if (authProviderMode !== 'legacy' || getAuthProvider() === 'clerk') return false;
           const epoch = identityEpoch;
           try {
             const access = await refreshAuthToken();
@@ -228,7 +229,7 @@ export const useAuthStore = create<AuthStore>()(
           }
         },
         checkAuth: () => {
-          if (getAuthProvider() === 'clerk') return Promise.resolve();
+          if (authProviderMode !== 'legacy' || getAuthProvider() === 'clerk') return Promise.resolve();
           if (initialization) return initialization;
           set({ authStatus: 'loading', isLoading: true });
           configureAuthProvider('legacy');
@@ -316,7 +317,7 @@ export const useAuthStore = create<AuthStore>()(
           });
         },
         logout: async (promptRelogin = false) => {
-          const mode = get().authProvider;
+          const mode = authProviderMode;
           resetIdentity();
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
@@ -333,8 +334,15 @@ export const useAuthStore = create<AuthStore>()(
             const clerk = (
               window as unknown as { Clerk?: { signOut: () => Promise<void> } }
             ).Clerk;
-            if (!promptRelogin) await clerk?.signOut();
-          } else
+            if (!promptRelogin) {
+              try {
+                if (!clerk) throw new AuthNotReadyError();
+                await clerk.signOut();
+              } catch {
+                set({ authStatus: 'error', error: 'Não foi possível encerrar sua sessão. Tente novamente.' });
+              }
+            }
+          } else if (mode === 'legacy')
             await axios
               .post(
                 `${API_BASE_URL}/api/auth/logout/`,
@@ -345,19 +353,23 @@ export const useAuthStore = create<AuthStore>()(
           if (promptRelogin)
             toast.error('Sessão expirada. Acesse sua conta novamente.');
         },
-        requestPasswordReset: async email =>
-          (
+        requestPasswordReset: async email => {
+          if (authProviderMode !== 'legacy') throw new AuthNotReadyError();
+          return (
             await axios.post(`${API_BASE_URL}/api/auth/password-reset/`, {
               email
             })
-          ).data,
-        confirmPasswordReset: async payload =>
-          (
+          ).data;
+        },
+        confirmPasswordReset: async payload => {
+          if (authProviderMode !== 'legacy') throw new AuthNotReadyError();
+          return (
             await axios.post(
               `${API_BASE_URL}/api/auth/password-reset/confirm/`,
               payload
             )
-          ).data
+          ).data;
+        }
       };
     },
     {

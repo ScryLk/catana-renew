@@ -1,7 +1,9 @@
+import { authProviderMode } from '../services/authConfig';
+import { ClerkAuthPage } from '../components/auth/ClerkAuthExperience';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { GoogleLoginButton } from '../components/auth/GoogleLoginButton';
+import { LegacyGoogleLoginButton } from '../components/auth/LegacyGoogleLoginButton';
 import { MultiAgentShowcase } from '../components/auth/MultiAgentShowcase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useStudioStore } from '../store/studioStore';
 
-export const Login = () => {
+const LegacyLogin = () => {
   const navigate = useNavigate();
   const isDark = useStudioStore((s) => s.theme === 'dark');
   const { login, googleLogin, isLoading, error, clearError, isAuthenticated } = useAuthStore();
@@ -26,8 +28,8 @@ export const Login = () => {
     try {
       await login({ username, password });
       navigate('/');
-    } catch (err) {
-      console.error('Login failed:', err);
+    } catch {
+      // The store reports a controlled error without exposing credentials.
     }
   };
 
@@ -66,13 +68,13 @@ export const Login = () => {
 
             {/* Login com Google */}
             <div className="mb-5 space-y-4">
-              <GoogleLoginButton
+              <LegacyGoogleLoginButton
                 onSuccess={async (credential) => {
                   try {
                     await googleLogin(credential);
                     navigate('/');
-                  } catch (err) {
-                    console.error('Falha no login com Google:', err);
+                  } catch {
+                    // The store reports a controlled error.
                   }
                 }}
                 isLoading={isLoading}
@@ -174,4 +176,9 @@ export const Login = () => {
   );
 };
 
+
+
+export const Login = () => authProviderMode === 'legacy'
+  ? <LegacyLogin />
+  : <ClerkAuthPage view="login" />;
 export default Login;
