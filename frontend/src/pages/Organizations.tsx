@@ -1,3 +1,4 @@
+import { selectOrganization } from '../services/workspaceContext';
 import { useState, useEffect } from 'react';
 import type { FC } from 'react';
 import { Button } from '@/components/ui/button';
@@ -53,9 +54,9 @@ export const Organizations: FC = () => {
         } catch (error) {
             console.error(error);
         }
-    }
+    };
 
-    const handleCreateShare = async (targetSedeId: string) => {
+  const handleCreateShare = async (targetSedeId: string) => {
         if (!showSedeSettings || !targetSedeId) return;
         try {
             await organizationService.createShare({
@@ -68,9 +69,9 @@ export const Organizations: FC = () => {
         } catch (error) {
             console.error(error);
         }
-    }
+    };
 
-    const loadOrganizations = async () => {
+  const loadOrganizations = async () => {
         try {
             setIsLoading(true);
             const data = await organizationService.getOrganizations();
@@ -106,7 +107,7 @@ export const Organizations: FC = () => {
             await loadOrganizations();
             // If deleted org was active, clear storage
             if (activeOrgId === id) {
-                localStorage.removeItem('active_organization');
+        selectOrganization(null);
                 localStorage.removeItem('active_sede');
                 window.location.reload();
             }
@@ -115,10 +116,10 @@ export const Organizations: FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }
+    };
 
-    const handleSelectOrganization = (org: Organization) => {
-        localStorage.setItem('active_organization', JSON.stringify(org));
+  const handleSelectOrganization = (org: Organization) => {
+    selectOrganization(org);
 
         // Auto-select Default Sede if available
         if (org.default_sede && org.sedes) {
@@ -192,13 +193,13 @@ export const Organizations: FC = () => {
             // Optimistic update (optional, but good for UX) - forcing visual update
             // Ideally we wait for load, but let's just wait for load.
 
-            await organizationService.updateOrganization(activeOrgId, {
-                default_sede: newDefault || undefined
-            } as any);
+      await organizationService.updateOrganization(activeOrgId, {
+        default_sede: newDefault || undefined
+      } as any);
 
-            await loadOrganizations();
+      await loadOrganizations();
 
-            // Update active_sede in localStorage if we just SET a default and it wasn't set?
+      // Update active_sede in localStorage if we just SET a default and it wasn't set?
             // User requested: "Clicou, virou padrão." -> "Click, becomes default".
             // If I just set it as default, should I SWITCH to it immediately if I am currently viewing the Org?
             // The user is ALREADY viewing the Org (Sedes list is visible).
@@ -283,12 +284,17 @@ export const Organizations: FC = () => {
                                                 )}
                                             </div>
                                             <div>
-                                                <h3 className="text-lg font-semibold break-words">{org.name} {activeOrgId === org.id && <span className="ml-2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">Ativa</span>}</h3>
-                                                <p className="text-sm text-muted-foreground">Criado em {new Date(org.created_at).toLocaleDateString()}</p>
+                                                <h3 className="text-lg font-semibold break-words">{org.name} {' '}
+                          {activeOrgId === org.id && (
+                            <span className="ml-2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">Ativa</span>
+                          )}</h3>
+                                                <p className="text-sm text-muted-foreground">Criado em{' '}
+                          {new Date(org.created_at).toLocaleDateString()}</p>
                                                 {org.default_sede && (
                                                     <div className="flex items-center gap-1.5 mt-2 text-xs font-medium text-amber-500 bg-amber-500/10 px-2 py-1 rounded-md w-fit">
                                                         <Star className="h-3 w-3 fill-amber-500" />
-                                                        Inicia em: {org.sedes?.find(s => s.id === org.default_sede)?.name}
+                                                        Inicia em:{' '}
+                            {org.sedes?.find(s => s.id === org.default_sede)?.name}
                                                     </div>
                                                 )}
                                             </div>
@@ -313,7 +319,8 @@ export const Organizations: FC = () => {
                             <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
                                 <div>
                                     <h2 className="text-2xl font-bold text-foreground mb-2">Sedes / Filiais</h2>
-                                    <p className="text-muted-foreground">Gerencie as sedes da organização <strong>{activeOrg.name}</strong></p>
+                                    <p className="text-muted-foreground">Gerencie as sedes da organização{' '}
+                    <strong>{activeOrg.name}</strong></p>
                                 </div>
                                 <Button
                                     variant="outline"
@@ -331,7 +338,9 @@ export const Organizations: FC = () => {
                                 >
                                     <Plus className="h-4 w-4" />
                                     Nova Sede
-                                    {!isAdmin && <Shield className="h-3 w-3 ml-1 text-amber-500" />}
+                                    {!isAdmin && (
+                    <Shield className="h-3 w-3 ml-1 text-amber-500" />
+                  )}
                                 </Button>
                             </div>
 
@@ -434,7 +443,9 @@ export const Organizations: FC = () => {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancelar</Button>
                         <Button onClick={handleCreateOrganization} disabled={isCreating || !newOrgName.trim()}>
-                            {isCreating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            {isCreating ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
                             Criar
                         </Button>
                     </DialogFooter>
@@ -513,7 +524,8 @@ export const Organizations: FC = () => {
                                                                         ? `Para: ${activeOrg?.sedes?.find(s => s.id === share.target_sede)?.name || `#${share.target_sede}`}`
                                                                         : `De: ${activeOrg?.sedes?.find(s => s.id === share.source_sede)?.name || `#${share.source_sede}`}`}
                                                                 </span>
-                                                                <span className="text-xs text-muted-foreground capitalize">{share.resource_type} • {share.permission_level === 'read' ? 'Leitura' : 'Escrita'}</span>
+                                                                <span className="text-xs text-muted-foreground capitalize">{share.resource_type} • {' '}
+                                  {share.permission_level === 'read' ? 'Leitura' : 'Escrita'}</span>
                                                             </div>
                                                         </div>
                                                         <Button
@@ -549,7 +561,8 @@ export const Organizations: FC = () => {
                     <DialogHeader>
                         <DialogTitle>Nova Sede</DialogTitle>
                         <DialogDescription>
-                            Adicione uma nova sede para a organização <strong>{activeOrg?.name}</strong>.
+                            Adicione uma nova sede para a organização{' '}
+              <strong>{activeOrg?.name}</strong>.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
@@ -562,7 +575,9 @@ export const Organizations: FC = () => {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowCreateSedeDialog(false)}>Cancelar</Button>
                         <Button onClick={handleCreateSede} disabled={isCreatingSede || !newSedeName.trim()}>
-                            {isCreatingSede ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            {isCreatingSede ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
                             Criar
                         </Button>
                     </DialogFooter>

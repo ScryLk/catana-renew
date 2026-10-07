@@ -1,3 +1,8 @@
+import {
+  configureAuthProvider,
+  setTokenReady,
+  setInMemoryAccessToken
+} from './authTokenProvider';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act } from 'react';
@@ -91,6 +96,9 @@ describe('Private analysis and explicit confirmation', () => {
     const read = vi.fn().mockReturnValue(chunk.promise); const cancel = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ok: true, body: {getReader: () => ({read, cancel})}}));
     const patch = vi.spyOn(useStudioStore.getState(), 'applySpreadPatch'); const fallback = vi.spyOn(useStudioStore.getState(), 'executeCopilotCommand');
+    configureAuthProvider('legacy');
+    setInMemoryAccessToken('test');
+    setTokenReady(true);
     const chatting = useStudioStore.getState().sendMessageToAgent('Alterar o título');
     await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
     expect(read).toHaveBeenCalledTimes(1);
@@ -188,7 +196,8 @@ describe('Source identity, safe images and progressive editing', () => {
     useStudioStore.setState({activeCatalogId: '51', pages: Array.from({length: 7}, (_, index) => page(index + 1)), totalPages: 7, currentSpread: [7, 7], importMetadata: {importId: 'import-1', share_enabled: true}});
     const post = vi.spyOn(api, 'post').mockResolvedValue({data: {import_metadata: {importId: 'import-1', share_enabled: false, quality: {passed: false}}}});
     await useStudioStore.getState().flushSaveSpread();
-    const payload=post.mock.calls[0][1] as {total_pages:number;spreads:unknown[]};
+    const payload=post.mock.calls[0][1] as {total_pages:number;spreads:unknown[];
+    };
     expect(payload.total_pages).toBe(7);
     expect(payload.spreads).toHaveLength(4);
     expect(payload.spreads[3]).toMatchObject({spread_index: 3, left_page_elements: [page(7)], right_page_elements: []});
@@ -203,7 +212,9 @@ describe('Source identity, safe images and progressive editing', () => {
     await useStudioStore.getState().loadExistingCatalog('51');
     await useStudioStore.getState().flushSaveSpread();
     // Strict server source approval must survive opening/exporting without an edit.
-    const payload = (post.mock.calls[0][1] as {spreads:{left_page_elements: unknown[]; right_page_elements: unknown[]}[]}).spreads[0];
+    const payload = (post.mock.calls[0][1] as {spreads:{left_page_elements: unknown[]; right_page_elements: unknown[];
+        }[];
+      }).spreads[0];
     expect(JSON.parse(JSON.stringify(payload.left_page_elements[0]))).toEqual(original);
     expect(payload.right_page_elements).toEqual([]);
     expect(useStudioStore.getState().importMetadata?.quality).toMatchObject({passed: true});
@@ -221,7 +232,8 @@ describe('Source identity, safe images and progressive editing', () => {
   });
   it('opts in only after the explicit share action succeeds, ignoring a late response in another tenant', async () => {
     useStudioStore.setState({activeCatalogId: '51', pages: [page()], currentSpread: [1, 1], importMetadata: {importId: 'import-1', share_enabled: false}});
-    vi.spyOn(api, 'post').mockResolvedValue({data: {}}); const pending = deferred<{data: {import_metadata: {share_enabled: boolean}}}>();
+    vi.spyOn(api, 'post').mockResolvedValue({data: {}}); const pending = deferred<{data: {import_metadata: {share_enabled: boolean}};
+    }>();
     const put = vi.spyOn(api, 'put').mockReturnValue(pending.promise);
     useStudioStore.getState().openExportModal('pdf'); expect(put).not.toHaveBeenCalled(); useStudioStore.getState().closeExportModal();
     const sharing = useStudioStore.getState().openExportModal('share'); await Promise.resolve(); await Promise.resolve();

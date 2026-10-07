@@ -6,13 +6,10 @@ import { ptBR } from '@clerk/localizations';
 import './index.css';
 import App from './App.tsx';
 
-const CLERK_PUBLISHABLE_KEY =
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
-  import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-const isClerkConfigured =
-  Boolean(CLERK_PUBLISHABLE_KEY) &&
-  (CLERK_PUBLISHABLE_KEY.startsWith('pk_test_') || CLERK_PUBLISHABLE_KEY.startsWith('pk_live_')) &&
-  !CLERK_PUBLISHABLE_KEY.includes('placeholder');
+import {
+  clerkPublishableKey as CLERK_PUBLISHABLE_KEY,
+  isClerkConfigured
+} from './services/authConfig';
 
 // Salvaguarda de Interface: Remocao ativa de marcadores e badges de desenvolvimento injetados por SDKs
 if (typeof window !== 'undefined') {
@@ -76,4 +73,3 @@ createRoot(document.getElementById('root')!).render(
     )}
   </StrictMode>
 );
-

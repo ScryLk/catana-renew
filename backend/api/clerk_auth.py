@@ -5,6 +5,7 @@ import jwt
 from jwt.algorithms import RSAAlgorithm
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction, IntegrityError
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 
@@ -46,7 +47,7 @@ def get_clerk_jwks(jwks_url: str) -> dict:
         return {}
 
 
-def provision_local_user_from_clerk(clerk_id: str, email: str = '', first_name: str = '', last_name: str = ''):
+def _create_local_user_from_clerk(clerk_id: str, email: str = '', first_name: str = '', last_name: str = ''):
     """
     Provisiona um usuario local com Organizacao e Sede padrao a partir de dados do Clerk.
     """
@@ -81,17 +82,8 @@ def provision_local_user_from_clerk(clerk_id: str, email: str = '', first_name: 
     user.organizations.add(org)
     user.sedes.add(sede)
 
-    plan = SubscriptionPlan.objects.filter(tier='free').first()
-    if not plan:
-        plan = SubscriptionPlan.objects.create(
-            name="Plano Gratuito",
-            tier="free",
-            monthly_token_quota=100000,
-            max_active_catalogs=5,
-            rate_limit_rpm=15,
-            can_use_council=False,
-            can_export_pdf=True,
-        )
+    from api.guards.quota_guard import get_or_create_default_plan
+    plan = get_or_create_default_plan('free')
 
     OrganizationQuota.objects.get_or_create(
         organization=org,
@@ -99,6 +91,23 @@ def provision_local_user_from_clerk(clerk_id: str, email: str = '', first_name: 
     )
 
     return user
+
+
+def provision_local_user_from_clerk(clerk_id: str, email: str = '', first_name: str = '', last_name: str = ''):
+    # Unique clerk_user_id selects one winner. Its entire workspace commits atomically.
+    for attempt in range(3):
+        try:
+            with transaction.atomic():
+                existing = User.objects.filter(clerk_user_id=clerk_id).first()
+                if existing:
+                    return existing
+                return _create_local_user_from_clerk(clerk_id, email, first_name, last_name)
+        except IntegrityError:
+            existing = User.objects.filter(clerk_user_id=clerk_id).first()
+            if existing:
+                return existing
+            if attempt == 2:
+                raise
 
 
 class ClerkJWTAuthentication(BaseAuthentication):
@@ -186,10 +195,12 @@ class ClerkJWTAuthentication(BaseAuthentication):
         # Se nao achou por clerk_user_id, tenta por email nas claims
         email = payload.get('email') or payload.get('primary_email_address') or ''
         if not user and email:
-            user = User.objects.filter(email__iexact=email).first()
+            user = User.objects.filter(email__iexact=email, clerk_user_id__isnull=True).first()
             if user:
-                user.clerk_user_id = clerk_id
-                user.save(update_fields=['clerk_user_id'])
+                with transaction.atomic():
+                    linked = User.objects.filter(pk=user.pk, clerk_user_id__isnull=True).update(clerk_user_id=clerk_id)
+                if not linked:
+                    user = User.objects.filter(clerk_user_id=clerk_id).first()
 
         # Se ainda nao existir, provisiona localmente com seguranca
         if not user:

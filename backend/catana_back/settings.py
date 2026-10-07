@@ -27,6 +27,7 @@ DEBUG = env('DEBUG')
 
 # SEC-ENV: Ambiente operacional e trava de segurança de mocks
 ENVIRONMENT = env('ENVIRONMENT', default=('development' if DEBUG else 'production'))
+AUTH_PROVIDER = env('AUTH_PROVIDER', default='mixed')
 ALLOW_MOCK_OAUTH = env.bool('ALLOW_MOCK_OAUTH', default=False)
 if not DEBUG or ENVIRONMENT == 'production':
     ALLOW_MOCK_OAUTH = False
@@ -295,3 +296,9 @@ LOGGING = {
         'level': 'INFO',
     },
 }
+
+# Explicit production mode prevents Clerk/legacy credentials competing.
+if AUTH_PROVIDER == 'clerk':
+    REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = ('api.clerk_auth.ClerkJWTAuthentication',)
+elif AUTH_PROVIDER == 'legacy':
+    REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = ('rest_framework_simplejwt.authentication.JWTAuthentication',)

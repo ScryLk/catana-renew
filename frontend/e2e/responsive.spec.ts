@@ -17,6 +17,7 @@ async function fixtures(page: Page) {
     const path = new URL(route.request().url()).pathname;
     let body: unknown = [];
     if (path.includes('/auth/')) body = { access: 'responsive-test', refresh: 'responsive-test', user: { id: 1, username: 'qa', name: 'QA Mobile', email: 'qa@example.test', role: 'admin' } };
+    else if (path === '/api/profile/') body = {id: 1, username: 'qa', name: 'QA Mobile', email: 'qa@example.test', role: 'admin'};
     else if (path.includes('/public/catalogs/')) return route.fulfill({ status: 404, json: { detail: 'Fixture uses canonical demo fallback' } });
     else if (path === '/api/organizations/') body = [{ id: 1, name: 'Atelier de teste', owner: 1, created_at: '2026-01-01', updated_at: '2026-01-01', default_sede: 1, sedes: [{ id: 1, name: 'Sede principal', organization: 1, created_at: '2026-01-01', updated_at: '2026-01-01', members_count: 1 }] }];
     else if (path === '/api/media/stats/') body = { total_files: 1, folders_count: 0, total_size: 1024, total_size_formatted: '1 KB', images_count: 1, videos_count: 0, documents_count: 0, favorites_count: 0 };

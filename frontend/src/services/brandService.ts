@@ -1,14 +1,20 @@
+import { workspaceKey } from './workspaceContext';
 import api from './api';
 import type { Brand, RecentCatalogItem } from '../store/studioStore';
 import { cropImageToDataUrl } from '../utils/colorExtractor';
 import { parseBrandMarkdown } from '../utils/brandMarkdownParser';
 
 export type BrandEvidenceStatus = 'user_supplied' | 'inferred' | 'confirmed' | 'rejected';
-export interface BrandColor { hex: string; role: string; source: string; status: BrandEvidenceStatus; confidence?: number }
-export interface BrandRule { id: string; type: 'MUST' | 'PREFER' | 'AVOID'; category: string; rule: string; source: string; status: BrandEvidenceStatus; confidence?: number }
-export interface BrandInference { value: unknown; source: string; status: BrandEvidenceStatus; confidence?: number }
-export interface BrandAsset { id: string; kind: string; url?: string; media?: number; width?: number; height?: number }
-export interface BrandSnapshotState { brandId: string | null; brandVersion: number | null; brandSnapshot: Record<string, unknown> | null; brandSnapshotHash: string | null }
+export interface BrandColor { hex: string; role: string; source: string; status: BrandEvidenceStatus; confidence?: number;
+}
+export interface BrandRule { id: string; type: 'MUST' | 'PREFER' | 'AVOID'; category: string; rule: string; source: string; status: BrandEvidenceStatus; confidence?: number;
+}
+export interface BrandInference { value: unknown; source: string; status: BrandEvidenceStatus; confidence?: number;
+}
+export interface BrandAsset { id: string; kind: string; url?: string; media?: number; width?: number; height?: number;
+}
+export interface BrandSnapshotState { brandId: string | null; brandVersion: number | null; brandSnapshot: Record<string, unknown> | null; brandSnapshotHash: string | null;
+}
 
 interface BackendBrand {
   id: string; organization: number; name: string; segment?: string; logo_url?: string;
@@ -50,7 +56,7 @@ export function brandVisualUpdate(brand: Brand | null | undefined, name: string,
     surface: brand?.customPalette?.surface || '#FFFFFF', locked: true};
   const colors: BrandColor[] = [
     ...(brand?.colors || []).filter(color => !['primary', 'secondary', 'accent'].includes(color.role)),
-    ...Object.entries(swatches).map(([role, hex]): BrandColor => brand?.colors?.find(color => color.role === role && color.hex.toUpperCase() === hex.toUpperCase()) || ({role, hex, source, status: 'confirmed'})),
+    ...Object.entries(swatches).map(([role, hex]): BrandColor => brand?.colors?.find(color => color.role === role && color.hex.toUpperCase() === hex.toUpperCase()) || {role, hex, source, status: 'confirmed'}),
   ];
   return {customPalette, colors};
 }
@@ -63,7 +69,8 @@ async function persistedLogo(brand: Partial<Brand>): Promise<Partial<Brand>> {
   } catch { throw new Error('Não foi possível converter o logo SVG. Selecione um PNG; a marca original neste navegador foi preservada.'); }
 }
 
-const cacheKey = (userId: string | number, organization: number) => `katana_brand_cache:v1:${userId}:${organization}`;
+const cacheKey = (userId: string | number, organization: number) =>
+  workspaceKey(userId, organization, 'brand_cache');
 export function readBrandCache(userId: string | number, organization: number): Brand[] {
   try {
     const cached = JSON.parse(localStorage.getItem(cacheKey(userId, organization)) || 'null');
@@ -86,6 +93,7 @@ export function legacyMigrationKey(userId: string | number, organization: number
   return `katana_brand_migration:v1:${userId}:${organization}`;
 }
 export function pendingLegacyBrands(userId: string | number, organization: number): Brand[] {
+  if (String(userId) === '1') return [];
   try {
     const mapping = JSON.parse(localStorage.getItem(legacyMigrationKey(userId, organization)) || '{}');
     return readLegacyBrands(userId).filter(brand => !mapping[brand.id]);
@@ -97,7 +105,8 @@ export function catalogBrandSnapshot(data: Record<string, unknown>): BrandSnapsh
   const id = data.brand_id ?? data.brandId ?? data.brand;
   return {
     brandId: typeof id === 'string' || typeof id === 'number' ? String(id) : null,
-    brandVersion: typeof (data.brand_version ?? data.brandVersion) === 'number' ? (data.brand_version ?? data.brandVersion) as number : null,
+    brandVersion: typeof (data.brand_version ?? data.brandVersion) === 'number' ? ((data.brand_version ?? data.brandVersion) as number)
+        : null,
     brandSnapshot: (data.brand_snapshot ?? data.brandSnapshot ?? null) as Record<string, unknown> | null,
     brandSnapshotHash: (data.brand_snapshot_hash ?? data.brandSnapshotHash ?? null) as string | null,
   };
@@ -136,8 +145,9 @@ export const brandService = {
   async migrate(userId: string | number, organization: number) {
     const brands = pendingLegacyBrands(userId, organization);
     if (!brands.length) return {brands: [] as Brand[], idMapping: {} as Record<string, string>};
-    const payload = await Promise.all(brands.map(async brand => ({...await persistedLogo(brand), guidelines_input: parseBrandMarkdown(brand.brandMarkdown || '').guidelines})));
-    const {data} = await api.post<{brands: BackendBrand[]; id_mapping: Record<string, string>}>('/api/brands/migrate/', {organization, brands: payload});
+    const payload = await Promise.all(brands.map(async brand => ({...(await persistedLogo(brand)), guidelines_input: parseBrandMarkdown(brand.brandMarkdown || '').guidelines})));
+    const {data} = await api.post<{brands: BackendBrand[]; id_mapping: Record<string, string>;
+    }>('/api/brands/migrate/', {organization, brands: payload});
     // The source key stays intact for rollback; mark only acknowledged server IDs.
     try {
       const previous = JSON.parse(localStorage.getItem(legacyMigrationKey(userId, organization)) || '{}');
@@ -145,7 +155,8 @@ export const brandService = {
     } catch { /* Server import remains idempotent if cache is unavailable. */ }
     return {brands: data.brands.map(adaptBrand), idMapping: data.id_mapping};
   },
-  async decide(id: string, decision: {kind: 'guideline' | 'memory' | 'intelligence' | 'color'; id?: string; key?: string; status: 'confirmed' | 'rejected'}) {
+  async decide(id: string, decision: {kind: 'guideline' | 'memory' | 'intelligence' | 'color'; id?: string; key?: string; status: 'confirmed' | 'rejected';
+    }) {
     const payload = decision.kind === 'color' ? {...decision, id: Number(decision.id)} : decision;
     if (decision.kind === 'color' && (!Number.isInteger(payload.id) || Number(payload.id) < 0)) throw new Error('Selecione uma cor válida para confirmar.');
     await api.post(`/api/brands/${id}/decisions/`, payload);

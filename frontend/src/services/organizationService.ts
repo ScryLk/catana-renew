@@ -1,3 +1,4 @@
+import {getContextOrganizationId, getContextUserId, authorizeCreatedOrganization} from './workspaceContext';
 import api from './api';
 import type { Organization, Sede } from '@/types/api';
 
@@ -15,6 +16,7 @@ export const organizationService = {
      */
     async createOrganization(data: Pick<Organization, 'name' | 'description'>): Promise<Organization> {
         const response = await api.post<Organization>('/api/organizations/', data);
+        authorizeCreatedOrganization(response.data);
         return response.data;
     },
 
@@ -34,14 +36,11 @@ export const organizationService = {
     },
 
     getActiveOrganizationId(): number | null {
-        try {
-            const stored = localStorage.getItem('active_organization');
-            if (!stored) return null;
-            const org = JSON.parse(stored);
-            return org.id || null;
-        } catch {
-            return null;
-        }
+        if (getContextUserId() != null) return getContextOrganizationId();
+        return getContextOrganizationId() ?? (() => {
+            // Isolated previews can supply a context mirror; verified app boot clears it.
+            try {return JSON.parse(localStorage.getItem('active_organization') || '{}').id || null;} catch {return null;}
+        })();
     },
 
     /**

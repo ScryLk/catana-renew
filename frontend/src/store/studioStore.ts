@@ -1,10 +1,14 @@
+import { workspaceKey, getContextUserId } from '../services/workspaceContext';
+import { sanitizeAgentText } from '../utils/agentProtocol';
+import { AuthNotReadyError, isTokenReady } from '../services/authTokenProvider';
 import ACTION_REGISTRY from '../../../shared/studio-actions.json';
 import { editableTextIndex, executeTextAction, executeTextGroup, executionFeedback, commercialText, type ActionResult } from '../utils/textCommandExecution';
 import { normalizeCatalogDocument, QualityGate } from '../data/editorialCatalog.mock';
 import { parseSuppliedPrice } from '../utils/commercialProduct';
 import { create } from 'zustand';
-import axios, {type AxiosResponse} from 'axios';
-import api, { getAuthToken, setInMemoryAccessToken, API_BASE_URL } from '../services/api';
+import {type AxiosResponse} from 'axios';
+import api, {
+  authenticatedStreamingFetch, API_BASE_URL } from '../services/api';
 import { toast } from 'sonner';
 import { brandService, catalogBrandSnapshot, groupBrandCatalogs, pendingLegacyBrands, readBrandCache, writeBrandCache } from '../services/brandService';
 import type { BrandAsset, BrandColor, BrandInference, BrandRule, BrandSnapshotState } from '../services/brandService';
@@ -375,25 +379,18 @@ export const INITIAL_BRANDS: Brand[] = [
   },
 ];
 
-export const getCurrentUserId = (): string | number => {
-  if (typeof window === 'undefined') return 'anonymous';
-  try {
-    const raw = localStorage.getItem('catana-auth-storage');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed?.state?.user?.id) {
-        return parsed.state.user.id;
-      }
-    }
-  } catch {}
-  return 'anonymous';
-};
+export const getCurrentUserId = (): string | number =>
+  getContextUserId() ?? 'anonymous';
 
 export const getStoredBrands = (userId?: string | number | null): Brand[] => {
   if (typeof window === 'undefined') return [];
   const uid = userId ?? getCurrentUserId();
   try {
-    const key = `katana_studio_brands:${uid}`;
+    const key = workspaceKey(
+      uid,
+      organizationService.getActiveOrganizationId(),
+      'brands'
+    );
     const saved = localStorage.getItem(key);
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -415,7 +412,12 @@ export const saveStoredBrands = (brands: Brand[], userId?: string | number | nul
   if (typeof window === 'undefined') return;
   const uid = userId ?? getCurrentUserId();
   try {
-    localStorage.setItem(`katana_studio_brands:${uid}`, JSON.stringify(brands));
+    localStorage.setItem(
+      workspaceKey(
+        uid,
+        organizationService.getActiveOrganizationId(),
+        'brands'
+      ), JSON.stringify(brands));
     // Limpa chave legada global para evitar vazamento entre contas
     localStorage.removeItem('katana_studio_brands');
   } catch {
@@ -453,7 +455,11 @@ export const getStoredUnlinkedCatalogs = (userId?: string | number | null): Rece
   if (typeof window === 'undefined') return [];
   const uid = userId ?? getCurrentUserId();
   try {
-    const key = `katana_studio_unlinked_catalogs:${uid}`;
+    const key = workspaceKey(
+      uid,
+      organizationService.getActiveOrganizationId(),
+      'unlinked_catalogs'
+    );
     const saved = localStorage.getItem(key);
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -472,7 +478,12 @@ export const saveStoredUnlinkedCatalogs = (catalogs: RecentCatalogItem[], userId
   if (typeof window === 'undefined') return;
   const uid = userId ?? getCurrentUserId();
   try {
-    localStorage.setItem(`katana_studio_unlinked_catalogs:${uid}`, JSON.stringify(catalogs));
+    localStorage.setItem(
+      workspaceKey(
+        uid,
+        organizationService.getActiveOrganizationId(),
+        'unlinked_catalogs'
+      ), JSON.stringify(catalogs));
     // Limpa chave legada global
     localStorage.removeItem('katana_studio_unlinked_catalogs');
   } catch {
@@ -496,11 +507,15 @@ export interface StoredProjectSession {
 
 const STORAGE_KEY_PREFIX = 'katana_studio_project_session_';
 
-export const getStoredProjectSession = (catalogId: string, userId?: string | number | null): StoredProjectSession | null => {
+export const getStoredProjectSession = (catalogId: string, userId?: string | number | null,
+  organizationId = organizationService.getActiveOrganizationId()
+): StoredProjectSession | null => {
   if (typeof window === 'undefined' || !catalogId) return null;
   const uid = userId ?? getCurrentUserId();
   try {
-    const raw = localStorage.getItem(`${STORAGE_KEY_PREFIX}${uid}_${catalogId}`);
+    const raw = localStorage.getItem(
+      workspaceKey(uid, organizationId, `project:${catalogId}`)
+    );
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.threads) && parsed.threads.length > 0) {
@@ -521,12 +536,19 @@ export const saveStoredProjectSession = (catalogId: string, session: StoredProje
   if (typeof window === 'undefined' || !catalogId) return;
   const uid = userId ?? getCurrentUserId();
   try {
-    const key = `${STORAGE_KEY_PREFIX}${uid}_${catalogId}`;
+    const organizationId =
+      session.organization ?? organizationService.getActiveOrganizationId();
+    const key = workspaceKey(uid, organizationId, `project:${catalogId}`);
     const previous = JSON.parse(localStorage.getItem(key) || '{}');
     localStorage.setItem(key, JSON.stringify({...session,
       brandContext: session.brandContext ?? previous.brandContext,
       organization: session.organization ?? previous.organization}));
-    localStorage.setItem(`katana_studio_last_active_catalog:${uid}`, catalogId);
+    localStorage.setItem(
+      workspaceKey(
+        uid,
+        organizationService.getActiveOrganizationId(),
+        'last_active_catalog'
+      ), catalogId);
     // Remove chaves legadas globais
     localStorage.removeItem(`${STORAGE_KEY_PREFIX}${catalogId}`);
     localStorage.removeItem('katana_studio_last_active_catalog');
@@ -568,7 +590,8 @@ export const syncActiveCatalogStorage = (state: {
 export interface StudioState {
   qualityGate?: QualityGate;
   importMetadata?: DocumentImportMetadata;
-  confirmDocumentImport: (importId: string, options: {title: string; mode: DocumentImportMode; brandId?: string | null}) => Promise<boolean>;
+  confirmDocumentImport: (importId: string, options: {title: string; mode: DocumentImportMode; brandId?: string | null;
+    }) => Promise<boolean>;
   cancelDocumentImport: () => void;
   updateDocumentText: (pageNumber: number, elementId: string, text: string) => void;
   resetDocumentText: (pageNumber: number, elementId: string) => void;
@@ -592,7 +615,8 @@ export interface StudioState {
   triggerAgentCursor: (
     roleId: AgentCursorRole,
     actionText: string,
-    options?: { x?: number; y?: number; startX?: number; startY?: number; targetElementId?: string; durationMs?: number }
+    options?: { x?: number; y?: number; startX?: number; startY?: number; targetElementId?: string; durationMs?: number;
+    }
   ) => void;
   clearAgentCursors: () => void;
 
@@ -633,6 +657,8 @@ export interface StudioState {
   setActiveCatalogId: (id: string | null) => void;
   setHasStartedSession: (started: boolean) => void;
   loadExistingCatalog: (catalogId: string) => void | Promise<void>;
+  initializeWorkspace: (userId: number) => Promise<void>;
+  catalogSyncStatus: 'idle' | 'loading' | 'ready' | 'error';
   syncUserCatalogs: () => Promise<void>;
   isDemoLoading: boolean;
   loadDemoCatalog: (templateKey: string) => Promise<void>;
@@ -792,7 +818,8 @@ export interface StudioState {
     type?: PageLayoutType;
     contentRole?: string;
     pageId?: string;
-    pageColors?: {backgroundColor?:string; textColor?:string; accentColor?:string};
+    pageColors?: {backgroundColor?:string; textColor?:string; accentColor?:string;
+    };
     afterPage?: number;
     title?: string;
     subtitle?: string;
@@ -811,7 +838,8 @@ export interface StudioState {
   removePageOverlay: (pageNumber: number, overlayId: string) => void;
   clearPageOverlays: (pageNumber: number, typeFilter?: string) => void;
   updatePageOverlay: (pageNumber: number, overlayId: string, updates: Partial<PageOverlayElement>) => void;
-  generateSprite: (prompt: string, targetPage: number, options?: { x?: number; y?: number; scale?: number; width?: number; height?: number }) => Promise<string | null>;
+  generateSprite: (prompt: string, targetPage: number, options?: { x?: number; y?: number; scale?: number; width?: number; height?: number;
+    }) => Promise<string | null>;
 
   // Active theme / palette & Brand Lock
   activePalette: StudioPalette;
@@ -900,7 +928,13 @@ const getInitialRoles = (): StudioRole[] => {
   if (typeof window !== 'undefined') {
     try {
       const uid = getCurrentUserId();
-      const saved = localStorage.getItem(`katana_studio_custom_roles:${uid}`) || localStorage.getItem('katana_studio_custom_roles');
+      const saved = localStorage.getItem(
+        workspaceKey(
+          uid,
+          organizationService.getActiveOrganizationId(),
+          'custom_roles'
+        )
+      );
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -918,7 +952,12 @@ const saveCustomRoles = (roles: StudioRole[], userId?: string | number | null) =
   if (typeof window !== 'undefined') {
     const uid = userId ?? getCurrentUserId();
     const customs = roles.filter((r) => r.isCustom);
-    localStorage.setItem(`katana_studio_custom_roles:${uid}`, JSON.stringify(customs));
+    localStorage.setItem(
+      workspaceKey(
+        uid,
+        organizationService.getActiveOrganizationId(),
+        'custom_roles'
+      ), JSON.stringify(customs));
   }
 };
 
@@ -930,8 +969,11 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   let generationOperation = 0;
   let spreadSaveOperation = 0;
   let catalogLoadOperation = 0;
+  let bootFlight: Promise<void> | null = null;
+  let bootScopeKey = '';
   let documentEpoch = 0;
   let activeImportOperation: number | null = null;
+  let chatAbort: AbortController | null = null;
   const captureBrandScope = () => ({user: get().activeUserId, org: get().activeOrganizationId, epoch: brandEpoch});
   const isCurrentBrandScope = (scope: ReturnType<typeof captureBrandScope>) => scope.user === get().activeUserId && scope.org === get().activeOrganizationId && scope.epoch === brandEpoch && scope.org === organizationService.getActiveOrganizationId();
   const captureDocumentScope = () => ({...captureBrandScope(), catalog: get().activeCatalogId, documentEpoch});
@@ -1107,7 +1149,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
   };
 
-  return ({
+  return {
   theme: getInitialTheme(),
   toggleTheme: () =>
     set((s) => {
@@ -1222,12 +1264,17 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     if (get().activeUserId !== userId || get().activeOrganizationId !== org) {
       get().resetStudioState();
       set({activeUserId: userId, activeOrganizationId: org,
-        brands: userId != null && org != null ? readBrandCache(userId, org) : [],
+          roles: getInitialRoles(),
+          brands: userId != null && org != null ? readBrandCache(userId, org) : [],
         legacyBrandCount: userId != null && org != null ? pendingLegacyBrands(userId, org).length : 0});
     }
   },
   resetStudioState: () => {
-    brandEpoch += 1;
+      chatAbort?.abort();
+      chatAbort = null;
+      bootFlight = null;
+      bootScopeKey = '';
+      brandEpoch += 1;
     documentEpoch += 1;
     activeImportOperation = null;
     catalogLoadOperation += 1;
@@ -1246,7 +1293,23 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       hasStartedSession: false,
       activeCatalogId: null,
       catalogTitle: 'Novo Catálogo',
-      pages: [],
+        activePalette: { ...STUDIO_PALETTE_PRESETS[0] },
+        roles: [...DEFAULT_STUDIO_ROLES],
+        activeRoleId: 'orchestrator',
+        activeMode: 'orchestrator',
+        pendingInputPrompt: null,
+        activeTargetSlot: null,
+        isBrandModalOpen: false,
+        brandModalEditingId: null,
+        isAccountSettingsOpen: false,
+        isRoleManagerOpen: false,
+        isCouncilModalOpen: false,
+        isSkillsModalOpen: false,
+        isProductDrawerOpen: false,
+        isExcelImportModalOpen: false,
+        isExportModalOpen: false,
+        isNewCatalogModalOpen: false,
+        pages: [],
       qualityGate: undefined, importMetadata: undefined,
       totalPages: 0,
       executionPlan: [],
@@ -1262,6 +1325,12 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       generationLogs: [],
       generationTargetCatalog: null,
       unlinkedCatalogs: [],
+        catalogSyncStatus: 'idle',
+        historyStack: [],
+        redoStack: [],
+        canUndo: false,
+        canRedo: false,
+        isDemoLoading: false,
       brands: [],
       activeBrandId: null,
       unassignedProducts: [],
@@ -1394,7 +1463,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
     // Lâminas intermediárias
     for (let i = 2; i < pagesCount; i++) {
-      const pageType: PageLayoutType = i === 2 ? 'manifesto' : (i % 2 === 1 ? 'hero' : 'duo');
+      const pageType: PageLayoutType = i === 2 ? 'manifesto' : i % 2 === 1 ? 'hero' : 'duo';
       pages.push({
         id: `${tempId}-p${i}`,
         pageNumber: i,
@@ -1519,7 +1588,12 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
     try {
       const uid = get().activeUserId ?? getCurrentUserId();
-      localStorage.setItem(`katana_studio_last_active_catalog:${uid}`, realCatalogId);
+      localStorage.setItem(
+          workspaceKey(
+            uid,
+            organizationService.getActiveOrganizationId(),
+            'last_active_catalog'
+          ), realCatalogId);
       localStorage.removeItem('katana_studio_last_active_catalog');
     } catch {}
 
@@ -2109,7 +2183,12 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
           set({ activeCatalogId: realId });
           try {
             const uid = get().activeUserId ?? getCurrentUserId();
-            localStorage.setItem(`katana_studio_last_active_catalog:${uid}`, realId);
+            localStorage.setItem(
+                  workspaceKey(
+                    uid,
+                    organizationService.getActiveOrganizationId(),
+                    'last_active_catalog'
+                  ), realId);
             localStorage.removeItem('katana_studio_last_active_catalog');
           } catch {}
           const spreadsPayload = [];
@@ -2191,6 +2270,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     // 1. Persiste o catálogo que está saindo se houver sessão ativa
     if (s.activeCatalogId && s.threads && s.threads.length > 0) {
       saveStoredProjectSession(s.activeCatalogId, {
+        organization: s.activeOrganizationId,
         threads: s.threads,
         activeThreadId: s.activeThreadId,
         catalogTitle: s.catalogTitle,
@@ -2203,13 +2283,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       get().flushSaveSpread();
     }
 
-    try {
-      const uid = s.activeUserId ?? getCurrentUserId();
-      localStorage.setItem(`katana_studio_last_active_catalog:${uid}`, catalogId);
-      localStorage.removeItem('katana_studio_last_active_catalog');
-    } catch {}
-
-    const numericCatalogId = parseInt(catalogId, 10);
+    const numericCatalogId = /^\d+$/.test(catalogId) ? Number(catalogId) : NaN;
     // Se for ID numérico real do backend, busca do PostgreSQL com isolamento do usuário autenticado:
     if (!isNaN(numericCatalogId)) {
       try {
@@ -2218,6 +2292,8 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         const catData = res.data;
         if (loadOperation !== catalogLoadOperation || !isCurrentBrandScope(loadScope)) return;
         if (s.activeOrganizationId != null && catData.organization != null && catData.organization !== s.activeOrganizationId) {
+          const hintKey = workspaceKey(s.activeUserId, s.activeOrganizationId, 'last_active_catalog');
+          if (localStorage.getItem(hintKey) === catalogId) localStorage.removeItem(hintKey);
           set({agentStatus: 'idle'}); return;
         }
         if (catData && catData.id) {
@@ -2226,14 +2302,18 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         }
       } catch (err: any) {
         if (loadOperation !== catalogLoadOperation || !isCurrentBrandScope(loadScope)) return;
-        console.warn('Falha ao buscar catalogo no backend:', err);
+        console.warn('catalog_restore_failed', {catalogId, status: err?.response?.status});
         set({ agentStatus: 'idle' });
-        // Anti-IDOR / Anti-vazamento: se o backend retornar 404/403, não faz fallback para mock
-        if (err?.response?.status === 404 || err?.response?.status === 403) {
-          toast.error('Catálogo não encontrado ou você não possui permissão para acessá-lo.');
-          return;
+        if ([403, 404].includes(err?.response?.status)) {
+          const key = workspaceKey(s.activeUserId, s.activeOrganizationId, 'last_active_catalog');
+          if (localStorage.getItem(key) === catalogId) localStorage.removeItem(key);
+          await get().syncUserCatalogs();
+          toast.error('Catálogo não encontrado ou sem permissão de acesso.');
+        } else if (err?.response?.status !== 401) {
+          toast.error('Não foi possível carregar o catálogo. Tente novamente.');
         }
       }
+      return; // A backend ID never falls back to browser copies or demo documents.
     }
 
     // 2. Mapeamento de títulos e briefings padrão para mocks legados
@@ -2352,16 +2432,58 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     });
   },
 
+    catalogSyncStatus: 'idle',
+    initializeWorkspace: userId => {
+      if (!isTokenReady()) return Promise.resolve();
+      get().setActiveUserId(userId);
+      const scope = captureBrandScope();
+      const key = `${scope.user}:${scope.org}:${scope.epoch}`;
+      if (bootFlight && bootScopeKey === key) return bootFlight;
+      if (scope.org == null) return Promise.resolve();
+      bootScopeKey = key;
+      const flight = (async () => {
+        await Promise.allSettled([
+          get().syncBrands(),
+          get().syncUserCatalogs()
+        ]);
+        if (!isCurrentBrandScope(scope) || get().catalogSyncStatus !== 'ready')
+          return;
+        const hintKey = workspaceKey(
+          scope.user,
+          scope.org,
+          'last_active_catalog'
+        );
+        const hint = localStorage.getItem(hintKey);
+        const ids = [
+          ...get().unlinkedCatalogs,
+          ...get().brands.flatMap(brand => brand.catalogs)
+        ].map(catalog => String(catalog.id));
+        if (hint && !ids.includes(hint)) localStorage.removeItem(hintKey);
+        else if (hint && !get().hasStartedSession)
+          await get().loadExistingCatalog(hint);
+      })().finally(() => {
+        if (isCurrentBrandScope(scope) && get().catalogSyncStatus === 'error')
+          bootFlight = null;
+      });
+      bootFlight = flight;
+      return flight;
+  },
+
   syncUserCatalogs: async () => {
     const scope = captureBrandScope();
     if (scope.user == null || scope.org == null) return;
-    try {
-      const {data} = await api.get(`/api/v2/studio/catalogs/?organization=${scope.org}`);
+      set({ catalogSyncStatus: 'loading' });
+      try {
+      const {data} = await api.get(
+          `/api/v2/studio/catalogs/?organization=${scope.org}&status=active`
+        );
       if (!isCurrentBrandScope(scope) || !Array.isArray(data)) return;
       const grouped = groupBrandCatalogs(get().brands, data);
-      set(grouped);
+      set({ ...grouped, catalogSyncStatus: 'ready' });
       writeBrandCache(scope.user, scope.org, grouped.brands);
-    } catch { /* Studio remains usable; server Brand errors have an explicit retry. */ }
+    } catch {
+        if (isCurrentBrandScope(scope)) set({ catalogSyncStatus: 'error' });
+      }
   },
 
   loadDemoCatalog: async (templateKey: string) => {
@@ -2432,7 +2554,12 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         const activeCatId = String(catData.id);
         try {
           const uid = s.activeUserId ?? getCurrentUserId();
-          localStorage.setItem(`katana_studio_last_active_catalog:${uid}`, activeCatId);
+          localStorage.setItem(
+              workspaceKey(
+                uid,
+                organizationService.getActiveOrganizationId(),
+                'last_active_catalog'
+              ), activeCatId);
           localStorage.removeItem('katana_studio_last_active_catalog');
         } catch {}
 
@@ -3419,7 +3546,9 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     set({ saveStatus: 'saving' });
 
     try {
-      const numericCatalogId = parseInt(catalogId, 10);
+      const numericCatalogId = /^\d+$/.test(catalogId)
+          ? Number(catalogId)
+          : NaN;
       if (!isNaN(numericCatalogId)) {
         const spreads = [];
         for (let offset=0; offset<state.pages.length; offset+=2) {
@@ -4450,7 +4579,9 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   sendMessageToAgent: async (prompt, attachments) => {
     const state = get();
     const documentScope = captureDocumentScope();
-    const streamIsCurrent = () => isCurrentDocumentScope(documentScope) && get().activeThreadId === state.activeThreadId;
+    const streamIsCurrent = () =>
+        !controller.signal.aborted &&
+        isCurrentDocumentScope(documentScope) && get().activeThreadId === state.activeThreadId;
     const userPrompt = prompt.trim();
     if (!userPrompt && (!attachments || attachments.length === 0)) return;
 
@@ -4472,8 +4603,12 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       return;
     }
 
-    // 1. Mensagem do usuario
-    const userMsgId = `msg-user-${Date.now()}`;
+      chatAbort?.abort();
+      const controller = new AbortController();
+      chatAbort = controller;
+      const requestId = crypto.randomUUID();
+      // 1. Mensagem do usuario
+    const userMsgId = `msg-user-${requestId}`;
     const userMsg: ChatMessage = {
       id: userMsgId,
       role: 'user',
@@ -4519,7 +4654,8 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     const numericThreadId = state.activeThreadId ? parseInt(state.activeThreadId, 10) : NaN;
 
     const payload = {
-      message: userPrompt,
+        client_request_id: requestId,
+        message: userPrompt,
       agent_role: state.activeRoleId || 'orchestrator',
       catalog_id: !isNaN(numericCatalogId) ? numericCatalogId : undefined,
       thread_id: !isNaN(numericThreadId) ? numericThreadId : undefined,
@@ -4531,74 +4667,20 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     };
 
     try {
-      let activeToken = await getAuthToken();
-      if (!streamIsCurrent()) return;
-      let response = await fetch(`${API_BASE_URL}/api/v2/studio/chat/stream/`, {
+        const response = await authenticatedStreamingFetch(`${API_BASE_URL}/api/v2/studio/chat/stream/`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
-        },
-        credentials: 'include',
+          'Content-Type': 'application/json'
+            },
         body: JSON.stringify(payload),
-      });
+            signal: controller.signal
+          });
 
       if (!streamIsCurrent()) { await response.body?.cancel(); return; }
-      if (!response.ok && response.status === 401) {
-        try {
-          let newAccess = await getAuthToken(true);
-          if (!streamIsCurrent()) return;
-          if (!newAccess) {
-            const storedRefresh = localStorage.getItem('refresh_token');
-            if (storedRefresh) {
-              const refreshRes = await axios.post(
-                `${API_BASE_URL}/api/auth/token/refresh/`,
-                { refresh: storedRefresh },
-                { withCredentials: true }
-              );
-              if (!streamIsCurrent()) return;
-              newAccess = refreshRes.data?.access;
-              if (newAccess && typeof newAccess === 'string') {
-                setInMemoryAccessToken(newAccess);
-                localStorage.setItem('access_token', newAccess);
-                if (refreshRes.data.refresh) {
-                  localStorage.setItem('refresh_token', refreshRes.data.refresh);
-                }
-              }
-            }
-          }
+      if (response.status === 401) throw new AuthNotReadyError();
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-          if (newAccess && typeof newAccess === 'string') {
-            activeToken = newAccess;
-            response = await fetch(`${API_BASE_URL}/api/v2/studio/chat/stream/`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${newAccess}`,
-              },
-              credentials: 'include',
-              body: JSON.stringify(payload),
-            });
-          }
-        } catch {
-          // Refresh falhou
-        }
-      }
-
-      if (!streamIsCurrent()) { await response.body?.cancel(); return; }
-      if (!response.ok) {
-        if (response.status === 401) {
-          const hasClerkSession = typeof window !== 'undefined' && Boolean((window as any).Clerk?.session);
-          if (!hasClerkSession) {
-            window.dispatchEvent(new CustomEvent('catana:unauthorized'));
-          }
-          set({ agentStatus: 'idle' });
-          return;
-        }
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      set({ agentStatus: 'generating' });
+        set({ agentStatus: 'generating' });
 
       const reader = response.body?.getReader();
       if (!reader) throw new Error('ReadableStream nao disponivel');
@@ -4608,13 +4690,13 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       let accumulatedContent = '';
       let appliedPatch: any = null;
 
+        let streamDone = false;
+        let protocolError = false;
+
       let executionResults: ActionResult[] = [];
       let providerMetadata: Record<string, unknown> = {};
       const executePatch = (patch: Parameters<StudioState['applySpreadPatch']>[0]) => {
         executionResults = get().applySpreadPatch(patch);
-        const applied = executionResults.filter(result => result.status === 'applied').length;
-        if (applied) toast.success(`${applied} alteração(ões) aplicada(s)`);
-        else toast.error('Nenhuma alteração aplicada', {description: executionFeedback(executionResults)});
       };
 
       const resolveActionSummaries = (patchObj: any): string[] => {
@@ -4748,39 +4830,33 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
               executePatch(data.patch);
             }
 
-            if (data.event === 'done') {
-              providerMetadata = data.metadata || {};
+            if (data.event === 'protocol_error') protocolError = true;
+              if (data.event === 'error')
+                throw new Error('Agent stream failed');
+              if (data.event === 'done') {
+                streamDone = true;
+                providerMetadata = data.metadata || {};
               if (data.patch && !appliedPatch) {
                 appliedPatch = data.patch;
                 executePatch(data.patch);
               }
             }
-          } catch {
-            // Ignora linhas intermediarias de streaming
-          }
+          } catch (error) {
+              if (!(error instanceof SyntaxError)) throw error;
+            }
         }
       }
 
       if (!streamIsCurrent()) return;
-      // Se nao veio evento de patch explicito mas o texto acumulado tem json:patch
-      if (!appliedPatch && accumulatedContent.includes('json:patch')) {
-        const match = accumulatedContent.match(/```(?:json:patch|json)?\s*(\{[\s\S]*?(?:"updates"|"actions")[\s\S]*?\})\s*```/);
-        if (match) {
-          try {
-            const parsed = JSON.parse(match[1]);
-            appliedPatch = parsed;
-            executePatch(parsed);
-          } catch {}
-        }
-      }
-
-      // Extrai açoes e delegaçoes para a mensagem formada
+        if (!streamDone) throw new Error('Interrupted stream');
+        // Extrai açoes e delegaçoes para a mensagem formada
       const actionSummaries = appliedPatch ? resolveActionSummaries(appliedPatch).filter((_: string, index: number) => executionResults[index]?.status === 'applied') : [];
-      const mappedDelegations = resolveDelegations(appliedPatch, accumulatedContent);
+      const mappedDelegations = resolveDelegations(appliedPatch,
+          sanitizeAgentText(accumulatedContent)
+        );
 
       // Limpa blocos de patch e tags tecnicas do conteudo apresentado ao usuario
-      let cleanContent = accumulatedContent
-        .replace(/```(?:json:patch|json)?[\s\S]*?```/g, '')
+      let cleanContent = sanitizeAgentText(accumulatedContent)
         .replace(/\[CONTEXTO DO PROJETO\][\s\S]*?(?=\n\n|$)/gi, '')
         .trim();
 
@@ -4811,16 +4887,22 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         cleanContent = 'Nenhuma alteração confirmada na prancheta.';
       }
 
-      if (appliedPatch) {
+      if (protocolError)
+          cleanContent =
+            'Não consegui transformar essa solicitação em uma alteração válida. Tente novamente.';
+        if (appliedPatch) {
         await get().flushSaveSpread();
         if (!streamIsCurrent()) return;
         if (get().saveStatus === 'error') executionResults = executionResults.map(r => ({...r,status:'failed' as const,reason:'Não foi possível salvar a alteração. Tente novamente.'}));
         cleanContent = executionFeedback(executionResults);
+        const applied = executionResults.filter(result => result.status === 'applied').length;
+        if (applied) toast.success(`${applied} alteração(ões) aplicada(s)`);
+        else toast.error('Nenhuma alteração aplicada', {description: cleanContent});
       }
 
       if (!appliedPatch && /(?:realizad[oa]|executad[oa]|atualizad[oa]|sincronizad[oa]|conclu[ií]d[oa])/i.test(cleanContent) && providerMetadata.user_guard_status !== 'BLOCKED') cleanContent = 'Nenhuma alteração confirmada na prancheta. ' + (providerMetadata.mock ? 'O provedor simulado está ativo.' : 'Selecione o texto ou reformule a solicitação.');
 
-      const assistantMsgId = `msg-agent-${Date.now()}`;
+      const assistantMsgId = `msg-agent-${requestId}`;
       const assistantMsg: ChatMessage = {
         id: assistantMsgId,
         role: 'assistant',
@@ -4854,7 +4936,10 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     } catch (err) {
       if (!streamIsCurrent()) return;
       console.warn('Agent request failed:', err instanceof Error ? err.name : 'request_error');
-      const failure: ChatMessage = {id: `msg-error-${Date.now()}`, role: 'assistant', content: 'Provedor indisponível ou falha de execução. Nenhuma nova alteração confirmada; tente novamente.', timestamp: new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}), providerMetadata: {error: 'provider_unavailable'}};
+      const failure: ChatMessage = {id: `msg-error-${Date.now()}`, role: 'assistant', content:
+            err instanceof AuthNotReadyError
+              ? 'Sua sessão precisa ser verificada. Acesse sua conta e tente novamente.'
+              : 'Resposta interrompida ou falha de execução. Nenhuma nova alteração confirmada; tente novamente.', timestamp: new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}), providerMetadata: {error: 'provider_unavailable'}};
       set(s => ({agentStatus: 'idle', messages: [...s.messages, failure], threads: s.threads.map(thread => thread.id === s.activeThreadId ? {...thread, messages: [...thread.messages, failure]} : thread)}));
     }
   },
@@ -6665,18 +6750,18 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     });
   },
 
-  isPalettePanelOpen: false,
-  setIsPalettePanelOpen: (open) => set({ isPalettePanelOpen: open }),
+    isPalettePanelOpen: false,
+    setIsPalettePanelOpen: (open) => set({ isPalettePanelOpen: open }),
 
-  activePalette: STUDIO_PALETTE_PRESETS[0],
+    activePalette: STUDIO_PALETTE_PRESETS[0],
 
-  setPaletteLocked: (locked) => {
+    setPaletteLocked: (locked) => {
     set((state) => ({
       activePalette: { ...state.activePalette, locked },
     }));
   },
 
-  applyPaletteToPages: (palette) => {
+    applyPaletteToPages: (palette) => {
     set((state) => {
       const isDarkPage = (type: string) => type === 'cover' || type === 'divider' || type === 'backcover';
       const updatedPages = state.pages.map((p) => ({
@@ -6691,7 +6776,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     });
   },
 
-  setActivePalette: (palette, syncPages = true) => {
+    setActivePalette: (palette, syncPages = true) => {
     set((state) => {
       const isDarkPage = (type: string) => type === 'cover' || type === 'divider' || type === 'backcover';
       const updatedPages = syncPages
@@ -6710,7 +6795,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     });
   },
 
-  updateActivePalette: (updates, syncPages = true) => {
+    updateActivePalette: (updates, syncPages = true) => {
     set((state) => {
       const merged: StudioPalette = {
         ...state.activePalette,
@@ -6733,44 +6818,54 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     });
   },
 
-  selectedElementId: null,
-  setSelectedElementId: (id) => set({ selectedElementId: id }),
+    selectedElementId: null,
+    setSelectedElementId: (id) => set({ selectedElementId: id }),
 
-  startSession: (initialPrompt, _categoryName, attachments) => {
+    startSession: (initialPrompt, _categoryName, attachments) => {
     const prompt = initialPrompt || 'Criar catálogo editorial moderno';
     get().triggerCatalogGeneration(prompt, attachments);
   },
 
-  resetToHome: () => {
-    const s = get();
-    if (s.activeCatalogId && s.threads && s.threads.length > 0) {
-      saveStoredProjectSession(s.activeCatalogId, {
-        threads: s.threads,
-        activeThreadId: s.activeThreadId,
-        catalogTitle: s.catalogTitle,
-        activePalette: s.activePalette,
-        currentSpread: s.currentSpread,
-        pages: s.pages,
-        totalPages: s.totalPages,
-      }, s.activeUserId);
-    }
-    if (typeof window !== 'undefined') {
-      const uid = s.activeUserId ?? getCurrentUserId();
-      localStorage.removeItem(`katana_studio_last_active_catalog:${uid}`);
-      localStorage.removeItem('katana_studio_last_active_catalog');
-    }
-    set({
-      hasStartedSession: false,
-      activeCatalogId: null,
-      catalogTitle: 'Novo Catálogo',
-      pages: [],
-      qualityGate: undefined,
-      totalPages: 0,
-      executionPlan: [],
-      messages: [],
-      threads: [],
-      activeThreadId: '',
-      agentStatus: 'idle',
+    resetToHome: () => {
+      const s = get();
+      if (s.activeCatalogId && s.threads && s.threads.length > 0) {
+        saveStoredProjectSession(
+          s.activeCatalogId,
+          {
+            threads: s.threads,
+            activeThreadId: s.activeThreadId,
+            catalogTitle: s.catalogTitle,
+            activePalette: s.activePalette,
+            currentSpread: s.currentSpread,
+            pages: s.pages,
+            totalPages: s.totalPages
+          },
+          s.activeUserId
+        );
+      }
+      if (typeof window !== 'undefined') {
+        const uid = s.activeUserId ?? getCurrentUserId();
+        localStorage.removeItem(
+          workspaceKey(
+            uid,
+            organizationService.getActiveOrganizationId(),
+            'last_active_catalog'
+          )
+        );
+        localStorage.removeItem('katana_studio_last_active_catalog');
+      }
+      set({
+        hasStartedSession: false,
+        activeCatalogId: null,
+        catalogTitle: 'Novo Catálogo',
+        pages: [],
+        qualityGate: undefined,
+        totalPages: 0,
+        executionPlan: [],
+        messages: [],
+        threads: [],
+        activeThreadId: '',
+        agentStatus: 'idle',
       selectedElementId: null,
       currentSpread: [1, 2],
       isGeneratingCatalog: false,
@@ -6780,5 +6875,5 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       generationTargetCatalog: null,
     });
   },
-});
+};
 });
