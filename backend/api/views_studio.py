@@ -727,6 +727,19 @@ class StudioChatStreamView(APIView):
         agent_role = agent_role.strip().lower()
         catalog_id = request.data.get("catalog_id")
         thread_id = request.data.get("thread_id")
+        for field, value in (('catalog_id', catalog_id), ('thread_id', thread_id)):
+            if value is not None and (type(value) not in (str, int) or not str(value).isascii()
+                    or not str(value).isdigit() or len(str(value)) > 18 or int(value) <= 0):
+                return Response({'code': 'invalid_target', 'error': f'{field} inválido.'}, status=400)
+        selected_element_id = request.data.get('selected_element_id')
+        if selected_element_id is not None and (not isinstance(selected_element_id, str)
+                or not 0 < len(selected_element_id) <= 200 or not re.fullmatch(r'[\w.:-]+', selected_element_id)):
+            return Response({'code': 'invalid_target', 'error': 'Seleção inválida.'}, status=400)
+        raw_spread = request.data.get('spread_index', 0)
+        if (type(raw_spread) not in (str, int) or not str(raw_spread).isascii()
+                or not str(raw_spread).isdigit() or len(str(raw_spread)) > 5 or int(raw_spread) > 10000):
+            return Response({'code': 'invalid_target', 'error': 'Página inválida.'}, status=400)
+        spread_index = int(raw_spread)
 
         if not message and not request.FILES:
             return Response({"error": "Mensagem ou anexo sao obrigatorios."}, status=status.HTTP_400_BAD_REQUEST)
@@ -812,12 +825,6 @@ class StudioChatStreamView(APIView):
             except Exception:
                 pass
 
-        selected_element_id = request.data.get("selected_element_id")
-        try:
-            spread_index = int(request.data.get("spread_index", 0))
-        except (ValueError, TypeError):
-            spread_index = 0
-
         # 6. Prepara o agente especializado
         agent = get_agent(agent_role)
         catalog_context = {
@@ -835,6 +842,22 @@ class StudioChatStreamView(APIView):
         if catalog and catalog.brand_id:
             # Chat uses the catalog's historical identity, never today's Brand state.
             catalog_context['brand_context'] = copy.deepcopy(catalog.brand_snapshot)
+
+        imported_entries = None
+        if catalog and catalog.import_metadata:
+            from api.services.imported_text_resolver import catalog_index
+            from api.ai.text_commands import parse_replacement
+            parsed_intent = parse_replacement(message)
+            requested_page = parsed_intent[2] if parsed_intent else None
+            imported_entries, imported_status = catalog_index(catalog, spread_index, selected_element_id, requested_page)
+            if imported_status != 'redesign':
+                catalog_context['editable_text_index'] = imported_entries
+                catalog_context['imported_text_status'] = imported_status
+                # Browser geometry and skeleton are hints, not private PDF evidence.
+                catalog_context['active_spread_data'] = None
+                catalog_context['catalog_skeleton'] = None
+            else:
+                imported_entries = None
 
         # 7. Gerador de Eventos SSE
         def sse_event_stream() -> Generator[str, None, None]:
@@ -868,7 +891,8 @@ class StudioChatStreamView(APIView):
                             "event": "token",
                             "text": chunk.text,
                         }
-                        yield f"data: {json.dumps(token_payload)}\n\n"
+                        if imported_entries is None:
+                            yield f"data: {json.dumps(token_payload)}\n\n"
 
                     if chunk.done:
                         final_usage = chunk.usage
@@ -878,6 +902,20 @@ class StudioChatStreamView(APIView):
 
                 # Extrai bloco de patch estruturado para aplicacao no canvas
                 patch_data = extract_patch_from_text(full_content)
+                if imported_entries is not None and patch_data:
+                    from api.services.imported_text_resolver import catalog_index, validate_patch
+                    # Re-read persisted state after model latency; never certify stale targets.
+                    fresh_entries, _ = catalog_index(catalog, spread_index, selected_element_id, requested_page)
+                    patch_data = validate_patch(patch_data, fresh_entries)
+                    if patch_data is None:
+                        full_content = 'Edição rejeitada: o destino não é editável ou os dados comerciais estão protegidos.'
+                        metadata['planner_status'] = 'invalid_target'
+                    else:
+                        from api.ai.text_commands import planner_response
+                        full_content = planner_response(('Edição proposta; aguardando execução.', patch_data))
+                if imported_entries is not None:
+                    # Embedded patches must not reach the client's fallback parser before validation.
+                    yield f"data: {json.dumps({'event': 'token', 'text': full_content})}\n\n"
                 if patch_data:
                     yield f"data: {json.dumps({'event': 'patch', 'patch': patch_data})}\n\n"
 
@@ -1090,8 +1128,24 @@ class StudioCatalogImportDocumentView(APIView):
         from api.services.document_preflight import DocumentImportError, MAX_SOURCE_BYTES
         try:
             action = request.data.get('action', 'analyze')
-            if action not in ('analyze', 'prepare', 'confirm'):
+            if action not in ('analyze', 'prepare', 'confirm', 'reanalyze', 'confirm_reanalysis'):
                 raise ValidationError({'action': 'Ação de importação inválida.'})
+            if action in ('reanalyze', 'confirm_reanalysis'):
+                identifier = request.data.get('catalog_id')
+                if (type(identifier) not in (str, int) or not str(identifier).isascii()
+                        or not str(identifier).isdigit() or len(str(identifier)) > 18):
+                    raise ValidationError({'catalog_id': 'Catálogo inválido.'})
+                catalog = _studio_catalogs_for(request.user).filter(pk=identifier).first()
+                if not catalog:
+                    raise NotFound('Catálogo não encontrado.')
+                _assert_brand_catalog_write(request.user, catalog)
+                if action == 'reanalyze':
+                    job = DocumentReconstructorService.reanalyze_catalog(catalog, request.user)
+                else:
+                    job = DocumentReconstructorService.get_import(request.user, request.data.get('import_id'), write=True)
+                    job = DocumentReconstructorService.confirm_reanalysis(job, catalog, request.user,
+                        request.data.get('replace_reconstruction'))
+                return Response(DocumentReconstructorService.response(job))
             if action in ('prepare', 'confirm'):
                 job = DocumentReconstructorService.get_import(request.user, request.data.get('import_id'), write=True)
                 organization_id = request.data.get('organization')
@@ -1101,6 +1155,8 @@ class StudioCatalogImportDocumentView(APIView):
                 requested_id = request.data.get('brand_id', request.data.get('brand'))
                 brand = _requested_brand(request.user, {**request.data, 'organization': job.organization_id}) if requested_id else None
                 if action == 'prepare':
+                    if job.report.get('reanalysis'):
+                        raise ValidationError({'code': 'confirmation_required', 'error': 'Revise a prévia de atualização no catálogo de origem.'})
                     with transaction.atomic():
                         job = DocumentImport.objects.select_for_update().get(pk=job.pk)
                         DocumentReconstructorService.prepare_preview(job, request.data.get('mode', job.mode),

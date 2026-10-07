@@ -1,14 +1,46 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { editableTextIndex, executeTextAction, replaceNormalized } from './textCommandExecution';
+import { editableTextIndex, executeTextAction, executeTextGroup, replaceNormalized } from './textCommandExecution';
 import { useStudioStore } from '../store/studioStore';
 import type { CatalogPageData } from '../data/editorialCatalog.mock';
 
 const page = (text = 'Catálogo de Produtos', number = 1): CatalogPageData => ({id: `p${number}`, pageNumber: number, type: 'hero', products: [], backgroundColor: '#fff', textColor: '#000', accentColor: '#000', documentPage: {pageNumber: number, width: 612, height: 792, unit: 'pt', visibility: 'hybrid', fallbackSnapshot: {url: '/media/clean.png', hash: 'clean-hash', widthPixels: 612, heightPixels: 792}, sourceSnapshot: {url: '/media/source.png', hash: 'original-hash', widthPixels: 612, heightPixels: 792}, elements: [{id: 't1', type: 'text', editable: true, snapshot: {url: '/media/crop.png', hash: 'crop-hash', widthPixels: 300, heightPixels: 40}, text, x: .1, y: .1, width: .6, height: .1, fontSize: 18, fontFamily: 'Helvetica', resolvedFont: 'Arial', fontFallback: true, rotation: 0, provenance: {sourceText: text, sourceTextHash: 'original-text'}}]}});
 const params = {find: 'catálogo de produtos', replacement: 'Catálogo de Itens', expectedText: 'Catálogo de Produtos'};
-beforeEach(() => {vi.useFakeTimers(); useStudioStore.getState().resetStudioState();});
-afterEach(() => {useStudioStore.getState().resetStudioState(); vi.clearAllTimers(); vi.useRealTimers();});
+beforeEach(() => {vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({font: '', measureText: (value: string) => ({width: value.length * 7})} as unknown as CanvasRenderingContext2D); vi.useFakeTimers(); useStudioStore.getState().resetStudioState();});
+afterEach(() => {useStudioStore.getState().resetStudioState(); vi.clearAllTimers(); vi.useRealTimers(); vi.restoreAllMocks();});
 
 describe('source-preserving command execution', () => {
+  it('allows editorial digits and validates each candidate independently', () => {
+    const source = page('CATÁLOGO 2026');
+    source.documentPage!.elements.push({...source.documentPage!.elements[0], id: 'bad', width: 2});
+    expect(executeTextAction([source], 'element:t1', {text: 'Coleção 25'}).result.status).toBe('applied');
+    expect(executeTextAction([source], 'element:bad', {text: 'Coleção 25'}).result.status).toBe('not_editable');
+  });
+  it('uses only the selected server proposal to bootstrap a render-only element', () => {
+    const source = page('PRODUTOS');
+    delete source.documentPage!.elements[0].text;
+    delete source.documentPage!.elements[0].provenance;
+    expect(editableTextIndex([source], [1])).toEqual([]);
+    const result = executeTextAction([source], 'page:1/element:t1', {find: 'PRODUTOS', replacement: 'ITENS', expectedText: 'PRODUTOS'});
+    expect(result.result.status).toBe('applied');
+    expect(result.pages[0].documentPage!.elements[0].provenance?.sourceText).toBe('PRODUTOS');
+  });
+  it('applies a visual group atomically with one undo and rolls back stale members and overflow', () => {
+    const source = page('CATÁLOGO DE');
+    source.documentPage!.elements.push({...source.documentPage!.elements[0], id: 't2', text: 'PRODUTOS', y: .21, provenance: {sourceText: 'PRODUTOS'}});
+    const target = 'page:1/group:01234567890123456789';
+    const group = {expectedText: 'CATÁLOGO DE PRODUTOS', replacement: 'CATÁLOGO', members: [{target: 'page:1/element:t1', text: 'CATÁLOGO DE'}, {target: 'page:1/element:t2', text: 'PRODUTOS'}]};
+    useStudioStore.setState({pages: [source], currentSpread: [1, 1], totalPages: 1});
+    const results = useStudioStore.getState().applySpreadPatch({actions: [{type: 'update_text_group', target, params: group}]});
+    expect(results[0].status).toBe('applied');
+    expect(useStudioStore.getState().pages[0].documentPage!.elements.map(e => e.text)).toEqual(['CATÁLOGO', '']);
+    useStudioStore.getState().undo();
+    expect(useStudioStore.getState().pages[0].documentPage).toEqual(source.documentPage);
+    const stale = {...group, members: [group.members[0], {...group.members[1], text: 'stale'}], expectedText: 'CATÁLOGO DE stale'};
+    expect(executeTextGroup([source], target, stale).pages).toEqual([source]);
+    const overflow = executeTextGroup([source], target, {...group, replacement: 'x'.repeat(2000)});
+    expect(overflow.result.status).toBe('needs_layout_review');
+    expect(overflow.pages).toEqual([source]);
+  });
   it('replaces case, accent and whitespace variants while preserving surrounding copy', () => {
     expect(replaceNormalized('Veja CATALOGO  DE\nPRODUTOS hoje', 'catálogo de produtos', 'Catálogo de Itens')).toBe('Veja Catálogo de Itens hoje');
     expect(replaceNormalized('título título', 'titulo', 'novo')).toBeNull();

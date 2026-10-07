@@ -170,8 +170,8 @@ class DocumentImportTests(TestCase):
         self.assertEqual(self.client.get(reverse('studio_catalog_detail', kwargs={'pk': catalog.pk})).status_code, 404)
 
     def test_material_edits_invalidate_import_gate_but_noop_save_does_not(self):
-        data = self.analyze()
-        catalog = self.confirm(data)
+        data = self.analyze(mode='editable')
+        catalog = self.confirm(data, mode='editable')
         self.assertEqual(self.share(catalog).status_code, 200)
         spread = catalog.spreads.first()
         bulk = reverse('studio_spread_bulk_sync', kwargs={'catalog_id': catalog.pk})

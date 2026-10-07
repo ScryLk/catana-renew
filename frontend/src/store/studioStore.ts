@@ -1,4 +1,4 @@
-import { editableTextIndex, executeTextAction, executionFeedback, commercialText, type ActionResult } from '../utils/textCommandExecution';
+import { editableTextIndex, executeTextAction, executeTextGroup, executionFeedback, commercialText, type ActionResult } from '../utils/textCommandExecution';
 import { normalizeCatalogDocument, QualityGate } from '../data/editorialCatalog.mock';
 import { parseSuppliedPrice } from '../utils/commercialProduct';
 import { create } from 'zustand';
@@ -2926,12 +2926,13 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
   setPages: (pages) => set({ pages, totalPages: pages.length }),
 
   updateDocumentText: (pageNumber, elementId, text) => {
-    const page = get().pages.find(item => item.pageNumber === pageNumber);
-    const element = page?.documentPage?.elements.find(item => item.id === elementId);
-    if (!page?.documentPage || !element?.editable || element.type !== 'text' || page.documentPage.visibility === 'source_only') return;
+    const execution = executeTextAction(get().pages, `page:${pageNumber}/element:${elementId}`, {text});
+    if (execution.result.status !== 'applied') {
+      if (execution.result.status !== 'unchanged') toast.error(executionFeedback([execution.result]));
+      return;
+    }
     get().pushHistorySnapshot();
-    set(state => ({pages: state.pages.map(item => item.pageNumber !== pageNumber || !item.documentPage ? item : {...item, documentPage: {...item.documentPage,
-      elements: item.documentPage.elements.map(entry => entry.id === elementId ? {...entry, text, edited: text !== entry.provenance?.sourceText} : entry)}}), saveStatus: 'unsaved'}));
+    set({pages: execution.pages, saveStatus: 'unsaved'});
     get().debouncedSaveCurrentSpread();
   },
   resetDocumentText: (pageNumber, elementId) => {
@@ -3735,6 +3736,12 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
             break;
           }
 
+          case 'update_text_group': {
+            const execution = executeTextGroup(get().pages, targetStr, params);
+            results.push(execution.result);
+            if (execution.result.status === 'applied') set({pages: execution.pages, saveStatus: 'unsaved'});
+            break;
+          }
           case 'update_text': {
             if (targetStr.includes('element:') || targetStr.includes('/field:')) {
               const execution = executeTextAction(get().pages, targetStr, params);
@@ -4461,7 +4468,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       spread_index: Math.floor((leftPageNum - 1) / 2),
       active_spread_data: activeSpreadData,
       catalog_skeleton: catalogSkeleton,
-      editable_text_index: editableTextIndex(state.pages, state.currentSpread, state.selectedElementId),
+      editable_text_index: state.pages.some(page => page.documentPage) ? [] : editableTextIndex(state.pages, state.currentSpread, state.selectedElementId),
       selected_element_id: state.selectedElementId || undefined,
     };
 

@@ -2,6 +2,7 @@ import { test, expect, type Page, type Locator, type Request } from '@playwright
 import { createHash } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
 import { isDeepStrictEqual } from 'node:util';
+import { importEditingBridge } from './import-editing-bridge';
 
 const ENDPOINT = '/api/v2/studio/catalogs/import-document/';
 const IMPORT_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -146,7 +147,7 @@ function makePreview(mode: Mode, count: number, mixed: boolean, assets: Map<stri
 function multipartField(request: Request, key: string) {
   return request.postData()?.match(new RegExp(`name="${key}"\\r\\n\\r\\n([^\\r]*)`))?.[1];
 }
-async function fixture(page: Page, options: { count?: number; mixed?: boolean; holdAnalysis?: boolean; analysisFailures?: number; lostConfirmationResponses?: number; textCommands?: boolean } = {}) {
+async function fixture(page: Page, options: { count?: number; mixed?: boolean; holdAnalysis?: boolean; analysisFailures?: number; lostConfirmationResponses?: number } = {}) {
   const state: FixtureState = { analyses: [], preparations: [], confirmations: [], cancellations: [], brandWrites: [], assetRequests: [], catalogs: [], spreadWrites: [],
     analysisFailures: options.analysisFailures || 0, lostConfirmationResponses: options.lostConfirmationResponses || 0 };
   if (options.holdAnalysis) state.analysisGate = new Promise<void>(resolve => { state.releaseAnalysis = resolve; });
@@ -205,12 +206,6 @@ async function fixture(page: Page, options: { count?: number; mixed?: boolean; h
       if (Number(body.organization) !== 1 || !['preserve', 'editable', 'redesign'].includes(body.mode || '')) return route.fulfill({ status: 400, json: { detail: 'Analysis requires organization and an explicit supported mode' } });
       if (state.analysisFailures > 0) { state.analysisFailures--; return route.fulfill({ status: 503, json: { detail: 'Análise indisponível temporariamente.' } }); }
       state.preview = makePreview(body.mode as Mode, options.count || 7, options.mixed || false, assets, body.title || 'Fonte QA', body.brand_id || undefined);
-      if (options.textCommands) {
-        const element = state.preview.pages[0].documentPage.elements[0];
-        element.text = 'CATÁLOGO DE PRODUTOS'; element.sourceText = element.text;
-        element.provenance.sourceText = element.text;
-        element.provenance.sourceTextHash = createHash('sha256').update(element.text).digest('hex');
-      }
       if (state.analysisGate) await state.analysisGate;
       try { return await route.fulfill({ json: state.preview }); } catch { /* A cancelled fetch must not revive the modal. */ }
       return;
@@ -230,13 +225,6 @@ async function fixture(page: Page, options: { count?: number; mixed?: boolean; h
       const unchanged = isDeepStrictEqual(body.left_page_elements, expectedLeft ? [expectedLeft] : [])
         && isDeepStrictEqual(body.right_page_elements, expectedRight ? [expectedRight] : []);
       state.spreadWrites.push({ body, unchanged });
-      if (options.textCommands) {
-        const spread = state.catalogs[0].spreads[index];
-        spread.left_page_elements = body.left_page_elements;
-        spread.right_page_elements = body.right_page_elements;
-        spread.left_page = body.left_page_elements[0];
-        spread.right_page = body.right_page_elements[0] || null;
-      }
       // Deterministic preserve imports carry their approval in import_metadata;
       // the canonical backend's generative qualityGate is null for this mode.
       return route.fulfill({ json: { qualityGate: null,
@@ -245,18 +233,6 @@ async function fixture(page: Page, options: { count?: number; mixed?: boolean; h
     if (path === '/api/v2/studio/catalogs/901/') {
       if (method !== 'GET') return route.fulfill({ json: state.catalogs[0] });
       return route.fulfill(state.catalogs[0] ? { json: state.catalogs[0] } : { status: 404, json: { detail: 'No catalog exists before confirmation' } });
-    }
-    if (options.textCommands && path === '/api/v2/studio/chat/stream/') {
-      const body = request.postDataJSON();
-      expect(body.message).toBe('altere catálogo de produtos para catálogo de itens');
-      expect(body.active_spread_data.left_page.unit).toBe('pt');
-      expect(JSON.stringify(body.active_spread_data)).not.toContain('sourceSnapshot');
-      const target = body.editable_text_index.find((element: {text: string}) => element.text === 'CATÁLOGO DE PRODUTOS');
-      expect(target).toBeTruthy();
-      const patch = {actions: [{type: 'update_text', action: 'update_text', target: target.target, params: {find: 'catálogo de produtos', replacement: 'catálogo de itens', expectedText: target.text}}]};
-      // Browser transport fixture; the canonical guard/planner is exercised in Django integration tests.
-      const events = [{event: 'token', text: 'Edição proposta.'}, {event: 'patch', patch}, {event: 'done', patch, metadata: {provider: 'local-command-planner', user_guard_status: 'PASSED', context_guard_status: 'PASSED'}}];
-      return route.fulfill({contentType: 'text/event-stream', body: events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')});
     }
     if (/generate|\/chat\//.test(path)) return route.fulfill({ status: 418, json: { detail: 'Paid AI is outside this browser fixture' } });
     let body: unknown = [];
@@ -584,31 +560,54 @@ test('quota changing at confirmation keeps analysis and offers recovery without 
 });
 
 
-test('imported unit pt command edits canvas, confirms execution, retains original and persists on reload', async ({page}) => {
+test('real private PDF resolves commands without browser source text, saves groups, reloads and restores', async ({page}) => {
+  test.setTimeout(120000);
   await page.setViewportSize({width: 1440, height: 1000});
-  const state = await fixture(page, {count: 1, textCommands: true});
-  const dialog = await openImport(page); await upload(dialog, 1);
-  await dialog.getByRole('radio', {name: /^Original editável/}).check(); await analyze(dialog); await confirm(page, dialog);
-  const before = (await storeState(page)).pages[0].documentPage;
-  expect(before.unit).toBe('pt');
-  const input = page.getByRole('textbox', {name: 'Instrução ou comando para o assistente de design'});
-  await input.fill('altere catálogo de produtos para catálogo de itens'); await input.press('Enter');
-  await expect.poll(async () => (await storeState(page)).pages[0].documentPage.elements[0].text).toBe('catálogo de itens');
-  await expect(page.getByText("Texto da página atualizado para 'catálogo de itens'.", {exact: true})).toBeVisible();
-  await expect(page.getByText(/neutralidade institucional/)).toHaveCount(0);
-  await expect(page.getByRole('region', {name: 'Catálogo', exact: true}).getByText('catálogo de itens', {exact: true})).toBeVisible();
-  await page.getByRole('button', {name: 'Editar texto: CATÁLOGO DE PRODUTOS', exact: true}).click();
-  await expect(page.getByText('Texto original: CATÁLOGO DE PRODUTOS', {exact: true})).toBeVisible();
-  await page.getByRole('button', {name: 'Fechar edição', exact: true}).click();
-  const edited = (await storeState(page)).pages[0].documentPage;
-  expect(edited.sourceSnapshot).toEqual(before.sourceSnapshot);
-  expect(edited.elements[0].provenance).toEqual(before.elements[0].provenance);
-  expect(edited.elements[0].provenance.sourceText).toBe('CATÁLOGO DE PRODUTOS');
-  await expect.poll(() => state.spreadWrites.length).toBeGreaterThan(0);
-  await page.reload();
-  await page.evaluate(async moduleUrl => {const {useStudioStore} = await import(moduleUrl); await useStudioStore.getState().loadExistingCatalog('901');}, await storeModule(page));
-  await expect.poll(async () => (await storeState(page)).pages[0].documentPage.elements[0].text).toBe('catálogo de itens');
-  expect((await storeState(page)).pages[0].documentPage.sourceSnapshot).toEqual(before.sourceSnapshot);
-  await page.evaluate(async moduleUrl => {const {useStudioStore} = await import(moduleUrl); useStudioStore.getState().resetDocumentText(1, 'text-1');}, await storeModule(page));
-  expect((await storeState(page)).pages[0].documentPage.elements[0].text).toBe('CATÁLOGO DE PRODUTOS');
+  await fixture(page, {count: 1});
+  const bridge = await importEditingBridge();
+  const catalogId = String(bridge.initial.catalog_id);
+  let firstLoad = true;
+  let chats = 0;
+  try {
+    await page.route('**/api/v2/studio/**', async route => {
+      const request = route.request(), path = new URL(request.url()).pathname;
+      if (!(path === `/api/v2/studio/catalogs/${catalogId}/` || path.startsWith(`/api/v2/studio/catalogs/${catalogId}/spreads`) || path.includes('/import-document/assets/') || path === '/api/v2/studio/chat/stream/')) return route.fallback();
+      if (firstLoad && request.method() === 'GET' && path === `/api/v2/studio/catalogs/${catalogId}/`) {
+        firstLoad = false;
+        return route.fulfill({json: bridge.initial.initial});
+      }
+      const body = request.postData() ? request.postDataJSON() : undefined;
+      if (path === '/api/v2/studio/chat/stream/') {
+        if (chats++ === 0) expect(body.editable_text_index).toEqual([]);
+      }
+      const reply = await bridge.request(request.method(), path, body);
+      expect(reply.bridge_error).toBeUndefined();
+      return route.fulfill({status: Number(reply.status), contentType: String(reply.content_type), body: Buffer.from(String(reply.base64), 'base64')});
+    });
+    await page.goto('/studio');
+    await page.evaluate(async ({moduleUrl, catalogId}) => {const {useStudioStore} = await import(moduleUrl); await useStudioStore.getState().loadExistingCatalog(catalogId);}, {moduleUrl: await storeModule(page), catalogId});
+    const before = (await storeState(page)).pages[0].documentPage;
+    expect(before.elements.every((e: {text?: string; provenance?: unknown}) => e.text === undefined && e.provenance === undefined)).toBe(true);
+    const input = page.getByRole('textbox', {name: 'Instrução ou comando para o assistente de design'});
+    await input.fill('na página 1, troque PRODUTOS por ITENS'); await input.press('Enter');
+    await expect.poll(async () => (await storeState(page)).pages[0].documentPage.elements.some((e: {text?: string}) => e.text === 'ITENS')).toBe(true);
+    await expect(page.getByText("Texto da página atualizado para 'ITENS'.", {exact: true})).toBeVisible();
+    await page.evaluate(async moduleUrl => {const {useStudioStore} = await import(moduleUrl); await useStudioStore.getState().flushSaveSpread();}, await storeModule(page));
+    await page.reload();
+    await page.evaluate(async ({moduleUrl, catalogId}) => {const {useStudioStore} = await import(moduleUrl); await useStudioStore.getState().loadExistingCatalog(catalogId);}, {moduleUrl: await storeModule(page), catalogId});
+    let saved = (await storeState(page)).pages[0].documentPage;
+    expect(saved.elements.some((e: {text?: string}) => e.text === 'ITENS')).toBe(true);
+    expect(saved.sourceSnapshot).toEqual(before.sourceSnapshot);
+    // Restore via the existing source-preserving editor path before testing the full original phrase.
+    await page.evaluate(async moduleUrl => {const {useStudioStore} = await import(moduleUrl); const s = useStudioStore.getState(); const element = s.pages[0].documentPage!.elements.find(e => e.text === 'ITENS')!; s.resetDocumentText(1, element.id); await s.flushSaveSpread();}, await storeModule(page));
+    await input.fill('altere catálogo de produtos para Catálogo na página 1'); await input.press('Enter');
+    await expect.poll(async () => (await storeState(page)).pages[0].documentPage.elements.filter((e: {edited?: boolean}) => e.edited).length).toBe(2);
+    saved = (await storeState(page)).pages[0].documentPage;
+    expect(saved.elements.filter((e: {edited?: boolean}) => e.edited).map((e: {text: string}) => e.text)).toEqual(['Catálogo', '']);
+    expect(saved.elements.some((e: {text?: string}) => e.text === 'SOCIAL FOOTER')).toBe(true);
+    await page.evaluate(async moduleUrl => {const {useStudioStore} = await import(moduleUrl); const s = useStudioStore.getState(); s.undo(); await s.flushSaveSpread();}, await storeModule(page));
+    saved = (await storeState(page)).pages[0].documentPage;
+    expect(saved.elements.some((e: {text?: string}) => e.text === 'PRODUTOS')).toBe(true);
+    expect(saved.sourceSnapshot).toEqual(before.sourceSnapshot);
+  } finally {bridge.close();}
 });

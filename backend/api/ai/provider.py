@@ -284,7 +284,7 @@ class GeminiAIProvider:
         plan = plan_text_replacement(literal_prompt, context)
         if plan is not None:
             yield AIResponseChunk(text=planner_response(plan))
-            yield AIResponseChunk(done=True, metadata={**diagnostics, "provider": "local-command-planner", "model": "deterministic", "planner_status": plan[1]["planner_status"], "action_planner": "normalized-text-replacement"})
+            yield AIResponseChunk(done=True, metadata={**diagnostics, "provider": "local-command-planner", "model": "deterministic", "planner_status": plan[1]["planner_status"], "resolution_candidates": plan[1].get('candidates', []), "action_planner": "normalized-text-replacement"})
             return
         # Mock receives only literal intent, never serialized customer context.
         prompt = literal_prompt

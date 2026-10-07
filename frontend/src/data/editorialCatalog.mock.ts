@@ -233,6 +233,7 @@ export interface CatalogPageData {
   pageWidth?: number;
   pageHeight?: number;
   sourceUnit?: 'pt' | 'px';
+  sourceVisibility?: 'source_only' | 'hybrid' | 'reconstructed';
   qualityGate?: QualityGate;
   id: string;
   pageNumber: number;
