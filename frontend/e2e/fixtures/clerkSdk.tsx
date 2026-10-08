@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- This test-only SDK boundary must export both components and hooks. */
-import { type ReactNode, useSyncExternalStore } from 'react';
+import { type CSSProperties, type ReactNode, useSyncExternalStore } from 'react';
 
 type Scenario = 'success' | 'cancel' | 'disabled' | 'callback_error';
 type RedirectOptions = { strategy: string; redirectUrl: string; redirectUrlComplete: string };
@@ -76,14 +76,35 @@ export function useSignIn() { return { isLoaded: useSnapshot().isLoaded, signIn 
 export function useSignUp() { return { isLoaded: useSnapshot().isLoaded, signUp }; }
 export function useClerk() { return clerk; }
 
-// This is an SDK boundary fixture, not a replica or visual assertion of Clerk's hosted form.
-function CredentialForm({ register = false }: { register?: boolean }) {
-  return <form aria-label={register ? 'Formulário Clerk de cadastro' : 'Formulário Clerk de acesso'} className="space-y-3" onSubmit={event => event.preventDefault()}>
-    <label className="block text-sm">E-mail<input className="block w-full min-w-0 min-h-11 rounded-xl border p-3" type="email" autoComplete="email" /></label>
-    <label className="block text-sm">Senha<input className="block w-full min-w-0 min-h-11 rounded-xl border p-3" type="password" autoComplete={register ? 'new-password' : 'current-password'} /></label>
-    <button type="submit" className="w-full min-h-11 rounded-xl border">{register ? 'Criar conta com e-mail' : 'Entrar com e-mail'}</button>
+type WidgetProps = { appearance?: { elements?: Record<string, string | CSSProperties> } };
+// Exercise the observed SDK CSS boundary, not hosted-form internals or real OAuth.
+// ClerkJS 5.128.0's inspected source uses fit-content root, a $100-size card,
+// overflow clipping and an unlayered flex social root. Tailwind utilities alone
+// cannot override unlayered SDK defaults. Do not simplify this into a native form.
+function CredentialForm({ register = false, appearance }: WidgetProps & { register?: boolean }) {
+  const element = (name: string, base: string) => {
+    const override = appearance?.elements?.[name];
+    return { className: `${base} ${typeof override === 'string' ? override : ''}`, style: typeof override === 'object' ? override : undefined };
+  };
+  return <>
+    <style>{`.cl-fixture-root { width:fit-content; } .cl-fixture-card { width:400px; max-width:calc(100vw - 40px); overflow:hidden; } .cl-fixture-social { display:flex; }`}</style>
+    <div {...element('rootBox', 'cl-rootBox cl-fixture-root')}>
+    <div {...element('cardBox', 'cl-cardBox cl-fixture-card')}>
+    <div {...element('card', 'cl-card')}>
+    <header {...element('header', 'cl-header')}>Clerk sign in</header>
+    <div {...element('socialButtonsRoot', 'cl-socialButtonsRoot cl-fixture-social')}>
+      <button type="button" className="cl-socialButtonsBlockButton" onClick={() => void authenticateWithRedirect(register ? 'signUp.redirect' : 'signIn.redirect', { strategy: 'oauth_google', redirectUrl: '/auth/callback', redirectUrlComplete: '/studio' })}>Continuar com o Google</button>
+    </div>
+    <div {...element('dividerRow', 'cl-dividerRow')}>ou</div>
+    <form aria-label={register ? 'Formulário Clerk de cadastro' : 'Formulário Clerk de acesso'} className="space-y-3" onSubmit={event => event.preventDefault()}>
+    <label className="block text-sm">E-mail<input className="cl-formFieldInput block w-full min-w-0 min-h-11 rounded-xl border p-3" type="email" autoComplete="email" /></label>
+    <label className="block text-sm">Senha<input className="cl-formFieldInput block w-full min-w-0 min-h-11 rounded-xl border p-3" type="password" autoComplete={register ? 'new-password' : 'current-password'} /></label>
+    <button type="submit" className="cl-formButtonPrimary w-full min-h-11 rounded-xl border">{register ? 'Criar conta com e-mail' : 'Entrar com e-mail'}</button>
     {!register && <button type="button" className="min-h-11">Esqueci minha senha</button>}
-  </form>;
+    </form>
+    <footer {...element('footer', 'cl-footer')}>Secured by Clerk</footer>
+    </div></div></div>
+  </>;
 }
-export function SignIn() { return <CredentialForm />; }
-export function SignUp() { return <CredentialForm register />; }
+export function SignIn(props: WidgetProps) { return <CredentialForm {...props} />; }
+export function SignUp(props: WidgetProps) { return <CredentialForm {...props} register />; }

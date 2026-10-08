@@ -101,9 +101,9 @@ function assertNoLegacyAuthority(requests: RequestRecord[], googleRequests: stri
 }
 
 test.describe('Clerk social authentication', () => {
-  for (const [width, height] of [[320, 568], [390, 844], [1440, 900]]) {
+  for (const [width, height] of [[320, 568], [375, 667], [390, 844], [768, 1024], [1024, 768], [1440, 900], [1920, 1080]]) {
     for (const theme of ['light', 'dark'] as const) {
-      test(`canonical login modal fits ${width}x${height} in ${theme}`, async ({ page }) => {
+      test(`canonical login modal fits ${width}x${height} in ${theme}`, async ({ page }, testInfo) => {
         const fixture = await browserFixture(page, { theme });
         await page.setViewportSize({ width, height });
         await page.goto('/login');
@@ -111,7 +111,24 @@ test.describe('Clerk social authentication', () => {
         await expect(modal).toBeVisible();
         await expect(modal.locator('[data-auth-provider="clerk"]')).toBeVisible();
         const google = modal.getByRole('button', { name: 'Continuar com o Google', exact: true });
+        await expect(google).toHaveCount(1);
         await expect(google).toBeVisible();
+        await expect(modal.locator('.cl-socialButtonsRoot')).toBeHidden();
+        await expect(modal.locator('.cl-footer')).toBeHidden();
+        const dimensions = await modal.locator('[data-auth-provider="clerk"]').evaluate(section => {
+          const outer = section.getBoundingClientRect();
+          return [...section.querySelectorAll('.cl-rootBox, .cl-cardBox, .cl-card, input')].map(node => {
+            const bounds = node.getBoundingClientRect();
+            return { left: bounds.left - outer.left, right: bounds.right - outer.right };
+          });
+        });
+        for (const bounds of dimensions) { expect(bounds.left).toBeGreaterThanOrEqual(-1); expect(bounds.right).toBeLessThanOrEqual(1); }
+        const email = modal.getByLabel('E-mail');
+        await expect(email).toBeEditable();
+        await email.focus();
+        await page.keyboard.press('Tab');
+        await expect(modal.getByLabel('Senha')).toBeFocused();
+        expect(await email.evaluate(node => getComputedStyle(node).color)).toBe(theme === 'dark' ? 'rgb(244, 244, 245)' : 'rgb(24, 24, 27)');
         expect((await google.boundingBox())?.height).toBeGreaterThanOrEqual(44);
         await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /^(?!.*dark).*$/);
         await google.scrollIntoViewIfNeeded();
@@ -121,6 +138,7 @@ test.describe('Clerk social authentication', () => {
         expect((await state(page)).status).toBe('signed_out');
         await expect(page.locator('script[src*="accounts.google.com/gsi"]')).toHaveCount(0);
         assertNoLegacyAuthority(fixture.requests, fixture.googleRequests);
+        await page.screenshot({ path: testInfo.outputPath(`login-${width}-${theme}.png`) });
       });
     }
   }

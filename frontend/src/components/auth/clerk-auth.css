@@ -1,0 +1,53 @@
+/* Clerk injects unlayered styles. Tailwind's layered `hidden` / `w-full`
+   appearance classes cannot reliably override them. Scope these overrides to
+   Catana authentication; do not alter Clerk account/organization components. */
+[data-auth-provider="clerk"] {
+  --catana-auth-input-background: #fafafa;
+  --catana-auth-input-text: #18181b;
+  --catana-auth-button-background: #18181b;
+  --catana-auth-button-text: #f4f4f5;
+}
+
+.dark [data-auth-provider="clerk"] {
+  --catana-auth-input-background: #27272a;
+  --catana-auth-input-text: #f4f4f5;
+  --catana-auth-button-background: #f4f4f5;
+  --catana-auth-button-text: #18181b;
+}
+
+[data-auth-provider="clerk"] .cl-rootBox,
+[data-auth-provider="clerk"] .cl-cardBox,
+[data-auth-provider="clerk"] .cl-card {
+  box-sizing: border-box;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+/* The custom button is the sole visible Google entry and owns its SDK redirect.
+   Clerk still owns password, verification, registration and recovery forms. */
+[data-auth-provider="clerk"] .cl-socialButtonsRoot,
+[data-auth-provider="clerk"] .cl-dividerRow,
+[data-auth-provider="clerk"] .cl-header,
+[data-auth-provider="clerk"] .cl-footer {
+  display: none !important;
+}
+
+/* Override the older global dark-only Clerk rules without affecting legacy UI. */
+[data-auth-provider="clerk"] .cl-formFieldInput {
+  min-width: 0;
+  max-width: 100%;
+  background-color: var(--catana-auth-input-background) !important;
+  color: var(--catana-auth-input-text) !important;
+}
+
+[data-auth-provider="clerk"] .cl-formButtonPrimary {
+  background-color: var(--catana-auth-button-background) !important;
+  color: var(--catana-auth-button-text) !important;
+}
+
+[data-auth-provider="clerk"] .cl-formButtonPrimary:hover {
+  background-color: var(--catana-auth-button-background) !important;
+  color: var(--catana-auth-button-text) !important;
+  filter: brightness(0.95);
+}
