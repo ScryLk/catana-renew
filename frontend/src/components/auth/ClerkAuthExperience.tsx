@@ -8,6 +8,7 @@ import { isAuthReady, useAuthStore } from '../../store/authStore';
 import { useStudioStore } from '../../store/studioStore';
 import { ResponsiveModal } from '../mobile/ResponsiveModal';
 import { MultiAgentShowcase } from './MultiAgentShowcase';
+import './clerk-auth.css';
 
 export type AuthView = 'login' | 'register' | 'forgot-password';
 
