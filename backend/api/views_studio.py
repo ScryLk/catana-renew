@@ -96,7 +96,7 @@ def _invalidate_generation_approval(catalog, reason):
     if catalog.import_metadata:
         previous_import = catalog.import_metadata.get('quality') or {}
         from api.services.catalog_page_origin import catalog_pages
-        edited_source = any(e.get('edited') for p in catalog_pages(catalog) for e in (p.get('documentPage') or {}).get('elements', []) if isinstance(e,dict))
+        edited_source = any(e.get('edited') or e.get('styleRevision') for p in catalog_pages(catalog) for e in (p.get('documentPage') or {}).get('elements', []) if isinstance(e,dict))
         structural_only = reason == 'GENERATED_CONTENT_UPDATED' and not edited_source
         catalog.import_metadata = {
             **catalog.import_metadata, 'share_enabled': False,
@@ -612,6 +612,9 @@ class StudioSpreadBulkSyncView(APIView):
             return Response({"error": "Catalogo nao encontrado"}, status=status.HTTP_404_NOT_FOUND)
         _assert_brand_catalog_write(user, catalog)
 
+        from api.services.execution_receipts import begin_execution_save, finish_execution_save
+        execution_binding = begin_execution_save(catalog, user, request.data.get('execution'))
+
         spreads_data = request.data.get("spreads", [])
         if not isinstance(spreads_data, list):
             return Response({"error": "O campo spreads deve ser uma lista"}, status=status.HTTP_400_BAD_REQUEST)
@@ -714,6 +717,8 @@ class StudioSpreadBulkSyncView(APIView):
                 _invalidate_generation_approval(catalog, 'GENERATED_CONTENT_UPDATED')
                 catalog.save(update_fields=['generation_metadata', 'import_metadata', 'updated_at'])
 
+        execution_save = finish_execution_save(catalog, execution_binding)
+
         return Response({
             'qualityGate': (catalog.generation_metadata or {}).get('qualityGate'),
             'import_metadata': catalog.import_metadata,
@@ -721,7 +726,21 @@ class StudioSpreadBulkSyncView(APIView):
             "catalog_id": catalog.id,
             "synced_spreads": saved_spreads,
             "count": len(saved_spreads),
+            'execution_save': execution_save,
         })
+
+
+class StudioExecutionReceiptView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, catalog_id):
+        catalog = _studio_catalogs_for(request.user).select_for_update(of=('self',)).filter(pk=catalog_id).first()
+        if not catalog:
+            raise NotFound('Catálogo não encontrado.')
+        _assert_brand_catalog_write(request.user, catalog)
+        from api.services.execution_receipts import record_execution
+        return Response(record_execution(catalog, request.user, request.data))
 
 
 class StudioThreadMessagesView(APIView):
@@ -902,6 +921,8 @@ class StudioChatStreamView(APIView):
             "catalog_skeleton": catalog_skeleton,
             "selected_element_id": selected_element_id,
             "editable_text_index": request.data.get("editable_text_index", []),
+            'catalog_revision': DocumentReconstructorService.reconstruction_revision(catalog) if catalog else None,
+            'style_choice': request.data.get('style_choice'),
         }
         if catalog and catalog.brand_id:
             # Chat uses the catalog's historical identity, never today's Brand state.
@@ -911,12 +932,17 @@ class StudioChatStreamView(APIView):
         if catalog and catalog.import_metadata:
             from api.services.imported_text_resolver import catalog_index
             from api.ai.text_commands import parse_replacement
+            from api.ai.style_commands import parse_style_request
             parsed_intent = parse_replacement(message)
             requested_page = parsed_intent[2] if parsed_intent else None
-            imported_entries, imported_status = catalog_index(catalog, spread_index, selected_element_id, requested_page)
+            parsed_style = parse_style_request(message)
+            search_texts = [parsed_intent[0]] if parsed_intent and parsed_intent[0] else (
+                [parsed_style.get('target_text'), parsed_style.get('reference_text')] if parsed_style else None)
+            imported_entries, imported_status = catalog_index(catalog, spread_index, selected_element_id, requested_page, search_texts=search_texts)
             if imported_status != 'redesign':
                 catalog_context['editable_text_index'] = imported_entries
                 catalog_context['imported_text_status'] = imported_status
+                catalog_context['source_search_texts'] = search_texts
                 # Browser geometry and skeleton are hints, not private PDF evidence.
                 catalog_context['active_spread_data'] = None
                 catalog_context['catalog_skeleton'] = None
@@ -986,7 +1012,8 @@ class StudioChatStreamView(APIView):
                     if patch_data is None:
                         failure = next(d for d in decisions if not d.allowed)
                         metadata['planner_status'] = failure.reasonCode
-                        full_content = MESSAGES.get(failure.reasonCode, MESSAGES['invalid_action'])
+                        from api.ai.style_commands import MESSAGES as STYLE_MESSAGES
+                        full_content = MESSAGES.get(failure.reasonCode, STYLE_MESSAGES.get(failure.reasonCode, MESSAGES['invalid_action']))
                         if all(d.allowed or d.requiresConfirmation for d in decisions):
                             metadata['confirmation_token'] = confirmation_token(catalog, user, proposed_patch)
                     else:
@@ -1014,7 +1041,12 @@ class StudioChatStreamView(APIView):
                     sender_type="agent",
                     agent_role=agent.role,
                     content=full_content,
-                    metadata={"usage": final_usage, "metadata": metadata, "patch": patch_data},
+                    metadata={"usage": final_usage, "metadata": metadata, "patch": patch_data,
+                        **({'execution_basis': {'revision_before': catalog_context['catalog_revision'],
+                            'style_reliability': {entry['target']: entry.get('fontWeightReliable', False)
+                                for entry in catalog_context['editable_text_index'] if isinstance(entry, dict)
+                                and entry.get('target') and not entry.get('members')}}}
+                            if patch_data and catalog else {})},
                 )
 
                 done_payload = {
@@ -1218,11 +1250,13 @@ class StudioCatalogImportDocumentView(APIView):
                     raise NotFound('Catálogo não encontrado.')
                 _assert_brand_catalog_write(request.user, catalog)
                 if action == 'reanalyze':
-                    job = DocumentReconstructorService.reanalyze_catalog(catalog, request.user)
+                    job = DocumentReconstructorService.reanalyze_catalog(catalog, request.user,
+                        preserve_edits=request.data.get('preserve_edits', True))
                 else:
                     job = DocumentReconstructorService.get_import(request.user, request.data.get('import_id'), write=True)
                     job = DocumentReconstructorService.confirm_reanalysis(job, catalog, request.user,
-                        request.data.get('replace_reconstruction'))
+                        request.data.get('replace_reconstruction'),
+                        preserve_edits=request.data.get('preserve_edits', True))
                 return Response(DocumentReconstructorService.response(job))
             if action in ('prepare', 'confirm'):
                 job = DocumentReconstructorService.get_import(request.user, request.data.get('import_id'), write=True)

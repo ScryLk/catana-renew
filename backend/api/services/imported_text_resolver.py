@@ -15,6 +15,37 @@ MAX_ENTRIES = 500
 MAX_INDEX_CHARS = 32000
 PROTECTED_ROLES = frozenset(('price', 'sku', 'quantity', 'technical_specs', 'product_name',
     'product_description', 'material', 'dimensions', 'reference_code', 'commercial_condition'))
+PROTECTED_STYLE_ROLES = frozenset(('logo', 'logotype', 'brand_logo'))
+
+
+def valid_font_weight(value):
+    return type(value) is int and 100 <= value <= 900 and value % 100 == 0
+
+
+def valid_style_revision(value):
+    """Only the implemented visual capability can cross the source boundary."""
+    return (isinstance(value, dict) and set(value) == {'fontWeight'}
+            and valid_font_weight(value['fontWeight']))
+
+
+def effective_font_weight(element, source=None):
+    source = source or element
+    revision = element.get('styleRevision')
+    if valid_style_revision(revision):
+        return revision['fontWeight']
+    weight = source.get('fontWeight')
+    return weight if valid_font_weight(weight) else 400
+
+
+def font_weight_reliable(element, source=None):
+    """Fallback family metadata is not proof of the original visible weight."""
+    source = source or element
+    if valid_style_revision(element.get('styleRevision')):
+        return True
+    confidence = source.get('fontResolutionConfidence')
+    return (valid_font_weight(source.get('fontWeight'))
+            and source.get('fontResolutionStatus') in ('exact', 'registry_alias')
+            and type(confidence) in (int, float) and math.isfinite(confidence) and confidence >= .9)
 
 
 def safe_element(element):
@@ -31,6 +62,27 @@ def safe_element(element):
             for k in ('textExtractionConfidence', 'geometryConfidence', 'visibilityConfidence')))
 
 
+def safe_readonly_text(element):
+    """Painted source text may be readable even when removal is not pixel-safe.
+
+    This does not admit hidden OCR, partial contributions or unproven ink and
+    never grants mutation authority. The current private evidence must also be
+    identical to the retained source before it enters the bounded index.
+    """
+    return (isinstance(element, dict) and element.get('type') == 'text'
+        and isinstance(element.get('id'), str) and 0 < len(element['id']) <= 200
+        and isinstance(element.get('text'), str) and rectangle(element)
+        and type(element.get('fontSize')) in (int, float) and math.isfinite(element['fontSize']) and 0 < element['fontSize'] <= 500
+        and element.get('sourceVisible') is True and element.get('visibilityStatus') == 'sourceVisible'
+        and all(type(element.get(k)) in (int, float) and math.isfinite(element[k]) and .9 <= element[k] <= 1
+            for k in ('textExtractionConfidence', 'geometryConfidence', 'visibilityConfidence')))
+
+
+def immutable_element_fields(element):
+    return {key: value for key, value in element.items()
+            if key not in ('text', 'content', 'edited', 'styleRevision')}
+
+
 def protected_text(text, element=None):
     element = element or {}
     if element.get('role') in PROTECTED_ROLES or element.get('bindingProduct') or element.get('productBinding'):
@@ -44,7 +96,7 @@ def protected_text(text, element=None):
 
 def visual_groups(entries):
     """Short local lines only; adjacency must be unique in both directions."""
-    singles = [e for e in entries if len(e['text']) <= 500 and e['text'].strip()
+    singles = [e for e in entries if e.get('editable') is True and len(e['text']) <= 500 and e['text'].strip()
                and e.get('role') not in ('logo', 'footer', 'page_number', 'social', 'caption')]
     links = {}
     for upper in singles:
@@ -97,7 +149,7 @@ def visual_groups(entries):
     return groups
 
 
-def catalog_index(catalog, spread_index=0, selected=None, page_number=None):
+def catalog_index(catalog, spread_index=0, selected=None, page_number=None, search_texts=None):
     """Caller has already authorized catalog write access; verify import scope too."""
     try:
         job = catalog.source_import
@@ -119,6 +171,8 @@ def catalog_index(catalog, spread_index=0, selected=None, page_number=None):
         return [], 'not_editable'
     if job.mode == 'redesign':
         return [], 'redesign'
+    from api.ai.text_commands import normalize
+    needles = [normalize(value) for value in (search_texts or []) if isinstance(value, str) and normalize(value)]
     entries = []
     budget = MAX_INDEX_CHARS - 2
     evidence_found = False
@@ -164,15 +218,19 @@ def catalog_index(catalog, spread_index=0, selected=None, page_number=None):
                 if not isinstance(current, dict):
                     continue
                 source = source_elements.get(current.get('id'))
-                if not safe_element(source):
+                editable = safe_element(source)
+                if not editable and (not safe_readonly_text(source) or current != source):
                     continue
-                if not safe_element(current):
+                if editable and not safe_element(current):
                     # Older catalogs may persist only render fields. Missing evidence
                     # is supplied by the private source, never by a client approval flag.
                     if 'sourceVisible' in current:
                         continue
                     projected = projected_elements.get(current.get('id'))
                     comparison = dict(current)
+                    revision = comparison.pop('styleRevision', None)
+                    if 'styleRevision' in current and not valid_style_revision(revision):
+                        continue
                     for key in ('text', 'content', 'edited'):
                         comparison.pop(key, None)
                     provenance = comparison.pop('provenance', None)
@@ -181,16 +239,32 @@ def catalog_index(catalog, spread_index=0, selected=None, page_number=None):
                     expected = {k: v for k, v in (projected or {}).items() if k not in ('text', 'content', 'edited')}
                     if not projected or comparison != expected:
                         continue
-                    current = {**source, 'text': current.get('text', source.get('text')), 'edited': current.get('edited') is True}
-                if current.get('provenance') != source.get('provenance') or any(current.get(k) != source.get(k) for k in ('x', 'y', 'width', 'height', 'appearance', 'role')):
+                    current = {**source, 'text': current.get('text', source.get('text')), 'edited': current.get('edited') is True,
+                               **({'styleRevision': revision} if revision is not None else {})}
+                if 'styleRevision' in current and not valid_style_revision(current['styleRevision']):
+                    continue
+                if immutable_element_fields(current) != immutable_element_fields(source):
                     continue
                 text = current.get('text') if current.get('edited') is True else source.get('text')
                 if not isinstance(text, str) or len(text) > 2000:
                     continue
+                # Search all retained source pages, then budget only relevant
+                # evidence. Adding typography must not make a unique cover
+                # command ambiguous merely because unrelated text fills 32 KB.
+                # Include constituents of a full phrase so safe visual groups
+                # remain available across native text objects.
+                from api.ai.prompt_envelope import data_section
+                if needles and current.get('id') != selected and not any(
+                        needle in normalize(text) or normalize(text) in needle for needle in needles) and not data_section(text)[1]:
+                    continue
                 entry = {'id': source['id'], 'target': f"page:{number}/element:{source['id']}", 'page': number,
-                    'text': text, 'editable': True, 'commercial': protected_text(source.get('text', ''), source) or protected_text(text, source),
+                    'text': text, 'editable': editable, 'commercial': protected_text(source.get('text', ''), source) or protected_text(text, source),
                     'visible': number in visible_pages, 'role': source.get('role'),
-                    'geometry': {k: source[k] for k in ('x', 'y', 'width', 'height')}, 'fontSize': source.get('fontSize', 12)}
+                    'geometry': {k: source[k] for k in ('x', 'y', 'width', 'height')}, 'fontSize': source.get('fontSize', 12),
+                    'resolvedFont': source.get('resolvedFont'), 'fontStyle': source.get('fontStyle', 'normal'),
+                    'fontWeight': effective_font_weight(current, source),
+                    'effectiveFontWeight': effective_font_weight(current, source),
+                    'fontWeightReliable': font_weight_reliable(current, source)}
                 cost = len(json.dumps(entry, ensure_ascii=False)) + 2
                 if len(entries) < MAX_ENTRIES and cost <= budget:
                     entries.append(entry)
@@ -222,14 +296,24 @@ def validate_patch(patch, entries):
     indexed = {entry['target']: entry for entry in entries}
     accepted = []
     for action in patch['actions']:
-        if not isinstance(action, dict) or action.get('action', action.get('type')) not in ('update_text', 'update_text_group'):
+        if not isinstance(action, dict) or action.get('action', action.get('type')) not in ('update_text', 'update_text_group', 'update_text_style'):
             return None
         target = action.get('target')
         if not isinstance(target, str) or len(target) > 250:
             return None
         entry = indexed.get(target)
         params = action.get('params')
-        if not entry or entry['commercial'] or not isinstance(params, dict) or set(params) - {'find','replacement','text','expectedText','members'}:
+        kind = action.get('action', action.get('type'))
+        if kind == 'update_text_style':
+            if (not entry or entry.get('commercial') or entry.get('role') in PROTECTED_STYLE_ROLES
+                    or not entry.get('editable') or entry.get('members')
+                    or not isinstance(params, dict) or set(params) != {'fontWeight', 'expectedFontWeight', 'expectedText'}
+                    or not valid_font_weight(params['fontWeight']) or not valid_font_weight(params['expectedFontWeight'])
+                    or params['expectedFontWeight'] != entry.get('fontWeight') or params['expectedText'] != entry.get('text')):
+                return None
+            accepted.append({'action': kind, 'type': kind, 'target': target, 'params': dict(params)})
+            continue
+        if not entry or not entry.get('editable') or entry['commercial'] or not isinstance(params, dict) or set(params) - {'find','replacement','text','expectedText','members'}:
             return None
         replacement = params.get('replacement', params.get('text'))
         if not isinstance(replacement, str) or len(replacement) > 2000 or protected_text(replacement):

@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { editableTextIndex, executeTextAction, executeTextGroup, replaceNormalized } from './textCommandExecution';
+import { editableTextIndex, executeTextAction, executeTextGroup, executeTextStyleAction, executionFeedback, replaceNormalized } from './textCommandExecution';
 import { useStudioStore } from '../store/studioStore';
 import type { CatalogPageData } from '../data/editorialCatalog.mock';
 
@@ -9,6 +9,80 @@ beforeEach(() => {vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturn
 afterEach(() => {useStudioStore.getState().resetStudioState(); vi.clearAllTimers(); vi.useRealTimers(); vi.restoreAllMocks();});
 
 describe('source-preserving command execution', () => {
+  it('establishes an explicit weight even when uncertain PDF metadata has the same number', () => {
+    const source = page('PLASWILL');
+    Object.assign(source.documentPage!.elements[0], {fontWeight: 300, fontResolutionStatus: 'generic_fallback', fontResolutionConfidence: .5});
+    const execution = executeTextStyleAction([source], 'page:1/element:t1', {fontWeight: 300, expectedFontWeight: 300, expectedText: 'PLASWILL'});
+    expect(execution.result.status).toBe('applied');
+    expect(execution.pages[0].documentPage!.elements[0].styleRevision).toEqual({fontWeight: 300});
+    expect(executeTextStyleAction(execution.pages, 'page:1/element:t1', {fontWeight: 300, expectedFontWeight: 300, expectedText: 'PLASWILL'}).result.status).toBe('unchanged');
+  });
+  it('changes only a weight revision and preserves manual copy, source pixels and extracted typography', () => {
+    const source = page('PLASWILL');
+    Object.assign(source.documentPage!.elements[0], {fontWeight: 300, edited: true, provenance: {sourceText: 'PRODUTOS'}});
+    const execution = executeTextStyleAction([source], 'page:1/element:t1', {fontWeight: 700, expectedFontWeight: 300, expectedText: 'PLASWILL'});
+    expect(execution.result).toMatchObject({action: 'update_text_style', status: 'applied', value: '700'});
+    expect(execution.pages[0].documentPage!.elements[0]).toEqual({...source.documentPage!.elements[0], styleRevision: {fontWeight: 700}});
+    expect(source.documentPage!.elements[0].styleRevision).toBeUndefined();
+    expect(executionFeedback([execution.result])).toBe('Peso tipográfico atualizado para 700.');
+  });
+  it('rejects stale style/text, extra origin fields, unsafe targets and commercial text without mutation', () => {
+    const source = page('PLASWILL'); source.documentPage!.elements[0].fontWeight = 300;
+    const proposal = {fontWeight: 700, expectedFontWeight: 300, expectedText: 'PLASWILL'};
+    for (const input of [{...proposal, expectedText: 'PRODUTOS'}, {...proposal, expectedFontWeight: 400}, {...proposal, fontFamily: 'Other'}, {...proposal, fontWeight: 750}]) {
+      const execution = executeTextStyleAction([source], 'page:1/element:t1', input);
+      expect(execution.result.status).not.toBe('applied'); expect(execution.pages).toEqual([source]);
+    }
+    expect(executeTextStyleAction([source], 'element:t1', proposal).result.status).toBe('invalid_target');
+    const protectedPage = page('SKU AB-1'); protectedPage.documentPage!.elements[0].fontWeight = 300;
+    expect(executeTextStyleAction([protectedPage], 'page:1/element:t1', {...proposal, expectedText: 'SKU AB-1'}).result.status).toBe('blocked_by_integrity');
+    expect(executeTextAction([source], 'page:1/element:t1', {text: 'PLASWILL', fontWeight: 700}).result.status).toBe('unsupported');
+  });
+  it('rejects a weight that requires shrinking and reports unavailable loaded fonts', () => {
+    const source = page('PLASWILL'); Object.assign(source.documentPage!.elements[0], {fontWeight: 300, width: .07});
+    const execution = executeTextStyleAction([source], 'page:1/element:t1', {fontWeight: 700, expectedFontWeight: 300, expectedText: 'PLASWILL'});
+    expect(execution.result).toMatchObject({status: 'needs_layout_review', reason: 'style_overflow'});
+    expect(execution.pages).toEqual([source]);
+    source.documentPage!.elements[0].width = .6;
+    const descriptor = Object.getOwnPropertyDescriptor(document, 'fonts');
+    Object.defineProperty(document, 'fonts', {configurable: true, value: Object.assign(new Set(), {check: () => false})});
+    try {
+      expect(executeTextStyleAction([source], 'page:1/element:t1', {fontWeight: 700, expectedFontWeight: 300, expectedText: 'PLASWILL'}).result.reason).toBe('font_unavailable');
+    } finally {if (descriptor) Object.defineProperty(document, 'fonts', descriptor); else Reflect.deleteProperty(document, 'fonts');}
+  });
+  it('keeps a manually fitted title at its existing displayed size when changing only weight', () => {
+    const source = page('PLASWILL');
+    Object.assign(source.documentPage!.elements[0], {fontWeight:300, edited:true, height:.02});
+    const execution = executeTextStyleAction([source], 'page:1/element:t1', {fontWeight:700, expectedFontWeight:300, expectedText:'PLASWILL'});
+    expect(execution.result.status).toBe('applied');
+    expect(execution.pages[0].documentPage!.elements[0].fontSize).toBe(source.documentPage!.elements[0].fontSize);
+    expect(execution.pages[0].documentPage!.elements[0].height).toBe(source.documentPage!.elements[0].height);
+  });
+  it('creates one history only for a real style change; undo/redo and restore include content and weight', async () => {
+    const source = page('PLASWILL'); Object.assign(source.documentPage!.elements[0], {fontWeight: 300, edited: true, provenance: {sourceText: 'PRODUTOS'}});
+    useStudioStore.setState({pages: [source], totalPages: 1, historyStack: [], redoStack: [], canUndo: false, canRedo: false});
+    const params = {fontWeight: 700, expectedFontWeight: 300, expectedText: 'PLASWILL'};
+    expect(useStudioStore.getState().applySpreadPatch({actions: [{action: 'update_text_style', target: 'page:1/element:t1', params}]})[0].status).toBe('applied');
+    expect(useStudioStore.getState().historyStack).toHaveLength(1);
+    const unchanged = useStudioStore.getState().applySpreadPatch({actions: [{action: 'update_text_style', target: 'page:1/element:t1', params: {...params, expectedFontWeight: 700}}]});
+    expect(unchanged[0].status).toBe('unchanged'); expect(useStudioStore.getState().historyStack).toHaveLength(1);
+    expect(executionFeedback(unchanged)).toContain('não comprova equivalência visual');
+    useStudioStore.getState().undo(); expect(useStudioStore.getState().pages[0].documentPage!.elements[0].styleRevision).toBeUndefined();
+    useStudioStore.getState().redo(); expect(useStudioStore.getState().pages[0].documentPage!.elements[0].styleRevision?.fontWeight).toBe(700);
+    useStudioStore.getState().resetDocumentText(1, 't1');
+    expect(useStudioStore.getState().pages[0].documentPage!.elements[0]).toEqual({...source.documentPage!.elements[0], text: 'PRODUTOS', edited: false});
+    const restoredHistory = useStudioStore.getState().historyStack.length;
+    useStudioStore.getState().resetDocumentText(1, 't1'); expect(useStudioStore.getState().historyStack).toHaveLength(restoredHistory);
+  });
+  it('does not create undo history for equal copy or ignored legacy update fields', () => {
+    useStudioStore.setState({pages: [page('PLASWILL')], totalPages: 1, historyStack: [], redoStack: []});
+    const equal = useStudioStore.getState().applySpreadPatch({actions: [{action: 'update_text', target: 'page:1/element:t1', params: {text: 'PLASWILL'}}]});
+    expect(equal[0].status).toBe('unchanged'); expect(useStudioStore.getState().historyStack).toHaveLength(0);
+    useStudioStore.setState({pages: [{...page(), documentPage: undefined}]});
+    const ignored = useStudioStore.getState().applySpreadPatch({actions: [{action: 'update_text', target: 'page:1', params: {fontWeight: 700}}]});
+    expect(executionFeedback(ignored)).toContain('não contém um campo de edição compatível');
+    expect(useStudioStore.getState().historyStack).toHaveLength(0);
+  });
   it('allows editorial digits and validates each candidate independently', () => {
     const source = page('CATÁLOGO 2026');
     source.documentPage!.elements.push({...source.documentPage!.elements[0], id: 'bad', width: 2});

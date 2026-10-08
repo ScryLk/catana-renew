@@ -27,7 +27,7 @@ from .views_auth import (
 )
 from .views_clerk_webhook import ClerkWebhookView
 from .views_studio import (
-    StudioAgentsListView, StudioActionConfirmView,
+    StudioAgentsListView, StudioActionConfirmView, StudioExecutionReceiptView,
     StudioQuotaStatusView,
     StudioChatStreamView,
     StudioCatalogListView,
@@ -157,6 +157,7 @@ urlpatterns = [
     path('v2/studio/agents/', StudioAgentsListView.as_view(), name='studio_agents_list'),
     path('v2/studio/quotas/', StudioQuotaStatusView.as_view(), name='studio_quota_status'),
     path('v2/studio/catalogs/<int:catalog_id>/actions/confirm/', StudioActionConfirmView.as_view(), name='studio_action_confirm'),
+    path('v2/studio/catalogs/<int:catalog_id>/chat/execution/', StudioExecutionReceiptView.as_view(), name='studio_execution_receipt'),
     path('v2/studio/chat/stream/', StudioChatStreamView.as_view(), name='studio_chat_stream'),
     path('v2/studio/catalogs/', StudioCatalogListView.as_view(), name='studio_catalog_list'),
     path('v2/studio/catalogs/generate/', StudioCatalogGenerateView.as_view(), name='studio_catalog_generate'),

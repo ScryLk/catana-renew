@@ -1,4 +1,4 @@
-"""Playwright transport bridge to real Django APIs, isolated synthetic PDF only.
+"""Playwright transport bridge to real Django APIs and isolated private storage.
 
 No test routes ship in the application. Each process owns its temporary DB and
 private asset storage. Stdout carries JSON; diagnostics stay on stderr.
@@ -31,9 +31,10 @@ with tempfile.TemporaryDirectory(prefix='catana-browser-api-') as workspace:
     owner = User.objects.create_user(username='browser-owner', role='editor')
     org = Organization.objects.create(name='Browser private source', owner=owner)
     owner.organizations.add(org)
-    source = synthetic_pdf([{'size': (595, 842), 'content':
+    local_pdf = os.environ.get('CATANA_TEST_PDF')
+    source = Path(local_pdf).read_bytes() if local_pdf else synthetic_pdf([{'size': (595, 842), 'content':
         'BT /F1 35 Tf 50 600 Td (CATALOGO DE) Tj ET BT /F1 36 Tf 50 555 Td (PRODUTOS) Tj ET BT /F1 12 Tf 50 50 Td (SOCIAL FOOTER) Tj ET'} for _ in range(int(sys.argv[1]) if len(sys.argv)>1 else 1)])
-    job = DocumentReconstructorService.analyze_file(source, 'invented.pdf', owner, org, mode='editable')
+    job = DocumentReconstructorService.analyze_file(source, Path(local_pdf).name if local_pdf else 'invented.pdf', owner, org, mode='editable')
     job, _ = DocumentReconstructorService.confirm_import(job, owner, mode='editable')
     client = APIClient()
     client.force_authenticate(owner)
@@ -48,7 +49,8 @@ with tempfile.TemporaryDirectory(prefix='catana-browser-api-') as workspace:
             projected = public_import_page(values[0]) if values else None
             spread[f'{side}_page'] = projected
             spread[f'{side}_page_elements'] = [projected] if projected else []
-    print(json.dumps({'catalog_id': job.catalog_id, 'initial': initial}), flush=True)
+    cover_texts = {e['text']: e['id'] for e in job.previews[0]['documentPage']['elements'] if e.get('editable')}
+    print(json.dumps({'catalog_id': job.catalog_id, 'initial': initial, 'cover_texts': cover_texts}), flush=True)
     with patch('api.ai.agents.base.get_ai_provider', return_value=provider), patch('api.ai.provider.time.sleep'):
         for line in sys.stdin:
             try:

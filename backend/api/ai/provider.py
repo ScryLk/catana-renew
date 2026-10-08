@@ -132,7 +132,8 @@ class MockGeminiProvider:
 
         if isinstance(context, dict) and 'editable_text_index' in context:
             from api.ai.text_commands import plan_text_replacement, planner_response
-            plan = plan_text_replacement(clean_user_prompt, context)
+            from api.ai.style_commands import plan_text_style
+            plan = plan_text_style(clean_user_prompt, context) or plan_text_replacement(clean_user_prompt, context)
             if plan is not None:
                 return planner_response(plan)
         lower = clean_user_prompt.lower()
@@ -282,11 +283,13 @@ class GeminiAIProvider:
         if gateway["status"] == "NORMALIZED":
             literal_prompt = KatanaGuardrailEngine.sanitize_and_extract_intent(envelope.current_user)[1]
         from api.ai.structural_commands import plan_structure
+        from api.ai.style_commands import plan_text_style
         structure_plan = plan_structure(literal_prompt, context)
-        plan = structure_plan or plan_text_replacement(literal_prompt, context)
+        style_plan = None if structure_plan else plan_text_style(literal_prompt, context)
+        plan = structure_plan or style_plan or plan_text_replacement(literal_prompt, context)
         if plan is not None:
             yield AIResponseChunk(text=planner_response(plan))
-            yield AIResponseChunk(done=True, metadata={**diagnostics, "provider": "local-command-planner", "model": "deterministic", "planner_status": plan[1]["planner_status"], "resolution_candidates": plan[1].get('candidates', []), "action_planner": "catalog-structure" if structure_plan else "normalized-text-replacement"})
+            yield AIResponseChunk(done=True, metadata={**diagnostics, "provider": "local-command-planner", "model": "deterministic", "planner_status": plan[1]["planner_status"], "resolution_candidates": plan[1].get('candidates', []), "style_choices": plan[1].get('style_choices', []), "action_planner": "catalog-structure" if structure_plan else "source-text-weight" if style_plan else "normalized-text-replacement"})
             return
         # Mock receives only literal intent, never serialized customer context.
         prompt = literal_prompt

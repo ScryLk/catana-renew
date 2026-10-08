@@ -2,7 +2,7 @@ import { workspaceKey, getContextUserId } from '../services/workspaceContext';
 import { sanitizeAgentText } from '../utils/agentProtocol';
 import { AuthNotReadyError, isTokenReady } from '../services/authTokenProvider';
 import ACTION_REGISTRY from '../../../shared/studio-actions.json';
-import { editableTextIndex, executeTextAction, executeTextGroup, executionFeedback, commercialText, type ActionResult } from '../utils/textCommandExecution';
+import { editableTextIndex, executeTextAction, executeTextGroup, executeTextStyleAction, loadDocumentStyleFonts, executionFeedback, commercialText, type ActionResult } from '../utils/textCommandExecution';
 import { normalizeCatalogDocument, QualityGate } from '../data/editorialCatalog.mock';
 import { parseSuppliedPrice } from '../utils/commercialProduct';
 import { create } from 'zustand';
@@ -202,6 +202,8 @@ export interface ChatMessage {
   timestamp: string;
   reasoning?: string;
   executionResults?: ActionResult[];
+  proposal?: {content?: string; patch?: unknown};
+  executionReceipt?: {status: string; revision_before?: string; revision_after?: string};
   providerMetadata?: Record<string, unknown>;
   actions?: string[];
   delegations?: ChatDelegation[];
@@ -209,6 +211,20 @@ export interface ChatMessage {
   capturedDossier?: CapturedDossier;
   feedback?: 'like' | 'dislike' | null;
 }
+
+export interface TextStyleChoice {
+  label: string;
+  fontWeight: number;
+  target: string;
+  elementId: string;
+  page: number;
+  expectedText: string;
+  expectedFontWeight: number;
+  catalog_id: number;
+  catalog_revision: string;
+  command: string;
+}
+interface ExecutionSaveContext {client_request_id: string; message_id: number}
 
 export interface ChatThread {
   id: string;
@@ -872,7 +888,7 @@ export interface StudioState {
   saveStatus: 'saved' | 'saving' | 'unsaved' | 'error';
   setSaveStatus: (status: 'saved' | 'saving' | 'unsaved' | 'error') => void;
   debouncedSaveCurrentSpread: () => void;
-  flushSaveSpread: () => Promise<void>;
+  flushSaveSpread: (execution?: ExecutionSaveContext) => Promise<void>;
 
   // JSON Patch mutation
   applySpreadPatch: (patch: {
@@ -890,7 +906,7 @@ export interface StudioState {
   }) => ActionResult[];
 
   // Real Agent Streaming & Command Execution
-  sendMessageToAgent: (prompt: string, attachments?: ChatAttachment[]) => Promise<void>;
+  sendMessageToAgent: (prompt: string, attachments?: ChatAttachment[], styleChoice?: TextStyleChoice) => Promise<void>;
 }
 
 const getInitialTheme = (): 'dark' | 'light' => {
@@ -1082,7 +1098,10 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
     let threadsToUse: ChatThread[] = [];
     if (Array.isArray(catData.threads) && catData.threads.length > 0) {
-      threadsToUse = catData.threads;
+      threadsToUse = catData.threads.map((thread: ChatThread) => ({...thread, messages: thread.messages.map(message => {
+        const metadata = (message as ChatMessage & {metadata?: Record<string, unknown>}).metadata;
+        return {...message, ...(metadata ? {providerMetadata: metadata.metadata as Record<string, unknown> || metadata, executionResults: metadata.execution_results as ActionResult[] | undefined, executionReceipt: metadata.execution_receipt as ChatMessage['executionReceipt'], proposal: typeof metadata.proposal_content === 'string' && metadata.patch ? {content: metadata.proposal_content, patch: metadata.patch as Parameters<StudioState['applySpreadPatch']>[0]} : metadata.proposal as ChatMessage['proposal']} : {})};
+      })}));
     } else {
       threadsToUse = [
         {
@@ -3072,8 +3091,14 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     get().debouncedSaveCurrentSpread();
   },
   resetDocumentText: (pageNumber, elementId) => {
-    const element = get().pages.find(item => item.pageNumber === pageNumber)?.documentPage?.elements.find(item => item.id === elementId);
-    if (typeof element?.provenance?.sourceText === 'string') get().updateDocumentText(pageNumber, elementId, element.provenance.sourceText);
+    const page = get().pages.find(item => item.pageNumber === pageNumber);
+    const element = page?.documentPage?.elements.find(item => item.id === elementId);
+    if (!element || typeof element.provenance?.sourceText !== 'string' || (!element.edited && !element.styleRevision && element.text === element.provenance.sourceText)) return;
+    const restored = {...element, text: element.provenance.sourceText, edited: false};
+    delete restored.styleRevision;
+    get().pushHistorySnapshot();
+    set({pages: get().pages.map(item => item !== page ? item : {...item, documentPage: {...item.documentPage!, elements: item.documentPage!.elements.map(candidate => candidate === element ? restored : candidate)}}), saveStatus: 'unsaved'});
+    get().debouncedSaveCurrentSpread();
   },
 
   updatePage: (pageNumber, updates) => {
@@ -3277,11 +3302,11 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
       contentRole: options?.contentRole,
       pageNumber: insertIndex + 1,
       type: pageType,
-      title: options?.title || (pageType === 'manifesto' ? 'Manifesto Editorial' : pageType === 'divider' ? 'Nova Coleção' : 'Destaque Editorial'),
+      title: options?.title ?? (pageType === 'manifesto' ? 'Manifesto Editorial' : pageType === 'divider' ? 'Nova Coleção' : 'Destaque Editorial'),
       subtitle: options?.subtitle,
-      quote: options?.quote || (pageType === 'manifesto' ? 'A simbiose entre tradição manufatureira e vanguarda estética.' : undefined),
-      content: options?.content || (pageType === 'manifesto' ? 'Peças concebidas com matérias-primas de alta procedência, lapidadas para transcender coleções sazonais.' : undefined),
-      label: options?.label || (pageType === 'manifesto' ? 'MANIFESTO' : pageType === 'divider' ? 'SEÇÃO' : 'EDITORIAL'),
+      quote: options?.quote ?? (pageType === 'manifesto' ? 'A simbiose entre tradição manufatureira e vanguarda estética.' : undefined),
+      content: options?.content ?? (pageType === 'manifesto' ? 'Peças concebidas com matérias-primas de alta procedência, lapidadas para transcender coleções sazonais.' : undefined),
+      label: options?.label ?? (pageType === 'manifesto' ? 'MANIFESTO' : pageType === 'divider' ? 'SEÇÃO' : 'EDITORIAL'),
       backgroundColor: isDark ? activePal.primary : activePal.background,
       textColor: isDark ? activePal.background : activePal.primary,
       accentColor: activePal.accent,
@@ -3528,7 +3553,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     }, 1200);
   },
 
-  flushSaveSpread: async () => {
+  flushSaveSpread: async (execution) => {
     if (saveTimeout) {
       clearTimeout(saveTimeout);
       saveTimeout = null;
@@ -3555,7 +3580,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
           spreads.push({spread_index:offset/2, left_page_elements:[state.pages[offset]], right_page_elements:state.pages[offset+1] ? [state.pages[offset+1]] : []});
         }
         const response = await api.post(`/api/v2/studio/catalogs/${numericCatalogId}/spreads/bulk/`, {
-          spreads, total_pages:state.pages.length, unassigned_products:state.unassignedProducts, ...(pendingConfirmationToken ? {confirmation_token:pendingConfirmationToken} : {}),
+          spreads, total_pages:state.pages.length, unassigned_products:state.unassignedProducts, ...(execution ? {execution} : {}), ...(pendingConfirmationToken ? {confirmation_token:pendingConfirmationToken} : {}),
         });
         pendingConfirmationToken = undefined;
         if (!saveIsCurrent()) return;
@@ -3585,14 +3610,15 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     if (patch.confirmation_token) pendingConfirmationToken = patch.confirmation_token;
     if (patch.expectedPageIds && JSON.stringify(patch.expectedPageIds) !== JSON.stringify(state.pages.map(p=>p.id))) return [{action_id:'0',target:'catalog:pages',status:'invalid_target',reason:'stale_target'}];
     // Text fitting and stale checks happen before any action in an AI batch mutates state.
+    let checkedPages = state.pages;
     for (const a of patch.actions || []) {
       const name=a.action || a.type;
-      if ((name === 'update_text' && /(?:element:|\/field:)/.test(a.target)) || name === 'update_text_group') {
-        const check = name === 'update_text_group' ? executeTextGroup(state.pages,a.target,a.params || {}) : executeTextAction(state.pages,a.target,a.params || {});
+      if ((name === 'update_text' && /(?:element:|\/field:)/.test(a.target)) || name === 'update_text_group' || name === 'update_text_style') {
+        const check = name === 'update_text_style' ? executeTextStyleAction(checkedPages,a.target,a.params || {}) : name === 'update_text_group' ? executeTextGroup(checkedPages,a.target,a.params || {}) : executeTextAction(checkedPages,a.target,a.params || {});
         if (!['applied','unchanged'].includes(check.result.status)) return [check.result];
+        checkedPages = check.pages;
       }
     }
-    state.pushHistorySnapshot();
     patchExecuting = true;
     try {
     const [leftPageNum, rightPageNum] = state.currentSpread;
@@ -3921,6 +3947,12 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
             break;
           }
 
+          case 'update_text_style': {
+            const execution = executeTextStyleAction(get().pages, targetStr, params);
+            results.push(execution.result);
+            if (execution.result.status === 'applied') set({pages: execution.pages, saveStatus: 'unsaved'});
+            break;
+          }
           case 'update_text_group': {
             const execution = executeTextGroup(get().pages, targetStr, params);
             results.push(execution.result);
@@ -4499,7 +4531,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         }
         if (results.length === resultCountBefore) {
           const changed = beforeAction !== JSON.stringify({pages: get().pages, products: get().unassignedProducts});
-          results.push({action_id: `${results.length}`, action: actType, target: targetStr, status: changed ? 'applied' : ['navigate','export_pdf'].includes(actType) ? 'applied' : 'unchanged'});
+          results.push({action_id: `${results.length}`, action: actType, target: targetStr, status: changed ? 'applied' : ['navigate','export_pdf'].includes(actType) ? 'applied' : 'unchanged', ...(!changed && actType === 'update_text' ? {reason: 'ignored_update'} : {})});
         }
       }
     }
@@ -4571,12 +4603,17 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     }
 
     patchExecuting = false;
-    get().debouncedSaveCurrentSpread();
+    const pagesChanged = JSON.stringify(state.pages) !== JSON.stringify(get().pages);
+    const productsChanged = JSON.stringify(state.unassignedProducts) !== JSON.stringify(get().unassignedProducts);
+    if (pagesChanged || productsChanged) {
+      set({historyStack: [...state.historyStack, structuredClone(state.pages)].slice(-30), redoStack: [], canUndo: true, canRedo: false});
+      get().debouncedSaveCurrentSpread();
+    } else set({saveStatus: state.saveStatus});
     return results.map((result, index) => ({...result, action_id: String(index)}));
     } finally {patchExecuting = false;}
   },
 
-  sendMessageToAgent: async (prompt, attachments) => {
+  sendMessageToAgent: async (prompt, attachments, styleChoice) => {
     const state = get();
     const documentScope = captureDocumentScope();
     const streamIsCurrent = () =>
@@ -4651,11 +4688,12 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     }));
 
     const numericCatalogId = state.activeCatalogId ? parseInt(state.activeCatalogId, 10) : NaN;
-    const numericThreadId = state.activeThreadId ? parseInt(state.activeThreadId, 10) : NaN;
+    const numericThreadId = state.activeThreadId && /^(?:thread-)?\d+$/.test(state.activeThreadId) ? Number(state.activeThreadId.replace(/^thread-/, '')) : NaN;
 
     const payload = {
         client_request_id: requestId,
         message: userPrompt,
+      ...(styleChoice ? {style_choice: styleChoice} : {}),
       agent_role: state.activeRoleId || 'orchestrator',
       catalog_id: !isNaN(numericCatalogId) ? numericCatalogId : undefined,
       thread_id: !isNaN(numericThreadId) ? numericThreadId : undefined,
@@ -4667,6 +4705,12 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
     };
 
     try {
+        // Manual edits must reach the canonical catalog before its authoritative index is read.
+        if (get().saveStatus !== 'saved') {
+          await get().flushSaveSpread();
+          if (!streamIsCurrent()) return;
+          if (get().saveStatus === 'error') throw new Error('Pending edits could not be saved');
+        }
         const response = await authenticatedStreamingFetch(`${API_BASE_URL}/api/v2/studio/chat/stream/`, {
         method: 'POST',
         headers: {
@@ -4695,6 +4739,8 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
 
       let executionResults: ActionResult[] = [];
       let providerMetadata: Record<string, unknown> = {};
+      let serverMessageId: number | undefined;
+      let executionReceipt: ChatMessage['executionReceipt'];
       const executePatch = (patch: Parameters<StudioState['applySpreadPatch']>[0]) => {
         executionResults = get().applySpreadPatch(patch);
       };
@@ -4836,6 +4882,7 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
               if (data.event === 'done') {
                 streamDone = true;
                 providerMetadata = data.metadata || {};
+                if (Number.isInteger(data.message_id) && data.message_id > 0) serverMessageId = data.message_id;
               if (data.patch && !appliedPatch) {
                 appliedPatch = data.patch;
 
@@ -4851,7 +4898,11 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         if (!streamDone) throw new Error('Interrupted stream');
         // Execute only a complete, accepted response; an interrupted proposal has no effects.
         if (protocolError) appliedPatch = null;
-        else if (appliedPatch) executePatch(appliedPatch);
+        else if (appliedPatch) {
+          await loadDocumentStyleFonts(get().pages, appliedPatch.actions || []);
+          if (!streamIsCurrent()) return;
+          executePatch(appliedPatch);
+        }
         // Extrai açoes e delegaçoes para a mensagem formada
       const actionSummaries = appliedPatch ? resolveActionSummaries(appliedPatch).filter((_: string, index: number) => executionResults[index]?.status === 'applied') : [];
       const mappedDelegations = resolveDelegations(appliedPatch,
@@ -4894,10 +4945,26 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
           cleanContent =
             'Não consegui transformar essa solicitação em uma alteração válida. Tente novamente.';
         if (appliedPatch) {
-        await get().flushSaveSpread();
+        await get().flushSaveSpread(serverMessageId ? {client_request_id: requestId, message_id: serverMessageId} : undefined);
         if (!streamIsCurrent()) return;
         if (get().saveStatus === 'error') executionResults = executionResults.map(r => ({...r,status:'failed' as const,reason:'Não foi possível salvar a alteração. Tente novamente.'}));
+        else executionResults = executionResults.map(r => r.status === 'applied' ? {...r, status:'unverified' as const, reason:'receipt_unavailable'} : r);
         cleanContent = executionFeedback(executionResults);
+        if (serverMessageId && !isNaN(numericCatalogId)) {
+          try {
+            const receipt = await api.post(`/api/v2/studio/catalogs/${numericCatalogId}/chat/execution/`, {client_request_id: requestId, message_id: serverMessageId, results: executionResults});
+            if (!streamIsCurrent()) return;
+            if (typeof receipt.data.content === 'string' && Array.isArray(receipt.data.execution_results)) {
+              cleanContent = sanitizeAgentText(receipt.data.content);
+              executionResults = receipt.data.execution_results;
+              executionReceipt = receipt.data.execution_receipt;
+            }
+          } catch {
+            if (!streamIsCurrent()) return;
+            // A local application and a successful save do not prove the accepted action ran.
+            cleanContent = executionFeedback(executionResults);
+          }
+        }
         const applied = executionResults.filter(result => result.status === 'applied').length;
         if (applied) toast.success(`${applied} alteração(ões) aplicada(s)`);
         else toast.error('Nenhuma alteração aplicada', {description: cleanContent});
@@ -4913,8 +4980,10 @@ export const useStudioStore = create<StudioState>((rawSet, get) => {
         timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         reasoning: appliedPatch?.reasoning,
         executionResults,
+        ...(appliedPatch ? {proposal: {content: sanitizeAgentText(accumulatedContent), patch: appliedPatch}} : {}),
+        executionReceipt,
         providerMetadata,
-        actions: actionSummaries.length > 0 ? actionSummaries : undefined,
+        actions: executionResults.some(result => result.status === 'applied') && actionSummaries.length > 0 ? actionSummaries : undefined,
         delegations: mappedDelegations,
       };
 

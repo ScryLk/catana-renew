@@ -365,6 +365,10 @@ def _text_ink_mask(page, obj, page_number, scale, pixel_box):
     An object can contain both readable and concealed characters. Comparing its
     full ink mask against the source contribution avoids treating one painted
     glyph as proof that every extracted character was visible.
+
+    The caller must supply an unmodified source page. PDFium may merge distinct
+    embedded font resources with the same BaseFont when regenerating content;
+    importing a regenerated page can therefore change the selected glyphs.
     """
     import pypdfium2 as pdfium
     members = obj if isinstance(obj, list) else [obj]
@@ -428,58 +432,80 @@ def _reconstruct(page, source, objects, width, height, scale, assets, page_numbe
     if not selected:
         return None, 0, None
     from PIL import ImageChops, ImageStat
-    background = source.copy()
-    admitted = []
-    rejected_verification = None
+
+    # Capture every candidate's ink before any source object is removed or
+    # content regenerated. Each isolation owns its imported document, while all
+    # copies still read the untouched source resources. Keep only one-byte ink
+    # crops: candidate pixel boxes cannot overlap, so their total allocation is
+    # at most one source page (already bounded by MAX_PAGE_PIXELS). The existing
+    # worker memory/CPU limits and reconstruction deadline still apply.
+    immutable_candidates = []
     for obj, element, box, pixel_box in selected:
         if deadline is not None and time.monotonic() >= deadline:
             break
-        removed = False
         try:
             mask = _text_ink_mask(page, obj, page_number, scale, pixel_box)
-            members = obj if isinstance(obj, list) else [obj]
-            for member in members:
-                page.remove_obj(member)
-            removed = True
-            page.gen_content()
-            trial = _render(page, scale)
-            difference = ImageChops.difference(background.crop(pixel_box), trial.crop(pixel_box))
-            changed = ImageChops.lighter(ImageChops.lighter(difference.getchannel("R"), difference.getchannel("G")), difference.getchannel("B"))
-            # Require evidence for every ink pixel: hidden OCR and concealed
-            # characters must never be exposed as visible source facts.
-            changed_pixels = changed.point(lambda value: 255 if value else 0)
-            # PDFium transparent isolation may emit alpha <= 15 at glyph
-            # edges where the opaque renderer rounds to the background. Ignore
-            # only those low-alpha edges; every stronger ink pixel must change.
-            # Final source/crop composition still requires exact pixel equality.
-            expected_ink = mask.point(lambda value: 255 if value >= 16 else 0)
-            painted = expected_ink.getbbox() is not None and ImageChops.subtract(expected_ink, changed_pixels).getbbox() is None
-            element["visibilityStatus"] = "sourceVisible" if painted else "partiallyOccluded" if changed.getbbox() else "fullyOccluded"
-            element["sourceVisible"] = painted
-            element["visibilityConfidence"] = 1.0
-            # Validate each removal independently. Damage outside this crop
-            # rejects only this candidate, and the original object is reinserted.
-            composed = trial.copy()
-            composed.paste(background.crop(pixel_box), (pixel_box[0], pixel_box[1]))
-            residual = ImageChops.difference(background, composed)
-            if residual.getbbox() is not None:
-                rejected_verification = {"method": "per_element_source_pixel_comparison", "exactPixels": False,
-                    "meanAbsoluteChannelError": round(sum(ImageStat.Stat(residual).mean) / 3, 6)}
-            if painted and residual.getbbox() is None:
-                background = trial
-                admitted.append((obj, element, box, pixel_box))
-                for member in members:
-                    member.close()
-                removed = False
-                continue
+            try:
+                # Preserve the existing low-alpha edge threshold. Visibility
+                # still requires every stronger source ink pixel to contribute.
+                expected_ink = mask.point(lambda value: 255 if value >= 16 else 0)
+            finally:
+                mask.close()
+            immutable_candidates.append((obj, element, box, pixel_box, expected_ink))
         except Exception:
             element["sourceVisible"] = None
             element["visibilityStatus"] = "unknown"
-        finally:
-            if removed:
+
+    background = source.copy()
+    admitted = []
+    rejected_verification = None
+    try:
+        for obj, element, box, pixel_box, expected_ink in immutable_candidates:
+            if deadline is not None and time.monotonic() >= deadline:
+                break
+            removed = False
+            try:
+                members = obj if isinstance(obj, list) else [obj]
                 for member in members:
-                    page.insert_obj(member)
+                    page.remove_obj(member)
+                removed = True
                 page.gen_content()
+                trial = _render(page, scale)
+                difference = ImageChops.difference(background.crop(pixel_box), trial.crop(pixel_box))
+                changed = ImageChops.lighter(ImageChops.lighter(difference.getchannel("R"), difference.getchannel("G")), difference.getchannel("B"))
+                # Require evidence for every ink pixel: hidden OCR and concealed
+                # characters must never be exposed as visible source facts.
+                changed_pixels = changed.point(lambda value: 255 if value else 0)
+                painted = expected_ink.getbbox() is not None and ImageChops.subtract(expected_ink, changed_pixels).getbbox() is None
+                element["visibilityStatus"] = "sourceVisible" if painted else "partiallyOccluded" if changed.getbbox() else "fullyOccluded"
+                element["sourceVisible"] = painted
+                element["visibilityConfidence"] = 1.0
+                # Validate each removal independently. Damage outside this crop
+                # rejects only this candidate, and the original object is reinserted.
+                composed = trial.copy()
+                composed.paste(background.crop(pixel_box), (pixel_box[0], pixel_box[1]))
+                residual = ImageChops.difference(background, composed)
+                if residual.getbbox() is not None:
+                    rejected_verification = {"method": "per_element_source_pixel_comparison", "exactPixels": False,
+                        "meanAbsoluteChannelError": round(sum(ImageStat.Stat(residual).mean) / 3, 6)}
+                if painted and residual.getbbox() is None:
+                    background = trial
+                    admitted.append((obj, element, box, pixel_box))
+                    for member in members:
+                        member.close()
+                    removed = False
+                    continue
+            except Exception:
+                element["sourceVisible"] = None
+                element["visibilityStatus"] = "unknown"
+            finally:
+                if removed:
+                    for member in members:
+                        page.insert_obj(member)
+                    page.gen_content()
+    finally:
+        for *_, expected_ink in immutable_candidates:
+            expected_ink.close()
     selected = admitted
     if not selected:
         return None, 0, rejected_verification

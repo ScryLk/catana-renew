@@ -252,7 +252,7 @@ async function storeModule(page: Page) {
 async function storeState(page: Page) {
   return page.evaluate(async moduleUrl => { const { useStudioStore } = await import(moduleUrl); const state = useStudioStore.getState();
     return { catalogSyncStatus: state.catalogSyncStatus, pages: state.pages, totalPages: state.totalPages, activeCatalogId: state.activeCatalogId, activeBrandId: state.activeBrandId,
-      activeOrganizationId: state.activeOrganizationId, catalogBrandContext: state.catalogBrandContext, qualityGate: state.qualityGate, importMetadata: state.importMetadata }; }, await storeModule(page));
+      activeOrganizationId: state.activeOrganizationId, catalogBrandContext: state.catalogBrandContext, qualityGate: state.qualityGate, importMetadata: state.importMetadata, messages: state.messages, historyLength: state.historyStack.length }; }, await storeModule(page));
 }
 async function openImport(page: Page) {
   await page.goto('/studio');
@@ -573,7 +573,7 @@ test('real private PDF resolves commands without browser source text, saves grou
   try {
     await page.route('**/api/v2/studio/**', async route => {
       const request = route.request(), path = new URL(request.url()).pathname;
-      if (!(path === `/api/v2/studio/catalogs/${catalogId}/` || path.startsWith(`/api/v2/studio/catalogs/${catalogId}/spreads`) || path.includes('/import-document/assets/') || path === '/api/v2/studio/chat/stream/')) return route.fallback();
+      if (!(path === `/api/v2/studio/catalogs/${catalogId}/` || path.startsWith(`/api/v2/studio/catalogs/${catalogId}/spreads`) || path === `/api/v2/studio/catalogs/${catalogId}/chat/execution/` || path.includes('/import-document/assets/') || path === '/api/v2/studio/chat/stream/')) return route.fallback();
       if (firstLoad && request.method() === 'GET' && path === `/api/v2/studio/catalogs/${catalogId}/`) {
         firstLoad = false;
         return route.fulfill({json: bridge.initial.initial});
@@ -625,7 +625,7 @@ test('eight imported pages accept a closing ninth page through real API, reload,
   try {
     await page.route('**/api/v2/studio/**',async route=>{
       const request=route.request(),path=new URL(request.url()).pathname;
-      if (!(path===`/api/v2/studio/catalogs/${catalogId}/` || path.startsWith(`/api/v2/studio/catalogs/${catalogId}/spreads`) || path.includes('/import-document/assets/') || path==='/api/v2/studio/chat/stream/')) return route.fallback();
+      if (!(path===`/api/v2/studio/catalogs/${catalogId}/` || path.startsWith(`/api/v2/studio/catalogs/${catalogId}/spreads`) || path===`/api/v2/studio/catalogs/${catalogId}/chat/execution/` || path.includes('/import-document/assets/') || path==='/api/v2/studio/chat/stream/')) return route.fallback();
       const reply=await bridge.request(request.method(),path,request.postData() ? request.postDataJSON() : undefined);
       expect(reply.bridge_error).toBeUndefined();
       return route.fulfill({status:Number(reply.status),contentType:String(reply.content_type),body:Buffer.from(String(reply.base64),'base64')});
@@ -661,5 +661,101 @@ test('eight imported pages accept a closing ninth page through real API, reload,
     expect(saved.source_page_count).toBe(8);
     expect(saved.total_pages).toBe(9);
     expect(saved.spreads[4].right_page_elements).toEqual([]);
+  } finally {bridge.close();}
+});
+
+test('manual cover edits resolve the exact command, persist weight choices and retain eight source pages', async ({page}) => {
+  test.setTimeout(180000);
+  await page.setViewportSize({width:1440,height:1000});
+  await fixture(page,{count:8});
+  const bridge = await importEditingBridge(8);
+  const catalogId = String(bridge.initial.catalog_id);
+  const sourceTexts = bridge.initial.cover_texts as Record<string,string>;
+  const first = sourceTexts['CATÁLOGO DE'] || sourceTexts['CATALOGO DE'];
+  const title = sourceTexts['PRODUTOS'];
+  expect(first).toBeTruthy(); expect(title).toBeTruthy();
+  let chats = 0;
+  try {
+    await page.route('**/api/v2/studio/**', async route => {
+      const request = route.request(), path = new URL(request.url()).pathname;
+      if (!(path === `/api/v2/studio/catalogs/${catalogId}/` || path.startsWith(`/api/v2/studio/catalogs/${catalogId}/spreads`) || path === `/api/v2/studio/catalogs/${catalogId}/chat/execution/` || path.includes('/import-document/assets/') || path === '/api/v2/studio/chat/stream/')) return route.fallback();
+      const body = request.postData() ? request.postDataJSON() : undefined;
+      if (path === '/api/v2/studio/chat/stream/') {expect(body.editable_text_index).toEqual([]); chats++;}
+      const reply = await bridge.request(request.method(), path, body);
+      expect(reply.bridge_error).toBeUndefined();
+      return route.fulfill({status:Number(reply.status),contentType:String(reply.content_type),body:Buffer.from(String(reply.base64),'base64')});
+    });
+    await page.goto('/studio');
+    await expect.poll(async () => (await storeState(page)).catalogSyncStatus).toBe('ready');
+    const url = await storeModule(page);
+    const load = () => page.evaluate(async ({url,id}) => {const {useStudioStore} = await import(url);await useStudioStore.getState().loadExistingCatalog(id);},{url,id:catalogId});
+    const reload = async () => {await page.reload(); await expect.poll(async () => (await storeState(page)).catalogSyncStatus).toBe('ready'); await load();};
+    await load();
+    const before = (await storeState(page)).pages;
+    expect(before).toHaveLength(8);
+    await page.evaluate(async ({url,first,title}) => {
+      const {useStudioStore} = await import(url); const s = useStudioStore.getState();
+      s.updateDocumentText(1,first,'ITENS DE'); s.updateDocumentText(1,title,'PLASWILL'); await s.flushSaveSpread();
+    },{url,first,title});
+    await load();
+    const input = page.getByRole('textbox',{name:'Instrução ou comando para o assistente de design'});
+    await input.fill('altere de ITENS para PRODUTOS'); await input.press('Enter');
+    await expect(page.getByText("Texto da página atualizado para 'PRODUTOS DE'.",{exact:true})).toBeVisible();
+    const text = () => storeState(page).then(s => s.pages[0].documentPage.elements.find((e:{id:string}) => e.id === first).text);
+    expect(await text()).toBe('PRODUTOS DE');
+    await page.evaluate(async url => {const {useStudioStore} = await import(url);const s=useStudioStore.getState();s.undo();await s.flushSaveSpread();},url);
+    expect(await text()).toBe('ITENS DE');
+    await page.evaluate(async url => {const {useStudioStore} = await import(url);const s=useStudioStore.getState();s.redo();await s.flushSaveSpread();},url);
+    expect(await text()).toBe('PRODUTOS DE');
+    await reload();
+    expect(await text()).toBe('PRODUTOS DE');
+    expect((await storeState(page)).messages.some((m:{content:string;executionReceipt?:{status:string};proposal?:unknown}) => m.content.includes("'PRODUTOS DE'") && m.executionReceipt?.status === 'confirmed' && m.proposal)).toBe(true);
+    await input.fill('deixe o negrito destacado de PLASWILL semelhante ao da EMPRESA na segunda página'); await input.press('Enter');
+    const choices = page.getByLabel('Escolher peso tipográfico');
+    await expect(choices).toBeVisible();
+    if (process.env.CATANA_TEST_PDF) await expect(page.getByText(/A referência não informa um peso visual confiável/)).toBeVisible();
+    await choices.getByRole('button',{name:/700/}).click();
+    await expect(page.getByText('Peso do texto atualizado para 700.',{exact:true})).toBeVisible();
+    const titleElement = () => storeState(page).then(s => s.pages[0].documentPage.elements.find((e:{id:string}) => e.id === title));
+    expect((await titleElement()).styleRevision).toEqual({fontWeight:700});
+    const renderedTitle = page.locator('[data-document-page="1"] [style*="font-weight: 700"]').filter({hasText:'PLASWILL'}).first();
+    await expect(renderedTitle).toBeVisible();
+    const fit = await renderedTitle.evaluate(el => {
+      const style = getComputedStyle(el);
+      const context=document.createElement('canvas').getContext('2d')!;
+      context.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      const metrics=context.measureText(el.textContent || ''), baseline=(parseFloat(style.lineHeight)+metrics.fontBoundingBoxAscent-metrics.fontBoundingBoxDescent)/2;
+      return {width:el.clientWidth,height:el.clientHeight,inkWidth:metrics.actualBoundingBoxLeft+metrics.actualBoundingBoxRight,
+        inkTop:baseline-metrics.actualBoundingBoxAscent,inkBottom:baseline+metrics.actualBoundingBoxDescent};
+    });
+    expect(fit.inkWidth, JSON.stringify(fit)).toBeLessThanOrEqual(fit.width + 1);
+    expect(fit.inkTop, JSON.stringify(fit)).toBeGreaterThanOrEqual(-1);
+    expect(fit.inkBottom, JSON.stringify(fit)).toBeLessThanOrEqual(fit.height + 1);
+    await expect(renderedTitle.getByRole('status')).toHaveCount(0);
+    const state = await storeState(page);
+    expect(state.pages.map((p:{id:string})=>p.id)).toEqual(before.map((p:{id:string})=>p.id));
+    expect(state.pages.map((p:{documentPage:{sourceSnapshot:unknown}})=>p.documentPage.sourceSnapshot)).toEqual(before.map((p:{documentPage:{sourceSnapshot:unknown}})=>p.documentPage.sourceSnapshot));
+    await reload();
+    expect((await titleElement()).styleRevision).toEqual({fontWeight:700});
+    const history = (await storeState(page)).historyLength;
+    await input.fill('deixe PLASWILL em negrito'); await input.press('Enter');
+    await expect(page.getByText('O título já possui esse peso tipográfico confirmado. Nenhuma alteração foi necessária.',{exact:true})).toBeVisible();
+    expect((await storeState(page)).historyLength).toBe(history);
+    // Explicit recovery uses retained private bytes and reconciles revisions;
+    // it must never discard the manual copy or the accepted weight.
+    const parseReply = (reply: Record<string,unknown>) => JSON.parse(Buffer.from(String(reply.base64),'base64').toString());
+    const prepared = await bridge.request('POST','/api/v2/studio/catalogs/import-document/',{action:'reanalyze',catalog_id:Number(catalogId),preserve_edits:true});
+    expect(prepared.status).toBe(200);
+    const review = parseReply(prepared);
+    expect(review.report.reanalysis).toMatchObject({preservedTextEdits:2,preservedStyleEdits:1,canConfirm:true,conflicts:[]});
+    const confirmed = await bridge.request('POST','/api/v2/studio/catalogs/import-document/',{action:'confirm_reanalysis',catalog_id:Number(catalogId),import_id:review.import_id,replace_reconstruction:true,preserve_edits:true});
+    expect(confirmed.status).toBe(200);
+    await reload();
+    expect(await text()).toBe('PRODUTOS DE');
+    expect((await titleElement()).styleRevision).toEqual({fontWeight:700});
+    await page.evaluate(async ({url,title}) => {const {useStudioStore} = await import(url);const s=useStudioStore.getState();s.resetDocumentText(1,title);await s.flushSaveSpread();},{url,title});
+    await load(); expect((await titleElement()).styleRevision).toBeUndefined();
+    expect((await storeState(page)).pages).toHaveLength(8);
+    expect(chats).toBe(4);
   } finally {bridge.close();}
 });

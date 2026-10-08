@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState, type CSSProperties } from 'react';
 import type { CatalogPageData } from '../../data/editorialCatalog.mock';
 import type { DocumentElement } from '../../types/documentImport';
-import { isEditableDocumentText, normalizeDocumentPage } from '../../types/documentImport';
+import { effectiveDocumentFontWeight, isEditableDocumentText, normalizeDocumentPage } from '../../types/documentImport';
 import { fitDocumentText } from '../../utils/documentTextFit';
 import { resolveSafeFontFamily } from '../../utils/fontRegistry';
 import { useStudioStore } from '../../store/studioStore';
@@ -42,18 +42,19 @@ export function DocumentPageRenderer({page, interactive = false, original = fals
   const hasCleanLayer = Boolean(document.fallbackSnapshot) && editable.length > 0;
   const showSource = original || page.sourceVisibility === 'source_only' || document.visibility === 'source_only' || !hasCleanLayer;
   const target = document.elements.find(element => element.id === editing);
-  const targetFit = target ? fitDocumentText(text, sourceFont(target.resolvedFont), target.fontSize || 12, target.width * document.width, target.height * document.height, target.fontWeight) : null;
+  const targetFit = target ? fitDocumentText(text, sourceFont(target.resolvedFont), target.fontSize || 12, target.width * document.width, target.height * document.height, effectiveDocumentFontWeight(target)) : null;
   return <div className={`document-page-content relative w-full h-full overflow-hidden bg-white ${className}`} style={{containerType: 'inline-size', ...style}}
     data-render-mode="document" data-document-page={page.pageNumber} data-document-view={original ? 'original' : 'reconstructed'}>
     <ProtectedDocumentImage snapshot={document.sourceSnapshot} alt={`Página ${page.pageNumber} do documento`} className="absolute inset-0 w-full h-full" style={{objectFit: 'fill'}} />
     {!showSource && editable.map(element => {
       const geometry: CSSProperties = {position: 'absolute', left: `${element.x * 100}%`, top: `${element.y * 100}%`, width: `${element.width * 100}%`, height: `${element.height * 100}%`, zIndex: typeof element.zIndex === 'number' ? element.zIndex : 1};
-      if (!element.edited) {
+      if (!element.edited && !element.styleRevision) {
         const appearance = element.appearance;
         return <ProtectedDocumentImage key={element.id} snapshot={(appearance?.asset || element.snapshot)!} alt="" style={{...geometry,
           ...(appearance ? {left: `${appearance.x * 100}%`, top: `${appearance.y * 100}%`, width: `${appearance.width * 100}%`, height: `${appearance.height * 100}%`} : {}), objectFit: 'fill'}} />;
       }
-      const fit = fitDocumentText(element.text ?? element.content ?? '', sourceFont(element.resolvedFont || element.font?.resolved), element.fontSize ?? element.font?.size ?? 12, element.width * document.width, element.height * document.height, element.fontWeight);
+      const weight = effectiveDocumentFontWeight(element);
+      const fit = fitDocumentText(element.text ?? element.content ?? '', sourceFont(element.resolvedFont || element.font?.resolved), element.fontSize ?? element.font?.size ?? 12, element.width * document.width, element.height * document.height, weight);
       const size = fit.size;
       const crop = element.appearance || element;
       return <Fragment key={element.id}>
@@ -61,7 +62,7 @@ export function DocumentPageRenderer({page, interactive = false, original = fals
         <div style={{position: 'absolute', left: `${crop.x * 100}%`, top: `${crop.y * 100}%`, width: `${crop.width * 100}%`, height: `${crop.height * 100}%`, overflow: 'hidden', zIndex: geometry.zIndex}}>
           <ProtectedDocumentImage snapshot={document.fallbackSnapshot!} alt="" style={{position: 'absolute', left: `${-crop.x / crop.width * 100}%`, top: `${-crop.y / crop.height * 100}%`, width: `${100 / crop.width}%`, height: `${100 / crop.height}%`, maxWidth: 'none', objectFit: 'fill'}} />
         </div>
-        <div style={{...geometry, whiteSpace: 'pre-wrap', overflow: 'visible', fontFamily: sourceFont(element.resolvedFont || element.font?.resolved), fontSize: `${Math.max(1, Math.min(500, size)) / document.width * 100}cqw`, fontWeight: typeof element.fontWeight === 'number' ? element.fontWeight : 400, fontStyle: element.fontStyle === 'italic' ? 'italic' : 'normal', lineHeight: 1, color: /^#[a-f0-9]{3,8}$/i.test(element.color || '') ? element.color : '#000000'}}>{element.text ?? element.content ?? ''}{fit.overflow && <span role="status" style={{fontSize: '8px', background: '#fff', color: '#9a3412'}}> Texto excede a caixa de origem</span>}</div>
+        <div style={{...geometry, whiteSpace: 'pre-wrap', overflow: 'visible', fontFamily: sourceFont(element.resolvedFont || element.font?.resolved), fontSize: `${Math.max(1, Math.min(500, size)) / document.width * 100}cqw`, fontWeight: weight, fontStyle: element.fontStyle === 'italic' ? 'italic' : 'normal', lineHeight: 1, color: /^#[a-f0-9]{3,8}$/i.test(element.color || '') ? element.color : '#000000'}}>{element.text ?? element.content ?? ''}{fit.overflow && <span role="status" style={{fontSize: '8px', background: '#fff', color: '#9a3412'}}> Texto excede a caixa de origem</span>}</div>
       </Fragment>;
     })}
     {interactive && !original && !showSource && editable.map(element => <button type="button" key={`edit-${element.id}`} aria-label={`Editar texto: ${(element.provenance?.sourceText || element.text || element.content || '').slice(0, 40)}`}
