@@ -91,7 +91,7 @@ describe('Private analysis and explicit confirmation', () => {
     expect(useStudioStore.getState().pages[0].overlays?.[0].imageUrl).toBe('/media/authorized-sprite.png');
   });
   it('ignores an older CoPilot stream patch and local fallback after the import changes the active document', async () => {
-    useStudioStore.setState({activeCatalogId: '40', hasStartedSession: true, pages: [page()], totalPages: 1, currentSpread: [1, 1], threads: [{id: 'old', title: 'Anterior', mode: 'orchestrator', roleId: 'orchestrator', createdAt: '00:00', messages: []}], activeThreadId: 'old'});
+    useStudioStore.setState({activeCatalogId: '40', saveStatus: 'saved', hasStartedSession: true, pages: [page()], totalPages: 1, currentSpread: [1, 1], threads: [{id: 'old', title: 'Anterior', mode: 'orchestrator', roleId: 'orchestrator', createdAt: '00:00', messages: []}], activeThreadId: 'old'});
     const chunk = deferred<{done: boolean; value?: Uint8Array}>();
     const read = vi.fn().mockReturnValue(chunk.promise); const cancel = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ok: true, body: {getReader: () => ({read, cancel})}}));
@@ -263,7 +263,7 @@ it('does not turn an authoritative quota denial into an offline blank catalog', 
   expect(useStudioStore.getState().hasStartedSession).toBe(false);
 });
 it('does not execute a structured patch from a stream interrupted before done', async () => {
-  useStudioStore.setState({activeCatalogId: '40', hasStartedSession: true, pages: [page()], totalPages: 1, currentSpread: [1, 1], threads: [{id: 'old', title: 'Anterior', mode: 'orchestrator', roleId: 'orchestrator', createdAt: '00:00', messages: []}], activeThreadId: 'old'});
+  useStudioStore.setState({activeCatalogId: '40', saveStatus: 'saved', hasStartedSession: true, pages: [page()], totalPages: 1, currentSpread: [1, 1], threads: [{id: 'old', title: 'Anterior', mode: 'orchestrator', roleId: 'orchestrator', createdAt: '00:00', messages: []}], activeThreadId: 'old'});
   configureAuthProvider('legacy'); setInMemoryAccessToken('test'); setTokenReady(true);
   const read = vi.fn().mockResolvedValueOnce({done: false, value: new TextEncoder().encode('data: {"event":"patch","patch":{"updates":[{"page":1,"title":"Título antigo"}]}}\n')}).mockResolvedValue({done: true});
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ok: true, body: {getReader: () => ({read, cancel: vi.fn()})}}));

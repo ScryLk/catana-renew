@@ -22,7 +22,9 @@ Current flow:
 5. All decisions must allow the patch before a sanitized patch or embedded delta is emitted.
 6. Existing `applySpreadPatch` checks current page IDs and preflights text fit/staleness.
 7. Existing history records one snapshot per batch. Full sequence saves atomically through bulk sync.
-8. Chat success is derived from execution results after persistence; a failed save reports failure.
+8. Bulk save binds the proposal to its message, request and catalog revision. A separate
+   server receipt verifies the persisted values before chat can report success; a failed
+   save reports failure, and actions without an independent verifier stay unverified.
 
 All responses are buffered before delivery to prevent the fallback embedded-patch
 parser receiving unvalidated model JSON. A chat without an owned persisted
@@ -52,6 +54,7 @@ handler exists, not that arbitrary model parameters are accepted.
 | --- | --- | --- | --- | --- | --- | --- |
 | navigate, export_pdf | Non-mutating | Yes | Allowed | Allowed | Allowed | Valid owned target; export opens existing export UI |
 | update_text, update_text_group | Source edit → imported resolver; authored text → editorial policy | Yes | Verified visible text only | Stable field + exact expected text | Verified retained source text | Visibility, staleness, commercial binding |
+| update_text_style | Source edit → imported resolver | Yes | Verified text; separate font-weight revision only | Unsupported | Verified retained source text | Exact text/weight/revision, reliable reference or explicit weight, loaded-font fit |
 | add_page (+ create_page, insert_page aliases) | Structure | Yes | Adds a separate authored page | Same | Same | Bounded position, role, safe copy, assigned UUID/origin |
 | move_page (+ reorder_page alias) | Structure | Added to existing executor | Allowed | Allowed | Allowed | Display position must not rewrite source lineage |
 | duplicate_page | Structure | Added to existing executor | New derived copy | New authored copy | New derived copy | Unique ID, retained evidence, parent lineage |

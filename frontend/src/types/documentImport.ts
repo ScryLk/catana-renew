@@ -28,6 +28,8 @@ export interface DocumentElement {
   fontFamily?: string;
   resolvedFont?: string;
   fontWeight?: number;
+  /** User-approved editing weight; extracted source metadata remains immutable. */
+  styleRevision?: {fontWeight: number};
   fontStyle?: string;
   fontFallback?: boolean;
   sourceFont?: string;
@@ -43,6 +45,10 @@ export interface DocumentElement {
   zIndex?: number;
   provenance?: { sourcePage?: number; sourceElement?: string; sourceText?: string | null; sourceBoundingBox?: number[]; sourceTextHash?: string | null; confidence?: number };
   [key: string]: unknown;
+}
+
+export function effectiveDocumentFontWeight(element: DocumentElement): number {
+  return element.styleRevision?.fontWeight ?? element.fontWeight ?? element.font?.weight ?? 400;
 }
 export interface DocumentPageIR {
   pageNumber: number;

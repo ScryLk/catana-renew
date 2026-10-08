@@ -4,17 +4,29 @@ export function fitDocumentText(text: string, family: string, size: number, widt
   if (!context) return {size, overflow: true};
   const fits = (candidate: number) => {
     context.font = `${weight} ${candidate}px ${family}`;
-    let lines = 0;
+    const lines: string[] = [];
     for (const paragraph of text.split('\n')) {
       let current = '';
-      lines += 1;
       for (const word of paragraph.split(/(\s+)/)) {
         if (context.measureText(word).width > width) return false;
-        if (current && context.measureText(current + word).width > width) {lines += 1; current = word.trimStart();}
+        if (current && context.measureText(current + word).width > width) {lines.push(current); current = word.trimStart();}
         else current += word;
       }
+      lines.push(current);
     }
-    return lines * candidate <= height;
+    if (lines.length * candidate > height) return false;
+    // CSS line-height:1 uses the font baseline, while scrollHeight includes
+    // unused ascenders/descenders. Check the ink actually painted by each line
+    // so visible glyphs cannot exceed the box or be hidden by clipping.
+    return lines.every((line, index) => {
+      const metrics = context.measureText(line);
+      const bounds = [metrics.fontBoundingBoxAscent, metrics.fontBoundingBoxDescent,
+        metrics.actualBoundingBoxAscent, metrics.actualBoundingBoxDescent];
+      if (!line || !bounds.every(Number.isFinite)) return true;
+      const baseline = (candidate + metrics.fontBoundingBoxAscent - metrics.fontBoundingBoxDescent) / 2;
+      return index * candidate + baseline - metrics.actualBoundingBoxAscent >= -.01
+        && index * candidate + baseline + metrics.actualBoundingBoxDescent <= height + .01;
+    });
   };
   const minimum = Math.min(size, Math.max(6, size * .5));
   let candidate = size;

@@ -66,6 +66,7 @@ MESSAGES = {
     "invalid_structure": "Não foi possível aplicar a alteração estrutural solicitada.",
     "stale_target": "O catálogo mudou; revise a proposta novamente.",
     "cross_tenant_target": "O catálogo não está disponível para edição.",
+    "unchanged": "O texto já possui esse peso tipográfico confirmado; nenhuma alteração foi necessária.",
 }
 logger = logging.getLogger(__name__)
 
@@ -247,6 +248,8 @@ class ActionPolicyRouter:
             and page
             and origin(page, self.catalog) == "catana_authored"
         ):
+            if name == "update_text_style":
+                return self.decision(name, "unsupported_action")
             code = self.validate_editorial_text(action)
             decision = self.decision(
                 name, code, action, category="catana_editorial_content"
@@ -308,19 +311,44 @@ class ActionPolicyRouter:
     def validate_source_element_edit(self, a):
         if self.entries is None:
             self.entries, _ = catalog_index(
-                self.catalog, self.context.get("spread_index", 0)
+                self.catalog, self.context.get("spread_index", 0), self.context.get('selected_element_id'),
+                search_texts=self.context.get('source_search_texts')
             )
         entry = next((e for e in self.entries if e["target"] == a["target"]), None)
         if not entry:
             return "source_target_not_editable"
         if (
             entry.get("commercial")
+            or a['action'] == 'update_text_style' and entry.get('role') in ('logo', 'logotype', 'brand_logo')
             or isinstance(a["params"].get("replacement", a["params"].get("text")), str)
             and protected_text(
                 a["params"].get("replacement", a["params"].get("text", ""))
             )
         ):
             return "commercial_integrity_blocked"
+        if entry.get('editable') is not True:
+            return 'source_target_not_editable'
+        if a['action'] == 'update_text_style':
+            current_weight = entry.get('effectiveFontWeight', entry.get('fontWeight'))
+            if (a['params'].get('expectedText') != entry['text']
+                    or a['params'].get('expectedFontWeight') != current_weight):
+                return 'stale_target'
+            if 'user_message' in self.context:
+                # A model proposal cannot turn an uncertain reference into an
+                # invented weight, or bypass a stale explicit choice.
+                from api.ai.style_commands import plan_text_style
+                from api.services.document_reconstructor import DocumentReconstructorService
+                fresh_context = {**self.context, 'editable_text_index': self.entries,
+                    'catalog_id': self.catalog.pk,
+                    'catalog_revision': DocumentReconstructorService.reconstruction_revision(self.catalog)}
+                planned = plan_text_style(self.context['user_message'], fresh_context)
+                if planned is None:
+                    return 'unsupported_action'
+                if not planned[1]['actions']:
+                    return planned[1]['planner_status']
+                intent = planned[1]['actions'][0]
+                if intent['target'] != a['target'] or intent['params'] != a['params']:
+                    return 'invalid_action'
         patch = validate_patch({"actions": [a]}, self.entries)
         if not patch:
             return (
@@ -329,6 +357,9 @@ class ActionPolicyRouter:
                 else "invalid_action"
             )
         a.update(patch["actions"][0])
+        if (a['action'] == 'update_text_style' and entry.get('fontWeightReliable') is True
+                and a['params']['fontWeight'] == current_weight):
+            return 'unchanged'
         return "allowed"
 
     def validate_catalog_structure(self, a):
@@ -667,6 +698,7 @@ class ActionPolicyRouter:
             if not d.allowed or d.sanitizedAction["action"] not in {
                 "update_text",
                 "update_text_group",
+                "update_text_style",
             }:
                 continue
             action = d.sanitizedAction

@@ -15,6 +15,10 @@
     "category": "source_element_edit",
     "executor": true
   },
+  "update_text_style": {
+    "category": "source_element_edit",
+    "executor": true
+  },
   "add_page": {
     "category": "catalog_structure",
     "executor": true

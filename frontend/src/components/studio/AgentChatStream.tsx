@@ -17,6 +17,7 @@ import { useStudioStore, type ChatMessage, type ChatDelegation } from '../../sto
 import { toast } from 'sonner';
 import { ConfirmStudioAction } from './ConfirmStudioAction';
 import { UpdateDocumentEditability } from './UpdateDocumentEditability';
+import { TextStyleChoices } from './TextStyleChoices';
 
 interface TypewriterTextProps {
   text: string;
@@ -464,6 +465,7 @@ export const AgentChatStream: React.FC = () => {
 
                 {typeof msg.providerMetadata?.confirmation_token === 'string' && <ConfirmStudioAction key={`${useStudioStore.getState().activeCatalogId}:${msg.id}`} token={msg.providerMetadata.confirmation_token} />}
                 {msg.providerMetadata?.planner_status === 'reanalyze_required' && <UpdateDocumentEditability />}
+                {Array.isArray(msg.providerMetadata?.style_choices) && <TextStyleChoices key={`${useStudioStore.getState().activeCatalogId}:${msg.id}`} choices={msg.providerMetadata.style_choices} />}
 
                 {/* Sub-itens de acoes adicionais caso haja instrucoes multiplas pontuais */}
                 {msg.actions && msg.actions.length > 1 && !msg.actions.every((act) => parsed.actionText.includes(act)) && (
